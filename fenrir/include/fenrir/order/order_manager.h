@@ -11,6 +11,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 
 namespace fenrir::order {
 
@@ -49,6 +50,10 @@ public:
                                        bifrost::protocol::TimeInForce::Value tif,
                                        double price,
                                        double quantity);
+
+    // Called by FenrirApp to measure MD-to-order latency. Set before strategy callbacks.
+    // Invoked synchronously inside place_order on success, before returning to the caller.
+    std::function<void(uint64_t order_id)> on_order_placed;
 
     // Direct access to the underlying gateway — use sparingly (prefer the methods above).
     // Provided for legacy strategies not yet migrated to OrderManager.

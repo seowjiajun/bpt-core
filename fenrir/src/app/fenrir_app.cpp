@@ -175,17 +175,26 @@ void FenrirApp::wire_callbacks() {
                              tick.askPrice());
             }
             metrics_.md_ticks_total->Increment();
-            if (!trading_paused_)
+            if (!trading_paused_) {
+                curr_tick_ts_ns_ = tick.timestampNs();
                 strategy_->on_bbo(tick);
+                tick_lat_hist_.record(ygg::util::TscClock::now_epoch_ns() - curr_tick_ts_ns_);
+            }
         };
         md_client_->on_trade = [this](const bifrost::protocol::MdTrade& tick) {
             metrics_.md_ticks_total->Increment();
-            if (!trading_paused_)
+            if (!trading_paused_) {
+                curr_tick_ts_ns_ = tick.timestampNs();
                 strategy_->on_trade(tick);
+                tick_lat_hist_.record(ygg::util::TscClock::now_epoch_ns() - curr_tick_ts_ns_);
+            }
         };
         md_client_->on_order_book = [this](const bifrost::protocol::MdOrderBook& book) {
-            if (!trading_paused_)
+            if (!trading_paused_) {
+                curr_tick_ts_ns_ = book.timestampNs();
                 strategy_->on_order_book(book);
+                tick_lat_hist_.record(ygg::util::TscClock::now_epoch_ns() - curr_tick_ts_ns_);
+            }
         };
     }
 
@@ -202,6 +211,12 @@ void FenrirApp::wire_callbacks() {
                          underlying_count,
                          point_count);
             surtr_ready_ = true;
+        };
+    }
+
+    if (order_mgr_) {
+        order_mgr_->on_order_placed = [this](uint64_t /*order_id*/) {
+            order_lat_hist_.record(ygg::util::TscClock::now_epoch_ns() - curr_tick_ts_ns_);
         };
     }
 
@@ -312,8 +327,10 @@ void FenrirApp::run() {
             break;
         }
 
-        if (strategy_started_)
+        if (strategy_started_) {
             check_service_liveness();
+            report_latency_stats();
+        }
 
         if (frags == 0)
             std::this_thread::sleep_for(10us);
@@ -366,6 +383,51 @@ void FenrirApp::check_service_liveness() {
         trading_paused_ = false;
         metrics_.trading_paused->Set(0.0);
         spdlog::info("[Fenrir] Trading RESUMED — all service heartbeats healthy");
+    }
+}
+
+void FenrirApp::report_latency_stats() {
+    constexpr uint64_t kReportIntervalNs = 30'000'000'000ULL;  // 30 s
+
+    const uint64_t now = ygg::util::TscClock::now_epoch_ns();
+    if (now - last_lat_report_ns_ < kReportIntervalNs)
+        return;
+    last_lat_report_ns_ = now;
+
+    auto tick = tick_lat_hist_.snapshot_and_reset();
+    auto ord  = order_lat_hist_.snapshot_and_reset();
+
+    if (tick.total == 0) {
+        spdlog::info("[Latency] No MD ticks processed in last 30s");
+        return;
+    }
+
+    // T0 = huginn TSC at wire receipt; T3 = fenrir TSC after strategy returns.
+    // Both services calibrate TscClock independently — cross-process skew is
+    // typically <1µs on a single host with invariant TSC, so delta is valid.
+    spdlog::info(
+        "[Latency] MD tick→strategy (T0→T3): n={} "
+        "p50={:.1f}µs p90={:.1f}µs p99={:.1f}µs p99.9={:.1f}µs max={:.1f}µs mean={:.1f}µs",
+        tick.total,
+        tick.percentile_ns(0.50) / 1e3,
+        tick.percentile_ns(0.90) / 1e3,
+        tick.percentile_ns(0.99) / 1e3,
+        tick.percentile_ns(0.999) / 1e3,
+        tick.max_ns() / 1e3,
+        tick.mean_ns() / 1e3);
+
+    if (ord.total > 0) {
+        spdlog::info(
+            "[Latency] MD tick→order placed (T0→T3 w/order): n={} "
+            "p50={:.1f}µs p90={:.1f}µs p99={:.1f}µs max={:.1f}µs mean={:.1f}µs",
+            ord.total,
+            ord.percentile_ns(0.50) / 1e3,
+            ord.percentile_ns(0.90) / 1e3,
+            ord.percentile_ns(0.99) / 1e3,
+            ord.max_ns() / 1e3,
+            ord.mean_ns() / 1e3);
+    } else {
+        spdlog::info("[Latency] No orders placed in last 30s");
     }
 }
 

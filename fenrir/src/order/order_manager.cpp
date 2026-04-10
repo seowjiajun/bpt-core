@@ -75,6 +75,9 @@ uint64_t OrderManager::place_order(uint64_t instrument_id,
                             inst->symbol))
         return 0;
 
+    if (on_order_placed)
+        on_order_placed(order_id);
+
     return order_id;
 }
 
