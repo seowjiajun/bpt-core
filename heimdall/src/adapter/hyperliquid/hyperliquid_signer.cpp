@@ -1,9 +1,10 @@
 #include "heimdall/adapter/hyperliquid/hyperliquid_signer.h"
 
-#include <openssl/ec.h>
+#include <openssl/bn.h>
+#include <openssl/core_names.h>
 #include <openssl/ecdsa.h>
 #include <openssl/evp.h>
-#include <openssl/obj_mac.h>
+#include <openssl/param_build.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -161,33 +162,55 @@ std::array<uint8_t, 32> HyperliquidSigner::keccak256(const uint8_t* data, std::s
 }
 
 SignedTransaction HyperliquidSigner::ecdsa_sign(const std::array<uint8_t, 32>& hash) const {
-    // Create secp256k1 key from raw bytes
-    EC_KEY* ec_key = EC_KEY_new_by_curve_name(NID_secp256k1);
-    if (!ec_key) throw std::runtime_error("EC_KEY_new_by_curve_name failed");
-
+    // Build secp256k1 private key using the OpenSSL 3.0 EVP_PKEY API.
     BIGNUM* priv_bn = BN_bin2bn(key_.data(), 32, nullptr);
-    if (!priv_bn) {
-        EC_KEY_free(ec_key);
-        throw std::runtime_error("BN_bin2bn failed");
-    }
+    if (!priv_bn) throw std::runtime_error("BN_bin2bn failed");
 
-    if (!EC_KEY_set_private_key(ec_key, priv_bn)) {
-        BN_free(priv_bn);
-        EC_KEY_free(ec_key);
-        throw std::runtime_error("EC_KEY_set_private_key failed");
-    }
-
-    // Compute public key from private key
-    const EC_GROUP* group = EC_KEY_get0_group(ec_key);
-    EC_POINT* pub = EC_POINT_new(group);
-    EC_POINT_mul(group, pub, priv_bn, nullptr, nullptr, nullptr);
-    EC_KEY_set_public_key(ec_key, pub);
-    EC_POINT_free(pub);
+    OSSL_PARAM_BLD* bld = OSSL_PARAM_BLD_new();
+    if (!bld) { BN_free(priv_bn); throw std::runtime_error("OSSL_PARAM_BLD_new failed"); }
+    OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, "secp256k1", 0);
+    OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, priv_bn);
+    OSSL_PARAM* params = OSSL_PARAM_BLD_to_param(bld);
+    OSSL_PARAM_BLD_free(bld);
     BN_free(priv_bn);
+    if (!params) throw std::runtime_error("OSSL_PARAM_BLD_to_param failed");
 
-    ECDSA_SIG* sig = ECDSA_do_sign(hash.data(), static_cast<int>(hash.size()), ec_key);
-    EC_KEY_free(ec_key);
-    if (!sig) throw std::runtime_error("ECDSA_do_sign failed");
+    EVP_PKEY_CTX* kctx = EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr);
+    if (!kctx) { OSSL_PARAM_free(params); throw std::runtime_error("EVP_PKEY_CTX_new_from_name failed"); }
+    if (EVP_PKEY_fromdata_init(kctx) <= 0) {
+        EVP_PKEY_CTX_free(kctx); OSSL_PARAM_free(params);
+        throw std::runtime_error("EVP_PKEY_fromdata_init failed");
+    }
+    EVP_PKEY* pkey = nullptr;
+    if (EVP_PKEY_fromdata(kctx, &pkey, EVP_PKEY_KEYPAIR, params) <= 0) {
+        EVP_PKEY_CTX_free(kctx); OSSL_PARAM_free(params);
+        throw std::runtime_error("EVP_PKEY_fromdata failed");
+    }
+    EVP_PKEY_CTX_free(kctx);
+    OSSL_PARAM_free(params);
+
+    // Sign the pre-hashed digest — produces a DER-encoded ECDSA signature.
+    EVP_PKEY_CTX* sctx = EVP_PKEY_CTX_new(pkey, nullptr);
+    if (!sctx) { EVP_PKEY_free(pkey); throw std::runtime_error("EVP_PKEY_CTX_new failed"); }
+    if (EVP_PKEY_sign_init(sctx) <= 0) {
+        EVP_PKEY_CTX_free(sctx); EVP_PKEY_free(pkey);
+        throw std::runtime_error("EVP_PKEY_sign_init failed");
+    }
+
+    std::size_t sig_len = 0;
+    EVP_PKEY_sign(sctx, nullptr, &sig_len, hash.data(), hash.size());
+    std::vector<uint8_t> sig_der(sig_len);
+    if (EVP_PKEY_sign(sctx, sig_der.data(), &sig_len, hash.data(), hash.size()) <= 0) {
+        EVP_PKEY_CTX_free(sctx); EVP_PKEY_free(pkey);
+        throw std::runtime_error("EVP_PKEY_sign failed");
+    }
+    EVP_PKEY_CTX_free(sctx);
+    EVP_PKEY_free(pkey);
+
+    // Decode DER to extract r and s.
+    const uint8_t* p = sig_der.data();
+    ECDSA_SIG* sig = d2i_ECDSA_SIG(nullptr, &p, static_cast<long>(sig_len));
+    if (!sig) throw std::runtime_error("d2i_ECDSA_SIG failed");
 
     const BIGNUM* r_bn;
     const BIGNUM* s_bn;
@@ -196,19 +219,13 @@ SignedTransaction HyperliquidSigner::ecdsa_sign(const std::array<uint8_t, 32>& h
     SignedTransaction tx;
     tx.nonce = nonce_;
 
-    // Pad r and s to 32 bytes
     uint8_t r_bytes[32] = {};
     uint8_t s_bytes[32] = {};
-    int r_len = BN_num_bytes(r_bn);
-    int s_len = BN_num_bytes(s_bn);
-    BN_bn2bin(r_bn, r_bytes + (32 - r_len));
-    BN_bn2bin(s_bn, s_bytes + (32 - s_len));
+    BN_bn2bin(r_bn, r_bytes + (32 - BN_num_bytes(r_bn)));
+    BN_bn2bin(s_bn, s_bytes + (32 - BN_num_bytes(s_bn)));
 
     tx.r = bytes_to_hex(r_bytes, 32);
     tx.s = bytes_to_hex(s_bytes, 32);
-
-    // Recover v (0 or 1) — HL uses v = 27 + recovery_id convention
-    // We try both and pick the one that verifies
     tx.v = 27;  // Hyperliquid expects v in {27, 28}
 
     ECDSA_SIG_free(sig);
