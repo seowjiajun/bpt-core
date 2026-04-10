@@ -36,7 +36,10 @@ static constexpr double kScale = 1e8;
 HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cfg,
                                                  const ExchangeCredentials& creds)
     : OrderAdapterBase(cfg), wallet_address_(creds.wallet_address) {
-    parser_.on_exec_event = [this](const ExecEvent& ev) { exec_queue_.try_push(ev); };
+    parser_.on_exec_event = [this](const ExecEvent& ev) {
+        if (!exec_queue_.try_push(ev))
+            spdlog::error("[Hyperliquid] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
+    };
 
     if (creds.private_key.empty()) {
         enabled_ = false;

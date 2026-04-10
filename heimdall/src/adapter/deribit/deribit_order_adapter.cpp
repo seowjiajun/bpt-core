@@ -44,7 +44,10 @@ DeribitOrderAdapter::DeribitOrderAdapter(const config::AdapterConfig& cfg,
     std::snprintf(buf, sizeof(buf), "%08x", epoch_s);
     session_prefix_ = std::string(buf, 8);
 
-    parser_.on_exec_event = [this](const ExecEvent& ev) { exec_queue_.try_push(ev); };
+    parser_.on_exec_event = [this](const ExecEvent& ev) {
+        if (!exec_queue_.try_push(ev))
+            spdlog::error("[Deribit] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
+    };
 }
 
 std::string DeribitOrderAdapter::build_auth_msg() {
@@ -294,7 +297,8 @@ void DeribitOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& orde
         rej.order_type = order.orderType();
         rej.status = bifrost::protocol::ExecStatus::REJECTED;
         rej.reject_reason = bifrost::protocol::RejectReason::EXCHANGE_ERROR;
-        exec_queue_.try_push(rej);
+        if (!exec_queue_.try_push(rej))
+            spdlog::error("[Deribit] exec_queue full — dropped rejection order_id={}", rej.order_id);
     };
 
     std::lock_guard<std::mutex> lk(send_mu_);

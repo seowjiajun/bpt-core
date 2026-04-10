@@ -66,7 +66,10 @@ static bifrost::protocol::FeeCurrency::Value parse_fee_currency(const std::strin
 BinanceOrderAdapter::BinanceOrderAdapter(const config::AdapterConfig& cfg,
                                          const ExchangeCredentials& creds)
     : OrderAdapterBase(cfg), api_key_(creds.api_key), secret_key_(creds.secret_key) {
-    parser_.on_exec_event = [this](const ExecEvent& ev) { exec_queue_.try_push(ev); };
+    parser_.on_exec_event = [this](const ExecEvent& ev) {
+        if (!exec_queue_.try_push(ev))
+            spdlog::error("[Binance] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
+    };
 }
 
 std::string BinanceOrderAdapter::sign_query(const std::string& params) const {
@@ -311,7 +314,8 @@ void BinanceOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& orde
             rej.order_type = order.orderType();
             rej.status = ES::REJECTED;
             rej.reject_reason = RR::EXCHANGE_ERROR;
-            exec_queue_.try_push(rej);
+            if (!exec_queue_.try_push(rej))
+                spdlog::error("[Binance] exec_queue full — dropped rejection order_id={}", rej.order_id);
             return;
         }
 
@@ -361,7 +365,8 @@ void BinanceOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& orde
             ev.reject_reason = RR::EXCHANGE_ERROR;
         }
 
-        exec_queue_.try_push(ev);
+        if (!exec_queue_.try_push(ev))
+            spdlog::error("[Binance] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
 
     } catch (const std::exception& e) {
         spdlog::error("[Heimdall] BinanceOrderAdapter: send_new_order failed: {}", e.what());
@@ -380,7 +385,8 @@ void BinanceOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& orde
         rej.order_type = order.orderType();
         rej.status = bifrost::protocol::ExecStatus::REJECTED;
         rej.reject_reason = bifrost::protocol::RejectReason::EXCHANGE_ERROR;
-        exec_queue_.try_push(rej);
+        if (!exec_queue_.try_push(rej))
+            spdlog::error("[Binance] exec_queue full — dropped rejection order_id={}", rej.order_id);
     }
 }
 
