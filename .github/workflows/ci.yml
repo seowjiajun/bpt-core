@@ -22,7 +22,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      # ── Restore all caches before any installation step ───────────────────
+      # vcpkg installation itself — skip clone+bootstrap on hit.
+      # Bump the key suffix (v1 → v2 etc.) to force a fresh vcpkg when needed.
+      - name: Restore vcpkg
+        uses: actions/cache@v4
+        id: vcpkg-cache
+        with:
+          path: ${{ env.VCPKG_ROOT }}
+          key: vcpkg-${{ runner.os }}-v1
+
+      # Compiled vcpkg package archives — keyed on vcpkg.json so a dep change
+      # triggers a full rebuild of only the changed packages.
+      - name: Restore vcpkg binary packages
+        uses: actions/cache@v4
+        id: vcpkg-pkgs-cache
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-pkgs-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-pkgs-${{ runner.os }}-
+
+      # Aeron + fast_float FetchContent — source + compiled artifacts.
+      # Keyed on CMakeLists.txt so a version bump triggers a fresh fetch.
+      - name: Restore FetchContent (Aeron + fast_float)
+        uses: actions/cache@v4
+        id: deps-cache
+        with:
+          path: build/_deps
+          key: cmake-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: cmake-deps-${{ runner.os }}-
+
+      # ── System packages ───────────────────────────────────────────────────
+      - name: Install apt dependencies
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends \
@@ -31,35 +62,25 @@ jobs:
             libssl-dev pkg-config \
             curl wget
 
-          # Apache Arrow 16.x — matches the local dev version from conda.
-          # Using the official Apache Arrow apt repo for ubuntu noble (24.04).
+      # Arrow 16.x from the official Apache apt repo — matches local conda version.
+      - name: Install Arrow & Parquet
+        run: |
           wget -q https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
           sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
           sudo apt-get update -q
           sudo apt-get install -y libarrow-dev libparquet-dev
 
+      # ── vcpkg ─────────────────────────────────────────────────────────────
       - name: Bootstrap vcpkg
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT" --depth 1
           "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
 
-      - name: Restore vcpkg binary cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: vcpkg-${{ runner.os }}-
-
       - name: Create vcpkg binary cache dir
         run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
 
-      - name: Restore CMake FetchContent cache
-        uses: actions/cache@v4
-        with:
-          path: build/_deps
-          key: cmake-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
-          restore-keys: cmake-deps-${{ runner.os }}-
-
+      # ── CMake ─────────────────────────────────────────────────────────────
       - name: Configure
         run: |
           cmake -B build -G Ninja \
@@ -67,6 +88,23 @@ jobs:
             -DCMAKE_C_COMPILER=gcc-13 \
             -DCMAKE_CXX_COMPILER=g++-13 \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+      # Save caches immediately after configure — before build can fail.
+      # actions/cache/save is a no-op if the key already exists, so safe to
+      # call unconditionally alongside the restore steps above.
+      - name: Save vcpkg binary packages
+        uses: actions/cache/save@v4
+        if: always() && steps.vcpkg-pkgs-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-pkgs-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Save FetchContent (Aeron + fast_float)
+        uses: actions/cache/save@v4
+        if: always() && steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: build/_deps
+          key: cmake-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Build
         run: cmake --build build -j$(nproc)
@@ -88,6 +126,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # Gradle dependency cache — setup-gradle handles this automatically.
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@v3
 
