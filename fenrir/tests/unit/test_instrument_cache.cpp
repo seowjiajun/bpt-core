@@ -54,12 +54,13 @@ std::vector<char> make_snapshot(uint64_t correlation_id,
     return buf;
 }
 
-std::vector<char> make_delta(uint64_t instrument_id, const char* symbol, DeltaUpdateType::Value update_type) {
+std::vector<char> make_delta(uint64_t instrument_id, const char* symbol, DeltaUpdateType::Value update_type,
+                            uint64_t seq = 2) {
     constexpr std::size_t kSize = MessageHeader::encodedLength() + RefDataDelta::sbeBlockLength();
     std::vector<char> buf(kSize, '\0');
     RefDataDelta msg;
     msg.wrapAndApplyHeader(buf.data(), 0, kSize)
-        .deltaSeqNum(1)
+        .deltaSeqNum(seq)
         .timestampNs(0)
         .updateType(update_type)
         .instrumentId(instrument_id)

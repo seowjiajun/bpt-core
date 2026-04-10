@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -90,7 +91,10 @@ protected:
     fs::path cache_dir_;
 
     void SetUp() override {
-        cache_dir_ = fs::temp_directory_path() / "jormungandr_dl_test";
+        // Include PID so concurrent gtest_discover_tests processes don't share
+        // the same directory and race on SetUp/TearDown.
+        cache_dir_ = fs::temp_directory_path() /
+                     ("jormungandr_dl_test_" + std::to_string(getpid()));
         fs::remove_all(cache_dir_);
         fs::create_directories(cache_dir_);
     }
