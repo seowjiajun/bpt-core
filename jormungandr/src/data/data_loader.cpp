@@ -41,14 +41,20 @@ static std::shared_ptr<arrow::Table> read_parquet_table(const std::string& path)
         throw std::runtime_error("Failed to open Parquet file: " + path + " — " +
                                  result.status().ToString());
 
-    std::unique_ptr<parquet::arrow::FileReader> reader;
-    auto status = parquet::arrow::OpenFile(*result, arrow::default_memory_pool(), &reader);
-    if (!status.ok())
+    parquet::arrow::FileReaderBuilder builder;
+    auto open_status = builder.Open(*result);
+    if (!open_status.ok())
         throw std::runtime_error("Failed to open Parquet reader: " + path + " — " +
-                                 status.ToString());
+                                 open_status.ToString());
+
+    std::unique_ptr<parquet::arrow::FileReader> reader;
+    auto build_status = builder.Build(&reader);
+    if (!build_status.ok())
+        throw std::runtime_error("Failed to build Parquet reader: " + path + " — " +
+                                 build_status.ToString());
 
     std::shared_ptr<arrow::Table> table;
-    status = reader->ReadTable(&table);
+    auto status = reader->ReadTable(&table);
     if (!status.ok())
         throw std::runtime_error("Failed to read Parquet table: " + path + " — " +
                                  status.ToString());
