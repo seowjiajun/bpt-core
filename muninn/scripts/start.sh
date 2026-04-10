@@ -7,7 +7,12 @@ SERVICE=muninn
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
 CONFIG="${1:-$PROJECT_DIR/config/muninn.qa-okx.toml}"
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
-BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
+# Prefer installed binary (deployed mode); fall back to CMake build dir (dev mode).
+if [ -f "$PROJECT_DIR/bin/$SERVICE" ]; then
+    BINARY="$PROJECT_DIR/bin/$SERVICE"
+else
+    BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
+fi
 READY_PATTERN="\[Muninn\] Ready"
 
 # ── Guard against double-start ────────────────────────────────────

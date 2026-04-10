@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+jobs:
+  package:
+    name: Build & publish release package
+    runs-on: ubuntu-24.04
+
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Restore caches (same keys as ci.yml) ─────────────────────
+      - name: Restore vcpkg
+        uses: actions/cache@v4
+        id: vcpkg-cache
+        with:
+          path: ${{ env.VCPKG_ROOT }}
+          key: vcpkg-${{ runner.os }}-v1
+
+      - name: Restore vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-pkgs-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-pkgs-${{ runner.os }}-
+
+      - name: Restore FetchContent (Aeron + fast_float)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: cmake-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: cmake-deps-${{ runner.os }}-
+
+      # ── System packages ───────────────────────────────────────────
+      - name: Install apt dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            gcc-13 g++-13 \
+            libssl-dev pkg-config \
+            curl wget
+
+      - name: Install Arrow & Parquet
+        run: |
+          wget -q https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get install -y ./apache-arrow-apt-source-latest-noble.deb
+          sudo apt-get update -q
+          sudo apt-get install -y libarrow-dev libparquet-dev
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
+      # ── vcpkg ─────────────────────────────────────────────────────
+      - name: Bootstrap vcpkg
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT" --depth 1
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Create vcpkg binary cache dir
+        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      # ── Package ───────────────────────────────────────────────────
+      - name: Build release package
+        env:
+          CC: gcc-13
+          CXX: g++-13
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          bash scripts/package.sh \
+            --version "$VERSION" \
+            --build-dir "${{ github.workspace }}/build-release" \
+            --out-dir   "${{ github.workspace }}/dist"
+
+      # ── Publish ───────────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true

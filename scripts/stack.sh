@@ -14,7 +14,7 @@ set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-BIFROST_DIR="$STACK_DIR/bifrost-fabric"
+BIFROST_DIR="$STACK_DIR/bifrost/fabric"
 MUNINN_DIR="$STACK_DIR/muninn"
 HUGINN_DIR="$STACK_DIR/huginn"
 HEIMDALL_DIR="$STACK_DIR/heimdall"

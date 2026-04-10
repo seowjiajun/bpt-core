@@ -3,27 +3,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SERVICE=fenrir
-PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
-CONFIG="${1:-$PROJECT_DIR/config/momentum.yaml}"
-# Resolve to absolute path before cd'ing to PROJECT_DIR (caller may pass a relative path)
-if [[ "$CONFIG" != /* ]]; then
-    CONFIG="$(pwd)/$CONFIG"
-fi
-LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
+SERVICE=surtr_app
+DISPLAY_NAME=surtr
+PID_FILE="$PROJECT_DIR/.$DISPLAY_NAME.pid"
+CONFIG="${1:-$PROJECT_DIR/config/surtr.qa-okx.toml}"
+LOG_FILE="$PROJECT_DIR/logs/$DISPLAY_NAME.log"
+READY_PATTERN="Starting Surtr Volatility Surface Service"
+
 # Prefer installed binary (deployed mode); fall back to CMake build dir (dev mode).
-if [ -f "$PROJECT_DIR/bin/$SERVICE" ]; then
-    BINARY="$PROJECT_DIR/bin/$SERVICE"
+if [ -f "$PROJECT_DIR/bin/$DISPLAY_NAME" ]; then
+    BINARY="$PROJECT_DIR/bin/$DISPLAY_NAME"
 else
-    BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
+    BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$DISPLAY_NAME/src/$SERVICE"
 fi
-READY_PATTERN="Polling\.\.\. waiting for RefDataReady"
 
 # ── Guard against double-start ────────────────────────────────────
 if [ -f "$PID_FILE" ]; then
     EXISTING_PID=$(cat "$PID_FILE")
     if kill -0 "$EXISTING_PID" 2>/dev/null; then
-        echo "$SERVICE is already running (PID $EXISTING_PID)."
+        echo "$DISPLAY_NAME is already running (PID $EXISTING_PID)."
         echo "Run ./scripts/stop.sh to stop it first."
         exit 1
     else
@@ -35,14 +33,16 @@ fi
 # ── Check binary ──────────────────────────────────────────────────
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: Binary not found: $BINARY"
-    echo "Run: cd $PROJECT_DIR && ./build.sh"
+    echo "Run: cmake --build build --target surtr_app"
     exit 1
 fi
+
+mkdir -p "$PROJECT_DIR/logs"
 
 # ── Truncate log so startup polling is clean ──────────────────────
 > "$LOG_FILE"
 
-echo "Starting $SERVICE..."
+echo "Starting $DISPLAY_NAME..."
 echo "  Config : $CONFIG"
 echo "  Log    : $LOG_FILE"
 
@@ -58,7 +58,7 @@ started=false
 
 while [ "$elapsed" -lt "$MAX_WAIT" ]; do
     if ! kill -0 "$PID" 2>/dev/null; then
-        echo "ERROR: $SERVICE exited early. Check $LOG_FILE for details."
+        echo "ERROR: $DISPLAY_NAME exited early. Check $LOG_FILE for details."
         rm -f "$PID_FILE"
         exit 1
     fi
@@ -71,10 +71,10 @@ while [ "$elapsed" -lt "$MAX_WAIT" ]; do
 done
 
 if [ "$started" = true ]; then
-    echo "$SERVICE started (PID $PID)."
+    echo "$DISPLAY_NAME started (PID $PID)."
     echo "  Tail logs : tail -f $LOG_FILE"
     echo "  Stop      : ./scripts/stop.sh"
 else
-    echo "WARNING: $SERVICE did not confirm startup within ${MAX_WAIT}s (PID $PID)."
+    echo "WARNING: $DISPLAY_NAME did not confirm startup within ${MAX_WAIT}s (PID $PID)."
     echo "  Check: tail -f $LOG_FILE"
 fi
