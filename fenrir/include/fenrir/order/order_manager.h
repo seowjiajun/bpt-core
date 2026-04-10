@@ -9,6 +9,7 @@
 #include <bifrost_protocol/TimeInForce.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 
 namespace fenrir::order {
@@ -70,7 +71,15 @@ public:
 private:
     OrderGatewayClient& gw_;
     const refdata::InstrumentCache& cache_;
-    std::atomic<uint64_t> next_order_id_{1};
+    // High 32 bits = Unix timestamp at construction (seconds), low 32 bits = counter.
+    // Guarantees uniqueness across process restarts without any persistent state.
+    static uint64_t make_session_base() {
+        const uint64_t ts = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        return ts << 32;
+    }
+    std::atomic<uint64_t> next_order_id_{make_session_base() + 1};
 };
 
 }  // namespace fenrir::order

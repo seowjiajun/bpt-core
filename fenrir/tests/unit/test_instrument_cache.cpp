@@ -15,7 +15,7 @@
 namespace {
 
 using namespace bifrost::protocol;
-using namespace fenrir::refdata;
+using fenrir::refdata::InstrumentCache;
 
 // ---------------------------------------------------------------------------
 // Helpers to encode snapshot / delta buffers

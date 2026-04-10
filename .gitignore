@@ -1,0 +1,47 @@
+# Build output
+build/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Runtime artifacts
+*.pid
+.*.pid
+logs/
+*.log
+
+# vcpkg (bootstrapped at build time, not checked in)
+vcpkg/
+
+# Secrets / local env
+.env
+*.env
+.bpt-secrets/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (data-forge)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+dist/
+*.egg-info/
+
+# Java (bifrost-fabric)
+bifrost/fabric/.gradle/
+bifrost/fabric/build/
+bifrost/protocol/generated/

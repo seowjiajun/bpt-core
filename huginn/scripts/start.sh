@@ -7,7 +7,7 @@ SERVICE=huginn
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
 CONFIG="${1:-$PROJECT_DIR/config/huginn.qa-okx.toml}"
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
-BINARY="$PROJECT_DIR/build/src/$SERVICE"
+BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
 READY_PATTERN="Huginn ready"
 
 # ── Guard against double-start ────────────────────────────────────

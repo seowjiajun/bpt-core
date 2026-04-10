@@ -7,7 +7,7 @@ SERVICE=muninn
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
 CONFIG="${1:-$PROJECT_DIR/config/muninn.qa-okx.toml}"
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
-BINARY="$PROJECT_DIR/build/src/$SERVICE"
+BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
 READY_PATTERN="\[Muninn\] Ready"
 
 # ── Guard against double-start ────────────────────────────────────

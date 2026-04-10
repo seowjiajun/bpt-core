@@ -1,7 +1,7 @@
 #include "jormungandr/app/jormungandr_app.h"
 
 #include <spdlog/spdlog.h>
-#include <yggdrasil/aeron_utils.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/signal.h>
 
 #include <chrono>

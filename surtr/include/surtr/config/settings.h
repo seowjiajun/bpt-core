@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <yggdrasil/stream_config.h>
+#include <yggdrasil/aeron/stream_config.h>
 
 namespace surtr::config {
 

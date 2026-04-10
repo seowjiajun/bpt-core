@@ -1,6 +1,6 @@
 #pragma once
 
-#include <yggdrasil/stream_config.h>
+#include <yggdrasil/aeron/stream_config.h>
 
 #include <cstdint>
 #include <string>

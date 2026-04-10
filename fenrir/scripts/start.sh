@@ -11,7 +11,7 @@ if [[ "$CONFIG" != /* ]]; then
     CONFIG="$(pwd)/$CONFIG"
 fi
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
-BINARY="$PROJECT_DIR/build/src/$SERVICE"
+BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
 READY_PATTERN="Polling\.\.\. waiting for RefDataReady"
 
 # ── Guard against double-start ────────────────────────────────────

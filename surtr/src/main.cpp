@@ -3,7 +3,7 @@
 
 #include <spdlog/spdlog.h>
 #include <string>
-#include <yggdrasil/aeron_utils.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 #include <yggdrasil/signal.h>
 
