@@ -50,8 +50,9 @@ int main(int argc, char** argv) {
     bridge::WsServer ws(settings.ws_port);
     ws.start();
 
-    ws.broadcast(bridge::encode::session(settings.symbol, settings.starting_capital));
-    ws.broadcast(bridge::encode::status("live"));
+    ws.publish(bridge::MsgKind::Session,
+               bridge::encode::session(settings.symbol, settings.starting_capital));
+    ws.publish(bridge::MsgKind::Status, bridge::encode::status("live"));
 
     // ── Position state (bridge is authoritative) ─────────────────────────────
     bridge::PositionTracker tracker(settings.starting_capital);
@@ -71,23 +72,25 @@ int main(int argc, char** argv) {
         const auto now = clock::now();
         if (now - last_tick_bcast < kTickMinInterval) return;
         last_tick_bcast = now;
-        ws.broadcast(bridge::encode::tick(ts_ns, settings.symbol, mid));
+        ws.publish(bridge::MsgKind::Tick, bridge::encode::tick(ts_ns, settings.symbol, mid));
     });
 
     exec_sub.set_handler([&](const bridge::ExecSubscriber::Fill& f) {
         const auto res = tracker.apply(f.side, f.qty, f.price);
 
-        ws.broadcast(bridge::encode::fill(f.ts_ns,
-                                          f.order_id,
-                                          settings.symbol,
-                                          f.side,
-                                          f.qty,
-                                          f.price,
-                                          res.realized_pnl,
-                                          res.equity));
+        ws.publish(bridge::MsgKind::Fill,
+                   bridge::encode::fill(f.ts_ns,
+                                        f.order_id,
+                                        settings.symbol,
+                                        f.side,
+                                        f.qty,
+                                        f.price,
+                                        res.realized_pnl,
+                                        res.equity));
 
         const double unreal = last_mid > 0 ? tracker.unrealized_pnl(last_mid) : 0.0;
-        ws.broadcast(bridge::encode::position(settings.symbol, res.net_qty, res.avg_entry, unreal));
+        ws.publish(bridge::MsgKind::Position,
+                   bridge::encode::position(settings.symbol, res.net_qty, res.avg_entry, unreal));
     });
 
     // ── Poll loop ────────────────────────────────────────────────────────────
@@ -99,7 +102,7 @@ int main(int argc, char** argv) {
     }
 
     ygg::log::info("bridge shutting down");
-    ws.broadcast(bridge::encode::status("off"));
+    ws.publish(bridge::MsgKind::Status, bridge::encode::status("off"));
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     ws.stop();
     return 0;

@@ -151,22 +151,57 @@ void WsServer::do_accept() {
     });
 }
 
-void WsServer::broadcast(std::string message) {
+void WsServer::publish(MsgKind kind, std::string message) {
     auto msg = std::make_shared<const std::string>(std::move(message));
-    // Hop onto the IO thread so session.enqueue() is always called from the
-    // same thread — no need for per-session mutexes.
-    net::post(io_ctx_, [this, msg] {
-        std::vector<std::shared_ptr<WsSession>> snapshot;
+    // Hop onto the IO thread so snapshot mutation and session enqueues are
+    // always single-threaded — no mutex needed on the snapshot, only on the
+    // sessions set (for stop() which runs on the calling thread).
+    net::post(io_ctx_, [this, kind, msg] {
+        update_snapshot(kind, msg);
+
+        std::vector<std::shared_ptr<WsSession>> live;
         {
             std::lock_guard<std::mutex> lock(sessions_mutex_);
-            snapshot.reserve(sessions_.size());
-            for (auto& s : sessions_) snapshot.push_back(s);
+            live.reserve(sessions_.size());
+            for (auto& s : sessions_) live.push_back(s);
         }
-        for (auto& s : snapshot) s->enqueue(msg);
+        for (auto& s : live) s->enqueue(msg);
     });
 }
 
+void WsServer::update_snapshot(MsgKind kind, std::shared_ptr<const std::string> msg) {
+    // Called only from the IO thread — no mutex on snapshot_.
+    switch (kind) {
+        case MsgKind::Session:  snapshot_.session_msg  = std::move(msg); break;
+        case MsgKind::Status:   snapshot_.status_msg   = std::move(msg); break;
+        case MsgKind::Tick:     snapshot_.tick_msg     = std::move(msg); break;
+        case MsgKind::Position: snapshot_.position_msg = std::move(msg); break;
+        case MsgKind::Fill:
+            snapshot_.fills.push_back(std::move(msg));
+            while (snapshot_.fills.size() > Snapshot::kMaxFills)
+                snapshot_.fills.pop_front();
+            break;
+    }
+}
+
+void WsServer::replay_snapshot_to(const std::shared_ptr<WsSession>& session) {
+    // Logical replay order: session config → status → last tick → all fills
+    // (oldest first) → latest position.  The frontend store handles messages
+    // in any order, but this ordering matches what a live client would have
+    // seen in chronological order.
+    if (snapshot_.session_msg)  session->enqueue(snapshot_.session_msg);
+    if (snapshot_.status_msg)   session->enqueue(snapshot_.status_msg);
+    if (snapshot_.tick_msg)     session->enqueue(snapshot_.tick_msg);
+    for (auto& f : snapshot_.fills) session->enqueue(f);
+    if (snapshot_.position_msg) session->enqueue(snapshot_.position_msg);
+}
+
 void WsServer::add_session(std::shared_ptr<WsSession> session) {
+    // Called from the IO thread (WsSession::run's async_accept handler).
+    // Replay the snapshot before adding the session to the live broadcast
+    // set so the snapshot lands before any newly-broadcast message.
+    replay_snapshot_to(session);
+
     std::lock_guard<std::mutex> lock(sessions_mutex_);
     sessions_.insert(std::move(session));
 }
