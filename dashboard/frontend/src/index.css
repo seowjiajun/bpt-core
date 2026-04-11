@@ -361,3 +361,57 @@ html, body, #root {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* ── Archive (research) view ───────────────────────────────────────────────── */
+.archive-shell {
+  display: grid;
+  height: 100vh;
+  grid-template-rows: var(--header-h) 1fr;
+  background: var(--border);
+  gap: var(--gap);
+}
+
+/* Amber accent strip so traders can never mistake this for the live view. */
+.topbar--archive {
+  border-top: 2px solid var(--yellow);
+}
+
+.mode-pill--research {
+  background: rgba(210, 153, 34, 0.14);
+  color:      var(--yellow);
+  border-color: var(--yellow);
+}
+
+.archive-back {
+  color: var(--blue);
+  text-decoration: none;
+  font-size: 11px;
+}
+.archive-back:hover { text-decoration: underline; }
+
+.archive-body {
+  overflow: hidden;
+  min-height: 0;
+  background: var(--bg-base);
+}
+
+/* List: single panel filling the body. */
+.archive-body:not(.archive-body--detail) {
+  padding: 0;
+}
+
+/* Detail: risk strip on top, equity chart in the middle, blotter at the bottom. */
+.archive-body--detail {
+  display: grid;
+  grid-template-rows: 110px 1fr 240px;
+  grid-template-areas:
+    "risk"
+    "equity"
+    "blotter";
+  gap: var(--gap);
+}
+
+.archive-table th.th-sortable { cursor: pointer; user-select: none; }
+.archive-table th.th-sortable:hover { color: var(--text-primary); }
+.archive-table th.num, .archive-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.archive-row { cursor: pointer; }

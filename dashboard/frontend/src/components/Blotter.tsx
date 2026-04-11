@@ -26,8 +26,15 @@ function pnlClass(pnl: number) {
   return 'pnl-zero'
 }
 
-export function Blotter() {
-  const fills = useStore((s) => s.fills)
+interface BlotterProps {
+  // Optional override — when provided, render these fills instead of the
+  // live store.  Used by the backtest archive view.
+  fills?: Fill[]
+}
+
+export function Blotter(props: BlotterProps = {}) {
+  const liveFills = useStore((s) => s.fills)
+  const fills = props.fills ?? liveFills
   // Newest fill first
   const rows = [...fills].reverse()
 

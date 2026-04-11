@@ -9,6 +9,14 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts'
 import { useStore } from '../store'
+import type { Fill } from './Blotter'
+
+interface EquityChartProps {
+  // Optional overrides — when provided, the chart renders these instead of
+  // the live store.  Used by the backtest archive view.
+  fills?: Array<Pick<Fill, 'ts' | 'equity'>>
+  startingCapital?: number
+}
 
 const CHART_THEME = {
   bg:        '#0d1117',
@@ -21,9 +29,11 @@ const CHART_THEME = {
   crosshair: '#243044',
 }
 
-export function EquityChart() {
-  const fills = useStore((s) => s.fills)
-  const startingCapital = useStore((s) => s.startingCapital)
+export function EquityChart(props: EquityChartProps = {}) {
+  const liveFills = useStore((s) => s.fills)
+  const liveCap = useStore((s) => s.startingCapital)
+  const fills = props.fills ?? liveFills
+  const startingCapital = props.startingCapital ?? liveCap
   const hostRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null)
