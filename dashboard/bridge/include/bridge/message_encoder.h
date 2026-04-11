@@ -10,8 +10,11 @@ namespace bridge::encode {
 
 enum class Side : uint8_t { Buy, Sell };
 
-// { "type":"session", "symbol":"BTC-USDT", "startingCapital":100000 }
-std::string session(std::string_view symbol, double starting_capital);
+// { "type":"session", "symbol":"...", "strategy":"...", "exchange":"...", "startingCapital":100000 }
+std::string session(std::string_view symbol,
+                    std::string_view strategy,
+                    std::string_view exchange,
+                    double starting_capital);
 
 // { "type":"status", "state":"live" }   // "live" | "mock" | "halted" | "off"
 std::string status(std::string_view state);

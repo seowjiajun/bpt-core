@@ -6,6 +6,8 @@ interface State {
   // Session
   status: ConnectionStatus
   symbol: string
+  strategy: string
+  exchange: string
   startingCapital: number
 
   // Market
@@ -28,6 +30,8 @@ interface State {
 const initialState = {
   status: 'off' as ConnectionStatus,
   symbol: '',
+  strategy: '',
+  exchange: '',
   startingCapital: 0,
   firstPrice: 0,
   price: 0,
@@ -47,6 +51,8 @@ export const useStore = create<State>((set) => ({
           return {
             symbol: msg.symbol,
             startingCapital: msg.startingCapital,
+            strategy: msg.strategy,
+            exchange: msg.exchange,
           }
 
         case 'status':

@@ -17,6 +17,8 @@ port = 8080
 
 [session]
 symbol           = "BTC-USDT"
+exchange         = "OKX"
+strategy         = "unknown"          # override at runtime via --strategy-name
 starting_capital = 100_000.0
 
 [logging]

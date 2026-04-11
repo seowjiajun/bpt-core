@@ -6,10 +6,15 @@ namespace bridge::encode {
 
 using nlohmann::json;
 
-std::string session(std::string_view symbol, double starting_capital) {
+std::string session(std::string_view symbol,
+                    std::string_view strategy,
+                    std::string_view exchange,
+                    double starting_capital) {
     return json{
         {"type", "session"},
         {"symbol", symbol},
+        {"strategy", strategy},
+        {"exchange", exchange},
         {"startingCapital", starting_capital},
     }.dump();
 }

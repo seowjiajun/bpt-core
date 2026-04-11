@@ -20,8 +20,16 @@ int main(int argc, char** argv) {
     ygg::signal::install();
 
     std::string config_path = "config/bridge.toml";
+    std::string strategy_override;     // --strategy-name overrides session.strategy
+    std::string symbol_override;       // --symbol        overrides session.symbol
+    std::string exchange_override;     // --exchange      overrides session.exchange
+
     for (int i = 1; i < argc - 1; ++i) {
-        if (std::string(argv[i]) == "--config") config_path = argv[i + 1];
+        const std::string arg(argv[i]);
+        if (arg == "--config")        config_path        = argv[i + 1];
+        if (arg == "--strategy-name") strategy_override  = argv[i + 1];
+        if (arg == "--symbol")        symbol_override    = argv[i + 1];
+        if (arg == "--exchange")      exchange_override  = argv[i + 1];
     }
 
     bridge::config::Settings settings;
@@ -33,12 +41,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // CLI overrides take precedence over TOML values.
+    if (!strategy_override.empty()) settings.strategy = strategy_override;
+    if (!symbol_override.empty())   settings.symbol   = symbol_override;
+    if (!exchange_override.empty()) settings.exchange = exchange_override;
+
     ygg::logging::init("bridge", settings.logging);
     ygg::log::info("bridge starting — ws :{}  aeron {}", settings.ws_port, settings.media_driver_dir);
     ygg::log::info("[bridge] md_data stream={}  exec_report stream={}",
                    settings.md_data.stream_id, settings.exec_report.stream_id);
-    ygg::log::info("[bridge] symbol={} starting_capital=${:.2f}",
-                   settings.symbol, settings.starting_capital);
+    ygg::log::info("[bridge] strategy={} symbol={}@{} starting_capital=${:.2f}",
+                   settings.strategy, settings.symbol, settings.exchange, settings.starting_capital);
 
     // ── Aeron ────────────────────────────────────────────────────────────────
     auto aeron = ygg::aeron::connect(settings.media_driver_dir);
@@ -51,7 +64,10 @@ int main(int argc, char** argv) {
     ws.start();
 
     ws.publish(bridge::MsgKind::Session,
-               bridge::encode::session(settings.symbol, settings.starting_capital));
+               bridge::encode::session(settings.symbol,
+                                       settings.strategy,
+                                       settings.exchange,
+                                       settings.starting_capital));
     ws.publish(bridge::MsgKind::Status, bridge::encode::status("live"));
 
     // ── Position state (bridge is authoritative) ─────────────────────────────

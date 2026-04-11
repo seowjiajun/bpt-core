@@ -37,6 +37,21 @@ is_running() {
     [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null
 }
 
+# Extract a display name for the running strategy from the fenrir config
+# filename.  momentum.backtest.toml  →  MomentumStrategy
+# vwap_reversion.backtest.toml       →  VwapReversionStrategy
+derive_strategy_name() {
+    local cfg="$1"
+    [ -z "$cfg" ] && { echo "unknown"; return; }
+    local base
+    base="$(basename "$cfg")"          # vwap_reversion.backtest.toml
+    base="${base%%.backtest.toml}"     # vwap_reversion
+    base="${base%%.*}"                 # vwap_reversion (safety)
+    # Convert snake_case → PascalCase and append "Strategy"
+    awk 'BEGIN{FS="_"; OFS=""}
+         { for (i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print $0 "Strategy" }' <<<"$base"
+}
+
 bridge_start() {
     if is_running "$BRIDGE_PID"; then
         echo "  [UP]   bridge (PID $(cat "$BRIDGE_PID")) — already running"
@@ -56,8 +71,11 @@ bridge_start() {
 
     mkdir -p "$BRIDGE_LOG_DIR"
 
-    echo "  Starting bridge..."
-    nohup "$BRIDGE_BIN" --config "$BRIDGE_CFG" \
+    local strategy_name
+    strategy_name="$(derive_strategy_name "${FENRIR_CONFIG_OVERRIDE:-}")"
+
+    echo "  Starting bridge (strategy: $strategy_name)..."
+    nohup "$BRIDGE_BIN" --config "$BRIDGE_CFG" --strategy-name "$strategy_name" \
         > "$BRIDGE_LOG_DIR/bridge.stdout" 2>&1 &
     echo $! > "$BRIDGE_PID"
 

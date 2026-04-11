@@ -20,6 +20,8 @@ function Clock() {
 
 export function TopBar() {
   const symbol = useStore((s) => s.symbol)
+  const strategy = useStore((s) => s.strategy)
+  const exchange = useStore((s) => s.exchange)
   const price = useStore((s) => s.price)
   const firstPrice = useStore((s) => s.firstPrice)
   const status = useStore((s) => s.status)
@@ -28,11 +30,20 @@ export function TopBar() {
   const pct = firstPrice ? (change / firstPrice) * 100 : 0
   const up = change >= 0
 
+  // Render "<Strategy> · <SYMBOL> @ <EXCHANGE>" with graceful fallback
+  // when fields aren't set yet (mock replay without a session message).
+  const subjectParts: string[] = []
+  if (strategy) subjectParts.push(strategy)
+  if (symbol) {
+    subjectParts.push(exchange ? `${symbol} @ ${exchange}` : symbol)
+  }
+  const subject = subjectParts.join(' · ') || '—'
+
   return (
     <div className="topbar">
       <span className="topbar-logo">BPT</span>
       <div className="topbar-divider" />
-      <span className="topbar-symbol">{symbol || '—'}</span>
+      <span className="topbar-symbol">{subject}</span>
       <span className="topbar-price">
         {price
           ? price.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })

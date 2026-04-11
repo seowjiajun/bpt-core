@@ -8,11 +8,13 @@ export type ConnectionStatus = 'live' | 'mock' | 'halted' | 'off'
 
 export type Side = 'BUY' | 'SELL'
 
-// Sent once at the start of a session.
+// Sent once at the start of a session (and replayed to mid-run joiners).
 export interface SessionMsg {
   type: 'session'
   symbol: string
   startingCapital: number
+  strategy: string    // e.g. "MomentumStrategy" — display only
+  exchange: string    // e.g. "OKX" — display only
 }
 
 // Connection / run state.

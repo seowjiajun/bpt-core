@@ -51,6 +51,8 @@ export default function App() {
       return startMockReplay({
         fills: MOCK_FILLS,
         symbol: 'BTC-USDT',
+        strategy: 'VwapReversion',
+        exchange: 'OKX',
         startingCapital: 100_000,
         intervalMs: 1200,
       })
