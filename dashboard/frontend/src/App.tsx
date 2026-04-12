@@ -11,10 +11,11 @@ import { GreeksPanel } from './components/GreeksPanel'
 import { OptionsPositionPanel } from './components/OptionsPositionPanel'
 import { VolSmileChart } from './components/VolSmileChart'
 import { VolSurfaceHeatmap } from './components/VolSurfaceHeatmap'
+import { VolTermStructure } from './components/VolTermStructure'
 import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
-import { MOCK_LEGS, MOCK_GREEKS, MOCK_VOL_SURFACE } from './mock/options'
+import { MOCK_LEGS, MOCK_GREEKS, MOCK_VOL_SURFACE, MOCK_SPOT } from './mock/options'
 
 // VITE_WS_URL selects the data source:
 //   unset or "mock"           → in-memory mock replay of trades.csv
@@ -88,7 +89,17 @@ export default function App() {
 
         <div className="right-col">
           {showOptions ? <GreeksPanel greeks={MOCK_GREEKS} /> : <PositionPanel />}
-          <RiskPanel />
+          {showOptions ? (
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">Term Structure</span>
+                <span className="panel-badge">ATM IV</span>
+              </div>
+              <VolTermStructure slices={MOCK_VOL_SURFACE} spot={MOCK_SPOT} />
+            </div>
+          ) : (
+            <RiskPanel />
+          )}
         </div>
       </div>
 
