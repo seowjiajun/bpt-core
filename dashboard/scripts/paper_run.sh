@@ -40,8 +40,8 @@ derive_strategy_name() {
     [ -z "$cfg" ] && { echo "unknown"; return; }
     local base
     base="$(basename "$cfg")"
-    base="${base%%.qa-okx.toml}"
-    base="${base%%.qa-deribit.toml}"
+    base="${base%%.*}"
+    base="${base%%.*}"
     base="${base%%.*}"
     awk 'BEGIN{FS="_"; OFS=""}
          { for (i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print $0 "Strategy" }' <<<"$base"

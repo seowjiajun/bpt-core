@@ -304,6 +304,8 @@ void FenrirApp::wire_callbacks() {
                 bit = 0x02;
             else if (exchange_id == ExchangeId::HYPERLIQUID)
                 bit = 0x04;
+            else if (exchange_id == ExchangeId::DERIBIT)
+                bit = 0x08;
 
             account_snapshot_ready_ |= bit;
 
@@ -370,6 +372,10 @@ void FenrirApp::run() {
             if (mask & 0x04) {
                 ygg::log::info("[Fenrir] Requesting AccountSnapshot for HYPERLIQUID");
                 order_gw_->send_account_snapshot_request(ExchangeId::HYPERLIQUID, corr++);
+            }
+            if (mask & 0x08) {
+                ygg::log::info("[Fenrir] Requesting AccountSnapshot for DERIBIT");
+                order_gw_->send_account_snapshot_request(ExchangeId::DERIBIT, corr++);
             }
         }
 

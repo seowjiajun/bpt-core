@@ -24,12 +24,37 @@ BIFROST_DIR="$STACK_DIR/bifrost/fabric"
 MUNINN_DIR="$STACK_DIR/muninn"
 HUGINN_DIR="$STACK_DIR/huginn"
 HEIMDALL_DIR="$STACK_DIR/heimdall"
+SURTR_DIR="$STACK_DIR/surtr"
 FENRIR_DIR="$STACK_DIR/fenrir"
 
 FENRIR_CONFIG="${2:-$FENRIR_DIR/config/vwap_reversion.qa-okx.toml}"
-MUNINN_CONFIG="$MUNINN_DIR/config/muninn.qa-okx.toml"
-HUGINN_CONFIG="$HUGINN_DIR/config/huginn.qa-okx.toml"
-HEIMDALL_CONFIG="$HEIMDALL_DIR/config/heimdall.qa-okx.toml"
+
+# Auto-detect exchange from fenrir config filename.
+# e.g. short_vol.qa-deribit.toml → deribit, vwap_reversion.qa-okx.toml → okx
+EXCHANGE="okx"
+case "$FENRIR_CONFIG" in
+    *deribit*) EXCHANGE="deribit" ;;
+    *okx*)     EXCHANGE="okx" ;;
+    *binance*) EXCHANGE="binance" ;;
+esac
+
+MUNINN_CONFIG="$MUNINN_DIR/config/muninn.qa-${EXCHANGE}.toml"
+HUGINN_CONFIG="$HUGINN_DIR/config/huginn.qa-${EXCHANGE}.toml"
+HEIMDALL_CONFIG="$HEIMDALL_DIR/config/heimdall.qa-${EXCHANGE}.toml"
+SURTR_CONFIG="$SURTR_DIR/config/surtr.qa-${EXCHANGE}.toml"
+
+# Options strategies need surtr for vol surface computation.
+NEEDS_SURTR=false
+case "$FENRIR_CONFIG" in
+    *short_vol*|*vol*|*option*) NEEDS_SURTR=true ;;
+esac
+
+# Source exchange-specific credentials
+CREDS_FILE="$HOME/.bpt-secrets/${EXCHANGE}-testnet.env"
+if [ -f "$CREDS_FILE" ]; then
+    # shellcheck disable=SC1090
+    source "$CREDS_FILE"
+fi
 
 # ── Helpers ───────────────────────────────────────────────────────
 
@@ -49,44 +74,52 @@ service_status() {
 }
 
 do_status() {
-    echo "Paper trading stack status:"
+    echo "Paper trading stack status ($EXCHANGE):"
     service_status "bifrost-fabric" "$BIFROST_DIR/.bifrost.pid"
     service_status "muninn"         "$MUNINN_DIR/.muninn.pid"
     service_status "huginn"         "$HUGINN_DIR/.huginn.pid"
     service_status "heimdall"       "$HEIMDALL_DIR/.heimdall.pid"
+    $NEEDS_SURTR && service_status "surtr" "$SURTR_DIR/.surtr.pid"
     service_status "fenrir"         "$FENRIR_DIR/.fenrir.pid"
 }
 
 do_start() {
-    echo "=== Starting Fenrir paper trading stack (OKX testnet) ==="
+    echo "=== Starting Fenrir paper trading stack (${EXCHANGE} testnet) ==="
+    echo "  Exchange      : $EXCHANGE"
     echo "  Fenrir config : $FENRIR_CONFIG"
     echo "  Muninn config : $MUNINN_CONFIG"
     echo "  Huginn config : $HUGINN_CONFIG"
     echo "  Heimdall cfg  : $HEIMDALL_CONFIG"
+    $NEEDS_SURTR && echo "  Surtr config  : $SURTR_CONFIG"
     echo
 
     # 1. Bifrost-fabric — Aeron media driver first
     "$BIFROST_DIR/scripts/dev_start.sh"
     echo
 
-    # 2. Muninn — reference data (connects to OKX for instrument snapshots)
+    # 2. Muninn — reference data
     "$MUNINN_DIR/scripts/start.sh" "$MUNINN_CONFIG"
     echo
 
-    # 3. Huginn + Heimdall — connect directly to OKX testnet WebSocket.
-    #    Market data starts flowing as soon as they subscribe.
+    # 3. Huginn + Heimdall (+ Surtr if options) — parallel startup.
     "$HUGINN_DIR/scripts/start.sh" "$HUGINN_CONFIG" &
     HUGINN_PID=$!
 
     "$HEIMDALL_DIR/scripts/start.sh" "$HEIMDALL_CONFIG" &
     HEIMDALL_PID=$!
 
+    if $NEEDS_SURTR; then
+        "$SURTR_DIR/scripts/start.sh" "$SURTR_CONFIG" &
+        SURTR_PID=$!
+    fi
+
     wait "$HUGINN_PID"
     wait "$HEIMDALL_PID"
+    $NEEDS_SURTR && wait "$SURTR_PID"
     echo
 
     # 4. Fenrir — waits for RefDataReady from Muninn, subscribes to MD via
-    #    Huginn, and begins trading against OKX testnet via Heimdall.
+    #    Huginn, and begins trading.
     "$FENRIR_DIR/scripts/start.sh" "$FENRIR_CONFIG"
     echo
 
@@ -98,11 +131,13 @@ do_start() {
     echo "  fenrir  : tail -f $FENRIR_DIR/logs/fenrir.log"
     echo "  huginn  : tail -f $HUGINN_DIR/logs/huginn.log"
     echo "  heimdall: tail -f $HEIMDALL_DIR/logs/heimdall.log"
+    $NEEDS_SURTR && echo "  surtr   : tail -f $SURTR_DIR/logs/surtr.log"
 }
 
 do_stop() {
     echo "=== Stopping paper trading stack ==="
     "$FENRIR_DIR/scripts/stop.sh"      2>/dev/null || true
+    $NEEDS_SURTR && "$SURTR_DIR/scripts/stop.sh" 2>/dev/null || true
     "$HEIMDALL_DIR/scripts/stop.sh"    2>/dev/null || true
     "$HUGINN_DIR/scripts/stop.sh"      2>/dev/null || true
     "$MUNINN_DIR/scripts/stop.sh"      2>/dev/null || true

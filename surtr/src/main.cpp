@@ -9,7 +9,7 @@
 int main(int argc, char** argv) {
     ygg::signal::install();
 
-    std::string config_path = "config/surtr.toml";
+    std::string config_path = (argc > 1 && argv[1][0] != '-') ? argv[1] : "config/surtr.toml";
     for (int i = 1; i < argc - 1; ++i) {
         if (std::string(argv[i]) == "--config")
             config_path = argv[i + 1];
