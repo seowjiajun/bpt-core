@@ -13,6 +13,7 @@
 #include "fenrir/vol/vol_surface_client.h"
 
 #include <Aeron.h>
+#include <Subscription.h>
 
 #include <cstdint>
 #include <memory>
@@ -44,6 +45,7 @@ private:
     std::unique_ptr<order::OrderManager> order_mgr_;
     std::unique_ptr<strategy::IStrategy> strategy_;
     std::unique_ptr<backtest::BacktestClient> backtest_client_;
+    std::shared_ptr<aeron::Subscription> dashboard_ctrl_sub_;
 
     bool refdata_ready_{false};
     bool surtr_ready_{false};
@@ -60,6 +62,10 @@ private:
     // Set to true when any service heartbeat goes stale; cleared on recovery.
     // MD and order-gateway callbacks are suppressed while paused.
     bool trading_paused_{false};
+    // Set by the dashboard kill-switch via the control stream (9003).
+    // Distinct from trading_paused_ so auto-recovery doesn't override
+    // a manual halt.
+    bool trading_halted_{false};
     uint64_t last_md_hb_recv_ns_{0};  // steady_clock receipt time of last Huginn heartbeat
     uint64_t last_gw_hb_recv_ns_{0};  // steady_clock receipt time of last Heimdall heartbeat
     uint64_t last_liveness_check_ns_{0};

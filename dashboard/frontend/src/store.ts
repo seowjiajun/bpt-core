@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ConnectionStatus, Msg, RunMode } from './types/messages'
 import type { Fill } from './components/Blotter'
+import { sendCommand } from './ws/client'
 
 // OHLC bar for the price chart. Built client-side by rolling incoming
 // TickMsg prices into 1-minute buckets — the bridge doesn't push candles
@@ -55,11 +56,12 @@ interface State {
   handleMessage: (msg: Msg) => void
   reset: () => void
 
-  // Kill switch — optimistic local mutations for slice (a).  Slice (b)
-  // will replace the bodies with WS command sends that wait for a
-  // server-side 'status' ack before flipping the UI.
-  localHalt: () => void
-  localResume: () => void
+  // Kill switch — sends a command to the bridge via WS. The bridge
+  // broadcasts a status message back to all clients, which handleMessage
+  // picks up to flip the UI. In mock mode (no WS), falls back to a local
+  // optimistic mutation.
+  halt: () => void
+  resume: () => void
 }
 
 const initialState = {
@@ -159,15 +161,26 @@ export const useStore = create<State>((set) => ({
 
   reset: () => set(initialState),
 
-  localHalt: () =>
-    set((state) => {
-      if (state.status === 'halted') return {}
-      return { preHaltStatus: state.status, status: 'halted' }
-    }),
+  halt: () => {
+    const { status } = useStore.getState()
+    if (status === 'halted') return
+    if (status === 'mock') {
+      // Mock mode: no bridge, just flip locally
+      set({ preHaltStatus: status, status: 'halted' })
+    } else {
+      // Real mode: send command, let the bridge's status broadcast update UI
+      set({ preHaltStatus: status })
+      sendCommand('halt')
+    }
+  },
 
-  localResume: () =>
-    set((state) => {
-      if (state.status !== 'halted') return {}
-      return { status: state.preHaltStatus ?? 'off', preHaltStatus: null }
-    }),
+  resume: () => {
+    const { status, preHaltStatus } = useStore.getState()
+    if (status !== 'halted') return
+    if (preHaltStatus === 'mock') {
+      set({ status: 'mock', preHaltStatus: null })
+    } else {
+      sendCommand('resume')
+    }
+  },
 }))

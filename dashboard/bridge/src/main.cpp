@@ -63,8 +63,9 @@ int main(int argc, char** argv) {
 
     ygg::logging::init("bridge", settings.logging);
     ygg::log::info("bridge starting — ws :{}  aeron {}", settings.ws_port, settings.media_driver_dir);
-    ygg::log::info("[bridge] md_data stream={}  exec_report stream={}",
-                   settings.md_data.stream_id, settings.exec_report.stream_id);
+    ygg::log::info("[bridge] md_data stream={}  exec_report stream={}  control stream={}",
+                   settings.md_data.stream_id, settings.exec_report.stream_id,
+                   settings.control_command.stream_id);
     ygg::log::info("[bridge] mode={} strategy={} symbol={}@{} starting_capital=${:.2f} instrument_filter={}",
                    settings.mode, settings.strategy, settings.symbol, settings.exchange,
                    settings.starting_capital,
@@ -76,8 +77,58 @@ int main(int argc, char** argv) {
     bridge::MdSubscriber   md_sub(aeron, settings.md_data.channel, settings.md_data.stream_id);
     bridge::ExecSubscriber exec_sub(aeron, settings.exec_report.channel, settings.exec_report.stream_id);
 
+    // ── Control publication (bridge → Fenrir) ────────────────────────────────
+    // 1-byte command: 0x00 = HALT, 0x01 = RESUME.  No SBE — this is a
+    // lightweight control path, not a high-throughput data stream.
+    std::shared_ptr<aeron::Publication> ctrl_pub;
+    if (settings.control_command.stream_id != 0) {
+        const int64_t reg_id = aeron->addPublication(
+            settings.control_command.channel, settings.control_command.stream_id);
+        for (int i = 0; i < 500; ++i) {
+            ctrl_pub = aeron->findPublication(reg_id);
+            if (ctrl_pub) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        if (ctrl_pub) {
+            ygg::log::info("[bridge] control publication ready on stream {}",
+                           settings.control_command.stream_id);
+        } else {
+            ygg::log::warn("[bridge] control publication unavailable — halt/resume disabled");
+        }
+    }
+
     // ── WebSocket server ─────────────────────────────────────────────────────
     bridge::WsServer ws(settings.ws_port);
+
+    ws.on_command = [&](const std::string& cmd) {
+        uint8_t ctrl_byte;
+        std::string status_str;
+
+        if (cmd == "halt") {
+            ctrl_byte = 0x00;
+            status_str = "halted";
+        } else if (cmd == "resume") {
+            ctrl_byte = 0x01;
+            status_str = "live";
+        } else {
+            ygg::log::warn("[bridge] unknown command: {}", cmd);
+            return;
+        }
+
+        // Publish to Fenrir via Aeron
+        if (ctrl_pub) {
+            aeron::AtomicBuffer buf(reinterpret_cast<uint8_t*>(&ctrl_byte), 1);
+            auto result = ctrl_pub->offer(buf, 0, 1);
+            if (result < 0) {
+                ygg::log::warn("[bridge] control offer failed: {}", result);
+            }
+        }
+
+        // Broadcast status to all connected dashboard clients
+        ws.publish(bridge::MsgKind::Status, bridge::encode::status(status_str));
+        ygg::log::info("[bridge] command '{}' → status '{}'", cmd, status_str);
+    };
+
     ws.start();
 
     ws.publish(bridge::MsgKind::Session,

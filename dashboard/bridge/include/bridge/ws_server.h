@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -42,6 +43,11 @@ public:
 
     void start();
     void stop();
+
+    // Callback invoked on the IO thread when a connected client sends a
+    // valid command (e.g. "halt", "resume").  The bridge's main() wires
+    // this to publish on the control Aeron stream + broadcast status.
+    std::function<void(const std::string& cmd)> on_command;
 
     // Publish a typed message.  Updates the replay snapshot and broadcasts
     // to every connected session.  Thread-safe; callable from any thread.

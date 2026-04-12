@@ -4,6 +4,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <deque>
+#include <nlohmann/json.hpp>
 #include <yggdrasil/logging.h>
 
 namespace bridge {
@@ -49,17 +50,33 @@ public:
 
 private:
     void do_read() {
-        // We don't expect inbound messages, but we need to keep reading to
-        // detect client-side disconnects.
         ws_.async_read(buffer_,
-            [self = shared_from_this()](beast::error_code ec, std::size_t /*bytes*/) {
+            [self = shared_from_this()](beast::error_code ec, std::size_t bytes) {
                 if (ec == websocket::error::closed || ec) {
                     self->server_.remove_session(self);
                     return;
                 }
+                self->handle_inbound(bytes);
                 self->buffer_.consume(self->buffer_.size());
                 self->do_read();
             });
+    }
+
+    void handle_inbound(std::size_t bytes) {
+        if (bytes == 0) return;
+        try {
+            auto data = beast::buffers_to_string(buffer_.data());
+            auto j = nlohmann::json::parse(data);
+            if (j.value("type", "") == "command") {
+                std::string cmd = j.value("cmd", "");
+                if (!cmd.empty() && server_.on_command) {
+                    ygg::log::info("[WsSession] received command: {}", cmd);
+                    server_.on_command(cmd);
+                }
+            }
+        } catch (const std::exception& e) {
+            ygg::log::warn("[WsSession] bad inbound message: {}", e.what());
+        }
     }
 
     void do_write() {

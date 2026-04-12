@@ -22,6 +22,18 @@ function isValidMessage(x: unknown): x is Msg {
   )
 }
 
+// Shared reference so the store (or any caller) can send commands to the
+// bridge without holding a direct reference to the WebSocket instance.
+let activeSocket: WebSocket | null = null
+
+export function sendCommand(cmd: 'halt' | 'resume' | 'cancel_all') {
+  if (!activeSocket || activeSocket.readyState !== WebSocket.OPEN) {
+    console.warn('[ws] cannot send command — not connected')
+    return
+  }
+  activeSocket.send(JSON.stringify({ type: 'command', cmd }))
+}
+
 export function connectWebSocket({ url, onOpen, onClose }: ClientOptions): () => void {
   let socket: WebSocket | null = null
   let stopped = false
@@ -36,9 +48,8 @@ export function connectWebSocket({ url, onOpen, onClose }: ClientOptions): () =>
 
     socket.onopen = () => {
       backoffMs = RECONNECT_MIN_MS
+      activeSocket = socket
       useStore.getState().reset()
-      // Optimistically mark ourselves live on open; the bridge may overwrite
-      // this with a later status message (e.g. 'halted').
       dispatch({ type: 'status', state: 'live' })
       onOpen?.()
     }
@@ -57,6 +68,7 @@ export function connectWebSocket({ url, onOpen, onClose }: ClientOptions): () =>
     }
 
     socket.onclose = () => {
+      activeSocket = null
       onClose?.()
       dispatch({ type: 'status', state: 'off' })
       if (stopped) return
@@ -74,6 +86,7 @@ export function connectWebSocket({ url, onOpen, onClose }: ClientOptions): () =>
 
   return () => {
     stopped = true
+    activeSocket = null
     if (reconnectTimer !== null) clearTimeout(reconnectTimer)
     socket?.close()
     socket = null

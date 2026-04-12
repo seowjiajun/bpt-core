@@ -16,8 +16,8 @@ import { useStore } from '../store'
 export function KillSwitch() {
   const status = useStore((s) => s.status)
   const mode = useStore((s) => s.mode)
-  const localHalt = useStore((s) => s.localHalt)
-  const localResume = useStore((s) => s.localResume)
+  const halt = useStore((s) => s.halt)
+  const resume = useStore((s) => s.resume)
 
   const isHalted = status === 'halted'
   const [confirming, setConfirming] = useState<'halt' | 'resume' | null>(null)
@@ -33,8 +33,8 @@ export function KillSwitch() {
   }, [confirming])
 
   const handleConfirm = () => {
-    if (confirming === 'halt') localHalt()
-    else if (confirming === 'resume') localResume()
+    if (confirming === 'halt') halt()
+    else if (confirming === 'resume') resume()
     setConfirming(null)
   }
 

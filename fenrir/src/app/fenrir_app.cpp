@@ -93,6 +93,25 @@ FenrirApp::FenrirApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> aeron)
                        ac.backtest_control.stream_id,
                        ac.backtest_ack.stream_id);
     }
+
+    // Dashboard control subscription — halt/resume from the bridge.
+    // 1-byte messages: 0x00 = HALT, 0x01 = RESUME.  Only enabled in
+    // live/paper mode (not backtest — backtest has its own control channel).
+    if (!cfg_.backtest_mode && ac.dashboard_control.stream_id != 0) {
+        const int64_t reg_id = aeron->addSubscription(
+            ac.dashboard_control.channel, ac.dashboard_control.stream_id);
+        for (int i = 0; i < 500; ++i) {
+            dashboard_ctrl_sub_ = aeron->findSubscription(reg_id);
+            if (dashboard_ctrl_sub_) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        if (dashboard_ctrl_sub_) {
+            ygg::log::info("[Fenrir] Dashboard control subscription ready on stream {}",
+                           ac.dashboard_control.stream_id);
+        } else {
+            ygg::log::warn("[Fenrir] Dashboard control subscription unavailable");
+        }
+    }
 }
 
 void FenrirApp::wire_callbacks() {
@@ -173,7 +192,7 @@ void FenrirApp::wire_callbacks() {
                                tick.askPrice());
             }
             metrics_.md_ticks_total->Increment();
-            if (!trading_paused_) {
+            if (!trading_paused_ && !trading_halted_) {
                 curr_tick_ts_ns_ = tick.timestampNs();
                 strategy_->on_bbo(tick);
                 const uint64_t t3 = ygg::util::TscClock::now_epoch_ns();
@@ -187,7 +206,7 @@ void FenrirApp::wire_callbacks() {
         };
         md_client_->on_trade = [this](const bifrost::protocol::MdTrade& tick) {
             metrics_.md_ticks_total->Increment();
-            if (!trading_paused_) {
+            if (!trading_paused_ && !trading_halted_) {
                 curr_tick_ts_ns_ = tick.timestampNs();
                 strategy_->on_trade(tick);
                 const uint64_t t3 = ygg::util::TscClock::now_epoch_ns();
@@ -196,7 +215,7 @@ void FenrirApp::wire_callbacks() {
             }
         };
         md_client_->on_order_book = [this](const bifrost::protocol::MdOrderBook& book) {
-            if (!trading_paused_) {
+            if (!trading_paused_ && !trading_halted_) {
                 curr_tick_ts_ns_ = book.timestampNs();
                 strategy_->on_order_book(book);
                 const uint64_t t3 = ygg::util::TscClock::now_epoch_ns();
@@ -293,6 +312,26 @@ void FenrirApp::run() {
             frags += vol_client_->poll();
         if (order_gw_)
             frags += order_gw_->poll();
+
+        // Poll dashboard control channel (halt/resume from bridge)
+        if (dashboard_ctrl_sub_) {
+            frags += dashboard_ctrl_sub_->poll(
+                [this](aeron::AtomicBuffer& buffer,
+                       aeron::util::index_t offset,
+                       aeron::util::index_t length,
+                       aeron::Header& /*hdr*/) {
+                    if (length < 1) return;
+                    const uint8_t cmd = *reinterpret_cast<const uint8_t*>(buffer.buffer() + offset);
+                    if (cmd == 0x00 && !trading_halted_) {
+                        trading_halted_ = true;
+                        ygg::log::warn("[Fenrir] TRADING HALTED via dashboard kill-switch");
+                    } else if (cmd == 0x01 && trading_halted_) {
+                        trading_halted_ = false;
+                        ygg::log::info("[Fenrir] Trading RESUMED via dashboard");
+                    }
+                },
+                1);
+        }
 
         // Step 1: once refdata is ready, send AccountSnapshotRequests to Heimdall
         // (one per configured exchange). This runs before the refdata subscription
