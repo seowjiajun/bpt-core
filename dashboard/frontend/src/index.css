@@ -85,6 +85,33 @@ html, body, #root {
   gap: var(--gap);
 }
 
+/* ── Options shell variant ─────────────────────────────────────────────────── */
+/* Expands the grid to include a row for vol smile + options positions
+ * between the main row and the equity curve. */
+.shell--options {
+  grid-template-rows: var(--header-h) 1fr 240px 140px 180px;
+  grid-template-areas:
+    "topbar"
+    "main"
+    "options"
+    "equity"
+    "blotter";
+}
+
+.options-row {
+  grid-area: options;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--gap);
+  min-height: 0;
+}
+.options-row > * { min-height: 0; }
+
+.options-agg-row td {
+  border-top: 1px solid var(--border-strong);
+  background: var(--bg-header);
+}
+
 /* ── Panel ─────────────────────────────────────────────────────────────────── */
 .panel {
   background: var(--bg-panel);

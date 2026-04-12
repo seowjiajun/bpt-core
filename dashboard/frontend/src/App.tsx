@@ -7,9 +7,14 @@ import { Blotter, type Fill } from './components/Blotter'
 import { PriceChart } from './components/PriceChart'
 import { EquityChart } from './components/EquityChart'
 import { HaltedBanner } from './components/HaltedBanner'
+import { GreeksPanel } from './components/GreeksPanel'
+import { OptionsPositionPanel } from './components/OptionsPositionPanel'
+import { VolSmileChart } from './components/VolSmileChart'
+import { VolSurfaceHeatmap } from './components/VolSurfaceHeatmap'
 import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
+import { MOCK_LEGS, MOCK_GREEKS, MOCK_VOL_SURFACE } from './mock/options'
 
 // VITE_WS_URL selects the data source:
 //   unset or "mock"           → in-memory mock replay of trades.csv
@@ -62,8 +67,13 @@ export default function App() {
 
   const finalEquity = fills.length ? fills[fills.length - 1].equity : 100_000
 
+  // Mock mode always shows options panels for development.
+  // In production, the bridge's session message would signal whether the
+  // strategy involves options (not yet implemented — phase 2).
+  const showOptions = WS_URL === 'mock'
+
   return (
-    <div className="shell">
+    <div className={`shell ${showOptions ? 'shell--options' : ''}`}>
       <TopBar />
       <HaltedBanner />
 
@@ -77,10 +87,29 @@ export default function App() {
         </div>
 
         <div className="right-col">
-          <PositionPanel />
+          {showOptions ? <GreeksPanel greeks={MOCK_GREEKS} /> : <PositionPanel />}
           <RiskPanel />
         </div>
       </div>
+
+      {showOptions && (
+        <div className="options-row">
+          <div className="panel">
+            <div className="panel-header">
+              <span className="panel-title">Vol Surface</span>
+              <span className="panel-badge">{MOCK_VOL_SURFACE.length} expiries</span>
+            </div>
+            <VolSurfaceHeatmap slices={MOCK_VOL_SURFACE} legs={MOCK_LEGS} />
+          </div>
+          <div className="panel">
+            <div className="panel-header">
+              <span className="panel-title">Vol Smile</span>
+            </div>
+            <VolSmileChart slices={MOCK_VOL_SURFACE} legs={MOCK_LEGS} />
+          </div>
+          <OptionsPositionPanel legs={MOCK_LEGS} />
+        </div>
+      )}
 
       <div className="panel" style={{ gridArea: 'equity' }}>
         <div className="panel-header">
