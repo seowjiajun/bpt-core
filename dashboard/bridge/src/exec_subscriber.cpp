@@ -85,8 +85,12 @@ void ExecSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffer,
         order_handler_(ev);
     }
 
-    // Only forward fills to the position tracker / equity curve.
+    // Only forward real fills to the position tracker / equity curve.
+    // OKX (and other venues) can emit PARTIAL exec reports with filled_qty=0
+    // as order-state updates ("order is resting in book"). Those are not
+    // actual executions and must not be counted as fills.
     if (status != ExecStatus::FILLED && status != ExecStatus::PARTIAL) return;
+    if (msg.filledQty() == 0) return;
 
     Fill f{};
     f.ts_ns         = msg.timestampNs();

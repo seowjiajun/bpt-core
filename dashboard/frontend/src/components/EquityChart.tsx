@@ -98,13 +98,20 @@ export function EquityChart(props: EquityChartProps = {}) {
 
     // Anchor point at the starting capital just before the first fill so the
     // line starts flat at $100k and visibly responds to the first trade.
+    // Dedupe by second-granularity time: lightweight-charts requires strictly
+    // ascending timestamps, but multiple fills can land in the same second
+    // (common with market-making / arb strategies). Keep the latest equity
+    // for each second so the curve reflects the most recent state.
     const firstTs = fills.length ? Math.floor(fills[0].ts / 1_000_000_000) - 60 : 0
+    const byTime = new Map<number, number>()
+    for (const f of fills) {
+      byTime.set(Math.floor(f.ts / 1_000_000_000), f.equity)
+    }
     const points = [
       { time: firstTs as UTCTimestamp, value: startingCapital },
-      ...fills.map(f => ({
-        time: Math.floor(f.ts / 1_000_000_000) as UTCTimestamp,
-        value: f.equity,
-      })),
+      ...[...byTime.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([t, v]) => ({ time: t as UTCTimestamp, value: v })),
     ]
 
     series.setData(points)
