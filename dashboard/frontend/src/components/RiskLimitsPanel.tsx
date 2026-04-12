@@ -1,9 +1,8 @@
+import { useEffect, useRef } from 'react'
+import { useStore } from '../store'
 import type { PortfolioGreeks } from '../types/options'
 
-// Risk limits configuration — in production these would come from
-// fenrir's strategy config via the session message or a dedicated
-// limits stream. For now, hardcoded mock values.
-interface RiskLimits {
+export interface RiskLimits {
   maxAbsDelta: number
   maxAbsGamma: number
   maxAbsVega: number
@@ -56,26 +55,52 @@ function LimitBar({ label, current, limit, decimals = 2 }: {
   )
 }
 
-export function RiskLimitsPanel({ greeks, limits }: Props) {
-  const anyBreach = [
-    utilization(greeks.netDelta, limits.maxAbsDelta),
-    utilization(greeks.netGamma, limits.maxAbsGamma),
-    utilization(greeks.netVega, limits.maxAbsVega),
-    utilization(greeks.netTheta, limits.maxAbsTheta),
-  ].some((u) => u >= 1.0)
+function detectBreaches(greeks: PortfolioGreeks, limits: RiskLimits): string[] {
+  const breaches: string[] = []
+  if (utilization(greeks.netDelta, limits.maxAbsDelta) >= 1.0) breaches.push('Delta')
+  if (utilization(greeks.netGamma, limits.maxAbsGamma) >= 1.0) breaches.push('Gamma')
+  if (utilization(greeks.netVega, limits.maxAbsVega) >= 1.0) breaches.push('Vega')
+  if (utilization(greeks.netTheta, limits.maxAbsTheta) >= 1.0) breaches.push('Theta')
+  if (limits.maxUnrealizedLoss > 0 && greeks.totalUnrealizedPnl < 0 &&
+      utilization(greeks.totalUnrealizedPnl, limits.maxUnrealizedLoss) >= 1.0) {
+    breaches.push('Unrealized Loss')
+  }
+  return breaches
+}
 
-  const lossUtilization = greeks.totalUnrealizedPnl < 0
-    ? utilization(greeks.totalUnrealizedPnl, limits.maxUnrealizedLoss)
-    : 0
+export function RiskLimitsPanel({ greeks, limits }: Props) {
+  const status = useStore((s) => s.status)
+  const halt = useStore((s) => s.halt)
+  const autoHaltFiredRef = useRef(false)
+
+  const breaches = detectBreaches(greeks, limits)
+  const anyBreach = breaches.length > 0
+
+  // Auto-halt: if any limit is breached and we're not already halted,
+  // trigger the kill switch automatically. The ref prevents re-firing
+  // on every render while halted. Resets when breaches clear so a
+  // subsequent breach triggers again.
+  useEffect(() => {
+    if (anyBreach && status !== 'halted' && status !== 'off' && !autoHaltFiredRef.current) {
+      autoHaltFiredRef.current = true
+      console.warn(`[RiskLimits] AUTO-HALT triggered: ${breaches.join(', ')} breached`)
+      halt()
+    }
+    if (!anyBreach) {
+      autoHaltFiredRef.current = false
+    }
+  }, [anyBreach, status, halt, breaches])
 
   return (
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">Risk Limits</span>
-        {anyBreach && (
+        {anyBreach ? (
           <span className="panel-badge" style={{ color: 'var(--red)', fontWeight: 700 }}>
-            BREACH
+            AUTO-HALT · {breaches.join(', ')}
           </span>
+        ) : (
+          <span className="panel-badge" style={{ color: 'var(--green)' }}>AUTO-HALT ARMED</span>
         )}
       </div>
       <div className="panel-body" style={{ padding: '8px 12px', gap: 6, display: 'flex', flexDirection: 'column' }}>
