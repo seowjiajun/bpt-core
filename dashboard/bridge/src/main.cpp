@@ -167,6 +167,30 @@ int main(int argc, char** argv) {
         ws.publish(bridge::MsgKind::Tick, bridge::encode::tick(ts_ns, settings.symbol, mid));
     });
 
+    // Order lifecycle handler — forwards all exec report statuses to the
+    // dashboard so it can display open/working orders.
+    exec_sub.set_order_handler([&](const bridge::ExecSubscriber::OrderEvent& ev) {
+        if (settings.instrument_id != 0 && ev.instrument_id != settings.instrument_id) return;
+
+        static const char* kStatusStr[] = {"acked", "filled", "partial", "rejected", "cancelled"};
+        static const char* kTypeStr[]   = {"MARKET", "LIMIT", "POST_ONLY"};
+
+        const char* status_s = ev.status < 5 ? kStatusStr[ev.status] : "unknown";
+        const char* type_s   = ev.order_type < 3 ? kTypeStr[ev.order_type] : "UNKNOWN";
+
+        ws.publish(bridge::MsgKind::Order,
+                   bridge::encode::order(ev.ts_ns,
+                                         ev.order_id,
+                                         settings.symbol,
+                                         ev.side,
+                                         type_s,
+                                         ev.price,
+                                         ev.qty,
+                                         ev.filled_qty,
+                                         ev.remaining_qty,
+                                         status_s));
+    });
+
     exec_sub.set_handler([&](const bridge::ExecSubscriber::Fill& f) {
         if (settings.instrument_id != 0 && f.instrument_id != settings.instrument_id) return;
 

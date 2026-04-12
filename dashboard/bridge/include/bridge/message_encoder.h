@@ -40,4 +40,18 @@ std::string position(std::string_view symbol,
                      double avg_entry,
                      double unrealized_pnl);
 
+// { "type":"order", "ts":..., "orderId":..., "symbol":"...", "side":"BUY",
+//   "orderType":"LIMIT", "price":..., "qty":..., "filledQty":...,
+//   "remainingQty":..., "status":"acked" }
+std::string order(uint64_t ts_ns,
+                  uint64_t order_id,
+                  std::string_view symbol,
+                  Side side,
+                  std::string_view order_type,
+                  double price,
+                  double qty,
+                  double filled_qty,
+                  double remaining_qty,
+                  std::string_view status);
+
 }  // namespace bridge::encode

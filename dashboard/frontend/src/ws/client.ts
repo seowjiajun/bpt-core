@@ -18,7 +18,7 @@ function isValidMessage(x: unknown): x is Msg {
   if (!x || typeof x !== 'object') return false
   const t = (x as { type?: unknown }).type
   return (
-    t === 'session' || t === 'status' || t === 'tick' || t === 'fill' || t === 'position'
+    t === 'session' || t === 'status' || t === 'tick' || t === 'fill' || t === 'position' || t === 'order'
   )
 }
 

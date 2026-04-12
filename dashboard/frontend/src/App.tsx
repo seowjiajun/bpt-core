@@ -7,6 +7,7 @@ import { Blotter, type Fill } from './components/Blotter'
 import { PriceChart } from './components/PriceChart'
 import { EquityChart } from './components/EquityChart'
 import { HaltedBanner } from './components/HaltedBanner'
+import { OpenOrdersPanel } from './components/OpenOrdersPanel'
 import { GreeksPanel } from './components/GreeksPanel'
 import { OptionsPositionPanel } from './components/OptionsPositionPanel'
 import { VolSmileChart } from './components/VolSmileChart'
@@ -132,6 +133,7 @@ export default function App() {
         <EquityChart />
       </div>
 
+      <OpenOrdersPanel />
       <Blotter />
     </div>
   )

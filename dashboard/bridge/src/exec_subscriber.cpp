@@ -63,17 +63,37 @@ void ExecSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffer,
                       hdr.version(),
                       static_cast<uint64_t>(length));
 
-    // Only forward actual fills — ignore acks, rejects, cancels.
     const auto status = msg.status();
+    const auto side = (msg.side() == OrderSide::BUY) ? encode::Side::Buy : encode::Side::Sell;
+    const double price = static_cast<double>(msg.price()) / kPriceScale;
+
+    // Fire order lifecycle event for all statuses so the dashboard can
+    // track open/working orders.
+    if (order_handler_) {
+        OrderEvent ev{};
+        ev.ts_ns         = msg.timestampNs();
+        ev.order_id      = msg.orderId();
+        ev.instrument_id = msg.instrumentId();
+        ev.side          = side;
+        ev.status        = static_cast<uint8_t>(status);
+        ev.order_type    = msg.orderTypeRaw();
+        ev.price         = price;
+        ev.qty           = static_cast<double>(msg.filledQty() + msg.remainingQty()) / kQtyScale;
+        ev.filled_qty    = static_cast<double>(msg.filledQty()) / kQtyScale;
+        ev.remaining_qty = static_cast<double>(msg.remainingQty()) / kQtyScale;
+        order_handler_(ev);
+    }
+
+    // Only forward fills to the position tracker / equity curve.
     if (status != ExecStatus::FILLED && status != ExecStatus::PARTIAL) return;
 
     Fill f{};
     f.ts_ns         = msg.timestampNs();
     f.order_id      = msg.orderId();
     f.instrument_id = msg.instrumentId();
-    f.side          = (msg.side() == OrderSide::BUY) ? encode::Side::Buy : encode::Side::Sell;
+    f.side          = side;
     f.qty           = static_cast<double>(msg.filledQty()) / kQtyScale;
-    f.price         = static_cast<double>(msg.price()) / kPriceScale;
+    f.price         = price;
 
     if (handler_) handler_(f);
 }

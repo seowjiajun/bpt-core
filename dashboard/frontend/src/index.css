@@ -60,11 +60,12 @@ html, body, #root {
 .shell {
   display: grid;
   height: 100vh;
-  grid-template-rows: var(--header-h) 1fr 160px 200px;
+  grid-template-rows: var(--header-h) 1fr 140px 140px 180px;
   grid-template-areas:
     "topbar"
     "main"
     "equity"
+    "orders"
     "blotter";
   gap: var(--gap);
   background: var(--border); /* gap colour */
@@ -89,12 +90,13 @@ html, body, #root {
 /* Expands the grid to include a row for vol smile + options positions
  * between the main row and the equity curve. */
 .shell--options {
-  grid-template-rows: var(--header-h) 1fr 240px 140px 180px;
+  grid-template-rows: var(--header-h) 1fr 240px 130px 130px 160px;
   grid-template-areas:
     "topbar"
     "main"
     "options"
     "equity"
+    "orders"
     "blotter";
 }
 
@@ -106,6 +108,10 @@ html, body, #root {
   min-height: 0;
 }
 .options-row > * { min-height: 0; }
+
+/* ── Order status ──────────────────────────────────────────────────────────── */
+.order-status--acked   { color: var(--blue) !important; font-weight: 600; }
+.order-status--partial { color: var(--yellow) !important; font-weight: 600; }
 
 .options-agg-row td {
   border-top: 1px solid var(--border-strong);

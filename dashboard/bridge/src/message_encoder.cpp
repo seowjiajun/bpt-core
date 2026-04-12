@@ -71,4 +71,29 @@ std::string position(std::string_view symbol,
     }.dump();
 }
 
+std::string order(uint64_t ts_ns,
+                  uint64_t order_id,
+                  std::string_view symbol,
+                  Side side,
+                  std::string_view order_type,
+                  double price,
+                  double qty,
+                  double filled_qty,
+                  double remaining_qty,
+                  std::string_view status) {
+    return json{
+        {"type", "order"},
+        {"ts", ts_ns},
+        {"orderId", order_id},
+        {"symbol", symbol},
+        {"side", side == Side::Buy ? "BUY" : "SELL"},
+        {"orderType", order_type},
+        {"price", price},
+        {"qty", qty},
+        {"filledQty", filled_qty},
+        {"remainingQty", remaining_qty},
+        {"status", status},
+    }.dump();
+}
+
 }  // namespace bridge::encode

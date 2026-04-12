@@ -60,4 +60,23 @@ export interface PositionMsg {
   unrealizedPnl: number
 }
 
-export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg
+// Order lifecycle event.  Emitted for every exec report status:
+// acked → working order, partial → partially filled, filled → done,
+// cancelled → removed, rejected → never entered the book.
+export type OrderStatus = 'acked' | 'partial' | 'filled' | 'cancelled' | 'rejected'
+
+export interface OrderMsg {
+  type: 'order'
+  ts: number
+  orderId: number
+  symbol: string
+  side: Side
+  orderType: string     // "LIMIT" | "MARKET"
+  price: number
+  qty: number           // original order qty
+  filledQty: number
+  remainingQty: number
+  status: OrderStatus
+}
+
+export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg | OrderMsg

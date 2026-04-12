@@ -22,6 +22,7 @@ enum class MsgKind : uint8_t {
     Tick,       // latest wins (per symbol — single-symbol for now)
     Fill,       // appended to rolling buffer
     Position,   // latest wins (per symbol)
+    Order,      // not snapshotted — transient lifecycle events
 };
 
 // Minimal broadcast-style WebSocket server with session replay.

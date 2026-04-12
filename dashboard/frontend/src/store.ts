@@ -1,7 +1,21 @@
 import { create } from 'zustand'
-import type { ConnectionStatus, Msg, RunMode } from './types/messages'
+import type { ConnectionStatus, Msg, OrderMsg, RunMode } from './types/messages'
 import type { Fill } from './components/Blotter'
 import { sendCommand } from './ws/client'
+
+// Working order tracked by the store — derived from OrderMsg events.
+export interface OpenOrder {
+  orderId: number
+  symbol: string
+  side: 'BUY' | 'SELL'
+  orderType: string
+  price: number
+  qty: number
+  filledQty: number
+  remainingQty: number
+  status: OrderMsg['status']
+  ts: number
+}
 
 // OHLC bar for the price chart. Built client-side by rolling incoming
 // TickMsg prices into 1-minute buckets — the bridge doesn't push candles
@@ -47,6 +61,10 @@ interface State {
   // OHLC candles rolled up from incoming ticks. See BAR_SEC / MAX_CANDLES.
   candles: Candle[]
 
+  // Open/working orders keyed by orderId. Orders appear on ACKED,
+  // update on PARTIAL, and are removed on FILLED/CANCELLED/REJECTED.
+  openOrders: Map<number, OpenOrder>
+
   // Kill-switch state: tracks the previous status so resume() can restore
   // the connection dot to whatever it was before the halt.  In slice (a)
   // this is pure client state; slice (b) will drive it from server acks.
@@ -78,6 +96,7 @@ const initialState = {
   unrealizedPnl: 0,
   fills: [] as Fill[],
   candles: [] as Candle[],
+  openOrders: new Map<number, OpenOrder>(),
   preHaltStatus: null as ConnectionStatus | null,
 }
 
@@ -156,6 +175,27 @@ export const useStore = create<State>((set) => ({
             avgEntry: msg.avgEntry,
             unrealizedPnl: msg.unrealizedPnl,
           }
+
+        case 'order': {
+          const next = new Map(state.openOrders)
+          if (msg.status === 'filled' || msg.status === 'cancelled' || msg.status === 'rejected') {
+            next.delete(msg.orderId)
+          } else {
+            next.set(msg.orderId, {
+              orderId: msg.orderId,
+              symbol: msg.symbol,
+              side: msg.side,
+              orderType: msg.orderType,
+              price: msg.price,
+              qty: msg.qty,
+              filledQty: msg.filledQty,
+              remainingQty: msg.remainingQty,
+              status: msg.status,
+              ts: msg.ts,
+            })
+          }
+          return { openOrders: next }
+        }
       }
     }),
 

@@ -95,10 +95,48 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
   }
 
   fills.forEach((fill, i) => {
+    // Emit an ACKED order event slightly before the fill so the open
+    // orders panel shows orders entering the book and then filling.
+    const ackDelay = initialDelayMs + i * intervalMs - 200
+    if (ackDelay > 0) {
+      timeouts.push(
+        window.setTimeout(() => {
+          dispatch({
+            type: 'order',
+            ts: fill.ts - 200_000_000,
+            orderId: fill.orderId,
+            symbol,
+            side: fill.side,
+            orderType: 'LIMIT',
+            price: fill.price,
+            qty: fill.qty,
+            filledQty: 0,
+            remainingQty: fill.qty,
+            status: 'acked',
+          })
+        }, ackDelay),
+      )
+    }
+
     const delay = initialDelayMs + i * intervalMs
     const id = window.setTimeout(() => {
       // Tick first (price moves to the fill price)
       dispatch({ type: 'tick', ts: fill.ts, symbol, price: fill.price })
+
+      // Order filled event — removes from open orders
+      dispatch({
+        type: 'order',
+        ts: fill.ts,
+        orderId: fill.orderId,
+        symbol,
+        side: fill.side,
+        orderType: 'LIMIT',
+        price: fill.price,
+        qty: fill.qty,
+        filledQty: fill.qty,
+        remainingQty: 0,
+        status: 'filled',
+      })
 
       // Then the fill itself
       dispatch({
