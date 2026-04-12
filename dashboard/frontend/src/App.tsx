@@ -13,6 +13,7 @@ import { OptionsPositionPanel } from './components/OptionsPositionPanel'
 import { VolSmileChart } from './components/VolSmileChart'
 import { VolSurfaceHeatmap } from './components/VolSurfaceHeatmap'
 import { VolTermStructure } from './components/VolTermStructure'
+import { RiskLimitsPanel, MOCK_LIMITS } from './components/RiskLimitsPanel'
 import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
@@ -88,7 +89,7 @@ export default function App() {
           <PriceChart />
         </div>
 
-        <div className="right-col">
+        <div className={`right-col ${showOptions ? 'right-col--options' : ''}`}>
           {showOptions ? <GreeksPanel greeks={MOCK_GREEKS} /> : <PositionPanel />}
           {showOptions ? (
             <div className="panel">
@@ -101,6 +102,7 @@ export default function App() {
           ) : (
             <RiskPanel />
           )}
+          {showOptions && <RiskLimitsPanel greeks={MOCK_GREEKS} limits={MOCK_LIMITS} />}
         </div>
       </div>
 

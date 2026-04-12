@@ -85,6 +85,9 @@ html, body, #root {
   grid-template-rows: 1fr 1fr;
   gap: var(--gap);
 }
+.right-col--options {
+  grid-template-rows: auto 1fr auto;
+}
 
 /* ── Options shell variant ─────────────────────────────────────────────────── */
 /* Expands the grid to include a row for vol smile + options positions
@@ -108,6 +111,54 @@ html, body, #root {
   min-height: 0;
 }
 .options-row > * { min-height: 0; }
+
+/* ── Risk limits ──────────────────────────────────────────────────────────── */
+.limit-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 100px 36px;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.limit-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.limit-bar-track {
+  height: 6px;
+  background: var(--bg-row-alt);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.limit-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 200ms;
+}
+.limit-bar-fill.limit-ok   { background: var(--green); opacity: 0.7; }
+.limit-bar-fill.limit-warn { background: var(--yellow); opacity: 0.9; }
+.limit-bar-fill.limit-breach { background: var(--red); animation: limit-flash 0.8s ease-in-out infinite; }
+.limit-bar-threshold {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--yellow);
+  opacity: 0.5;
+}
+.limit-value { color: var(--text-secondary); text-align: right; }
+.limit-pct   { text-align: right; }
+.limit-ok    { color: var(--text-muted); }
+.limit-warn  { color: var(--yellow) !important; }
+.limit-breach { color: var(--red) !important; font-weight: 700; }
+@keyframes limit-flash {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
 
 /* ── Order status ──────────────────────────────────────────────────────────── */
 .order-status--acked   { color: var(--blue) !important; font-weight: 600; }
