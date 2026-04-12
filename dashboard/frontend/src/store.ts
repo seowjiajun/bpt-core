@@ -171,8 +171,10 @@ export const useStore = create<State>((set) => ({
             ts: msg.ts,
             orderId: msg.orderId,
             side: msg.side,
+            orderType: msg.orderType,
             qty: msg.qty,
             price: msg.price,
+            fee: msg.fee,
             realizedPnl: msg.realizedPnl,
             equity: msg.equity,
           }

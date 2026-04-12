@@ -6,8 +6,11 @@ import type { Fill } from '../components/Blotter'
 import type { Msg, Side } from '../types/messages'
 import { useStore } from '../store'
 
+// Minimal mock-fill shape — orderType and fee are synthesized by the replay.
+export type MockFill = Omit<Fill, 'seq' | 'orderType' | 'fee'>
+
 interface ReplayConfig {
-  fills: Omit<Fill, 'seq'>[]  // seq is assigned by the store, not supplied by the caller
+  fills: MockFill[]
   symbol: string
   strategy: string
   exchange: string
@@ -138,15 +141,17 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
         status: 'filled',
       })
 
-      // Then the fill itself
+      // Then the fill itself — mock is all LIMIT with a token maker fee
       dispatch({
         type: 'fill',
         ts: fill.ts,
         orderId: fill.orderId,
         symbol,
         side: fill.side,
+        orderType: 'LIMIT',
         qty: fill.qty,
         price: fill.price,
+        fee: fill.qty * fill.price * 0.0002,  // 2 bps taker-ish placeholder
         realizedPnl: fill.realizedPnl,
         equity: fill.equity,
       })

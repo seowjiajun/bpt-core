@@ -6,8 +6,10 @@ export interface Fill {
   ts: number          // ns since epoch
   orderId: number
   side: 'BUY' | 'SELL'
+  orderType: string
   qty: number
   price: number
+  fee: number
   realizedPnl: number
   equity: number
 }
@@ -51,8 +53,10 @@ export function Blotter(props: BlotterProps = {}) {
               <th>Time (UTC)</th>
               <th>ID</th>
               <th>Side</th>
+              <th>Type</th>
               <th>Qty</th>
               <th>Price</th>
+              <th>Fee</th>
               <th>Realized PnL</th>
               <th>Equity</th>
             </tr>
@@ -60,7 +64,7 @@ export function Blotter(props: BlotterProps = {}) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
                   No fills yet
                 </td>
               </tr>
@@ -70,8 +74,12 @@ export function Blotter(props: BlotterProps = {}) {
                 <td>{fmtTime(f.ts)}</td>
                 <td style={{ color: 'var(--text-muted)' }}>#{f.orderId}</td>
                 <td className={f.side === 'BUY' ? 'side-buy' : 'side-sell'}>{f.side}</td>
+                <td style={{ color: 'var(--text-muted)' }}>{f.orderType}</td>
                 <td>{f.qty.toFixed(4)}</td>
                 <td>{fmtPrice(f.price)}</td>
+                <td style={{ color: 'var(--text-muted)' }}>
+                  {f.fee === 0 ? '—' : `$${f.fee.toFixed(4)}`}
+                </td>
                 <td className={pnlClass(f.realizedPnl)}>
                   {f.realizedPnl === 0 ? '—' : `${f.realizedPnl >= 0 ? '+' : ''}$${f.realizedPnl.toFixed(2)}`}
                 </td>

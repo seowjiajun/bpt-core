@@ -19,8 +19,10 @@ public:
         uint64_t       order_id;
         uint64_t       instrument_id;
         encode::Side   side;
+        uint8_t        order_type;  // raw OrderType enum (0=MARKET, 1=LIMIT, 2=POST_ONLY)
         double         qty;     // natural units
         double         price;   // natural units
+        double         fee;     // in quote currency (natural units, signed — positive = paid)
     };
 
     // Full order lifecycle event — includes all exec report statuses.

@@ -69,8 +69,10 @@ export function ArchiveDetail({ name }: Props) {
     ts: t.ts,
     orderId: t.orderId,
     side: t.side,
+    orderType: 'LIMIT',  // archive runs don't persist order type — default to LIMIT
     qty: t.qty,
     price: t.price,
+    fee: 0,              // not persisted in archive CSVs today
     realizedPnl: t.realizedPnl,
     equity: t.equity,
   }))

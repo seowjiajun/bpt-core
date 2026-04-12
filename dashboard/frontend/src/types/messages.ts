@@ -45,8 +45,10 @@ export interface FillMsg {
   orderId: number
   symbol: string
   side: Side
+  orderType: string   // "LIMIT" | "MARKET" | "POST_ONLY"
   qty: number
   price: number
+  fee: number         // in quote currency
   realizedPnl: number
   equity: number
 }

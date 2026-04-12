@@ -24,13 +24,16 @@ std::string status(std::string_view state);
 // { "type":"tick", "ts":..., "symbol":"BTC-USDT", "price":... }
 std::string tick(uint64_t ts_ns, std::string_view symbol, double price);
 
-// { "type":"fill", "ts":..., "orderId":..., "symbol":"...", "side":"BUY", ... }
+// { "type":"fill", "ts":..., "orderId":..., "symbol":"...", "side":"BUY",
+//   "orderType":"LIMIT", "qty":..., "price":..., "fee":..., ... }
 std::string fill(uint64_t ts_ns,
                  uint64_t order_id,
                  std::string_view symbol,
                  Side side,
+                 std::string_view order_type,
                  double qty,
                  double price,
+                 double fee,
                  double realized_pnl,
                  double equity);
 

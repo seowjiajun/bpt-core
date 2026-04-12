@@ -14,6 +14,7 @@ namespace bridge {
 namespace {
 constexpr double kPriceScale = 1e8;
 constexpr double kQtyScale   = 1e8;  // filled_qty = natural * 1e8
+constexpr double kFeeScale   = 1e8;
 }
 
 ExecSubscriber::ExecSubscriber(std::shared_ptr<aeron::Aeron> aeron,
@@ -92,8 +93,10 @@ void ExecSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffer,
     f.order_id      = msg.orderId();
     f.instrument_id = msg.instrumentId();
     f.side          = side;
+    f.order_type    = msg.orderTypeRaw();
     f.qty           = static_cast<double>(msg.filledQty()) / kQtyScale;
     f.price         = price;
+    f.fee           = static_cast<double>(msg.fee()) / kFeeScale;
 
     if (handler_) handler_(f);
 }

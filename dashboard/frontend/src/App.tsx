@@ -3,7 +3,8 @@ import './App.css'
 import { TopBar } from './components/TopBar'
 import { PositionPanel } from './components/PositionPanel'
 import { RiskPanel } from './components/RiskPanel'
-import { Blotter, type Fill } from './components/Blotter'
+import { Blotter } from './components/Blotter'
+import type { MockFill } from './mock/replay'
 import { PriceChart } from './components/PriceChart'
 import { EquityChart } from './components/EquityChart'
 import { HaltedBanner } from './components/HaltedBanner'
@@ -17,7 +18,7 @@ import { RiskLimitsPanel, MOCK_LIMITS } from './components/RiskLimitsPanel'
 import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
-import { optLegs, optGreeks, optSurface, spot } from './mock/options'
+import { MOCK_LEGS, MOCK_GREEKS, MOCK_VOL_SURFACE, MOCK_SPOT } from './mock/options'
 
 // VITE_WS_URL selects the data source:
 //   unset or "mock"           → in-memory mock replay of trades.csv
@@ -26,7 +27,7 @@ const WS_URL = import.meta.env.VITE_WS_URL ?? 'mock'
 
 // ── Static mock fills (the 22 round trips from trades.csv) ────────────────────
 // Typed without `seq` — the store assigns it when each fill is dispatched.
-const MOCK_FILLS: Omit<Fill, 'seq'>[] = [
+const MOCK_FILLS: MockFill[] = [
   { ts: 1767721259502000000, orderId: 1,  side: 'BUY',  qty: 1, price: 92007.0, realizedPnl: 0,      equity: 100071.25 },
   { ts: 1767721274101000000, orderId: 2,  side: 'SELL', qty: 1, price: 92091.1, realizedPnl: 84.10,  equity: 100084.10 },
   { ts: 1767722407301000000, orderId: 3,  side: 'BUY',  qty: 1, price: 91300.1, realizedPnl: 0,      equity: 100084.05 },
@@ -77,10 +78,10 @@ export default function App() {
   const price = useStore((s) => s.price)
 
   const hasLiveOptions = storeLegs.length > 0
-  const optLegs = hasLiveOptions ? storeLegs : optLegs
-  const optGreeks = storeGreeks ?? optGreeks
-  const optSurface = storeSurface.length > 0 ? storeSurface : optSurface
-  const spot = price || spot
+  const optLegs = hasLiveOptions ? storeLegs : MOCK_LEGS
+  const optGreeks = storeGreeks ?? MOCK_GREEKS
+  const optSurface = storeSurface.length > 0 ? storeSurface : MOCK_VOL_SURFACE
+  const spot = price || MOCK_SPOT
 
   // Show options panels in mock mode (dev) or when live options data arrives.
   const showOptions = WS_URL === 'mock' || hasLiveOptions

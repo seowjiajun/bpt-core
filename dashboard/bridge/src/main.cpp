@@ -216,13 +216,17 @@ int main(int argc, char** argv) {
 
         const auto res = tracker.apply(f.side, f.qty, f.price);
 
+        static const char* kTypeStr[] = {"MARKET", "LIMIT", "POST_ONLY"};
+        const char* type_s = f.order_type < 3 ? kTypeStr[f.order_type] : "UNKNOWN";
         ws.publish(bridge::MsgKind::Fill,
                    bridge::encode::fill(f.ts_ns,
                                         f.order_id,
                                         settings.symbol,
                                         f.side,
+                                        type_s,
                                         f.qty,
                                         f.price,
+                                        f.fee,
                                         res.realized_pnl,
                                         res.equity));
 
