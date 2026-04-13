@@ -11,6 +11,7 @@
         {"name": "boost-system", "default-features": false},
         "simdjson",
         "openssl",
+        "secp256k1",
         "nlohmann-json",
         "gtest",
         {"name": "prometheus-cpp", "features": ["pull"]},

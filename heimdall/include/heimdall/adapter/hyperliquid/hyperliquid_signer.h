@@ -1,43 +1,51 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <string_view>
 
+#include <boost/json/fwd.hpp>
+
 namespace heimdall::adapter {
 
 // Signed Hyperliquid transaction — returned by HyperliquidSigner.
+// r/s are 32-byte hex strings with NO "0x" prefix. v is 27 or 28 (the
+// recovery id + 27, as Hyperliquid expects).
 struct SignedTransaction {
-    std::string r;  // 32-byte hex
-    std::string s;  // 32-byte hex
-    uint8_t v;      // recovery id
+    std::string r;
+    std::string s;
+    uint8_t v;
     uint64_t nonce;
 };
 
-// Parameters for a new order to sign.
-struct OrderSignParams {
-    std::string coin;  // exchange native coin (e.g. "BTC")
-    bool is_buy;
-    double price;
-    double size;
-    bool reduce_only{false};
-    uint64_t cloid;  // client order ID
-};
-
-// HyperliquidSigner holds the private key and performs EIP-712 typed data
-// signing. SECURITY:
-//   - Key is passed in as a 64-char hex string (loaded from Secrets Manager by caller).
-//   - Key bytes are stored in a member array zeroed on destruction.
-//   - No method exposes the key bytes.
-//   - No signing intermediate values are logged.
-//   - This class is final, non-copyable, non-movable.
+// HyperliquidSigner holds the private key and signs L1 actions.
+//
+// Hyperliquid's L1 signing scheme (from the official Python SDK):
+//   1. msgpack-encode the action JSON object (insertion-order, no sorting)
+//   2. connectionId = keccak256(msgpack || nonce_BE_8 || vault_byte || expires_byte)
+//      vault_byte   = 0x00 if no vault, else 0x01 || vault_address(20)
+//      expires_byte = 0x00 if no expires, else 0x01 || expires_BE_8
+//   3. Build EIP-712 typed data:
+//        domain   = {name:"Exchange", version:"1", chainId:1337,
+//                    verifyingContract:0x0000000000000000000000000000000000000000}
+//        struct   = Agent(string source, bytes32 connectionId)
+//        source   = "a" (mainnet) or "b" (testnet)
+//   4. Sign keccak256("\x19\x01" || domainSep || structHash) via secp256k1
+//      with a canonical-low-s signature, recover id → v ∈ {27,28}
+//
+// SECURITY:
+//   - Key is passed in as a hex string (with or without 0x prefix).
+//   - Key bytes live in a member array zeroed on destruction.
+//   - No method exposes the key bytes and no intermediate values are logged.
+//   - Final class, non-copyable, non-movable.
 class HyperliquidSigner final {
 public:
-    // Accepts the 64-char hex private key directly. Throws std::runtime_error if
-    // the key is absent or malformed.
-    explicit HyperliquidSigner(std::string_view private_key_hex);
-
+    // hex: 64-char secp256k1 private key (optionally 0x-prefixed).
+    // is_mainnet: determines the "source" field in the Agent struct
+    //             ("a" for mainnet, "b" for testnet).
+    HyperliquidSigner(std::string_view hex, bool is_mainnet);
     ~HyperliquidSigner();
 
     HyperliquidSigner(const HyperliquidSigner&) = delete;
@@ -45,25 +53,21 @@ public:
     HyperliquidSigner(HyperliquidSigner&&) = delete;
     HyperliquidSigner& operator=(HyperliquidSigner&&) = delete;
 
-    // Sign a new order. Returns the signed transaction for inclusion in the REST
-    // request.
-    [[nodiscard]] SignedTransaction sign_order(const OrderSignParams& params);
+    // Sign an L1 action (e.g. {"type":"order",...} or {"type":"cancel",...}).
+    // The caller owns nonce assignment — use next_nonce() for a
+    // monotonic timestamp-based counter.
+    [[nodiscard]] SignedTransaction sign_l1_action(const boost::json::value& action, uint64_t nonce) const;
 
-    // Sign a cancel request.
-    [[nodiscard]] SignedTransaction sign_cancel(const std::string& coin, uint64_t oid);
-
-    // Increment and return the next nonce.
+    // Returns a monotonic, unique nonce suitable for use with Hyperliquid.
+    // Implemented as max(now_ms, last+1).
     [[nodiscard]] uint64_t next_nonce() noexcept;
 
-private:
-    // 32-byte private key — zeroed in destructor.
-    std::array<uint8_t, 32> key_{};
-    uint64_t nonce_{0};
+    bool is_mainnet() const noexcept { return is_mainnet_; }
 
-    // EIP-712 domain separator (precomputed from HL mainnet chain ID 1337).
-    // Implementation uses OpenSSL for keccak256 and secp256k1 for ECDSA.
-    [[nodiscard]] std::array<uint8_t, 32> keccak256(const uint8_t* data, std::size_t len) const;
-    [[nodiscard]] SignedTransaction ecdsa_sign(const std::array<uint8_t, 32>& hash) const;
+private:
+    std::array<uint8_t, 32> key_{};
+    bool is_mainnet_{false};
+    std::atomic<uint64_t> last_nonce_{0};
 };
 
 }  // namespace heimdall::adapter

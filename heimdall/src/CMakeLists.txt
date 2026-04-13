@@ -32,6 +32,7 @@ target_link_libraries(heimdall_lib PUBLIC
     Boost::json
     OpenSSL::SSL
     OpenSSL::Crypto
+    libsecp256k1::secp256k1
     Threads::Threads
     prometheus-cpp::pull
 )

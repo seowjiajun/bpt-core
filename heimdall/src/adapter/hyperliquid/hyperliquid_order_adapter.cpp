@@ -17,6 +17,8 @@
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/json.hpp>
 #include <chrono>
+#include <cmath>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 
@@ -32,6 +34,37 @@ using tcp = net::ip::tcp;
 
 static constexpr double kScale = 1e8;
 
+// Format a double matching Hyperliquid's Python SDK `float_to_wire`:
+//   1. Format to 8 decimals ("%.8f")
+//   2. Strip trailing zeros after the decimal point
+//   3. Strip the decimal point if nothing follows
+//
+// Examples (must match Python):
+//   72198.0575 → "72198.0575"
+//   50000.0    → "50000"
+//   0.001      → "0.001"
+//
+// HL's server normalizes the string to this canonical form before hashing,
+// so the wire string we msgpack MUST match this exactly — otherwise the
+// server-computed hash diverges from ours and ECDSA recovers a garbage
+// address (yielding "User or API Wallet does not exist").
+std::string float_to_wire(double v) {
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%.8f", v);
+    std::string s(buf);
+    // Strip trailing zeros after the decimal point.
+    auto dot = s.find('.');
+    if (dot != std::string::npos) {
+        auto last = s.find_last_not_of('0');
+        if (last == dot)
+            s.erase(dot);           // e.g. "50000." → "50000"
+        else
+            s.erase(last + 1);      // e.g. "72198.05750000" → "72198.0575"
+    }
+    if (s == "-0") s = "0";
+    return s;
+}
+
 HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cfg, const ExchangeCredentials& creds)
     : OrderAdapterBase(cfg),
       wallet_address_(creds.wallet_address) {
@@ -46,7 +79,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
         return;
     }
     try {
-        signer_ = std::make_unique<HyperliquidSigner>(creds.private_key);
+        signer_ = std::make_unique<HyperliquidSigner>(creds.private_key, !cfg.testnet);
         enabled_ = true;
         ygg::log::info("[Heimdall] HyperliquidOrderAdapter: signer loaded");
     } catch (const std::exception& e) {
@@ -228,43 +261,46 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
     using OS = bifrost::protocol::OrderSide;
 
     const std::string exchange_symbol = order.getExchangeSymbolAsString();
-
-    OrderSignParams params;
-    params.coin = exchange_symbol;
-    params.is_buy = (order.side() == OS::BUY);
-    params.price = static_cast<double>(order.price()) / kScale;
-    params.size = static_cast<double>(order.quantity()) / kScale;
-    params.cloid = order.orderId();
+    const bool is_buy = (order.side() == OS::BUY);
+    const double price_d = static_cast<double>(order.price()) / kScale;
+    const double size_d  = static_cast<double>(order.quantity()) / kScale;
 
     try {
-        auto tx = signer_->sign_order(params);
-
-        // Build Hyperliquid order request JSON.
+        // Build Hyperliquid order action JSON. The exact same JSON is
+        // msgpack-encoded by the signer so the signature matches what's
+        // POSTed — do NOT mutate `action` after signing.
+        //
         // Hyperliquid expects "a" as the asset INDEX (integer), not a coin
         // object. The index is from /info meta.universe[].name → position.
         // For now we hardcode BTC=0 since the strategy only trades BTC; a
         // proper fix would build a coin→index map at startup from /info meta.
-        // The "c" (cloid) field is optional and must be 16-byte hex if used,
-        // so we omit it for now.
-        json::object action;
-        action["type"] = "order";
-
-        int asset_idx = 0;  // BTC on Hyperliquid testnet
-        if (exchange_symbol == "ETH") asset_idx = 4;
-        // TODO: build a real coin→index map from /info meta at startup.
+        // TODO: load coin→(asset_idx, szDecimals) from /info meta at startup.
+        // Values below are TESTNET only and will diverge from mainnet.
+        int asset_idx = 3;       // BTC on Hyperliquid testnet
+        int sz_decimals = 5;     // BTC szDecimals
+        if (exchange_symbol == "ETH") { asset_idx = 4; sz_decimals = 4; }
+        (void)sz_decimals;
+        // Price rule: max (6 - szDecimals) decimals AND max 5 significant
+        // figures. For BTC (szDecimals=5) that's max 1 decimal and 5 sig
+        // figs → at ~$72k, the only valid form is an integer. Round to
+        // integer as the simplest compliant format for now.
+        const double px_rounded = std::round(price_d);
 
         json::object ord;
         ord["a"] = asset_idx;
-        ord["b"] = params.is_buy;
-        ord["p"] = std::to_string(params.price);
-        ord["s"] = std::to_string(params.size);
-        ord["r"] = params.reduce_only;
+        ord["b"] = is_buy;
+        ord["p"] = float_to_wire(px_rounded);
+        ord["s"] = float_to_wire(size_d);
+        ord["r"] = false;
         ord["t"] = json::object{{"limit", json::object{{"tif", "Gtc"}}}};
 
-        json::array orders;
-        orders.push_back(ord);
-        action["orders"] = std::move(orders);
+        json::object action;
+        action["type"] = "order";
+        action["orders"] = json::array{std::move(ord)};
         action["grouping"] = "na";
+
+        const uint64_t nonce = signer_->next_nonce();
+        auto tx = signer_->sign_l1_action(action, nonce);
 
         json::object signature;
         signature["r"] = "0x" + tx.r;
@@ -273,15 +309,15 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
 
         json::object req;
         req["action"] = std::move(action);
-        req["nonce"] = tx.nonce;
+        req["nonce"] = nonce;
         req["signature"] = std::move(signature);
 
         std::string resp = https_post("/exchange", json::serialize(req));
         ygg::log::info("[Heimdall] HyperliquidOrderAdapter: new order id={} side={} px={} sz={} resp={}",
                        order.orderId(),
-                       params.is_buy ? "BUY" : "SELL",
-                       params.price,
-                       params.size,
+                       is_buy ? "BUY" : "SELL",
+                       price_d,
+                       size_d,
                        resp);
 
         // Parse the /exchange response and emit ACKED/FILLED/REJECTED so
@@ -393,19 +429,22 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
     }
 
     try {
-        auto tx = signer_->sign_cancel(native_symbol, cancel.orderId());
+        // Build cancel action first, then sign the exact bytes we POST.
+        // Hyperliquid's cancel-by-oid action shape:
+        //   {"type":"cancel","cancels":[{"a":<asset_idx>,"o":<oid>}]}
+        int asset_idx = 3;  // BTC on Hyperliquid testnet (see send_new_order note)
+        if (native_symbol == "ETH") asset_idx = 4;
+
+        json::object c;
+        c["a"] = asset_idx;
+        c["o"] = cancel.orderId();
 
         json::object action;
         action["type"] = "cancel";
+        action["cancels"] = json::array{std::move(c)};
 
-        json::array cancels;
-        json::object c;
-        json::object asset;
-        asset["coin"] = native_symbol;
-        c["a"] = asset;
-        c["o"] = cancel.orderId();
-        cancels.push_back(c);
-        action["cancels"] = std::move(cancels);
+        const uint64_t nonce = signer_->next_nonce();
+        auto tx = signer_->sign_l1_action(action, nonce);
 
         json::object signature;
         signature["r"] = "0x" + tx.r;
@@ -414,11 +453,50 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
 
         json::object req;
         req["action"] = std::move(action);
-        req["nonce"] = tx.nonce;
+        req["nonce"] = nonce;
         req["signature"] = std::move(signature);
 
         std::string resp = https_post("/exchange", json::serialize(req));
-        ygg::log::debug("[Heimdall] HyperliquidOrderAdapter: cancel resp={}", resp);
+        ygg::log::info("[Heimdall] HyperliquidOrderAdapter: cancel id={} resp={}",
+                       cancel.orderId(), resp);
+
+        // Emit a CANCELLED ExecEvent on successful cancel so OrderStateManager
+        // can transition the order to a terminal state. Without this, the
+        // state machine leaves the order "ACKED" forever and the stale-order
+        // watchdog fires ~30s later with a synthetic CANCELLED anyway — but
+        // the slot remains held in the meantime, which wedges Stoikov.
+        //
+        // HL cancel response shape:
+        //   {"status":"ok","response":{"type":"cancel","data":{"statuses":[
+        //     "success"                                   // cancelled
+        //     | {"error":"Order was never placed..."}     // already gone
+        //   ]}}}
+        using ES = bifrost::protocol::ExecStatus;
+        using RR = bifrost::protocol::RejectReason;
+        using FC = bifrost::protocol::FeeCurrency;
+        try {
+            auto rj = json::parse(resp).as_object();
+            const std::string status = rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
+            if (status != "ok") return;
+
+            const uint64_t now_ns = static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+
+            ExecEvent ev{};
+            ev.order_id = cancel.orderId();
+            ev.exchange_id = bifrost::protocol::ExchangeId::HYPERLIQUID;
+            ev.status = ES::CANCELLED;
+            ev.reject_reason = RR::NULL_VALUE;
+            ev.fee_currency = FC::USDT;
+            ev.exchange_ts_ns = now_ns;
+            ev.local_ts_ns = now_ns;
+            if (!exec_queue_.try_push(ev))
+                ygg::log::error("[Hyperliquid] exec_queue full — dropped CANCELLED ExecEvent");
+        } catch (const std::exception& e) {
+            ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: failed to parse cancel resp: {}",
+                           e.what());
+        }
     } catch (const std::exception& e) {
         ygg::log::error("[Heimdall] HyperliquidOrderAdapter: send_cancel failed: {}", e.what());
     }
@@ -435,31 +513,34 @@ void HyperliquidOrderAdapter::send_modify(const bifrost::protocol::ModifyOrder& 
         return;
     }
 
-    // Hyperliquid supports order amendment
     try {
-        OrderSignParams params;
-        params.coin = native_symbol;
-        params.is_buy = true;  // side is not in ModifyOrder; retrieved from state in production
-        params.price = static_cast<double>(modify.newPrice()) / kScale;
-        params.size = static_cast<double>(modify.newQuantity()) / kScale;
-        params.cloid = modify.orderId();
+        // Build modify action first, then sign the exact bytes we POST.
+        // Side is not present in ModifyOrder — we default to buy and rely
+        // on upstream order-state tracking to only modify orders in-book.
+        int asset_idx = 3;  // BTC on Hyperliquid testnet (see send_new_order note)
+        if (native_symbol == "ETH") asset_idx = 4;
 
-        auto tx = signer_->sign_order(params);
+        const double price_d = static_cast<double>(modify.newPrice()) / kScale;
+        const double size_d  = static_cast<double>(modify.newQuantity()) / kScale;
+
+        json::object ord_inner;
+        ord_inner["a"] = asset_idx;
+        ord_inner["b"] = true;
+        ord_inner["p"] = float_to_wire(std::round(price_d));
+        ord_inner["s"] = float_to_wire(size_d);
+        ord_inner["r"] = false;
+        ord_inner["t"] = json::object{{"limit", json::object{{"tif", "Gtc"}}}};
+
+        json::object m;
+        m["oid"] = modify.orderId();
+        m["order"] = std::move(ord_inner);
 
         json::object action;
         action["type"] = "modify";
+        action["modifies"] = json::array{std::move(m)};
 
-        json::object ord;
-        json::object asset;
-        asset["coin"] = native_symbol;
-        ord["oid"] = modify.orderId();
-        ord["order"] = json::object{{"a", asset},
-                                    {"b", true},
-                                    {"p", std::to_string(params.price)},
-                                    {"s", std::to_string(params.size)},
-                                    {"r", false},
-                                    {"t", json::object{{"limit", json::object{{"tif", "Gtc"}}}}}};
-        action["modifies"] = json::array{ord};
+        const uint64_t nonce = signer_->next_nonce();
+        auto tx = signer_->sign_l1_action(action, nonce);
 
         json::object signature;
         signature["r"] = "0x" + tx.r;
@@ -468,7 +549,7 @@ void HyperliquidOrderAdapter::send_modify(const bifrost::protocol::ModifyOrder& 
 
         json::object req;
         req["action"] = std::move(action);
-        req["nonce"] = tx.nonce;
+        req["nonce"] = nonce;
         req["signature"] = std::move(signature);
 
         std::string resp = https_post("/exchange", json::serialize(req));

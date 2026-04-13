@@ -39,7 +39,12 @@ void OrderProcessor::on_exec_event(const adapter::ExecEvent& ev) {
 
     const OL new_lc = exec_status_to_lifecycle(ev.status);
 
-    state_mgr_.update(ev.order_id, new_lc, ev.exchange_order_id, ev.filled_qty, ev.remaining_qty, ev.local_ts_ns);
+    // Use TscClock consistently for state_mgr timestamps so check_stale's
+    // `cur_ns - last_update_ns` never underflows. Adapters set ev.local_ts_ns
+    // from system_clock on their own thread, which can drift from TscClock
+    // by a few ms and cause uint64 underflow in the stale check. The adapter
+    // timestamp still flows through the published ExecReport below.
+    state_mgr_.update(ev.order_id, new_lc, ev.exchange_order_id, ev.filled_qty, ev.remaining_qty, now_ns());
 
     // Release the open-order risk slot before publishing the exec report so
     // that Fenrir can immediately place a replacement order if needed.
