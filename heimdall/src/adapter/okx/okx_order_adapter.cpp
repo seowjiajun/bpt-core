@@ -164,8 +164,10 @@ void OKXOrderAdapter::fetch_inst_id_codes() {
 void OKXOrderAdapter::start() {
     // instIdCodes are only available from the real OKX REST API — skip in backtest
     // (use_tls=false means we're talking to a local simulation server).
-    if (cfg_.use_tls)
+    if (cfg_.use_tls) {
         fetch_inst_id_codes();
+        fetch_and_log_account_config();
+    }
     OrderAdapterBase::start();
 }
 
@@ -653,6 +655,93 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
                    static_cast<double>(snap.available_balance_e8) / 1e8,
                    snap.positions.size());
     return snap;
+}
+
+void OKXOrderAdapter::fetch_and_log_account_config() {
+    namespace net = boost::asio;
+    namespace ssl = net::ssl;
+    namespace http = boost::beast::http;
+    using tcp = net::ip::tcp;
+
+    try {
+        net::io_context ioc;
+        ssl::context ssl_ctx(ssl::context::tls_client);
+        ssl_ctx.set_default_verify_paths();
+        ssl_ctx.set_verify_mode(ssl::verify_peer);
+
+        tcp::resolver resolver(ioc);
+        beast::ssl_stream<beast::tcp_stream> stream(ioc, ssl_ctx);
+        if (!SSL_set_tlsext_host_name(stream.native_handle(), cfg_.rest_host.c_str()))
+            throw std::runtime_error("SSL_set_tlsext_host_name failed");
+        auto results = resolver.resolve(cfg_.rest_host, cfg_.rest_port);
+        beast::get_lowest_layer(stream).connect(results);
+        stream.handshake(ssl::stream_base::client);
+
+        auto req = okx_signed_get(cfg_.rest_host,
+                                  "/api/v5/account/config",
+                                  api_key_,
+                                  secret_key_,
+                                  passphrase_,
+                                  cfg_.testnet);
+        http::write(stream, req);
+        beast::flat_buffer buf;
+        http::response<http::string_body> res;
+        http::read(stream, buf, res);
+
+        auto j = json::parse(res.body());
+        if (!j.is_object()) {
+            ygg::log::warn("[OKX account/config] unexpected response shape");
+            return;
+        }
+        auto& obj = j.as_object();
+        if (obj.contains("code") && obj.at("code").as_string() != "0") {
+            ygg::log::warn("[OKX account/config] error code={} msg={}",
+                           std::string(obj.at("code").as_string()),
+                           obj.contains("msg") ? std::string(obj.at("msg").as_string()) : "");
+            return;
+        }
+        if (!obj.contains("data") || !obj.at("data").is_array() || obj.at("data").as_array().empty())
+            return;
+
+        const auto& d = obj.at("data").as_array().at(0).as_object();
+        const std::string acct_lv = d.contains("acctLv") ? std::string(d.at("acctLv").as_string()) : "?";
+        const std::string perm = d.contains("perm") ? std::string(d.at("perm").as_string()) : "?";
+        const std::string pos_mode = d.contains("posMode") ? std::string(d.at("posMode").as_string()) : "?";
+        const std::string label = d.contains("label") ? std::string(d.at("label").as_string()) : "";
+        const std::string uid = d.contains("uid") ? std::string(d.at("uid").as_string()) : "";
+
+        // Human-readable account level mapping per OKX docs:
+        // 1 = Simple (spot only), 2 = Single-currency margin,
+        // 3 = Multi-currency margin, 4 = Portfolio margin.
+        const char* lvl_name = "Unknown";
+        bool derivatives_allowed = false;
+        if (acct_lv == "1") {
+            lvl_name = "Simple (spot only)";
+        } else if (acct_lv == "2") {
+            lvl_name = "Single-currency margin";
+            derivatives_allowed = true;
+        } else if (acct_lv == "3") {
+            lvl_name = "Multi-currency margin";
+            derivatives_allowed = true;
+        } else if (acct_lv == "4") {
+            lvl_name = "Portfolio margin";
+            derivatives_allowed = true;
+        }
+
+        ygg::log::info("[OKX account/config] uid={} label='{}' acctLv={} ({}) perm={} posMode={}",
+                       uid, label, acct_lv, lvl_name, perm, pos_mode);
+
+        if (!derivatives_allowed) {
+            ygg::log::warn("[OKX account/config] ACCOUNT CANNOT TRADE DERIVATIVES — "
+                           "level {} is spot-only. Perp/futures/options orders will reject "
+                           "with sCode=51155 'local compliance requirements' (the real cause "
+                           "is the account level, not geo-compliance). Upgrade via OKX UI: "
+                           "Demo Trading → Account Mode → Single-currency margin or higher.",
+                           acct_lv);
+        }
+    } catch (const std::exception& e) {
+        ygg::log::warn("[OKX account/config] fetch failed: {}", e.what());
+    }
 }
 
 }  // namespace heimdall::adapter

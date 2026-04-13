@@ -56,6 +56,13 @@ private:
                               bool signed_req = false);
     void fetch_inst_id_codes();
 
+    // Fetch /api/v5/account/config at startup and log acctLv + perm.
+    // Warns prominently if the account is Level 1 (spot-only) because
+    // any attempt to trade derivatives will fail with OKX sCode 51155
+    // ("local compliance requirements") — the account level is the
+    // real cause, not geo-compliance.
+    void fetch_and_log_account_config();
+
     std::string api_key_;
     std::string secret_key_;
     std::string passphrase_;
