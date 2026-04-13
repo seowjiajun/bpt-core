@@ -147,6 +147,12 @@ static uint8_t hex_nibble(char c) {
 HyperliquidSigner::HyperliquidSigner(std::string_view hex) {
     if (hex.empty())
         throw std::runtime_error("HyperliquidSigner: private key is empty");
+
+    // Accept both "0x"-prefixed and raw hex — "0x" is standard Ethereum
+    // tooling convention (wallets, MetaMask exports, etc. include it).
+    if (hex.size() >= 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
+        hex.remove_prefix(2);
+
     if (hex.size() != 64)
         throw std::runtime_error("HyperliquidSigner: private key must be exactly 64 hex characters (32 bytes)");
 

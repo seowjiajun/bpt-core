@@ -137,30 +137,74 @@ void HyperliquidOrderAdapter::connect_and_run() {
         [](websocket::request_type& req) { req.set(boost::beast::http::field::user_agent, "heimdall/0.1"); }));
     ws->handshake(cfg_.ws_host, cfg_.ws_path);
 
-    // Subscribe to user fills
-    json::object sub_msg;
-    sub_msg["method"] = "subscribe";
-    json::object sub_detail;
-    sub_detail["type"] = "userFills";
-    // Note: Hyperliquid requires a user address for userFills subscription.
-    // In production, derive from the private key.
-    sub_detail["user"] = "0x0000000000000000000000000000000000000000";
-    sub_msg["subscription"] = sub_detail;
-    ws->write(net::buffer(json::serialize(sub_msg)));
+    // Subscribe to userFills for the main wallet. The real address comes
+    // from credentials (HYPERLIQUID_WALLET_ADDRESS). A placeholder zero
+    // address would cause Hyperliquid to silently reject the subscription,
+    // leaving the WS connection idle and closed after ~60s.
+    if (wallet_address_.empty()) {
+        ygg::log::warn(
+            "[Heimdall] HyperliquidOrderAdapter: wallet_address empty — "
+            "skipping userFills subscribe. WS will idle-close.");
+    } else {
+        json::object sub_msg;
+        sub_msg["method"] = "subscribe";
+        json::object sub_detail;
+        sub_detail["type"] = "userFills";
+        sub_detail["user"] = wallet_address_;
+        sub_msg["subscription"] = sub_detail;
+        ws->write(net::buffer(json::serialize(sub_msg)));
+        ygg::log::info("[Heimdall] HyperliquidOrderAdapter: subscribed userFills for {}", wallet_address_);
+    }
 
     connected_.store(true, std::memory_order_relaxed);
     ygg::log::info("[Heimdall] HyperliquidOrderAdapter connected");
 
+    // Hyperliquid closes idle WS after ~60s. Previous attempt (ping after
+    // ws.read) didn't work: ws->read() blocks for the full 60s even with
+    // get_lowest_layer().expires_after(5s) — that timer only applies to the
+    // first TCP op inside a multi-frame WS read, so the timeout is bypassed
+    // by trickle-data from the initial userFills snapshot.
+    //
+    // Solution: dedicated ping thread. Beast websocket::stream supports
+    // concurrent read+write from different threads as long as each direction
+    // is single-threaded. Reader stays in this loop; ping thread writes.
+    std::atomic<bool> ping_stop{false};
+    std::thread ping_thread([&] {
+        while (!ping_stop.load(std::memory_order_relaxed)) {
+            // Sleep in 1s slices so shutdown is responsive.
+            for (int i = 0; i < 20 && !ping_stop.load(std::memory_order_relaxed); ++i)
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            if (ping_stop.load(std::memory_order_relaxed))
+                break;
+            try {
+                static const std::string msg = R"({"method":"ping"})";
+                ws->write(net::buffer(msg));
+                ygg::log::info("[Heimdall] HyperliquidOrderAdapter: ping sent");
+            } catch (const std::exception& e) {
+                ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: ping write failed: {}",
+                               e.what());
+                // Don't throw — let the reader detect the dead connection
+                // and trigger reconnect via the normal error path.
+                break;
+            }
+        }
+    });
+    // Join the ping thread on scope exit (normal exit and exceptions).
+    struct JoinGuard {
+        std::atomic<bool>& stop;
+        std::thread& th;
+        ~JoinGuard() {
+            stop.store(true, std::memory_order_relaxed);
+            if (th.joinable()) th.join();
+        }
+    } join_guard{ping_stop, ping_thread};
+
     beast::flat_buffer buf;
     while (!stop_flag_.load(std::memory_order_relaxed)) {
-        beast::get_lowest_layer(*ws).expires_after(std::chrono::seconds(30));
         beast::error_code ec;
         ws->read(buf, ec);
 
         if (ec == beast::error::timeout) {
-            json::object ping;
-            ping["method"] = "ping";
-            ws->write(net::buffer(json::serialize(ping)));
             buf.consume(buf.size());
             continue;
         }
@@ -195,20 +239,27 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
     try {
         auto tx = signer_->sign_order(params);
 
-        // Build Hyperliquid order request JSON
+        // Build Hyperliquid order request JSON.
+        // Hyperliquid expects "a" as the asset INDEX (integer), not a coin
+        // object. The index is from /info meta.universe[].name → position.
+        // For now we hardcode BTC=0 since the strategy only trades BTC; a
+        // proper fix would build a coin→index map at startup from /info meta.
+        // The "c" (cloid) field is optional and must be 16-byte hex if used,
+        // so we omit it for now.
         json::object action;
         action["type"] = "order";
 
+        int asset_idx = 0;  // BTC on Hyperliquid testnet
+        if (exchange_symbol == "ETH") asset_idx = 4;
+        // TODO: build a real coin→index map from /info meta at startup.
+
         json::object ord;
-        json::object asset;
-        asset["coin"] = exchange_symbol;
-        ord["a"] = asset;
+        ord["a"] = asset_idx;
         ord["b"] = params.is_buy;
         ord["p"] = std::to_string(params.price);
         ord["s"] = std::to_string(params.size);
         ord["r"] = params.reduce_only;
         ord["t"] = json::object{{"limit", json::object{{"tif", "Gtc"}}}};
-        ord["c"] = std::to_string(order.orderId());
 
         json::array orders;
         orders.push_back(ord);
@@ -226,7 +277,109 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
         req["signature"] = std::move(signature);
 
         std::string resp = https_post("/exchange", json::serialize(req));
-        ygg::log::debug("[Heimdall] HyperliquidOrderAdapter: new order resp={}", resp);
+        ygg::log::info("[Heimdall] HyperliquidOrderAdapter: new order id={} side={} px={} sz={} resp={}",
+                       order.orderId(),
+                       params.is_buy ? "BUY" : "SELL",
+                       params.price,
+                       params.size,
+                       resp);
+
+        // Parse the /exchange response and emit ACKED/FILLED/REJECTED so
+        // OrderProcessor can publish ExecReports back to fenrir. Without
+        // this, fenrir's strategies (e.g. Stoikov) wedge after the first
+        // quote because they wait for an ack to clear in-flight state.
+        //
+        // Hyperliquid response shape:
+        //   { "status":"ok", "response": {
+        //       "type":"order",
+        //       "data": { "statuses": [
+        //         {"resting": {"oid": 12345}},                            // ACKED
+        //         {"filled":  {"totalSz":"0.001","avgPx":"70000","oid":12345}},  // FILLED
+        //         {"error":   "..."}                                       // REJECTED
+        //       ] } } }
+        using ES = bifrost::protocol::ExecStatus;
+        using RR = bifrost::protocol::RejectReason;
+        using FC = bifrost::protocol::FeeCurrency;
+        try {
+            auto rj = json::parse(resp).as_object();
+            const std::string status = rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
+            const uint64_t now_ns = static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+
+            auto emit = [&](ES::Value es, RR::Value rr, uint64_t filled_qty,
+                            uint64_t exch_oid) {
+                ExecEvent ev{};
+                ev.order_id = order.orderId();
+                ev.exchange_order_id = exch_oid;
+                ev.exchange_id = bifrost::protocol::ExchangeId::HYPERLIQUID;
+                ev.instrument_id = order.instrumentId();
+                ev.status = es;
+                ev.side = order.side();
+                ev.order_type = order.orderType();
+                ev.price = order.price();
+                ev.filled_qty = filled_qty;
+                ev.remaining_qty = (order.quantity() > filled_qty) ? (order.quantity() - filled_qty) : 0;
+                ev.reject_reason = rr;
+                ev.fee = 0;
+                ev.fee_currency = FC::USDT;
+                ev.exchange_ts_ns = now_ns;
+                ev.local_ts_ns = now_ns;
+                if (!exec_queue_.try_push(ev))
+                    ygg::log::error("[Hyperliquid] exec_queue full — dropped synthetic ExecEvent");
+            };
+
+            if (status != "ok") {
+                ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: order rejected, status={}", status);
+                emit(ES::REJECTED, RR::EXCHANGE_ERROR, 0, 0);
+                return;
+            }
+
+            // status=ok — drill into response.data.statuses[0]
+            if (!rj.contains("response")) return;
+            const auto& response = rj.at("response").as_object();
+            if (!response.contains("data")) return;
+            const auto& data = response.at("data").as_object();
+            if (!data.contains("statuses") || !data.at("statuses").is_array()) return;
+            const auto& statuses = data.at("statuses").as_array();
+            if (statuses.empty()) return;
+
+            const auto& s0 = statuses[0].as_object();
+            if (s0.contains("resting")) {
+                // ACKED — order rests in the book.
+                uint64_t exch_oid = 0;
+                if (s0.at("resting").as_object().contains("oid"))
+                    exch_oid = s0.at("resting").as_object().at("oid").to_number<uint64_t>();
+                emit(ES::ACKED, RR::NULL_VALUE, 0, exch_oid);
+            } else if (s0.contains("filled")) {
+                // Immediate fill (IOC or aggressive limit).
+                const auto& f = s0.at("filled").as_object();
+                uint64_t exch_oid = f.contains("oid") ? f.at("oid").to_number<uint64_t>() : 0;
+                double total_sz = f.contains("totalSz") ? std::stod(std::string(f.at("totalSz").as_string())) : 0.0;
+                uint64_t filled_qty = static_cast<uint64_t>(std::round(total_sz * kScale));
+                emit(ES::FILLED, RR::NULL_VALUE, filled_qty, exch_oid);
+            } else if (s0.contains("error")) {
+                ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: order error: {}",
+                               std::string(s0.at("error").as_string()));
+                emit(ES::REJECTED, RR::EXCHANGE_ERROR, 0, 0);
+            }
+        } catch (const std::exception& e) {
+            ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: failed to parse order resp: {} resp={}",
+                           e.what(), resp);
+            // Defensive: emit a REJECTED so fenrir doesn't wedge waiting forever.
+            ExecEvent ev{};
+            ev.order_id = order.orderId();
+            ev.exchange_id = bifrost::protocol::ExchangeId::HYPERLIQUID;
+            ev.instrument_id = order.instrumentId();
+            ev.status = ES::REJECTED;
+            ev.side = order.side();
+            ev.order_type = order.orderType();
+            ev.price = order.price();
+            ev.remaining_qty = order.quantity();
+            ev.reject_reason = RR::EXCHANGE_ERROR;
+            ev.fee_currency = FC::USDT;
+            (void)exec_queue_.try_push(ev);
+        }
     } catch (const std::exception& e) {
         ygg::log::error("[Heimdall] HyperliquidOrderAdapter: send_new_order failed: {}", e.what());
     }
