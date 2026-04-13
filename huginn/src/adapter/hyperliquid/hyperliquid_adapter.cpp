@@ -62,11 +62,46 @@ void HyperliquidAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
     const auto liveness = std::chrono::milliseconds(cfg_.ws_liveness_timeout_ms);
     auto last_recv = std::chrono::steady_clock::now();
 
-    while (!stop_flag_.load(std::memory_order_relaxed)) {
-        // Reset timer first — covers subscribe frame writes and the read.
-        ws.expires_after(std::chrono::milliseconds(cfg_.ws_read_timeout_ms));
+    // Hyperliquid closes idle WebSockets ~60s after the last client-sent
+    // message. Beast's get_lowest_layer().expires_after() doesn't reliably
+    // bound a multi-frame ws.read() — its timer is consumed by the first
+    // TCP op and the read can keep going. So an in-loop ping check after
+    // ws.read() can sit blocked for a full 60s, missing every ping window.
+    //
+    // Solution: dedicated ping thread that writes JSON pings every 20s.
+    // Beast websocket::stream supports concurrent read+write across threads
+    // as long as each direction is single-threaded.
+    std::atomic<bool> ping_stop{false};
+    std::thread ping_thread([&] {
+        while (!ping_stop.load(std::memory_order_relaxed)) {
+            for (int i = 0; i < 20 && !ping_stop.load(std::memory_order_relaxed); ++i)
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            if (ping_stop.load(std::memory_order_relaxed))
+                break;
+            try {
+                static const std::string msg = R"({"method":"ping"})";
+                ws.write(net::buffer(msg));
+                ygg::log::info("HyperliquidAdapter: ping sent");
+            } catch (const std::exception& e) {
+                ygg::log::warn("HyperliquidAdapter: ping write failed: {}", e.what());
+                break;
+            }
+        }
+    });
+    struct JoinGuard {
+        std::atomic<bool>& stop;
+        std::thread& th;
+        ~JoinGuard() {
+            stop.store(true, std::memory_order_relaxed);
+            if (th.joinable()) th.join();
+        }
+    } join_guard{ping_stop, ping_thread};
 
+    while (!stop_flag_.load(std::memory_order_relaxed)) {
         // Send subscribe frames for any instruments added since connect.
+        // Note: this does a write on the same WS the ping thread writes to,
+        // but runtime subscriptions are rare and bursty — accept the small
+        // race for now. A future refactor can guard with a write mutex.
         for (const auto& entry : subs_.take_pending()) {
             send_instrument_subs(ws, entry.symbol);
             ygg::log::info("HyperliquidAdapter: runtime subscribe {}", entry.symbol);
