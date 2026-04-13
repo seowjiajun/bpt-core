@@ -33,9 +33,10 @@ FENRIR_CONFIG="${2:-$FENRIR_DIR/config/vwap_reversion.qa-okx.toml}"
 # e.g. short_vol.qa-deribit.toml → deribit, vwap_reversion.qa-okx.toml → okx
 EXCHANGE="okx"
 case "$FENRIR_CONFIG" in
-    *deribit*) EXCHANGE="deribit" ;;
-    *okx*)     EXCHANGE="okx" ;;
-    *binance*) EXCHANGE="binance" ;;
+    *hyperliquid*) EXCHANGE="hyperliquid" ;;
+    *deribit*)     EXCHANGE="deribit" ;;
+    *okx*)         EXCHANGE="okx" ;;
+    *binance*)     EXCHANGE="binance" ;;
 esac
 
 MUNINN_CONFIG="$MUNINN_DIR/config/muninn.qa-${EXCHANGE}.toml"
