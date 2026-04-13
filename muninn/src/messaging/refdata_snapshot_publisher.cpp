@@ -15,6 +15,25 @@ namespace muninn::messaging {
 
 namespace {
 
+// The SBE exchange field is a fixed 8-char array. Exchange names longer than
+// 8 characters get silently truncated on the wire. A filter sent by a client
+// as "HYPERLIQUID" arrives here as "HYPERLIQ". This helper compares the full
+// venue name (e.g. "HYPERLIQUID") against a possibly-truncated filter by
+// checking that the filter is a prefix of the venue. Remove once the SBE
+// schema is widened.
+bool venue_matches_filter_exchange(const std::string& venue, const char* filter_exchange) {
+    if (filter_exchange[0] == '\0')
+        return true;
+    std::size_t flen = strnlen(filter_exchange, 8);
+    std::string_view fv(filter_exchange, flen);
+    if (venue == fv)
+        return true;
+    // Prefix match — handles "HYPERLIQ" filter matching "HYPERLIQUID" venue.
+    if (flen == 8 && venue.size() > 8 && venue.compare(0, 8, fv) == 0)
+        return true;
+    return false;
+}
+
 // Returns true if inst matches the request filter (empty filters = match all).
 bool matches(const refdata::Instrument& inst, const RefdataRequest& req) {
     // Canonical filter takes priority when present.
@@ -23,8 +42,7 @@ bool matches(const refdata::Instrument& inst, const RefdataRequest& req) {
             bool base_ok = inst.base == std::string_view(f.base_currency, strnlen(f.base_currency, 8));
             bool quote_ok = inst.quote == std::string_view(f.quote_currency, strnlen(f.quote_currency, 8));
             bool type_ok = to_sbe_type(inst.inst_type) == f.instrument_type;
-            bool ex_ok =
-                (f.exchange[0] == '\0') || (inst.venue == std::string_view(f.exchange, strnlen(f.exchange, 8)));
+            bool ex_ok = venue_matches_filter_exchange(inst.venue, f.exchange);
             if (base_ok && quote_ok && type_ok && ex_ok)
                 return true;
         }
@@ -35,8 +53,7 @@ bool matches(const refdata::Instrument& inst, const RefdataRequest& req) {
         for (const auto& f : req.instruments) {
             bool sym_ok =
                 (f.symbol[0] == '\0') || (inst.venue_symbol == std::string_view(f.symbol, strnlen(f.symbol, 24)));
-            bool ex_ok =
-                (f.exchange[0] == '\0') || (inst.venue == std::string_view(f.exchange, strnlen(f.exchange, 8)));
+            bool ex_ok = venue_matches_filter_exchange(inst.venue, f.exchange);
             if (sym_ok && ex_ok)
                 return true;
         }

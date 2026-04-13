@@ -26,6 +26,16 @@ InstrumentType from_sbe_type(bifrost::protocol::InstrumentType::Value v) {
     }
 }
 
+// The SBE "exchange" field is a fixed 8-char array. Exchange names longer
+// than 8 characters get silently truncated on the wire (e.g. "HYPERLIQUID"
+// → "HYPERLIQ"). Restore the canonical full name here so all downstream
+// string comparisons in strategies/configs keep working with the long name.
+// Remove once the SBE schema is widened.
+std::string canonicalize_exchange(const std::string& truncated) {
+    if (truncated == "HYPERLIQ") return "HYPERLIQUID";
+    return truncated;
+}
+
 InstrumentStatus from_sbe_status(bifrost::protocol::InstrumentStatus::Value v) {
     using P = bifrost::protocol::InstrumentStatus;
     switch (v) {
@@ -65,7 +75,7 @@ void InstrumentCache::apply_snapshot(bifrost::protocol::RefDataSnapshot& msg) {
         Instrument inst;
         inst.instrument_id = g.instrumentId();
         inst.symbol = g.getSymbolAsString();
-        inst.exchange = g.getExchangeAsString();
+        inst.exchange = canonicalize_exchange(g.getExchangeAsString());
         inst.base_currency = g.getBaseCurrencyAsString();
         inst.quote_currency = g.getQuoteCurrencyAsString();
         inst.type = from_sbe_type(g.instrumentType());
@@ -107,7 +117,7 @@ bool InstrumentCache::apply_delta(bifrost::protocol::RefDataDelta& msg) {
             Instrument inst;
             inst.instrument_id = msg.instrumentId();
             inst.symbol = msg.getSymbolAsString();
-            inst.exchange = msg.getExchangeAsString();
+            inst.exchange = canonicalize_exchange(msg.getExchangeAsString());
             inst.base_currency = msg.getBaseCurrencyAsString();
             inst.quote_currency = msg.getQuoteCurrencyAsString();
             inst.type = from_sbe_type(msg.instrumentType());

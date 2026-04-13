@@ -35,12 +35,21 @@ void SubscriptionManager::apply_batch(bifrost::protocol::MdSubscribeBatch& msg, 
     };
     std::vector<Instrument> desired;
 
+    // The SBE exchange field is a fixed 8-char array, so long names like
+    // "HYPERLIQUID" arrive truncated to "HYPERLIQ". Restore the canonical
+    // full name to match the adapter registry. Remove once SBE schema is
+    // widened / migrated to ExchangeId enum.
+    auto canonicalize = [](std::string s) {
+        if (s == "HYPERLIQ") return std::string("HYPERLIQUID");
+        return s;
+    };
+
     auto& g = msg.instruments();
     while (g.hasNext()) {
         g.next();
         Instrument inst;
         inst.id = g.instrumentId();
-        inst.exchange = g.getExchangeAsString();
+        inst.exchange = canonicalize(g.getExchangeAsString());
         inst.symbol = g.getSymbolAsString();
         inst.depth = g.depth();
         desired.push_back(std::move(inst));
