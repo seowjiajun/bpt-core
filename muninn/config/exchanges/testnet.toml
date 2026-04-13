@@ -26,9 +26,9 @@ use_tls     = true
 [[adapters]]
 exchange    = "HYPERLIQUID"
 secret_name = "bpt/testnet/HYPERLIQUID"
-rest_host   = "api.hyperliquid.xyz"
+rest_host   = "api.hyperliquid-testnet.xyz"
 rest_port   = "443"
-ws_host     = "api.hyperliquid.xyz"
+ws_host     = "api.hyperliquid-testnet.xyz"
 ws_port     = "443"
 use_tls     = true
 

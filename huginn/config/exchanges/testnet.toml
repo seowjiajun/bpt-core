@@ -19,7 +19,7 @@ ws_read_timeout_ms = 5000
 
 [[adapters]]
 exchange = "HYPERLIQUID"
-ws_host = "api.hyperliquid.xyz"
+ws_host = "api.hyperliquid-testnet.xyz"
 ws_port = "443"
 ws_path = "/ws"
 use_tls = true
