@@ -6,8 +6,10 @@
 #   2. Trading stack (bifrost-fabric, muninn, huginn, heimdall, fenrir)
 #   3. Dashboard bridge (WebSocket :8080)
 #
-# NOT started — dev-only surfaces you run by hand:
-#   - vite frontend (cd dashboard/frontend && npm run dev)
+# Frontend (vite dev server) is also started under paper_run.sh.
+# NOTE: vite is a DEV server — HMR, unminified bundle, dev error overlay.
+# For a real prod deployment, replace with `npm run build` + a static
+# file server (nginx/caddy) serving dashboard/frontend/dist/.
 #
 # Usage:
 #   ./scripts/up.sh                                        # default Hyperliquid stoikov
@@ -58,14 +60,9 @@ cat <<EOF
 
 === Everything up ===
 
-  Grafana      : http://localhost:3000          (BPT System Overview auto-loaded)
+  Dashboard    : http://localhost:5173          (paper trading UI)
+  Grafana      : http://localhost:3000          (BPT System Overview)
   Prometheus   : http://localhost:9090          (targets at /targets)
-  Dashboard WS : ws://localhost:8080            (bridge — the React frontend connects to this)
-
-To bring up the frontend in a separate terminal:
-
-  cd $ROOT/dashboard/frontend
-  VITE_WS_URL=ws://localhost:8080 npm run dev
 
 Logs:
   heimdall : tail -f $ROOT/heimdall/logs/heimdall.log
@@ -73,6 +70,7 @@ Logs:
   muninn   : tail -f $ROOT/muninn/logs/muninn.log
   fenrir   : tail -f $ROOT/fenrir/logs/fenrir.log
   bridge   : tail -f $ROOT/dashboard/bridge/logs/bridge.stdout
+  frontend : tail -f $ROOT/dashboard/frontend/logs/vite.stdout
 
 To stop: $ROOT/scripts/down.sh
 EOF

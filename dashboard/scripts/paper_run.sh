@@ -27,6 +27,16 @@ BRIDGE_LOG_DIR="$STACK_DIR/dashboard/bridge/logs"
 BRIDGE_PID="$STACK_DIR/dashboard/bridge/.bridge.pid"
 PAPER_SH="$STACK_DIR/scripts/paper.sh"
 FRONTEND_DIR="$STACK_DIR/dashboard/frontend"
+FRONTEND_BIN="$FRONTEND_DIR/node_modules/.bin/vite"
+FRONTEND_LOG_DIR="$FRONTEND_DIR/logs"
+FRONTEND_LOG="$FRONTEND_LOG_DIR/vite.stdout"
+FRONTEND_PID="$FRONTEND_DIR/.vite.pid"
+
+# TODO(prod): this orchestrator runs vite in dev mode (HMR, on-demand
+# TS/JSX compilation, dev error overlay) for fast iteration. For a real
+# prod deployment, replace with `npm run build` + a static file server
+# (nginx/caddy) serving dist/ on port 80/443. Dev mode is not suitable
+# for anything past a single-machine local stack.
 
 is_running() {
     local pid_file="$1"
@@ -148,12 +158,79 @@ bridge_stop() {
     echo "  [DOWN] bridge"
 }
 
+frontend_start() {
+    if is_running "$FRONTEND_PID"; then
+        echo "  [UP]   frontend (PID $(cat "$FRONTEND_PID")) — already running"
+        return 0
+    fi
+
+    if [ ! -x "$FRONTEND_BIN" ]; then
+        echo "ERROR: vite not found at $FRONTEND_BIN"
+        echo "       run 'cd $FRONTEND_DIR && npm install' first"
+        exit 1
+    fi
+
+    mkdir -p "$FRONTEND_LOG_DIR"
+
+    echo "  Starting frontend (vite dev server on :5173, ws→localhost:8080)..."
+
+    # Invoke vite directly (it's a node shebang script) rather than
+    # going through `npm run dev` — avoids the npm wrapper process and
+    # makes the real PID easier to track via pgrep.
+    (
+        cd "$FRONTEND_DIR"
+        VITE_WS_URL=ws://localhost:8080 \
+            setsid "$FRONTEND_BIN" \
+            < /dev/null > "$FRONTEND_LOG" 2>&1 &
+        disown 2>/dev/null || true
+    )
+
+    # setsid fork-execs into node, so $! is the stale setsid PID.
+    # Look up the real vite PID by its cmdline.
+    local actual_pid=""
+    for _ in 1 2 3 4 5 6 7 8; do
+        sleep 0.5
+        actual_pid="$(pgrep -f "node.*$FRONTEND_BIN" 2>/dev/null | head -1 || true)"
+        [ -n "$actual_pid" ] && break
+    done
+
+    if [ -n "$actual_pid" ] && kill -0 "$actual_pid" 2>/dev/null; then
+        echo "$actual_pid" > "$FRONTEND_PID"
+        echo "  [UP]   frontend (PID $actual_pid)"
+    else
+        echo "  [FAIL] frontend did not start — check $FRONTEND_LOG"
+        rm -f "$FRONTEND_PID"
+        exit 1
+    fi
+}
+
+frontend_stop() {
+    if is_running "$FRONTEND_PID"; then
+        local pid
+        pid=$(cat "$FRONTEND_PID")
+        echo "  Stopping frontend (PID $pid)..."
+        kill "$pid" 2>/dev/null || true
+        for _ in 1 2 3 4 5; do
+            is_running "$FRONTEND_PID" || break
+            sleep 0.5
+        done
+        is_running "$FRONTEND_PID" && kill -9 "$pid" 2>/dev/null || true
+    fi
+    rm -f "$FRONTEND_PID"
+    echo "  [DOWN] frontend"
+}
+
 do_status() {
     "$PAPER_SH" status
     if is_running "$BRIDGE_PID"; then
         echo "  [UP]   bridge (PID $(cat "$BRIDGE_PID"))"
     else
         echo "  [DOWN] bridge"
+    fi
+    if is_running "$FRONTEND_PID"; then
+        echo "  [UP]   frontend (PID $(cat "$FRONTEND_PID"))"
+    else
+        echo "  [DOWN] frontend"
     fi
 }
 
@@ -171,27 +248,25 @@ do_start() {
     bridge_start
     echo
 
+    frontend_start
+    echo
+
     cat <<EOF
 === Paper trading stack is up ===
 
-In a separate terminal, start the frontend pointed at the bridge:
-
-    cd $FRONTEND_DIR
-    VITE_WS_URL=ws://localhost:8080 npm run dev
-
-The top bar will show a yellow PAPER pill.  Real market data from OKX
-testnet flows into Huginn; Fenrir's orders hit the OKX demo-trading
-endpoint via Heimdall; fills come back through the same Aeron stream
-the backtest used, so the dashboard looks and behaves identically.
+  Dashboard : http://localhost:5173           (yellow PAPER pill)
+  Bridge WS : ws://localhost:8080
 
 Logs:
-  bridge  : $BRIDGE_LOG_DIR/bridge.stdout
-  fenrir  : $STACK_DIR/fenrir/logs/fenrir.log
+  bridge   : $BRIDGE_LOG_DIR/bridge.stdout
+  frontend : $FRONTEND_LOG
+  fenrir   : $STACK_DIR/fenrir/logs/fenrir.log
 EOF
 }
 
 do_stop() {
     echo "=== Dashboard paper trading run — stopping ==="
+    frontend_stop
     bridge_stop
     "$PAPER_SH" stop
     echo "=== Stack is down ==="
