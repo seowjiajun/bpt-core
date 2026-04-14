@@ -23,6 +23,8 @@ add_library(heimdall_lib
     adapter/okx/okx_ws_client.cpp
     adapter/okx/okx_order_adapter.cpp
     adapter/okx/okx_exec_parser.cpp
+    adapter/deribit/deribit_action_codec.cpp
+    adapter/deribit/deribit_ws_client.cpp
     adapter/deribit/deribit_order_adapter.cpp
     adapter/deribit/deribit_exec_parser.cpp
     adapter/hyperliquid/hyperliquid_action_codec.cpp

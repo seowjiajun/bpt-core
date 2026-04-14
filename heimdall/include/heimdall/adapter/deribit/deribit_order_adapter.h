@@ -3,9 +3,9 @@
 #include "heimdall/adapter/common/credentials.h"
 #include "heimdall/adapter/common/order_adapter_base.h"
 #include "heimdall/adapter/deribit/deribit_exec_parser.h"
+#include "heimdall/adapter/deribit/deribit_ws_client.h"
 
 #include <atomic>
-#include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -20,6 +20,10 @@ namespace heimdall::adapter {
 // Order placement: private/buy, private/sell via WebSocket JSON-RPC.
 // Execution reports: user.orders.any.raw subscription channel.
 // Heartbeat: public/set_heartbeat + respond to test_request with public/test.
+//
+// Transport is split across:
+//   - deribit_action_codec — pure JSON-RPC envelope builders
+//   - deribit_ws_client    — WS lifecycle + thread-safe send
 //
 // Credentials are passed directly via ExchangeCredentials (client_id, client_secret).
 class DeribitOrderAdapter : public OrderAdapterBase {
@@ -45,9 +49,6 @@ protected:
 private:
     void handle_message(const std::string& payload, uint64_t recv_ns);
 
-    // Build JSON-RPC auth message. Increments jsonrpc_id_.
-    std::string build_auth_msg();
-
     std::string client_id_;
     std::string client_secret_;
 
@@ -60,13 +61,13 @@ private:
     // JSON-RPC request id counter — used by adapter for auth, heartbeat, send_*.
     std::atomic<uint64_t> jsonrpc_id_{1};
 
-    // Outbound message queue for orders placed before auth completes.
-    // ws_send_ is nulled on disconnect and guarded by send_mu_.
-    mutable std::mutex send_mu_;
+    // Orders queued while waiting for auth response. Flushed in
+    // handle_message when the auth reply is seen.
+    mutable std::mutex pending_mu_;
     std::vector<std::string> pending_sends_;
-    std::function<void(const std::string&)> ws_send_;
 
     DeribitExecParser parser_;
+    deribit::DeribitWsClient ws_client_;
 };
 
 }  // namespace heimdall::adapter
