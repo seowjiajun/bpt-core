@@ -14,12 +14,21 @@ interface ClientOptions {
 const RECONNECT_MIN_MS = 1_000
 const RECONNECT_MAX_MS = 30_000
 
+const VALID_TYPES = new Set<string>([
+  'session',
+  'status',
+  'tick',
+  'fill',
+  'position',
+  'order',
+  'portfolio',
+  'account',
+])
+
 function isValidMessage(x: unknown): x is Msg {
   if (!x || typeof x !== 'object') return false
   const t = (x as { type?: unknown }).type
-  return (
-    t === 'session' || t === 'status' || t === 'tick' || t === 'fill' || t === 'position' || t === 'order' || t === 'portfolio'
-  )
+  return typeof t === 'string' && VALID_TYPES.has(t)
 }
 
 // Shared reference so the store (or any caller) can send commands to the
