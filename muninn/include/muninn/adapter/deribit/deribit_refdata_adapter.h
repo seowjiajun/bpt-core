@@ -3,6 +3,7 @@
 #include "muninn/adapter/common/i_exchange_refdata_adapter.h"
 #include "muninn/adapter/credentials.h"
 #include "muninn/config/settings.h"
+#include "muninn/http/rest_client.h"
 #include "muninn/mapping/instrument_mapping_loader.h"
 #include "muninn/registry/instrument_registry.h"
 
@@ -49,13 +50,13 @@ private:
     std::string client_id_;
     std::string client_secret_;
 
-    std::string http_post_jsonrpc(const std::string& host,
-                                  const std::string& port,
-                                  const std::string& method,
-                                  const std::string& params_json,
-                                  bool use_tls,
-                                  const std::string& access_token = "") const;
-    std::string authenticate(const std::string& host, const std::string& port, bool use_tls) const;
+    // Shared HTTPS client — reuses SSL context across calls and retries
+    // on transient failures. Constructed lazily in fetchSnapshot to
+    // honour the cfg_.rest_host empty-fallback.
+    std::unique_ptr<muninn::http::RestClient> rest_client_;
+
+    // Build JSON-RPC 2.0 envelope and POST to /api/v2. Returns raw body.
+    std::string post_jsonrpc(const std::string& method, const std::string& params_json) const;
 
     void parse_instruments(const std::string& body, uint64_t collected_ts);
     std::vector<std::string> get_perp_instrument_names() const;

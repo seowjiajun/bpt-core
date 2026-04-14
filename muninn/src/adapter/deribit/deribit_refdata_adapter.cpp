@@ -7,23 +7,12 @@
 #include <bifrost_protocol/ExchangeId.h>
 #include <bifrost_protocol/InstrumentType.h>
 
-#include <boost/asio/connect.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/ssl/context.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/ssl.hpp>
+#include <atomic>
 #include <cmath>
 #include <nlohmann/json.hpp>
-#include <sstream>
 #include <stdexcept>
 #include <yggdrasil/util/tsc_clock.h>
 
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace net = boost::asio;
-namespace ssl = net::ssl;
-using tcp = net::ip::tcp;
 using json = nlohmann::json;
 
 namespace muninn::adapter {
@@ -90,104 +79,16 @@ DeribitRefDataAdapter::DeribitRefDataAdapter(const config::AdapterConfig& cfg,
 }
 
 // ---------------------------------------------------------------------------
-// JSON-RPC 2.0 HTTP POST helper
+// JSON-RPC 2.0 envelope + POST via shared RestClient.
 // ---------------------------------------------------------------------------
-std::string DeribitRefDataAdapter::http_post_jsonrpc(const std::string& host,
-                                                     const std::string& port,
-                                                     const std::string& method,
-                                                     const std::string& params_json,
-                                                     bool use_tls,
-                                                     const std::string& access_token) const {
+std::string DeribitRefDataAdapter::post_jsonrpc(const std::string& method,
+                                                 const std::string& params_json) const {
     json req_body;
     req_body["jsonrpc"] = "2.0";
     req_body["id"] = g_jsonrpc_id.fetch_add(1, std::memory_order_relaxed);
     req_body["method"] = method;
     req_body["params"] = json::parse(params_json);
-
-    const std::string body_str = req_body.dump();
-
-    net::io_context ioc;
-
-    if (use_tls) {
-        ssl::context ssl_ctx(ssl::context::tls_client);
-        ssl_ctx.set_default_verify_paths();
-        beast::ssl_stream<beast::tcp_stream> stream(ioc, ssl_ctx);
-        if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
-            throw beast::system_error(beast::errc::make_error_code(beast::errc::not_connected));
-
-        beast::get_lowest_layer(stream).expires_after(std::chrono::seconds(30));
-
-        tcp::resolver resolver(ioc);
-        auto results = resolver.resolve(host, port);
-        beast::get_lowest_layer(stream).connect(results);
-        stream.handshake(ssl::stream_base::client);
-
-        http::request<http::string_body> req{http::verb::post, "/api/v2", 11};
-        req.set(http::field::host, host);
-        req.set(http::field::user_agent, "muninn/1.0");
-        req.set(http::field::content_type, "application/json");
-        if (!access_token.empty())
-            req.set(http::field::authorization, "Bearer " + access_token);
-        req.body() = body_str;
-        req.prepare_payload();
-        http::write(stream, req);
-
-        beast::flat_buffer buf;
-        http::response_parser<http::string_body> parser;
-        parser.body_limit(64 * 1024 * 1024);  // Deribit options can be large
-        http::read(stream, buf, parser);
-        auto res = parser.get();
-        if (res.result() != http::status::ok)
-            throw std::runtime_error("Deribit HTTP " + std::to_string(static_cast<int>(res.result())) + " for " +
-                                     method);
-        return res.body();
-    } else {
-        beast::tcp_stream stream(ioc);
-        stream.expires_after(std::chrono::seconds(30));
-
-        tcp::resolver resolver(ioc);
-        auto results = resolver.resolve(host, port);
-        stream.connect(results);
-
-        http::request<http::string_body> req{http::verb::post, "/api/v2", 11};
-        req.set(http::field::host, host);
-        req.set(http::field::user_agent, "muninn/1.0");
-        req.set(http::field::content_type, "application/json");
-        if (!access_token.empty())
-            req.set(http::field::authorization, "Bearer " + access_token);
-        req.body() = body_str;
-        req.prepare_payload();
-        http::write(stream, req);
-
-        beast::flat_buffer buf;
-        http::response_parser<http::string_body> parser;
-        parser.body_limit(64 * 1024 * 1024);
-        http::read(stream, buf, parser);
-        auto res = parser.get();
-        if (res.result() != http::status::ok)
-            throw std::runtime_error("Deribit HTTP " + std::to_string(static_cast<int>(res.result())) + " for " +
-                                     method);
-        return res.body();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Authenticate — returns access_token for private endpoints
-// ---------------------------------------------------------------------------
-std::string DeribitRefDataAdapter::authenticate(const std::string& host, const std::string& port, bool use_tls) const {
-    json params;
-    params["grant_type"] = "client_credentials";
-    params["client_id"] = client_id_;
-    params["client_secret"] = client_secret_;
-
-    auto body = http_post_jsonrpc(host, port, "public/auth", params.dump(), use_tls);
-    auto j = json::parse(body);
-
-    if (j.contains("error")) {
-        throw std::runtime_error("Deribit auth failed: " + j["error"].value("message", "unknown error"));
-    }
-
-    return j["result"].value("access_token", "");
+    return rest_client_->post("/api/v2", req_body.dump());
 }
 
 // ---------------------------------------------------------------------------
@@ -287,35 +188,46 @@ void DeribitRefDataAdapter::parse_instruments(const std::string& body, uint64_t 
 // ---------------------------------------------------------------------------
 // fetchSnapshot — blocking
 // ---------------------------------------------------------------------------
-void DeribitRefDataAdapter::fetchSnapshot() {
-    ygg::log::info("[DeribitRefData] Starting snapshot fetch...");
-
-    const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
-    const std::string port = cfg_.rest_port;
-    const bool tls = cfg_.use_tls;
-    const uint64_t ts = now_ns();
-
-    // Deribit requires fetching per-currency x per-kind.
-    // Currencies: BTC, ETH (primary). Kinds: future, option.
-    const std::vector<std::string> currencies = {"BTC", "ETH"};
-    const std::vector<std::string> kinds = {"future", "option"};
-
+namespace {
+void fetch_all_instruments(const std::vector<std::string>& currencies,
+                           const std::vector<std::string>& kinds,
+                           const char* log_prefix,
+                           const std::function<std::string(const std::string&, const std::string&)>& do_fetch,
+                           const std::function<void(const std::string&)>& on_body) {
     for (const auto& currency : currencies) {
         for (const auto& kind : kinds) {
             try {
-                json params;
-                params["currency"] = currency;
-                params["kind"] = kind;
-                params["expired"] = false;
-
-                auto body = http_post_jsonrpc(host, port, "public/get_instruments", params.dump(), tls);
-                parse_instruments(body, ts);
+                on_body(do_fetch(currency, kind));
             } catch (const std::exception& e) {
-                ygg::log::error("[DeribitRefData] Failed to fetch {} {} instruments: {}", currency, kind, e.what());
-                // Continue — try remaining currency/kind combos.
+                ygg::log::error("[DeribitRefData] {} {} {} failed: {}", log_prefix, currency, kind, e.what());
             }
         }
     }
+}
+}  // namespace
+
+void DeribitRefDataAdapter::fetchSnapshot() {
+    ygg::log::info("[DeribitRefData] Starting snapshot fetch...");
+
+    if (!rest_client_) {
+        const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
+        rest_client_ = std::make_unique<muninn::http::RestClient>(host, cfg_.rest_port, cfg_.use_tls);
+    }
+
+    const uint64_t ts = now_ns();
+    const std::vector<std::string> currencies = {"BTC", "ETH"};
+    const std::vector<std::string> kinds = {"future", "option"};
+
+    fetch_all_instruments(
+        currencies, kinds, "snapshot",
+        [this](const std::string& currency, const std::string& kind) {
+            json params;
+            params["currency"] = currency;
+            params["kind"] = kind;
+            params["expired"] = false;
+            return post_jsonrpc("public/get_instruments", params.dump());
+        },
+        [this, ts](const std::string& body) { parse_instruments(body, ts); });
 
     ready_.store(true, std::memory_order_release);
     ygg::log::info("[DeribitRefData] Snapshot complete. Registry has {} instruments.", registry_->count());
@@ -326,28 +238,25 @@ void DeribitRefDataAdapter::fetchSnapshot() {
 // ---------------------------------------------------------------------------
 void DeribitRefDataAdapter::fetchInstrumentListing() {
     ygg::log::info("[DeribitRefData] Hourly instrument listing refresh...");
-    const uint64_t ts = now_ns();
-    const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
+    if (!rest_client_) {
+        const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
+        rest_client_ = std::make_unique<muninn::http::RestClient>(host, cfg_.rest_port, cfg_.use_tls);
+    }
 
+    const uint64_t ts = now_ns();
     const std::vector<std::string> currencies = {"BTC", "ETH"};
     const std::vector<std::string> kinds = {"future", "option"};
 
-    for (const auto& currency : currencies) {
-        for (const auto& kind : kinds) {
-            try {
-                json params;
-                params["currency"] = currency;
-                params["kind"] = kind;
-                params["expired"] = false;
-
-                auto body =
-                    http_post_jsonrpc(host, cfg_.rest_port, "public/get_instruments", params.dump(), cfg_.use_tls);
-                parse_instruments(body, ts);
-            } catch (const std::exception& e) {
-                ygg::log::error("[DeribitRefData] Hourly {} {} refresh failed: {}", currency, kind, e.what());
-            }
-        }
-    }
+    fetch_all_instruments(
+        currencies, kinds, "hourly",
+        [this](const std::string& currency, const std::string& kind) {
+            json params;
+            params["currency"] = currency;
+            params["kind"] = kind;
+            params["expired"] = false;
+            return post_jsonrpc("public/get_instruments", params.dump());
+        },
+        [this, ts](const std::string& body) { parse_instruments(body, ts); });
 }
 
 // ---------------------------------------------------------------------------
