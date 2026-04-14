@@ -9,6 +9,7 @@ add_library(heimdall_lib
     risk/risk_checker.cpp
     order/order_state_manager.cpp
     order/order_processor.cpp
+    adapter/common/beast_https_client.cpp
     adapter/common/order_adapter_base.cpp
     adapter/binance/binance_action_codec.cpp
     adapter/binance/binance_auth.cpp

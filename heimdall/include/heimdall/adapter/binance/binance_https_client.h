@@ -8,6 +8,7 @@
 // All methods return the raw response body. Parsing is the caller's
 // job — the client stays independent of Binance's envelope shapes.
 
+#include "heimdall/adapter/common/beast_https_client.h"
 #include "heimdall/adapter/common/credentials.h"
 #include "heimdall/config/settings.h"
 
@@ -35,6 +36,7 @@ private:
     const config::AdapterConfig& cfg_;
     const std::string api_key_;
     const std::string secret_key_;
+    common::BeastHttpsClient inner_;
 };
 
 }  // namespace heimdall::adapter::binance

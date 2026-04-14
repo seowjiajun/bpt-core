@@ -14,6 +14,7 @@
 // this keeps the client from needing to know about OKX's envelope
 // shapes or the wire types each endpoint produces.
 
+#include "heimdall/adapter/common/beast_https_client.h"
 #include "heimdall/adapter/common/credentials.h"
 #include "heimdall/config/settings.h"
 
@@ -40,6 +41,7 @@ private:
     const std::string api_key_;
     const std::string secret_key_;
     const std::string passphrase_;
+    common::BeastHttpsClient inner_;
 };
 
 }  // namespace heimdall::adapter::okx
