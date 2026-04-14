@@ -34,9 +34,18 @@ echo "Starting Bifrost MediaDriver..."
 echo "  Config : $CONFIG"
 echo "  Log    : $LOG_FILE (logback also writes to logs/bifrost.log)"
 
+mkdir -p "$(dirname "$LOG_FILE")"
+# Redirect stdio into the log file and detach from the controlling terminal.
+# Without this, the java process inherits the parent shell's stdout/stderr
+# (e.g. a terminal, or a pipe to `tail` in a wrapper script) and writes its
+# 10-second heartbeat into them, keeping that pipe open forever and
+# confusing any pipeline the launcher runs inside. logback writes the real
+# structured log into logs/bifrost.log on its own; the redirected file just
+# catches stray stdout/stderr from the JVM itself.
 java --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
      --add-opens java.base/java.nio=ALL-UNNAMED \
-     -jar "$JAR_FILE" --config "$CONFIG" &
+     -jar "$JAR_FILE" --config "$CONFIG" \
+     < /dev/null > "$LOG_FILE.stdout" 2>&1 &
 
 DRIVER_PID=$!
 echo "$DRIVER_PID" > "$PID_FILE"

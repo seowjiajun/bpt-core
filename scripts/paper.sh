@@ -132,7 +132,9 @@ do_start() {
     echo "  fenrir  : tail -f $FENRIR_DIR/logs/fenrir.log"
     echo "  huginn  : tail -f $HUGINN_DIR/logs/huginn.log"
     echo "  heimdall: tail -f $HEIMDALL_DIR/logs/heimdall.log"
-    $NEEDS_SURTR && echo "  surtr   : tail -f $SURTR_DIR/logs/surtr.log"
+    if $NEEDS_SURTR; then
+        echo "  surtr   : tail -f $SURTR_DIR/logs/surtr.log"
+    fi
 }
 
 do_stop() {

@@ -47,6 +47,32 @@ derive_strategy_name() {
          { for (i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2); print $0 "Strategy" }' <<<"$base"
 }
 
+# Derive display metadata (symbol/exchange/instrument-type) from the fenrir
+# config filename so the bridge top-bar shows the right labels without
+# having to hand-pass --symbol / --exchange / --instrument-type every time.
+# These are display-only; they don't affect trading.
+derive_display_info() {
+    local cfg="$1"
+    DISPLAY_SYMBOL="BTC-USDT"
+    DISPLAY_EXCHANGE="OKX"
+    DISPLAY_INSTRUMENT_TYPE="SPOT"
+
+    case "$(basename "$cfg")" in
+        *hyperliquid*)
+            DISPLAY_SYMBOL="BTC"
+            DISPLAY_EXCHANGE="HYPERLIQUID"
+            DISPLAY_INSTRUMENT_TYPE="PERP" ;;
+        *deribit*)
+            DISPLAY_SYMBOL="BTC-PERPETUAL"
+            DISPLAY_EXCHANGE="DERIBIT"
+            DISPLAY_INSTRUMENT_TYPE="PERP" ;;
+        *okx*)
+            DISPLAY_SYMBOL="BTC-USDT"
+            DISPLAY_EXCHANGE="OKX"
+            DISPLAY_INSTRUMENT_TYPE="SPOT" ;;
+    esac
+}
+
 bridge_start() {
     if is_running "$BRIDGE_PID"; then
         echo "  [UP]   bridge (PID $(cat "$BRIDGE_PID")) — already running"
@@ -62,23 +88,43 @@ bridge_start() {
 
     local strategy_name
     strategy_name="$(derive_strategy_name "${FENRIR_CONFIG_OVERRIDE:-}")"
+    derive_display_info "${FENRIR_CONFIG_OVERRIDE:-}"
 
     local extra_args=()
     if [ -n "${INSTRUMENT_ID:-}" ]; then
         extra_args+=(--instrument-id "$INSTRUMENT_ID")
     fi
 
-    echo "  Starting bridge (mode: paper, strategy: $strategy_name${INSTRUMENT_ID:+, instrument_id: $INSTRUMENT_ID})..."
-    nohup "$BRIDGE_BIN" --config "$BRIDGE_CFG" \
-                        --mode paper \
-                        --strategy-name "$strategy_name" \
-                        "${extra_args[@]}" \
-        > "$BRIDGE_LOG_DIR/bridge.stdout" 2>&1 &
-    echo $! > "$BRIDGE_PID"
+    echo "  Starting bridge (mode: paper, strategy: $strategy_name, symbol: $DISPLAY_SYMBOL@$DISPLAY_EXCHANGE/$DISPLAY_INSTRUMENT_TYPE${INSTRUMENT_ID:+, instrument_id: $INSTRUMENT_ID})..."
 
-    sleep 1
-    if is_running "$BRIDGE_PID"; then
-        echo "  [UP]   bridge (PID $(cat "$BRIDGE_PID"))"
+    # setsid puts the child in its own session so it survives any TTY the
+    # parent shell might own. Redirecting stdio to /dev/null + logfile
+    # fully detaches it.
+    #
+    # setsid fork-execs into the bridge, which means the captured `$!` is
+    # the PID of setsid (which exits immediately after exec), NOT the
+    # bridge. We have to look up the real PID with pgrep after the spawn.
+    setsid "$BRIDGE_BIN" --config "$BRIDGE_CFG" \
+                         --mode paper \
+                         --strategy-name "$strategy_name" \
+                         --symbol "$DISPLAY_SYMBOL" \
+                         --exchange "$DISPLAY_EXCHANGE" \
+                         --instrument-type "$DISPLAY_INSTRUMENT_TYPE" \
+                         "${extra_args[@]}" \
+        < /dev/null > "$BRIDGE_LOG_DIR/bridge.stdout" 2>&1 &
+    disown 2>/dev/null || true
+
+    # Give setsid a moment to exec into bridge, then look it up by exe path.
+    local actual_pid=""
+    for _ in 1 2 3 4 5; do
+        sleep 0.3
+        actual_pid="$(pgrep -fx "$BRIDGE_BIN .*" 2>/dev/null | head -1 || true)"
+        [ -n "$actual_pid" ] && break
+    done
+
+    if [ -n "$actual_pid" ] && kill -0 "$actual_pid" 2>/dev/null; then
+        echo "$actual_pid" > "$BRIDGE_PID"
+        echo "  [UP]   bridge (PID $actual_pid)"
     else
         echo "  [FAIL] bridge did not start — check $BRIDGE_LOG_DIR/bridge.stdout"
         rm -f "$BRIDGE_PID"
