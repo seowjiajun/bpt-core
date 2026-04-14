@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace heimdall::adapter {
 
@@ -47,6 +48,12 @@ private:
     std::string wallet_address_;
     std::unique_ptr<HyperliquidSigner> signer_;
     HyperliquidExecParser parser_;
+
+    // client_order_id → HL exchange oid (from the "resting" response).
+    // HL's cancel-by-oid wants the EXCHANGE oid, not our client id, so
+    // send_cancel looks up the mapping here. Single-threaded access from
+    // the OrderProcessor thread (send_new_order/send_cancel never overlap).
+    std::unordered_map<uint64_t, uint64_t> client_to_exch_oid_;
 };
 
 }  // namespace heimdall::adapter

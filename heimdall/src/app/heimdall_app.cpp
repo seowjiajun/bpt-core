@@ -132,7 +132,12 @@ void HeimdallApp::run() {
 
     const uint64_t hb_interval_ns = static_cast<uint64_t>(cfg_.heimdall.heartbeat_interval_ms) * 1'000'000ULL;
     const uint64_t stale_timeout_ns = static_cast<uint64_t>(cfg_.heimdall.stale_order_timeout_ms) * 1'000'000ULL;
+    // Republish AccountSnapshot every 30s so late subscribers (e.g. the
+    // dashboard bridge starting up after heimdall) get a current view of
+    // exchange balance without having to wait for a Fenrir-driven request.
+    constexpr uint64_t kAccountSnapIntervalNs = 30'000'000'000ULL;
     uint64_t last_hb_ns = ygg::util::TscClock::now_epoch_ns();
+    uint64_t last_account_snap_ns = 0;
 
     while (ygg::signal::is_running()) {
         // Drain exec events from all adapter SPSC queues first — lowest latency path.
@@ -167,6 +172,27 @@ void HeimdallApp::run() {
             processor_->check_stale_orders(stale_timeout_ns);
 
             last_hb_ns = now_ns;
+        }
+
+        // Periodic account snapshot republish — fetches are blocking REST
+        // calls so dispatch to a detached thread (same pattern as the
+        // on_account_snapshot_request handler).
+        if (now_ns - last_account_snap_ns >= kAccountSnapIntervalNs) {
+            last_account_snap_ns = now_ns;
+            for (auto& adapter : adapters_) {
+                if (!adapter->is_connected()) continue;
+                auto a = adapter;  // capture the shared_ptr by value
+                std::thread([this, a]() {
+                    try {
+                        auto snap = a->fetch_account_snapshot(/*correlation_id=*/0);
+                        account_snap_pub_->publish(snap);
+                    } catch (const std::exception& e) {
+                        ygg::log::warn("[Heimdall] Periodic AccountSnapshot fetch failed for {}: {}",
+                                       bifrost::protocol::ExchangeId::c_str(a->exchange_id()),
+                                       e.what());
+                    }
+                }).detach();
+            }
         }
 
         if (fragments == 0)

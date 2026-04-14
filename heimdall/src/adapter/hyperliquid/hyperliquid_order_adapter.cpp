@@ -386,6 +386,8 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
                 uint64_t exch_oid = 0;
                 if (s0.at("resting").as_object().contains("oid"))
                     exch_oid = s0.at("resting").as_object().at("oid").to_number<uint64_t>();
+                if (exch_oid != 0)
+                    client_to_exch_oid_[order.orderId()] = exch_oid;
                 emit(ES::ACKED, RR::NULL_VALUE, 0, exch_oid);
             } else if (s0.contains("filled")) {
                 // Immediate fill (IOC or aggressive limit).
@@ -428,16 +430,27 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
         return;
     }
 
+    // HL's cancel-by-oid requires the EXCHANGE oid from the "resting"
+    // response, not our client order_id. Look it up in the map that
+    // send_new_order populated when it received the ACK.
+    auto it = client_to_exch_oid_.find(cancel.orderId());
+    if (it == client_to_exch_oid_.end()) {
+        ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: cancel id={}: no exch_oid mapping — order never ACKed or already terminal",
+                       cancel.orderId());
+        return;
+    }
+    const uint64_t exch_oid = it->second;
+
     try {
         // Build cancel action first, then sign the exact bytes we POST.
         // Hyperliquid's cancel-by-oid action shape:
-        //   {"type":"cancel","cancels":[{"a":<asset_idx>,"o":<oid>}]}
+        //   {"type":"cancel","cancels":[{"a":<asset_idx>,"o":<exch_oid>}]}
         int asset_idx = 3;  // BTC on Hyperliquid testnet (see send_new_order note)
         if (native_symbol == "ETH") asset_idx = 4;
 
         json::object c;
         c["a"] = asset_idx;
-        c["o"] = cancel.orderId();
+        c["o"] = exch_oid;
 
         json::object action;
         action["type"] = "cancel";
@@ -493,6 +506,7 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
             ev.local_ts_ns = now_ns;
             if (!exec_queue_.try_push(ev))
                 ygg::log::error("[Hyperliquid] exec_queue full — dropped CANCELLED ExecEvent");
+            client_to_exch_oid_.erase(cancel.orderId());
         } catch (const std::exception& e) {
             ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: failed to parse cancel resp: {}",
                            e.what());
