@@ -2,6 +2,7 @@
 
 #include "heimdall/adapter/common/credentials.h"
 #include "heimdall/adapter/common/order_adapter_base.h"
+#include "heimdall/adapter/hyperliquid/hyperliquid_exec_emitter.h"
 #include "heimdall/adapter/hyperliquid/hyperliquid_exec_parser.h"
 #include "heimdall/adapter/hyperliquid/hyperliquid_signer.h"
 
@@ -83,6 +84,7 @@ private:
     std::string wallet_address_;
     std::unique_ptr<HyperliquidSigner> signer_;
     HyperliquidExecParser parser_;
+    hyperliquid::HyperliquidExecEmitter exec_emitter_{exec_queue_};
 
     // client_order_id → HL exchange oid (from the "resting" response).
     // HL's cancel-by-oid wants the EXCHANGE oid, not our client id, so

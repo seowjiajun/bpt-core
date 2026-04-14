@@ -511,109 +511,31 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
                        size_d,
                        resp);
 
-        // Parse the /exchange response and emit ACKED/FILLED/REJECTED so
-        // OrderProcessor can publish ExecReports back to fenrir. Without
-        // this, fenrir's strategies (e.g. Stoikov) wedge after the first
-        // quote because they wait for an ack to clear in-flight state.
-        //
-        // Hyperliquid response shape:
-        //   { "status":"ok", "response": {
-        //       "type":"order",
-        //       "data": { "statuses": [
-        //         {"resting": {"oid": 12345}},                            // ACKED
-        //         {"filled":  {"totalSz":"0.001","avgPx":"70000","oid":12345}},  // FILLED
-        //         {"error":   "..."}                                       // REJECTED
-        //       ] } } }
-        using ES = bifrost::protocol::ExecStatus;
-        using RR = bifrost::protocol::RejectReason;
-        using FC = bifrost::protocol::FeeCurrency;
-        try {
-            auto rj = json::parse(resp).as_object();
-            const std::string status = rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
-            // TscClock, not system_clock — order_processor's created_ns is
-            // TscClock-sourced, and subtracting across different clocks
-            // silently measures clock skew as phantom latency (order-ack
-            // RTT was showing ~1.5 s of pure skew on top of real ~200 ms
-            // network RTT). Everything on heimdall's read path is TscClock.
-            const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
-
-            auto emit = [&](ES::Value es, RR::Value rr, uint64_t filled_qty,
-                            uint64_t exch_oid) {
-                ExecEvent ev{};
-                ev.order_id = order.orderId();
-                ev.exchange_order_id = exch_oid;
-                ev.exchange_id = bifrost::protocol::ExchangeId::HYPERLIQUID;
-                ev.instrument_id = order.instrumentId();
-                ev.status = es;
-                ev.side = order.side();
-                ev.order_type = order.orderType();
-                ev.price = order.price();
-                ev.filled_qty = filled_qty;
-                ev.remaining_qty = (order.quantity() > filled_qty) ? (order.quantity() - filled_qty) : 0;
-                ev.reject_reason = rr;
-                ev.fee = 0;
-                ev.fee_currency = FC::USDT;
-                ev.exchange_ts_ns = now_ns;
-                ev.local_ts_ns = now_ns;
-                if (!exec_queue_.try_push(ev))
-                    ygg::log::error("[Hyperliquid] exec_queue full — dropped synthetic ExecEvent");
-            };
-
-            if (status != "ok") {
-                ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: order rejected, status={}", status);
-                emit(ES::REJECTED, RR::EXCHANGE_ERROR, 0, 0);
-                return;
-            }
-
-            // status=ok — drill into response.data.statuses[0]
-            if (!rj.contains("response")) return;
-            const auto& response = rj.at("response").as_object();
-            if (!response.contains("data")) return;
-            const auto& data = response.at("data").as_object();
-            if (!data.contains("statuses") || !data.at("statuses").is_array()) return;
-            const auto& statuses = data.at("statuses").as_array();
-            if (statuses.empty()) return;
-
-            const auto& s0 = statuses[0].as_object();
-            if (s0.contains("resting")) {
-                // ACKED — order rests in the book.
-                uint64_t exch_oid = 0;
-                if (s0.at("resting").as_object().contains("oid"))
-                    exch_oid = s0.at("resting").as_object().at("oid").to_number<uint64_t>();
-                if (exch_oid != 0)
-                    client_to_exch_oid_[order.orderId()] = exch_oid;
-                emit(ES::ACKED, RR::NULL_VALUE, 0, exch_oid);
-            } else if (s0.contains("filled")) {
-                // Immediate fill (IOC or aggressive limit).
-                const auto& f = s0.at("filled").as_object();
-                uint64_t exch_oid = f.contains("oid") ? f.at("oid").to_number<uint64_t>() : 0;
-                double total_sz = f.contains("totalSz") ? std::stod(std::string(f.at("totalSz").as_string())) : 0.0;
-                uint64_t filled_qty = static_cast<uint64_t>(std::round(total_sz * kScale));
-                emit(ES::FILLED, RR::NULL_VALUE, filled_qty, exch_oid);
-            } else if (s0.contains("error")) {
-                ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: order error: {}",
-                               std::string(s0.at("error").as_string()));
-                emit(ES::REJECTED, RR::EXCHANGE_ERROR, 0, 0);
-            }
-        } catch (const std::exception& e) {
-            ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: failed to parse order resp: {} resp={}",
-                           e.what(), resp);
-            // Defensive: emit a REJECTED so fenrir doesn't wedge waiting forever.
-            ExecEvent ev{};
-            ev.order_id = order.orderId();
-            ev.exchange_id = bifrost::protocol::ExchangeId::HYPERLIQUID;
-            ev.instrument_id = order.instrumentId();
-            ev.status = ES::REJECTED;
-            ev.side = order.side();
-            ev.order_type = order.orderType();
-            ev.price = order.price();
-            ev.remaining_qty = order.quantity();
-            ev.reject_reason = RR::EXCHANGE_ERROR;
-            ev.fee_currency = FC::USDT;
-            (void)exec_queue_.try_push(ev);
-        }
+        const hyperliquid::OrderContext ctx{
+            order.orderId(),
+            order.instrumentId(),
+            order.side(),
+            order.orderType(),
+            order.price(),
+            order.quantity(),
+        };
+        exec_emitter_.emit_order_response(
+            resp, ctx,
+            [this, client_id = order.orderId()](uint64_t exch_oid) {
+                client_to_exch_oid_[client_id] = exch_oid;
+            });
     } catch (const std::exception& e) {
         ygg::log::error("[Heimdall] HyperliquidOrderAdapter: send_new_order failed: {}", e.what());
+        // Defensive: synthesize a REJECTED so fenrir doesn't wedge waiting.
+        const hyperliquid::OrderContext ctx{
+            order.orderId(),
+            order.instrumentId(),
+            order.side(),
+            order.orderType(),
+            order.price(),
+            order.quantity(),
+        };
+        exec_emitter_.emit_rejected(ctx);
     }
 }
 
@@ -645,42 +567,11 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
         ygg::log::info("[Heimdall] HyperliquidOrderAdapter: cancel id={} resp={}",
                        cancel.orderId(), resp);
 
-        // Emit a CANCELLED ExecEvent on successful cancel so OrderStateManager
-        // can transition the order to a terminal state. Without this, the
-        // state machine leaves the order "ACKED" forever and the stale-order
-        // watchdog fires ~30s later with a synthetic CANCELLED anyway — but
-        // the slot remains held in the meantime, which wedges Stoikov.
-        //
-        // HL cancel response shape:
-        //   {"status":"ok","response":{"type":"cancel","data":{"statuses":[
-        //     "success"                                   // cancelled
-        //     | {"error":"Order was never placed..."}     // already gone
-        //   ]}}}
-        using ES = bifrost::protocol::ExecStatus;
-        using RR = bifrost::protocol::RejectReason;
-        using FC = bifrost::protocol::FeeCurrency;
-        try {
-            auto rj = json::parse(resp).as_object();
-            const std::string status = rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
-            if (status != "ok") return;
-
-            const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
-
-            ExecEvent ev{};
-            ev.order_id = cancel.orderId();
-            ev.exchange_id = bifrost::protocol::ExchangeId::HYPERLIQUID;
-            ev.status = ES::CANCELLED;
-            ev.reject_reason = RR::NULL_VALUE;
-            ev.fee_currency = FC::USDT;
-            ev.exchange_ts_ns = now_ns;
-            ev.local_ts_ns = now_ns;
-            if (!exec_queue_.try_push(ev))
-                ygg::log::error("[Hyperliquid] exec_queue full — dropped CANCELLED ExecEvent");
-            client_to_exch_oid_.erase(cancel.orderId());
-        } catch (const std::exception& e) {
-            ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: failed to parse cancel resp: {}",
-                           e.what());
-        }
+        exec_emitter_.emit_cancel_response(
+            resp, cancel.orderId(),
+            [this, client_id = cancel.orderId()]() {
+                client_to_exch_oid_.erase(client_id);
+            });
     } catch (const std::exception& e) {
         ygg::log::error("[Heimdall] HyperliquidOrderAdapter: send_cancel failed: {}", e.what());
     }
