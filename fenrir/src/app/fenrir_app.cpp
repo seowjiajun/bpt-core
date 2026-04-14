@@ -79,6 +79,14 @@ FenrirApp::FenrirApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> aeron)
     }
 
     strategy_ = strategy::StrategyFactory::create(fc, *refdata_, md_client_.get(), order_mgr_.get(), vol_client_.get());
+
+    startup_gate_ = std::make_unique<app::StartupGate>(*refdata_,
+                                                       order_gw_.get(),
+                                                       *strategy_,
+                                                       metrics_,
+                                                       fc.strategy.schedule.configured_exchanges_mask,
+                                                       fc.correlation_id);
+
     wire_refdata_callbacks();
     wire_md_callbacks();
     wire_vol_callbacks();
@@ -130,40 +138,8 @@ void FenrirApp::wire_refdata_callbacks() {
                                 uint16_t instrument_count,
                                 bool fee_schedules_loaded,
                                 bool funding_rates_loaded) {
-        const uint8_t configured_mask = cfg_.fenrir.strategy.schedule.configured_exchanges_mask;
-        if (!refdata_ready_) {
-            ygg::log::info(
-                "[Fenrir] RefDataReady: exchanges=0x{:02x} (configured=0x{:02x}) "
-                "instruments={} fee_schedules={} funding_rates={}",
-                exchanges_loaded,
-                configured_mask,
-                instrument_count,
-                fee_schedules_loaded,
-                funding_rates_loaded);
-        } else {
-            ygg::log::debug("[Fenrir] RefDataReady (periodic): exchanges=0x{:02x} instruments={}",
-                            exchanges_loaded,
-                            instrument_count);
-        }
-
-        if (configured_mask != 0 && (exchanges_loaded & configured_mask) != configured_mask) {
-            const uint8_t missing = configured_mask & ~exchanges_loaded;
-            ygg::log::critical(
-                "[Fenrir] HALT — refdata service is missing required exchanges (mask=0x{:02x}). "
-                "Cannot trade safely. Shutting down.",
-                missing);
-            ygg::signal::stop();
-        } else {
-            refdata_ready_ = true;
-            if (exchanges_loaded & 0x01)
-                metrics_.refdata_ready("BINANCE").Set(1.0);
-            if (exchanges_loaded & 0x02)
-                metrics_.refdata_ready("OKX").Set(1.0);
-            if (exchanges_loaded & 0x04)
-                metrics_.refdata_ready("HYPERLIQUID").Set(1.0);
-            if (exchanges_loaded & 0x08)
-                metrics_.refdata_ready("DERIBIT").Set(1.0);
-        }
+        startup_gate_->on_refdata_ready(exchanges_loaded, instrument_count,
+                                        fee_schedules_loaded, funding_rates_loaded);
     };
 
     refdata_->on_error = [](RefDataErrorType::Value error_type, ExchangeId::Value exchange_id, uint64_t instrument_id) {
@@ -175,11 +151,7 @@ void FenrirApp::wire_refdata_callbacks() {
 
     refdata_->on_snapshot_complete = [this](const refdata::InstrumentCache& cache) {
         strategy_->on_snapshot(cache);
-        if (strategy_started_ && !strategy_md_started_) {
-            strategy_md_started_ = true;
-            ygg::log::info("[Fenrir] Snapshot received — starting strategy MD subscriptions");
-            strategy_->start();
-        }
+        startup_gate_->on_refdata_snapshot_complete();
     };
 
     refdata_->on_delta = [this](const refdata::Instrument& inst,
@@ -291,24 +263,13 @@ void FenrirApp::wire_order_callbacks() {
 
     order_gw_->on_account_snapshot = [this](bifrost::protocol::AccountSnapshot& snap) {
         const auto exchange_id = snap.exchangeId();
-        uint8_t bit = 0;
-        switch (exchange_id) {
-            case ExchangeId::BINANCE:     bit = 0x01; break;
-            case ExchangeId::OKX:         bit = 0x02; break;
-            case ExchangeId::HYPERLIQUID: bit = 0x04; break;
-            case ExchangeId::DERIBIT:     bit = 0x08; break;
-            default: break;
-        }
-        account_snapshot_ready_ |= bit;
-
         ygg::log::info(
-            "[Fenrir] AccountSnapshot received: exchange={} balance={:.2f} positions={} "
-            "ready_mask=0x{:02x}",
+            "[Fenrir] AccountSnapshot received: exchange={} balance={:.2f} positions={}",
             ExchangeId::c_str(exchange_id),
             static_cast<double>(snap.availableBalanceE8()) / 1e8,
-            snap.positions().count(),
-            account_snapshot_ready_);
+            snap.positions().count());
 
+        startup_gate_->on_account_snapshot(exchange_id);
         strategy_->on_account_snapshot(snap);
     };
 }
@@ -345,51 +306,16 @@ void FenrirApp::run() {
                 1);
         }
 
-        // Step 1: once refdata is ready, send AccountSnapshotRequests to Heimdall
-        // (one per configured exchange). This runs before the refdata subscription
-        // so position state is seeded before the strategy sees any ticks.
-        if (refdata_ready_ && order_gw_ && !account_snapshot_requests_sent_) {
-            account_snapshot_requests_sent_ = true;
-            const uint8_t mask = cfg_.fenrir.strategy.schedule.configured_exchanges_mask;
-            uint64_t corr = cfg_.fenrir.correlation_id;
-            if (mask & 0x01) {
-                ygg::log::info("[Fenrir] Requesting AccountSnapshot for BINANCE");
-                order_gw_->send_account_snapshot_request(ExchangeId::BINANCE, corr++);
-            }
-            if (mask & 0x02) {
-                ygg::log::info("[Fenrir] Requesting AccountSnapshot for OKX");
-                order_gw_->send_account_snapshot_request(ExchangeId::OKX, corr++);
-            }
-            if (mask & 0x04) {
-                ygg::log::info("[Fenrir] Requesting AccountSnapshot for HYPERLIQUID");
-                order_gw_->send_account_snapshot_request(ExchangeId::HYPERLIQUID, corr++);
-            }
-            if (mask & 0x08) {
-                ygg::log::info("[Fenrir] Requesting AccountSnapshot for DERIBIT");
-                order_gw_->send_account_snapshot_request(ExchangeId::DERIBIT, corr++);
-            }
-        }
-
-        // Step 2: wait for AccountSnapshot for all configured exchanges before subscribing.
-        // If order_gw_ is not configured, skip the gate (refdata-only mode).
-        const uint8_t configured_mask = cfg_.fenrir.strategy.schedule.configured_exchanges_mask;
-        const bool account_ready = !order_gw_ || (account_snapshot_ready_ & configured_mask) == configured_mask;
-
-        if (!strategy_started_ && refdata_ready_ && account_ready) {
-            strategy_started_ = true;
-            metrics_.strategy_active->Set(1.0);
-            ygg::log::info("[Fenrir] RefDataReady + AccountSnapshot received — sending RefDataSubscriptionRequest");
-            refdata_->subscribe(cfg_.fenrir.correlation_id);
-        }
+        startup_gate_->tick();
 
         // Once the strategy has its snapshot and started MD subscriptions, switch to
         // tick-gating mode if running a backtest.
-        if (cfg_.backtest_mode && strategy_md_started_) {
+        if (cfg_.backtest_mode && startup_gate_->is_active()) {
             run_backtest_loop();
             break;
         }
 
-        if (strategy_started_) {
+        if (startup_gate_->is_active()) {
             check_service_liveness();
             report_latency_stats();
 

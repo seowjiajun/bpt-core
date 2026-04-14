@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fenrir/app/startup_gate.h"
 #include "fenrir/backtest/backtest_client.h"
 #include "fenrir/config/config.h"
 #include "fenrir/dashboard/portfolio_snapshot_publisher.h"
@@ -52,16 +53,11 @@ private:
     std::shared_ptr<aeron::Subscription> dashboard_ctrl_sub_;
     std::unique_ptr<dashboard::PortfolioSnapshotPublisher> portfolio_snap_pub_;
 
-    bool refdata_ready_{false};
-    bool surtr_ready_{false};
-    bool strategy_started_{false};
-    bool strategy_md_started_{false};
+    // Drives the refdata→accounts→subscribe→snapshot startup sequence.
+    // Constructed after strategy_/order_gw_/refdata_ exist.
+    std::unique_ptr<app::StartupGate> startup_gate_;
 
-    // Bitmask of exchanges for which AccountSnapshot has been received.
-    // Same bit layout as RefDataReady.exchangesLoaded (bit0=BINANCE, bit1=OKX, bit2=HYPERLIQUID).
-    // Trading is gated until this matches configured_exchanges_mask when order_gw_ is active.
-    uint8_t account_snapshot_ready_{0x00};
-    bool account_snapshot_requests_sent_{false};
+    bool surtr_ready_{false};
 
     // Service liveness watchdog.
     // Set to true when any service heartbeat goes stale; cleared on recovery.

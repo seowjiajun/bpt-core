@@ -1,5 +1,6 @@
 add_library(fenrir_lib
     app/fenrir_app.cpp
+    app/startup_gate.cpp
     backtest/backtest_client.cpp
     config/config.cpp
     dashboard/portfolio_snapshot_publisher.cpp
