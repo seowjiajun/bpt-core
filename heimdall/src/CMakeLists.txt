@@ -19,6 +19,7 @@ add_library(heimdall_lib
     adapter/hyperliquid/hyperliquid_action_codec.cpp
     adapter/hyperliquid/hyperliquid_exec_emitter.cpp
     adapter/hyperliquid/hyperliquid_https_client.cpp
+    adapter/hyperliquid/hyperliquid_ws_client.cpp
     adapter/hyperliquid/hyperliquid_order_adapter.cpp
     adapter/hyperliquid/hyperliquid_exec_parser.cpp
     adapter/hyperliquid/hyperliquid_signer.cpp

@@ -6,14 +6,9 @@
 #include "heimdall/adapter/hyperliquid/hyperliquid_exec_parser.h"
 #include "heimdall/adapter/hyperliquid/hyperliquid_https_client.h"
 #include "heimdall/adapter/hyperliquid/hyperliquid_signer.h"
+#include "heimdall/adapter/hyperliquid/hyperliquid_ws_client.h"
 
-#include <boost/beast/websocket.hpp>
-#include <boost/beast/websocket/ssl.hpp>
-#include <boost/json/fwd.hpp>
-#include <atomic>
-#include <future>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -47,33 +42,12 @@ protected:
     void connect_and_run() override;
 
 private:
-    void handle_message(const std::string& payload, uint64_t recv_ns);
-
-    // WebSocket post action API — the fast path for signed exchange actions.
-    //
-    // HL exposes a `{"method":"post","id":N,"request":{"type":"action",
-    // "payload":<signed-action>}}` envelope on the same wss://.../ws
-    // connection that we already use for userFills. Responses come back on
-    // `channel:"post"` with the matching id, allowing multiple orders to
-    // be in-flight at once without the HTTP framing / dispatch cost that
-    // /exchange carries per request.
-    //
-    // ws_post_action blocks the caller until the matching post response
-    // arrives or the 5 s timeout fires. Returns the `response.payload`
-    // JSON string (same shape the /exchange REST body used to return).
-    // Throws on timeout, connection failure, or WS write error.
-    std::string ws_post_action(const boost::json::value& action,
-                               uint64_t nonce,
-                               const SignedTransaction& sig);
-    // Fail any pending ws_post_action futures with an error. Called on
-    // WS disconnect or shutdown so senders never hang forever.
-    void fail_pending_posts(const std::string& reason);
-
     bool enabled_{false};  // false if private_key credential is empty
     std::string wallet_address_;
     std::unique_ptr<HyperliquidSigner> signer_;
     HyperliquidExecParser parser_;
     hyperliquid::HyperliquidExecEmitter exec_emitter_{exec_queue_};
+    std::unique_ptr<hyperliquid::HyperliquidWsClient> ws_client_;
 
     // client_order_id → HL exchange oid (from the "resting" response).
     // HL's cancel-by-oid wants the EXCHANGE oid, not our client id, so
@@ -84,28 +58,6 @@ private:
     // REST client for /info queries (clearinghouseState, meta) and as
     // a fallback for signed actions the WS post path can't handle (modify).
     std::unique_ptr<hyperliquid::HyperliquidHttpsClient> https_client_;
-
-    // WS stream shared with the read loop + ping thread + order senders.
-    // shared_ptr so a reconnect in connect_and_run() doesn't pull the
-    // rug out from under a concurrent sender mid-write — the old stream
-    // stays alive for the duration of any in-progress writes.
-    //
-    // ws_lifecycle_mutex_ protects the pointer. ws_write_mutex_ serializes
-    // concurrent writes (ping, orders, cancels). Reads are single-threaded
-    // in connect_and_run()'s loop and don't contend with writes (Beast's
-    // websocket::stream supports concurrent read+write across threads as
-    // long as each direction is single-threaded).
-    using WsStream = boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>;
-    std::mutex ws_lifecycle_mutex_;
-    std::mutex ws_write_mutex_;
-    std::shared_ptr<WsStream> ws_stream_;
-
-    // Pending post-action requests, keyed by the monotonic `id` we send.
-    // When a `channel:"post"` frame arrives the reader loop looks up the
-    // matching promise and sets its value with the response payload.
-    std::atomic<uint64_t> next_post_id_{1};
-    std::mutex pending_posts_mutex_;
-    std::unordered_map<uint64_t, std::promise<std::string>> pending_posts_;
 };
 
 }  // namespace heimdall::adapter
