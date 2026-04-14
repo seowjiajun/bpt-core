@@ -35,7 +35,7 @@ struct OrderContext {
 
 class HyperliquidExecEmitter {
 public:
-    explicit HyperliquidExecEmitter(util::ExecEventQueue<256>& queue) : queue_(queue) {}
+    explicit HyperliquidExecEmitter(util::ExecEventQueue& queue) : queue_(queue) {}
 
     // Parses an order-action response and emits one of:
     //   - ACKED    with exch_oid (from the "resting" status)
@@ -64,7 +64,7 @@ public:
     void emit_rejected(const OrderContext& ctx);
 
 private:
-    util::ExecEventQueue<256>& queue_;
+    util::ExecEventQueue& queue_;
 };
 
 }  // namespace heimdall::adapter::hyperliquid

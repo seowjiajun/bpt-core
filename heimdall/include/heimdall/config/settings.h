@@ -35,6 +35,12 @@ struct AdapterConfig {
     std::string ws_path;
     bool use_tls{true};
     int io_cpu{-1};  // CPU to pin the adapter IO thread to; -1 = no pinning
+
+    // SPSC ring buffer between the adapter IO thread and the main poll
+    // thread. Must be a power of 2. Default 256 covers any realistic
+    // burst — a full book snapshot on a cold reconnect is ~tens of
+    // events — but a high-churn strategy on a busy venue may want 1024+.
+    uint32_t exec_queue_capacity{256};
 };
 
 struct HeimdallConfig {

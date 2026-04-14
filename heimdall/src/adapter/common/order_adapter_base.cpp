@@ -6,7 +6,10 @@ namespace heimdall::adapter {
 
 namespace ssl = boost::asio::ssl;
 
-OrderAdapterBase::OrderAdapterBase(const config::AdapterConfig& cfg) : cfg_(cfg), ssl_ctx_(ssl::context::tls_client) {
+OrderAdapterBase::OrderAdapterBase(const config::AdapterConfig& cfg)
+    : cfg_(cfg),
+      ssl_ctx_(ssl::context::tls_client),
+      exec_queue_(cfg.exec_queue_capacity) {
     ssl_ctx_.set_default_verify_paths();
     ssl_ctx_.set_verify_mode(ssl::verify_peer);
 }

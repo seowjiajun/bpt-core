@@ -38,7 +38,7 @@ ExecEvent make_skeleton(const OrderContext& ctx, uint64_t now_ns) {
     return ev;
 }
 
-void push_or_log(util::ExecEventQueue<256>& queue, const ExecEvent& ev, const char* tag) {
+void push_or_log(util::ExecEventQueue& queue, const ExecEvent& ev, const char* tag) {
     if (!queue.try_push(ev))
         ygg::log::error("[Hyperliquid] exec_queue full — dropped {} ExecEvent", tag);
 }

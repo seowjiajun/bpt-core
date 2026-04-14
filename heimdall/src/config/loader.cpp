@@ -121,6 +121,8 @@ Settings load(const std::string& path) {
             ac.ws_path = *v;
         if (auto v = (*a)["use_tls"].value<bool>())
             ac.use_tls = *v;
+        if (auto v = (*a)["exec_queue_capacity"].value<int64_t>())
+            ac.exec_queue_capacity = static_cast<uint32_t>(*v);
         s.heimdall.adapters.push_back(std::move(ac));
     }
 

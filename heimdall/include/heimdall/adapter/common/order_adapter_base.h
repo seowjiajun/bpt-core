@@ -48,7 +48,9 @@ protected:
     std::atomic<bool> connected_{false};
 
     // Adapter IO thread pushes events here; main thread pops via drain_exec_events().
-    util::ExecEventQueue<256> exec_queue_;
+    // Capacity is config-driven (AdapterConfig.exec_queue_capacity) and must
+    // be a power of 2 — enforced by the queue ctor.
+    util::ExecEventQueue exec_queue_;
 
     // Implement to run one connection session.  Throw on error to trigger reconnect.
     virtual void connect_and_run() = 0;
