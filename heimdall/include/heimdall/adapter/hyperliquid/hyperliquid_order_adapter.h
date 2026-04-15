@@ -55,9 +55,33 @@ private:
     // the OrderProcessor thread (send_new_order/send_cancel never overlap).
     std::unordered_map<uint64_t, uint64_t> client_to_exch_oid_;
 
+    // Reverse map: HL exchange oid → client_order_id. Needed because HL
+    // doesn't echo a cloid in userFills (we don't send one). When a fill
+    // arrives on the WS, the parser uses this lookup to resolve the fill
+    // back to the internal order_id. Without it every userFills entry is
+    // silently dropped. Populated whenever a new order is acked or fills
+    // on placement.
+    std::unordered_map<uint64_t, uint64_t> exch_oid_to_client_;
+
     // REST client for /info queries (clearinghouseState, meta) and as
     // a fallback for signed actions the WS post path can't handle (modify).
     std::unique_ptr<hyperliquid::HyperliquidHttpsClient> https_client_;
+
+    // ── Crash safety: TODO ────────────────────────────────────────────
+    // An earlier version of this adapter ran a dead-man-switch thread
+    // that periodically posted HL's scheduleCancel action so the exchange
+    // would auto-cancel all orders if heimdall died. That turned out to
+    // be unusable on this account: HL gates scheduleCancel behind
+    // $1,000,000 of lifetime traded volume (error seen on testnet:
+    // "Cannot set scheduled cancel time until enough volume traded.
+    // Required: $1000000. Traded: $129582.4."). Until the wallet clears
+    // that threshold, there is no in-adapter crash-safety layer — fenrir's
+    // graceful SIGTERM handler (fenrir_app.cpp::shutdown_flatten) covers
+    // the common case, and scripts/flatten_hl_positions.py is the manual
+    // kill switch. The correct long-term fix is a separate watchdog
+    // process with independent exchange connectivity that monitors
+    // heimdall health and fires cancellations via the same REST path the
+    // flatten script uses, bypassing the volume gate.
 };
 
 }  // namespace heimdall::adapter

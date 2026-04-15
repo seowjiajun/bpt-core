@@ -58,7 +58,10 @@ export function connectWebSocket({ url, onOpen, onClose }: ClientOptions): () =>
     socket.onopen = () => {
       backoffMs = RECONNECT_MIN_MS
       activeSocket = socket
-      useStore.getState().reset()
+      // Don't reset the store on reconnect — exchange-authoritative state
+      // (account balance/equity/positions) should persist until the next
+      // snapshot naturally overwrites it, otherwise every reconnect causes
+      // the equity curve to flip to 0 and holdings to disappear for ~5s.
       dispatch({ type: 'status', state: 'live' })
       onOpen?.()
     }

@@ -49,6 +49,15 @@ struct AssetMeta {
 // unknown symbols (asset_idx = -1) — callers should reject.
 [[nodiscard]] AssetMeta lookup_testnet_asset(std::string_view exchange_symbol);
 
+// HL time-in-force for the limit variant. Alo = Add Liquidity Only
+// (post-only) — HL rejects the order if it would cross the book at
+// submission time. Essential for market-making strategies that must
+// not pay the spread on fills.
+enum class HlTif { Gtc, Alo, Ioc };
+
+// Wire string HL expects in action.orders[].t.limit.tif.
+[[nodiscard]] const char* tif_to_string(HlTif tif);
+
 // Build the `action` JSON for a new order (one-leg limit). Uses
 // lookup_testnet_asset for the asset index and float_to_wire + price
 // rounding for the wire price/size strings.
@@ -61,7 +70,8 @@ struct AssetMeta {
 [[nodiscard]] boost::json::value build_order_action(std::string_view exchange_symbol,
                                                     bool is_buy,
                                                     double price_natural,
-                                                    double size_natural);
+                                                    double size_natural,
+                                                    HlTif tif = HlTif::Gtc);
 
 // Build the `action` JSON for a cancel-by-exchange-oid. The oid is the
 // HL exchange order id from the original `resting` response — NOT our
@@ -76,5 +86,20 @@ struct AssetMeta {
                                                      uint64_t client_or_exch_oid,
                                                      double price_natural,
                                                      double size_natural);
+
+// Build the `action` JSON for a scheduleCancel dead-man switch.
+// time_ms is the unix-epoch millisecond deadline at which HL will cancel
+// all open orders across every coin for the signing wallet if no further
+// scheduleCancel arrives before it. Passing 0 clears any pending schedule
+// without setting a new one.
+//
+// WARNING: not currently used. HL gates scheduleCancel behind $1,000,000
+// of lifetime traded volume — smaller accounts get "Cannot set scheduled
+// cancel time until enough volume traded". The helper is kept for a
+// future wallet tier that clears the threshold; see the TODO comment in
+// hyperliquid_order_adapter.h for the current crash-safety status.
+// Constraints when it IS usable: `time_ms` must be ≥5 seconds in the
+// future, and HL caps scheduled-cancel fires at 10 per UTC day.
+[[nodiscard]] boost::json::value build_schedule_cancel_action(int64_t time_ms);
 
 }  // namespace heimdall::adapter::hyperliquid

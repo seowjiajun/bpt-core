@@ -6,7 +6,7 @@
 namespace fenrir::strategy {
 
 static constexpr double kPriceScale = 1e8;
-static constexpr double kQtyScale = 1e5;
+static constexpr double kQtyScale = 1e8;
 
 void PositionTracker::on_fill(uint64_t instrument_id,
                               bifrost::protocol::ExchangeId::Value exchange_id,

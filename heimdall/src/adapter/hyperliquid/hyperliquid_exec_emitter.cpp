@@ -94,19 +94,19 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
         }
 
         if (s0.contains("filled")) {
-            // Immediate fill (IOC or aggressive limit).
+            // Immediate fill-on-placement (IOC, crossing limit, or market).
+            // We deliberately do NOT emit a FILLED ExecEvent here — the same
+            // fill also comes through the userFills WS stream, and emitting
+            // from both paths would double-count the fill in fenrir. Only
+            // the WS stream is authoritative; we just register the oid so
+            // the parser can resolve userFills → client order_id (HL does
+            // not echo a cloid).
             const auto& f = s0.at("filled").as_object();
             const uint64_t exch_oid = f.contains("oid") ? f.at("oid").to_number<uint64_t>() : 0;
-            const double total_sz = f.contains("totalSz") ? std::stod(std::string(f.at("totalSz").as_string())) : 0.0;
-            const uint64_t filled_qty = static_cast<uint64_t>(std::round(total_sz * kScale));
-
-            ExecEvent ev = make_skeleton(ctx, now_ns);
-            ev.status = ES::FILLED;
-            ev.reject_reason = RR::NULL_VALUE;
-            ev.exchange_order_id = exch_oid;
-            ev.filled_qty = filled_qty;
-            ev.remaining_qty = (ctx.quantity_e8 > filled_qty) ? (ctx.quantity_e8 - filled_qty) : 0;
-            push_or_log(queue_, ev, "FILLED");
+            if (exch_oid != 0 && on_acked) on_acked(exch_oid);
+            ygg::log::debug(
+                "[Heimdall] HL emitter: fill-on-placement client_id={} exch_oid={} — waiting for userFills",
+                ctx.client_order_id, exch_oid);
             return true;
         }
 
@@ -138,6 +138,50 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
         const std::string status =
             rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
         if (status != "ok") return false;
+
+        // Parse inner statuses. HL returns status:"ok" at the top level even
+        // when the specific cancel failed — the per-order result is in
+        // response.data.statuses[0], which is either the string "success" or
+        // an object {"error":"..."}. Critically, the error string is
+        //   "Order was never placed, already canceled, or filled."
+        // Three different meanings squashed into one message:
+        //   - never placed / already canceled → safe to treat as cancelled
+        //   - already FILLED → the real fill is about to arrive via userFills.
+        //     If we emit CANCELLED here and erase the oid→client mapping, the
+        //     userFills event resolves to order_id=0 and fenrir loses the fill.
+        // When we can't distinguish, err on the side of "wait for userFills":
+        // don't emit CANCELLED, don't erase maps. Fenrir's cancel-pending flag
+        // will be cleared by the FILLED event moments later.
+        bool ambiguous_already_filled = false;
+        if (rj.contains("response") && rj.at("response").is_object()) {
+            const auto& response = rj.at("response").as_object();
+            if (response.contains("data") && response.at("data").is_object()) {
+                const auto& data = response.at("data").as_object();
+                if (data.contains("statuses") && data.at("statuses").is_array()) {
+                    const auto& statuses = data.at("statuses").as_array();
+                    if (!statuses.empty() && statuses[0].is_object()) {
+                        const auto& s0 = statuses[0].as_object();
+                        if (s0.contains("error") && s0.at("error").is_string()) {
+                            const std::string_view err(s0.at("error").as_string());
+                            if (err.find("filled") != std::string_view::npos) {
+                                ambiguous_already_filled = true;
+                                ygg::log::warn(
+                                    "[Heimdall] HL emitter: cancel id={} raced with fill "
+                                    "(HL says '{}') — skipping CANCELLED emit, waiting for "
+                                    "userFills to deliver the real state",
+                                    client_order_id, err);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (ambiguous_already_filled) {
+            // Return true (parse succeeded) without emitting anything or
+            // erasing oid maps. The authoritative FILLED event is on its way.
+            return true;
+        }
 
         const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
 

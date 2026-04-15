@@ -46,12 +46,13 @@ double round_price_for_asset(double price, const AssetMeta& meta) {
     return std::round(price);
 }
 
-// Build the inner order object ({"a","b","p","s","r","t":{"limit":{"tif":"Gtc"}}})
+// Build the inner order object ({"a","b","p","s","r","t":{"limit":{"tif":...}}})
 // used by both the new-order and modify actions.
 json::object build_order_object(std::string_view exchange_symbol,
                                 bool is_buy,
                                 double price_natural,
-                                double size_natural) {
+                                double size_natural,
+                                HlTif tif) {
     const AssetMeta meta = lookup_testnet_asset(exchange_symbol);
     const double px = round_price_for_asset(price_natural, meta);
 
@@ -61,19 +62,29 @@ json::object build_order_object(std::string_view exchange_symbol,
     o["p"] = float_to_wire(px);
     o["s"] = float_to_wire(size_natural);
     o["r"] = false;
-    o["t"] = json::object{{"limit", json::object{{"tif", "Gtc"}}}};
+    o["t"] = json::object{{"limit", json::object{{"tif", tif_to_string(tif)}}}};
     return o;
 }
 
 }  // namespace
 
+const char* tif_to_string(HlTif tif) {
+    switch (tif) {
+        case HlTif::Alo: return "Alo";
+        case HlTif::Ioc: return "Ioc";
+        case HlTif::Gtc: return "Gtc";
+    }
+    return "Gtc";
+}
+
 json::value build_order_action(std::string_view exchange_symbol,
                                bool is_buy,
                                double price_natural,
-                               double size_natural) {
+                               double size_natural,
+                               HlTif tif) {
     json::object action;
     action["type"] = "order";
-    action["orders"] = json::array{build_order_object(exchange_symbol, is_buy, price_natural, size_natural)};
+    action["orders"] = json::array{build_order_object(exchange_symbol, is_buy, price_natural, size_natural, tif)};
     action["grouping"] = "na";
     return action;
 }
@@ -101,7 +112,8 @@ json::value build_modify_action(std::string_view exchange_symbol,
     json::object ord_inner = build_order_object(exchange_symbol,
                                                 /*is_buy=*/true,
                                                 price_natural,
-                                                size_natural);
+                                                size_natural,
+                                                HlTif::Gtc);
 
     json::object m;
     m["oid"] = client_or_exch_oid;
@@ -110,6 +122,14 @@ json::value build_modify_action(std::string_view exchange_symbol,
     json::object action;
     action["type"] = "modify";
     action["modifies"] = json::array{std::move(m)};
+    return action;
+}
+
+json::value build_schedule_cancel_action(int64_t time_ms) {
+    json::object action;
+    action["type"] = "scheduleCancel";
+    if (time_ms > 0)
+        action["time"] = time_ms;
     return action;
 }
 

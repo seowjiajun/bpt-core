@@ -1,3 +1,14 @@
+// Opt out of HMR for this module. Zustand's store is a module-level singleton,
+// so an HMR reload would create a fresh store with initialState zeros and
+// every subscriber would briefly see empty/zero state until the next WS
+// message repopulates. That manifested as the equity curve flipping 0↔722
+// every time any unrelated component was edited. Forcing a full page reload
+// on store edits is the correct behavior — you can't meaningfully hot-swap
+// a state container anyway.
+if (import.meta.hot) {
+  import.meta.hot.decline()
+}
+
 import { create } from 'zustand'
 import type {
   ConnectionStatus,
@@ -211,6 +222,11 @@ export const useStore = create<State>((set) => ({
           }
 
         case 'account': {
+          // Defensive: drop all-zero snapshots. These can leak through on a
+          // failed clearinghouseState parse (heimdall catches and publishes
+          // a default-constructed zero snapshot). Without this guard the
+          // equity chart visibly flips to 0 on any such bad message.
+          if (msg.balance === 0 && msg.equity === 0) return state
           // Append to history, but dedupe by second so multiple snapshots
           // in the same second collapse to the most recent value (otherwise
           // lightweight-charts errors on duplicate timestamps).

@@ -7,6 +7,7 @@
 #include <bifrost_protocol/OrderSide.h>
 #include <bifrost_protocol/OrderType.h>
 #include <bifrost_protocol/RejectReason.h>
+#include <bifrost_protocol/TimeInForce.h>
 
 #include <boost/json.hpp>
 #include <chrono>
@@ -78,11 +79,26 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
     }
 
     using OS = bifrost::protocol::OrderSide;
+    using OT = bifrost::protocol::OrderType;
+    using TIF = bifrost::protocol::TimeInForce;
 
     const std::string exchange_symbol = order.getExchangeSymbolAsString();
     const bool is_buy = (order.side() == OS::BUY);
     const double price_d = static_cast<double>(order.price()) / kScale;
     const double size_d  = static_cast<double>(order.quantity()) / kScale;
+
+    // Map (OrderType, TimeInForce) onto HL's limit tif string.
+    //   POST_ONLY → Alo  (HL rejects the order if it would cross — maker only)
+    //   LIMIT + IOC → Ioc
+    //   MARKET → Ioc (HL has no market type; strategies send an aggressive
+    //                 limit price with IOC semantics)
+    //   everything else → Gtc
+    const auto hl_tif = [&]() {
+        if (order.orderType() == OT::POST_ONLY) return hlcodec::HlTif::Alo;
+        if (order.timeInForce() == TIF::IOC || order.orderType() == OT::MARKET)
+            return hlcodec::HlTif::Ioc;
+        return hlcodec::HlTif::Gtc;
+    }();
 
     try {
         // Build Hyperliquid order action JSON via the pure codec helper.
@@ -90,7 +106,7 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
         // exact bytes we pass to ws_client_->post_action, so any post-sign mutation
         // desyncs the signature from the wire payload.
         const json::value action = hlcodec::build_order_action(
-            exchange_symbol, is_buy, price_d, size_d);
+            exchange_symbol, is_buy, price_d, size_d, hl_tif);
 
         const uint64_t nonce = signer_->next_nonce();
         auto tx = signer_->sign_l1_action(action, nonce);
@@ -100,9 +116,10 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
         // payload shape is identical to the REST body, so downstream
         // parsing below is unchanged.
         const std::string resp = ws_client_->post_action(action, nonce, tx);
-        ygg::log::info("[Heimdall] HyperliquidOrderAdapter: new order id={} side={} px={} sz={} resp={}",
+        ygg::log::info("[Heimdall] HyperliquidOrderAdapter: new order id={} side={} tif={} px={} sz={} resp={}",
                        order.orderId(),
                        is_buy ? "BUY" : "SELL",
+                       hlcodec::tif_to_string(hl_tif),
                        price_d,
                        size_d,
                        resp);
@@ -117,8 +134,13 @@ void HyperliquidOrderAdapter::send_new_order(const bifrost::protocol::NewOrder& 
         };
         exec_emitter_.emit_order_response(
             resp, ctx,
-            [this, client_id = order.orderId()](uint64_t exch_oid) {
+            [this, client_id = order.orderId(), qty_e8 = order.quantity()](uint64_t exch_oid) {
                 client_to_exch_oid_[client_id] = exch_oid;
+                exch_oid_to_client_[exch_oid] = client_id;
+                // Register with the parser so userFills entries for this oid
+                // can be resolved to a client_order_id AND tracked across
+                // multiple partial-fill slices.
+                parser_.register_order(exch_oid, client_id, qty_e8);
             });
     } catch (const std::exception& e) {
         ygg::log::error("[Heimdall] HyperliquidOrderAdapter: send_new_order failed: {}", e.what());
@@ -165,8 +187,9 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
 
         exec_emitter_.emit_cancel_response(
             resp, cancel.orderId(),
-            [this, client_id = cancel.orderId()]() {
+            [this, client_id = cancel.orderId(), exch_oid]() {
                 client_to_exch_oid_.erase(client_id);
+                exch_oid_to_client_.erase(exch_oid);
             });
     } catch (const std::exception& e) {
         ygg::log::error("[Heimdall] HyperliquidOrderAdapter: send_cancel failed: {}", e.what());
@@ -174,7 +197,85 @@ void HyperliquidOrderAdapter::send_cancel(const bifrost::protocol::CancelOrder& 
 }
 
 void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
-    ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: send_cancel_all instrument_id={}", instrument_id);
+    // HL doesn't expose a native per-instrument cancel-all. We implement
+    // this as: fetch the wallet's open orders via /info, build a batch
+    // cancel action covering every returned oid, sign, POST /exchange.
+    // The instrument_id parameter is logged but ignored — HL identifies
+    // orders by (asset_idx, oid) and every returned oid is cancelled.
+    // This matches the Python scripts/flatten_hl_positions.py flow and
+    // works regardless of scheduleCancel volume gating.
+    if (!enabled_ || !signer_) {
+        ygg::log::error("[Heimdall] HyperliquidOrderAdapter: disabled, cannot cancel_all");
+        return;
+    }
+
+    ygg::log::warn("[Heimdall] HyperliquidOrderAdapter: send_cancel_all(instrument_id={}) "
+                   "— cancelling ALL open orders on wallet (HL bulk cancel is not per-instrument)",
+                   instrument_id);
+
+    try {
+        json::object info_req;
+        info_req["type"] = "openOrders";
+        info_req["user"] = wallet_address_;
+        const std::string info_resp =
+            https_client_->post("/info", json::serialize(json::value(info_req)));
+
+        auto parsed = json::parse(info_resp);
+        if (!parsed.is_array()) {
+            ygg::log::warn("[Heimdall] cancel_all: unexpected openOrders response: {}", info_resp);
+            return;
+        }
+        const auto& orders = parsed.as_array();
+        if (orders.empty()) {
+            ygg::log::info("[Heimdall] cancel_all: no open orders to cancel");
+            return;
+        }
+
+        json::array cancels;
+        for (const auto& order_val : orders) {
+            if (!order_val.is_object())
+                continue;
+            const auto& o = order_val.as_object();
+            if (!o.contains("coin") || !o.contains("oid"))
+                continue;
+            const std::string coin = std::string(o.at("coin").as_string());
+            const uint64_t oid = static_cast<uint64_t>(o.at("oid").as_int64());
+
+            const auto meta = hlcodec::lookup_testnet_asset(coin);
+            json::object c;
+            c["a"] = meta.asset_idx;
+            c["o"] = oid;
+            cancels.push_back(std::move(c));
+        }
+        if (cancels.empty()) {
+            ygg::log::info("[Heimdall] cancel_all: no cancellable orders after parse");
+            return;
+        }
+
+        json::object action;
+        action["type"] = "cancel";
+        action["cancels"] = std::move(cancels);
+        const json::value action_val = action;
+
+        const uint64_t nonce = signer_->next_nonce();
+        auto tx = signer_->sign_l1_action(action_val, nonce);
+
+        json::object req;
+        req["action"] = action;
+        req["nonce"] = nonce;
+        json::object sig;
+        sig["r"] = "0x" + tx.r;
+        sig["s"] = "0x" + tx.s;
+        sig["v"] = tx.v;
+        req["signature"] = std::move(sig);
+
+        const std::string cancel_resp =
+            https_client_->post("/exchange", json::serialize(req));
+        ygg::log::info("[Heimdall] cancel_all: submitted batch cancel for {} order(s), resp={}",
+                       orders.size(), cancel_resp);
+    } catch (const std::exception& e) {
+        ygg::log::error("[Heimdall] send_cancel_all failed: {}", e.what());
+    }
 }
 
 void HyperliquidOrderAdapter::send_modify(const bifrost::protocol::ModifyOrder& modify,

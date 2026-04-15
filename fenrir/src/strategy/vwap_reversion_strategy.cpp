@@ -302,7 +302,7 @@ void VwapReversionStrategy::on_exec_report(const bifrost::protocol::ExecutionRep
                        st.symbol,
                        st.exchange,
                        bifrost::protocol::ExecStatus::c_str(status),
-                       static_cast<double>(rpt.filledQty()) / 1e5,
+                       static_cast<double>(rpt.filledQty()) / 1e8,
                        static_cast<double>(rpt.price()) / 1e8);
     }
 

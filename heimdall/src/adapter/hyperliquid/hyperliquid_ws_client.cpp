@@ -59,7 +59,11 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t recv
 
     const std::string_view channel(channel_it->value().as_string());
 
-    if (channel == "user") {
+    if (channel == "userFills") {
+        // HL sends { channel:"userFills", data:{ isSnapshot, user, fills:[...] } }.
+        // The subscription type is "userFills", and the response channel name
+        // matches — do NOT confuse with "user" (a legacy shorthand that HL no
+        // longer publishes). A mismatch here silently drops every fill.
         const auto& data = data_it->value().as_object();
         auto fills_it = data.find("fills");
         if (fills_it == data.end()) return;
