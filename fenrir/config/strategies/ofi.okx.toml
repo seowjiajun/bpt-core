@@ -1,0 +1,57 @@
+[fenrir.strategy]
+type = "OFIStrategy"
+enabled = true
+# Multi-asset: OKX's two deepest perp books.
+instruments = ["BTC/USDT:SWAP", "ETH/USDT:SWAP"]
+md_exchanges = ["OKX"]
+
+[fenrir.strategy.venue_exec.OKX]
+enabled = true
+latency_budget_us = 1000
+# OFI fires aggressive LIMIT IOCs to cross the spread — the strategy
+# picks an aggressive price and the IOC guarantees no resting liquidity.
+order_type = "LIMIT"
+tif = "IOC"
+max_retries = 1
+
+[fenrir.strategy.risk]
+# Conservative for first live paper session. Bump once the signal
+# distribution + hit rate are understood.
+max_position_usd = 500.0
+max_order_size_usd = 250.0
+max_daily_loss_usd = 200.0
+max_open_orders = 2   # one entry + one exit at most per instrument
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 5000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["OKX"]
+
+[fenrir.strategy.params]
+# ── OFI signal ────────────────────────────────────────────────────
+# Multi-level Cont-Kukanov-Stoikov; 1/(k+1) depth weighting across
+# book_levels, summed over a rolling window, normalised by the
+# window's average top-K depth.
+book_levels      = 5
+ofi_window_ms    = 1000     # 1s rolling sum — OFI decays fast in crypto
+order_book_depth = 5        # forwarded to huginn via md subscription
+
+# ── Entry / exit thresholds ───────────────────────────────────────
+# FIRST GUESSES — need tuning from live paper data. Log the raw
+# ofi_value to Prometheus during the first run, inspect the
+# distribution, and pick entry at roughly the 95th percentile.
+entry_threshold  = 0.35
+exit_threshold   = 0.15     # flip exits on weaker evidence than entries
+
+# ── Risk per position ─────────────────────────────────────────────
+# In bps from entry mid. OFI horizon is seconds, so keep both tight
+# and let the time_stop be the primary exit.
+stop_bps         = 8
+target_bps       = 12
+max_hold_seconds = 30
+cooldown_ticks   = 20       # skip re-entry for 20 order book updates after exit
+
+# ── Execution gates ───────────────────────────────────────────────
+qty_usd          = 200      # fixed notional per entry
+max_spread_bps   = 5        # skip trading when book is wide — bad signal hygiene
