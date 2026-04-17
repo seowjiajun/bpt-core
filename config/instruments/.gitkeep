@@ -1,0 +1,3 @@
+# Generated per-exchange instrument mapping files land here.
+# Produced by bpt-ops (`bpt-ops instrument-mapping`); consumed by bpt-refdata
+# at startup via InstrumentMappingMerger.

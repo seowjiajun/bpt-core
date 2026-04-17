@@ -22,10 +22,11 @@ app = typer.Typer(
 @app.callback(invoke_without_command=True)
 def run(
     output_dir: Path = typer.Option(
-        Path("out/instrument_mapping"),
+        Path("../config/instruments"),
         "--output-dir",
         "-o",
-        help="Where to write instrument_mapping.<exchange>.json files.",
+        help="Where to write instrument_mapping.<exchange>.json files. Default resolves to "
+        "<repo-root>/config/instruments/ when invoked from the bpt-ops dir.",
     ),
     exchange: list[str] = typer.Option(
         ["OKX"],  # binance/hyperliquid/deribit still stubbed
