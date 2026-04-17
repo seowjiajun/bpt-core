@@ -121,7 +121,7 @@ export function PriceChart() {
       position: f.side === 'BUY' ? 'belowBar' : 'aboveBar',
       color: f.side === 'BUY' ? CHART_THEME.up : CHART_THEME.down,
       shape: f.side === 'BUY' ? 'arrowUp' : 'arrowDown',
-      text: `${f.side[0]} ${f.qty}`,
+      text: `${f.side[0]} ${f.qty}@${f.price.toFixed(0)}`,
     }))
     markers.setMarkers(data)
   }, [fills])

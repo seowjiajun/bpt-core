@@ -1,7 +1,7 @@
 #include "bridge/account_subscriber.h"
 
-#include <bifrost_protocol/AccountSnapshot.h>
-#include <bifrost_protocol/MessageHeader.h>
+#include <messages/AccountSnapshot.h>
+#include <messages/MessageHeader.h>
 
 #include <chrono>
 #include <thread>
@@ -44,7 +44,7 @@ void AccountSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffe
                                     aeron::util::index_t offset,
                                     aeron::util::index_t length,
                                     const aeron::Header& /*header*/) {
-    using namespace bifrost::protocol;
+    using namespace bpt::messages;
 
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength())) return;
 
@@ -71,7 +71,7 @@ void AccountSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffe
     // Decode the positions repeating group. SBE group iterators are
     // stateful — calling .next() advances the read cursor, so the order
     // we call it matters. Empty positions (net_qty == 0) are skipped by
-    // the publisher on heimdall's side but we also filter defensively
+    // the publisher on order-gateway's side but we also filter defensively
     // in case a dead leg shows up.
     auto& positions = msg.positions();
     const std::size_t n = positions.count();

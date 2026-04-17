@@ -122,4 +122,33 @@ std::string order(uint64_t ts_ns,
     }.dump();
 }
 
+std::string toxicity(double bid_markout_5s,
+                     double ask_markout_5s,
+                     double bid_adverse_rate,
+                     double ask_adverse_rate,
+                     uint32_t bid_samples,
+                     uint32_t ask_samples,
+                     double bid_tox_score,
+                     double ask_tox_score,
+                     double bid_fill_rate,
+                     double ask_fill_rate,
+                     double bid_ttf_ms,
+                     double ask_ttf_ms) {
+    return json{
+        {"type", "toxicity"},
+        {"bidMarkout5s", bid_markout_5s},
+        {"askMarkout5s", ask_markout_5s},
+        {"bidAdverseRate", bid_adverse_rate},
+        {"askAdverseRate", ask_adverse_rate},
+        {"bidSamples", bid_samples},
+        {"askSamples", ask_samples},
+        {"bidToxScore", bid_tox_score},
+        {"askToxScore", ask_tox_score},
+        {"bidFillRate", bid_fill_rate},
+        {"askFillRate", ask_fill_rate},
+        {"bidTtfMs", bid_ttf_ms},
+        {"askTtfMs", ask_ttf_ms},
+    }.dump();
+}
+
 }  // namespace bridge::encode

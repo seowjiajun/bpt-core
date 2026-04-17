@@ -1,0 +1,46 @@
+# Instance config — BACKTEST mode
+# Order Gateway routes orders to Jormungandr's local order servers instead of real exchanges.
+# Aeron config is identical to QA — Fenrir still sends orders via Aeron as normal.
+environment    = "backtest"
+exchange_config = "config/exchanges/backtest.toml"
+exchanges      = ["BINANCE", "OKX"]
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bifrost"
+
+[aeron.order]
+channel   = "aeron:ipc"
+stream_id = 3001    # Fenrir → Order Gateway (NewOrder, CancelOrder, CancelAll, ModifyOrder)
+
+[aeron.exec_report]
+channel   = "aeron:ipc"
+stream_id = 3002    # Order Gateway → Fenrir (ExecutionReport)
+
+[aeron.heartbeat]
+channel   = "aeron:ipc"
+stream_id = 3003    # Order Gateway → Fenrir (Order GatewayHeartbeat)
+
+[aeron.account_snapshot]
+channel   = "aeron:ipc"
+stream_id = 3004    # Order Gateway → Fenrir (AccountSnapshot)
+
+[order-gateway]
+heartbeat_interval_ms   = 1000
+stale_order_timeout_ms  = 30000
+refdata_correlation_id  = 3001
+
+[order-gateway.risk]
+trading_enabled              = true
+max_order_size_usd           = 1000000.0   # High limit for backtesting
+max_notional_per_order_usd   = 5000000.0
+max_open_orders_per_venue    = 1000
+max_orders_per_second        = 10000
+
+[metrics]
+port = 9103
+
+[logging]
+level             = "debug"
+dir               = "logs/backtest"
+flush_level       = "warn"
+flush_interval_ms = 0

@@ -1,0 +1,57 @@
+[fenrir.strategy]
+type = "AvellanedaStoikovStrategy"
+enabled = true
+instruments = ["BTC/USDT:SPOT"]
+md_exchanges = ["OKX"]
+
+[fenrir.strategy.venue_exec.OKX]
+enabled = true
+latency_budget_us = 1000
+order_type = "LIMIT"    # AS posts resting orders — always LIMIT
+tif = "GTC"             # GTC so the order sits in the book until cancelled
+max_retries = 3
+
+[fenrir.strategy.risk]
+max_position_usd = 10000.0
+max_order_size_usd = 1000.0
+max_daily_loss_usd = 500.0
+max_open_orders = 10
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 5000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["OKX"]
+
+[fenrir.strategy.params]
+# ── Avellaneda-Stoikov model parameters ─────────────────────────────
+gamma = 0.3
+kappa = 1.5
+session_duration_s = 86400
+
+# ── Volatility estimation (EWMA) ────────────────────────────────────
+vol_halflife_s = 60.0
+vol_warmup_ticks = 20
+
+# ── Fill rate (κ) estimation (EWMA) ─────────────────────────────────
+kappa_halflife_s = 45.0
+kappa_warmup_ticks = 10
+kappa_min = 0.01
+
+# ── Quoting mechanics ────────────────────────────────────────────────
+order_qty = 0.0001   # BTC; ~$7 notional at $70k/BTC — tiny so small testnet balances work
+requote_threshold = 0.00005
+max_inventory = 0.001
+min_half_spread_bps = 1.5
+
+# ── Drift / momentum defence ────────────────────────────────────
+drift_halflife_s    = 15.0
+drift_suppress_bps  = 1.5
+
+# ── Tyr toxicity feedback ───────────────────────────────────────
+tyr_suppress_threshold = -2.0
+
+# ── Volatility halt ─────────────────────────────────────────────
+vol_gate_max_bps    = 8.0
+vol_gate_window_ms  = 1000
+vol_gate_halt_ms    = 5000

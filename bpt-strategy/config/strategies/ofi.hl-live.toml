@@ -1,0 +1,62 @@
+[fenrir.strategy]
+type = "OFIStrategy"
+enabled = true
+# BTC perp on Hyperliquid MAINNET. Real money. First run is an
+# information-buying exercise: does OFI have edge on perps?
+instruments = ["BTC/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "IOC"
+max_retries = 1
+
+[fenrir.strategy.risk]
+# Absolute minimum risk envelope for the first mainnet run. Each order
+# is ~$10, total open exposure capped at $50, daily loss capped at $20.
+# Tune upward only after the markout analysis shows signal edge clears
+# the HL taker fee (~3.5 bps) with margin.
+max_position_usd   = 50.0
+max_order_size_usd = 15.0
+max_daily_loss_usd = 20.0
+max_open_orders    = 2
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.params]
+# Signal config — identical to ofi.qa-okx v3 and ofi.qa-hyperliquid
+# so any difference in markouts is attributable to venue/instrument,
+# not signal tuning.
+book_levels      = 5
+ofi_window_ms    = 1000
+order_book_depth = 5
+
+entry_threshold  = 1.0
+exit_threshold   = 0.4
+
+# v3: price/target stops off, time-stop only.
+stop_bps         = 0
+target_bps       = 0
+max_hold_seconds = 30
+cooldown_ticks   = 40
+
+# ── Execution gates ───────────────────────────────────────────────
+# $10 per order is rounding error against HL mainnet top-of-book
+# (~$400k bid / ~$1.5M ask for BTC). max_spread_bps inherited from
+# OKX defaults; mainnet HL BTC routinely trades at 0.14 bps so this
+# gate is effectively never binding and can be tightened later.
+qty_usd          = 10
+max_spread_bps   = 5
+
+# Volatility halt — tighter on mainnet since we're risking real USDC.
+# 7 bps / 1s window catches the fast-move regimes that killed stoikov
+# on testnet. 5s cooldown lets the move settle before re-entering.
+vol_gate_max_bps   = 7.0
+vol_gate_window_ms = 1000
+vol_gate_halt_ms   = 5000

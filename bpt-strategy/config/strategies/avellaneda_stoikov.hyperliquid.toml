@@ -1,0 +1,93 @@
+[fenrir.strategy]
+type = "AvellanedaStoikovStrategy"
+enabled = true
+instruments = ["BTC/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "GTC"
+max_retries = 3
+
+[fenrir.strategy.risk]
+max_position_usd = 1000.0
+max_order_size_usd = 100.0
+max_daily_loss_usd = 200.0
+max_open_orders = 10
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.params]
+gamma = 0.3
+kappa = 1.5
+session_duration_s = 86400
+
+vol_halflife_s = 60.0
+vol_warmup_ticks = 20
+
+kappa_halflife_s = 45.0
+kappa_warmup_ticks = 10
+kappa_min = 0.01
+
+# Tiny order size so test USDC on Hyperliquid is plenty.
+order_qty = 0.001    # BTC; ~$70 notional at $70k/BTC
+requote_threshold = 0.00005
+max_inventory = 0.01
+# HL mainnet BTC spread is ~0.14 bps (one tick) and top-of-book is
+# deep ($400k+). A 2.0 bps half-spread floor puts us 14x wider than
+# the market — we never sit at the touch and every fill we get is
+# almost by construction adverse-selected sweep residue. Drop the
+# floor so the quoter can sit at or near the touch and participate
+# in normal flow. Backstop is still gamma/kappa + inventory skew in
+# the AS formula itself; this only removes the hard floor.
+min_half_spread_bps = 0.1
+
+# ── Drift / momentum defence (Cartea-Jaimungal extension) ────────
+# Estimates signed drift µ via EWMA of normalized log returns (same
+# machinery as σ², but without squaring). Two effects:
+#
+# 1. Reservation price shift: r = s + µ*(T-t) - q*γ*σ²*(T-t)
+#    In an uptrend (µ>0), quotes lean upward — harder to accumulate
+#    short inventory, easier to accumulate long. Always active.
+#
+# 2. Side suppression: when |µ| > drift_suppress_bps, cancel and
+#    refuse to post on the adverse side entirely (don't sell into an
+#    uptrend, don't buy into a downtrend). 0 disables suppression.
+#
+# 30s halflife reacts faster than vol (60s) — trends establish
+# quickly, and we'd rather suppress too early than too late.
+# 5 bps threshold: on HL BTC perp with 0.14 bps baseline spread,
+# a 5 bps/√s sustained drift is a clear momentum event. Tune down
+# for noisier/wider markets.
+drift_halflife_s    = 15.0
+drift_suppress_bps  = 1.5
+
+# ── Tyr toxicity feedback (optional) ──────────────────────────────
+# When tyr is running and fenrir subscribes to stream 5001 (set
+# [aeron.toxicity] stream_id = 5001 in the instance config), AS
+# receives live per-side toxicity scores. When a side's score drops
+# below tyr_suppress_threshold, that side is suppressed.
+# 0 disables tyr-based suppression even if the stream is connected.
+# Typical value: -2.0 (suppress when 5s markout is -2bps or worse).
+tyr_suppress_threshold = -2.0
+
+# ── Volatility halt ───────────────────────────────────────────────
+# Addresses the pathology we observed live: stoikov got stuck with
+# 0.088 BTC inventory after vol spiked and its quotes were picked off
+# faster than the AS model could widen them. The gate watches a 1s
+# rolling window and, if mid moves >N bps within it, cancels live
+# quotes and pauses for halt_ms before re-quoting. Zero disables.
+#
+# 8 bps / 1s / 5s: on HL mainnet BTC perp with 0.14 bps baseline
+# spread, an 8 bps intra-second move is a genuine flash event, not
+# normal tick noise. Tune down for quieter markets or up for crypto
+# altcoins with wider baseline noise.
+vol_gate_max_bps    = 8.0
+vol_gate_window_ms  = 1000
+vol_gate_halt_ms    = 5000

@@ -139,7 +139,7 @@ inline std::unique_ptr<WsStream> ws_connect(boost::asio::io_context& ioc,
 // ── ws_connect_plain (plain TCP, no TLS) ─────────────────────────────────────
 //
 // Same as ws_connect but skips TLS — intended for local simulation servers
-// (e.g. Jormungandr mock exchange) where TLS is not needed.
+// (e.g. Backtester mock exchange) where TLS is not needed.
 inline std::unique_ptr<PlainWsStream> ws_connect_plain(boost::asio::io_context& ioc,
                                                        const std::string& host,
                                                        const std::string& port,

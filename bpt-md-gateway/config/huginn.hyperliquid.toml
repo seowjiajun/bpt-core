@@ -1,0 +1,31 @@
+# Instance config — LIVE, Hyperliquid mainnet.
+environment = "live"
+exchange_config = "config/exchanges/live.toml"
+exchanges = ["HYPERLIQUID"]
+subscription_heartbeat_interval_ms = 5000
+service_heartbeat_interval_ms = 5000
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bifrost"
+
+[aeron.control]
+channel = "aeron:ipc"
+stream_id = 2001
+
+[aeron.data]
+channel = "aeron:ipc"
+stream_id = 2002
+
+[aeron.ack_hb]
+channel = "aeron:ipc"
+stream_id = 2003
+
+[metrics]
+host = "0.0.0.0"
+port = 9102
+
+[logging]
+level             = "info"
+dir               = "logs"
+flush_level       = "warn"
+flush_interval_ms = 1000

@@ -20,7 +20,8 @@ target_include_directories(bridge_lib PUBLIC
 
 target_link_libraries(bridge_lib PUBLIC
     yggdrasil
-    bifrost::protocol
+    bpt::messages
+    analytics_lib
     aeron_client
     fmt::fmt
     nlohmann_json::nlohmann_json

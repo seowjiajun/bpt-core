@@ -1,5 +1,5 @@
 #!/bin/bash
-# stack-testnet.sh — Start the Fenrir stack in OKX demo trading mode.
+# stack-testnet.sh — Start the Strategy stack in OKX demo trading mode.
 #
 # Usage:
 #   ./stack-testnet.sh start   Start all services with testnet configs.
@@ -10,13 +10,13 @@ set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-BIFROST_DIR="$STACK_DIR/bifrost/fabric"
-MUNINN_DIR="$STACK_DIR/muninn"
-HUGINN_DIR="$STACK_DIR/huginn"
-HEIMDALL_DIR="$STACK_DIR/heimdall"
-FENRIR_DIR="$STACK_DIR/fenrir"
+TRANSPORT_DIR="$STACK_DIR/transport/aeron"
+REFDATA_DIR="$STACK_DIR/bpt-refdata"
+MD_GATEWAY_DIR="$STACK_DIR/bpt-md-gateway"
+ORDER_GATEWAY_DIR="$STACK_DIR/bpt-order-gateway"
+STRATEGY_DIR="$STACK_DIR/bpt-strategy"
 
-FENRIR_CONFIG="$FENRIR_DIR/config/vwap_reversion.qa-okx.toml"
+STRATEGY_CONFIG="$STRATEGY_DIR/config/vwap_reversion.qa-okx.toml"
 
 # ── Helpers ───────────────────────────────────────────────────────
 
@@ -37,39 +37,39 @@ service_status() {
 
 do_status() {
     echo "Testnet stack status:"
-    service_status "bifrost-fabric" "$BIFROST_DIR/.bifrost.pid"
-    service_status "muninn"         "$MUNINN_DIR/.muninn.pid"
-    service_status "huginn"         "$HUGINN_DIR/.huginn.pid"
-    service_status "heimdall"        "$HEIMDALL_DIR/.heimdall.pid"
-    service_status "fenrir"         "$FENRIR_DIR/.fenrir.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
+    service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
+    service_status "order-gateway"        "$ORDER_GATEWAY_DIR/.order-gateway.pid"
+    service_status "bpt-strategy"         "$STRATEGY_DIR/.bpt-strategy.pid"
 }
 
 do_start() {
-    echo "=== Starting Fenrir stack (OKX demo / Avellaneda-Stoikov) ==="
-    echo "  Fenrir config : $FENRIR_CONFIG"
+    echo "=== Starting Strategy stack (OKX demo / Avellaneda-Stoikov) ==="
+    echo "  Strategy config : $STRATEGY_CONFIG"
     echo
 
     # 1. Bifrost-fabric
-    "$BIFROST_DIR/scripts/dev_start.sh"
+    "$TRANSPORT_DIR/scripts/dev_start.sh"
     echo
 
-    # 2. Muninn — testnet config (OKX simulated, others disabled)
-    "$MUNINN_DIR/scripts/start.sh" "$MUNINN_DIR/config/muninn.qa-okx.toml"
+    # 2. Refdata — testnet config (OKX simulated, others disabled)
+    "$REFDATA_DIR/scripts/start.sh" "$REFDATA_DIR/config/bpt-refdata.qa-okx.toml"
     echo
 
     # 3. Huginn + Heimdall in parallel — both use testnet configs by default
-    "$HUGINN_DIR/scripts/start.sh" "$HUGINN_DIR/config/huginn.qa-okx.toml" &
-    HUGINN_PID=$!
+    "$MD_GATEWAY_DIR/scripts/start.sh" "$MD_GATEWAY_DIR/config/bpt-md-gateway.qa-okx.toml" &
+    MD_GATEWAY_PID=$!
 
-    "$HEIMDALL_DIR/scripts/start.sh" "$HEIMDALL_DIR/config/heimdall.qa-okx.toml" &
-    HEIMDALL_PID=$!
+    "$ORDER_GATEWAY_DIR/scripts/start.sh" "$ORDER_GATEWAY_DIR/config/order-gateway.qa-okx.toml" &
+    ORDER_GATEWAY_PID=$!
 
-    wait "$HUGINN_PID"
-    wait "$HEIMDALL_PID"
+    wait "$MD_GATEWAY_PID"
+    wait "$ORDER_GATEWAY_PID"
     echo
 
-    # 4. Fenrir — Avellaneda-Stoikov strategy, BTC/USDT:SPOT on OKX
-    "$FENRIR_DIR/scripts/start.sh" "$FENRIR_CONFIG"
+    # 4. Strategy — Avellaneda-Stoikov strategy, BTC/USDT:SPOT on OKX
+    "$STRATEGY_DIR/scripts/start.sh" "$STRATEGY_CONFIG"
     echo
 
     echo "=== Testnet stack is up ==="
@@ -77,24 +77,24 @@ do_start() {
     do_status
     echo
     echo "Metrics:"
-    echo "  bifrost-fabric : http://localhost:9100/metrics"
-    echo "  muninn         : http://localhost:9101/metrics"
-    echo "  huginn         : http://localhost:9102/metrics"
-    echo "  heimdall        : http://localhost:9103/metrics"
-    echo "  fenrir         : http://localhost:9104/metrics"
+    echo "  transport : http://localhost:9100/metrics"
+    echo "  bpt-refdata         : http://localhost:9101/metrics"
+    echo "  bpt-md-gateway         : http://localhost:9102/metrics"
+    echo "  order-gateway        : http://localhost:9103/metrics"
+    echo "  bpt-strategy         : http://localhost:9104/metrics"
     echo
     echo "Logs:"
-    echo "  tail -f $FENRIR_DIR/logs/fenrir.log"
-    echo "  tail -f $HEIMDALL_DIR/logs/heimdall.log"
+    echo "  tail -f $STRATEGY_DIR/logs/bpt-strategy.log"
+    echo "  tail -f $ORDER_GATEWAY_DIR/logs/order-gateway.log"
 }
 
 do_stop() {
     echo "=== Stopping testnet stack ==="
-    "$FENRIR_DIR/scripts/stop.sh"
-    "$HEIMDALL_DIR/scripts/stop.sh"
-    "$HUGINN_DIR/scripts/stop.sh"
-    "$MUNINN_DIR/scripts/stop.sh"
-    "$BIFROST_DIR/scripts/dev_stop.sh"
+    "$STRATEGY_DIR/scripts/stop.sh"
+    "$ORDER_GATEWAY_DIR/scripts/stop.sh"
+    "$MD_GATEWAY_DIR/scripts/stop.sh"
+    "$REFDATA_DIR/scripts/stop.sh"
+    "$TRANSPORT_DIR/scripts/dev_stop.sh"
     echo "=== Testnet stack is down ==="
 }
 

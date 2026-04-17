@@ -1,5 +1,5 @@
 #!/bin/bash
-# live.sh — Run the Fenrir LIVE trading stack against OKX mainnet.
+# live.sh — Run the Strategy LIVE trading stack against OKX mainnet.
 #
 #   ██╗     ██╗██╗   ██╗███████╗
 #   ██║     ██║██║   ██║██╔════╝
@@ -15,13 +15,13 @@
 # Before first use, create these config files pointing at mainnet endpoints
 # and live credentials:
 #
-#   muninn/config/muninn.live-okx.toml
-#   huginn/config/huginn.live-okx.toml
-#   heimdall/config/heimdall.live-okx.toml
-#   fenrir/config/<strategy>.live-okx.toml
+#   bpt-refdata/config/bpt-refdata.live-okx.toml
+#   bpt-md-gateway/config/bpt-md-gateway.live-okx.toml
+#   order-gateway/config/order-gateway.live-okx.toml
+#   bpt-strategy/config/<strategy>.live-okx.toml
 #
 # Usage:
-#   ./live.sh start <fenrir-config>   REQUIRED — no default, explicit only.
+#   ./live.sh start <bpt-strategy-config>   REQUIRED — no default, explicit only.
 #   ./live.sh stop                    Stop all services.
 #   ./live.sh status                  Show running state.
 
@@ -29,16 +29,16 @@ set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-BIFROST_DIR="$STACK_DIR/bifrost/fabric"
-MUNINN_DIR="$STACK_DIR/muninn"
-HUGINN_DIR="$STACK_DIR/huginn"
-HEIMDALL_DIR="$STACK_DIR/heimdall"
-FENRIR_DIR="$STACK_DIR/fenrir"
+TRANSPORT_DIR="$STACK_DIR/transport/aeron"
+REFDATA_DIR="$STACK_DIR/bpt-refdata"
+MD_GATEWAY_DIR="$STACK_DIR/bpt-md-gateway"
+ORDER_GATEWAY_DIR="$STACK_DIR/bpt-order-gateway"
+STRATEGY_DIR="$STACK_DIR/bpt-strategy"
 
-FENRIR_CONFIG="${2:-}"  # no default — live trading requires explicit choice
-MUNINN_CONFIG="$MUNINN_DIR/config/muninn.live-okx.toml"
-HUGINN_CONFIG="$HUGINN_DIR/config/huginn.live-okx.toml"
-HEIMDALL_CONFIG="$HEIMDALL_DIR/config/heimdall.live-okx.toml"
+STRATEGY_CONFIG="${2:-}"  # no default — live trading requires explicit choice
+REFDATA_CONFIG="$REFDATA_DIR/config/bpt-refdata.live-okx.toml"
+MD_GATEWAY_CONFIG="$MD_GATEWAY_DIR/config/bpt-md-gateway.live-okx.toml"
+ORDER_GATEWAY_CONFIG="$ORDER_GATEWAY_DIR/config/order-gateway.live-okx.toml"
 
 # ── Helpers ───────────────────────────────────────────────────────
 
@@ -59,20 +59,20 @@ service_status() {
 
 do_status() {
     echo "LIVE trading stack status:"
-    service_status "bifrost-fabric" "$BIFROST_DIR/.bifrost.pid"
-    service_status "muninn"         "$MUNINN_DIR/.muninn.pid"
-    service_status "huginn"         "$HUGINN_DIR/.huginn.pid"
-    service_status "heimdall"       "$HEIMDALL_DIR/.heimdall.pid"
-    service_status "fenrir"         "$FENRIR_DIR/.fenrir.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
+    service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
+    service_status "order-gateway"       "$ORDER_GATEWAY_DIR/.order-gateway.pid"
+    service_status "bpt-strategy"         "$STRATEGY_DIR/.bpt-strategy.pid"
 }
 
 check_preflight() {
     local missing=()
-    [ -f "$MUNINN_CONFIG"   ] || missing+=("$MUNINN_CONFIG")
-    [ -f "$HUGINN_CONFIG"   ] || missing+=("$HUGINN_CONFIG")
-    [ -f "$HEIMDALL_CONFIG" ] || missing+=("$HEIMDALL_CONFIG")
-    [ -z "$FENRIR_CONFIG"   ] && missing+=("<fenrir-config arg>")
-    [ -n "$FENRIR_CONFIG" ] && [ ! -f "$FENRIR_CONFIG" ] && missing+=("$FENRIR_CONFIG")
+    [ -f "$REFDATA_CONFIG"   ] || missing+=("$REFDATA_CONFIG")
+    [ -f "$MD_GATEWAY_CONFIG"   ] || missing+=("$MD_GATEWAY_CONFIG")
+    [ -f "$ORDER_GATEWAY_CONFIG" ] || missing+=("$ORDER_GATEWAY_CONFIG")
+    [ -z "$STRATEGY_CONFIG"   ] && missing+=("<bpt-strategy-config arg>")
+    [ -n "$STRATEGY_CONFIG" ] && [ ! -f "$STRATEGY_CONFIG" ] && missing+=("$STRATEGY_CONFIG")
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo "ERROR: cannot start LIVE stack — missing:"
@@ -92,7 +92,7 @@ confirm() {
     echo "║  Real orders.  Real money.  Fills cannot be reversed.       ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo
-    echo "  Fenrir config : $FENRIR_CONFIG"
+    echo "  Strategy config : $STRATEGY_CONFIG"
     echo
     read -r -p "Type 'I UNDERSTAND' to continue, anything else to abort: " reply
     if [ "$reply" != "I UNDERSTAND" ]; then
@@ -105,26 +105,26 @@ do_start() {
     check_preflight
     confirm
 
-    echo "=== Starting Fenrir LIVE trading stack (OKX mainnet) ==="
+    echo "=== Starting Strategy LIVE trading stack (OKX mainnet) ==="
     echo
 
-    "$BIFROST_DIR/scripts/dev_start.sh"
+    "$TRANSPORT_DIR/scripts/dev_start.sh"
     echo
-    "$MUNINN_DIR/scripts/start.sh" "$MUNINN_CONFIG"
-    echo
-
-    "$HUGINN_DIR/scripts/start.sh" "$HUGINN_CONFIG" &
-    HUGINN_PID=$!
-    "$HEIMDALL_DIR/scripts/start.sh" "$HEIMDALL_CONFIG" &
-    HEIMDALL_PID=$!
-    wait "$HUGINN_PID"
-    wait "$HEIMDALL_PID"
+    "$REFDATA_DIR/scripts/start.sh" "$REFDATA_CONFIG"
     echo
 
-    "$FENRIR_DIR/scripts/start.sh" "$FENRIR_CONFIG"
+    "$MD_GATEWAY_DIR/scripts/start.sh" "$MD_GATEWAY_CONFIG" &
+    MD_GATEWAY_PID=$!
+    "$ORDER_GATEWAY_DIR/scripts/start.sh" "$ORDER_GATEWAY_CONFIG" &
+    ORDER_GATEWAY_PID=$!
+    wait "$MD_GATEWAY_PID"
+    wait "$ORDER_GATEWAY_PID"
     echo
 
-    echo "=== LIVE trading stack is up — Fenrir is trading with real money ==="
+    "$STRATEGY_DIR/scripts/start.sh" "$STRATEGY_CONFIG"
+    echo
+
+    echo "=== LIVE trading stack is up — Strategy is trading with real money ==="
     echo
     do_status
     echo
@@ -133,11 +133,11 @@ do_start() {
 
 do_stop() {
     echo "=== Stopping LIVE trading stack ==="
-    "$FENRIR_DIR/scripts/stop.sh"      2>/dev/null || true
-    "$HEIMDALL_DIR/scripts/stop.sh"    2>/dev/null || true
-    "$HUGINN_DIR/scripts/stop.sh"      2>/dev/null || true
-    "$MUNINN_DIR/scripts/stop.sh"      2>/dev/null || true
-    "$BIFROST_DIR/scripts/dev_stop.sh" 2>/dev/null || true
+    "$STRATEGY_DIR/scripts/stop.sh"      2>/dev/null || true
+    "$ORDER_GATEWAY_DIR/scripts/stop.sh"    2>/dev/null || true
+    "$MD_GATEWAY_DIR/scripts/stop.sh"      2>/dev/null || true
+    "$REFDATA_DIR/scripts/stop.sh"      2>/dev/null || true
+    "$TRANSPORT_DIR/scripts/dev_stop.sh" 2>/dev/null || true
     echo "=== LIVE trading stack is down ==="
 }
 
@@ -146,7 +146,7 @@ case "${1:-}" in
     stop)   do_stop ;;
     status) do_status ;;
     *)
-        echo "Usage: $0 start <fenrir-config>"
+        echo "Usage: $0 start <bpt-strategy-config>"
         echo "       $0 stop"
         echo "       $0 status"
         exit 1

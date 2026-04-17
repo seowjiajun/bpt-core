@@ -154,4 +154,60 @@ export interface PortfolioMsg {
   }>
 }
 
-export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg | OrderMsg | PortfolioMsg | AccountMsg
+// Live toxicity scores from Tyr via the bridge.
+export interface ToxicityMsg {
+  type: 'toxicity'
+  bidMarkout5s: number
+  askMarkout5s: number
+  bidAdverseRate: number
+  askAdverseRate: number
+  bidSamples: number
+  askSamples: number
+  bidToxScore: number
+  askToxScore: number
+  bidFillRate: number
+  askFillRate: number
+  bidTtfMs: number
+  askTtfMs: number
+}
+
+// Live strategy state from fenrir — AS model parameters, suppression state,
+// inventory, vol gate status. Published at ~2 Hz.
+export interface StrategyStateMsg {
+  type: 'strategyState'
+  symbol: string
+  exchange: string
+  drift: number
+  driftBps: number
+  sigma2: number
+  kappa: number
+  kappaLive: boolean
+  mid: number
+  reservation: number
+  reservationOffsetBps: number
+  halfSpread: number
+  halfSpreadBps: number
+  inventory: number
+  maxInventory: number
+  inventoryPct: number
+  bidSuppressed: boolean
+  bidSuppressReason: string
+  askSuppressed: boolean
+  askSuppressReason: string
+  volGateHalted: boolean
+  volGateTrips: number
+  bidOrderLive: boolean
+  askOrderLive: boolean
+  bidPrice: number
+  askPrice: number
+  volTicks: number
+  volWarmup: number
+  warmedUp: boolean
+  regime: string
+  hurst: number
+  gammaBase: number
+  gammaEffective: number
+  gammaMultiplier: number
+}
+
+export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg | OrderMsg | PortfolioMsg | AccountMsg | ToxicityMsg | StrategyStateMsg

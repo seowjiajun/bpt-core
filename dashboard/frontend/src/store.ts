@@ -99,6 +99,25 @@ interface State {
   portfolioGreeks: PortfolioGreeks | null
   volSurface: VolSmileSlice[]
 
+  // Strategy state — updated by 'strategyState' messages from fenrir via bridge.
+  strategyState: import('./types/messages').StrategyStateMsg | null
+
+  // Tyr toxicity scores — updated by 'toxicity' messages from the bridge.
+  toxicity: {
+    bidMarkout5s: number
+    askMarkout5s: number
+    bidAdverseRate: number
+    askAdverseRate: number
+    bidSamples: number
+    askSamples: number
+    bidToxScore: number
+    askToxScore: number
+    bidFillRate: number
+    askFillRate: number
+    bidTtfMs: number
+    askTtfMs: number
+  } | null
+
   // Kill-switch state: tracks the previous status so resume() can restore
   // the connection dot to whatever it was before the halt.  In slice (a)
   // this is pure client state; slice (b) will drive it from server acks.
@@ -140,6 +159,8 @@ const initialState = {
   optionLegs: [] as OptionLeg[],
   portfolioGreeks: null as PortfolioGreeks | null,
   volSurface: [] as VolSmileSlice[],
+  strategyState: null as State['strategyState'],
+  toxicity: null as State['toxicity'],
   preHaltStatus: null as ConnectionStatus | null,
 }
 
@@ -305,6 +326,27 @@ export const useStore = create<State>((set) => ({
 
           return { optionLegs: legs, portfolioGreeks: greeks, volSurface: surface }
         }
+
+        case 'strategyState':
+          return { strategyState: msg }
+
+        case 'toxicity':
+          return {
+            toxicity: {
+              bidMarkout5s: msg.bidMarkout5s,
+              askMarkout5s: msg.askMarkout5s,
+              bidAdverseRate: msg.bidAdverseRate,
+              askAdverseRate: msg.askAdverseRate,
+              bidSamples: msg.bidSamples,
+              askSamples: msg.askSamples,
+              bidToxScore: msg.bidToxScore,
+              askToxScore: msg.askToxScore,
+              bidFillRate: msg.bidFillRate,
+              askFillRate: msg.askFillRate,
+              bidTtfMs: msg.bidTtfMs,
+              askTtfMs: msg.askTtfMs,
+            },
+          }
 
         case 'order': {
           const next = new Map(state.openOrders)

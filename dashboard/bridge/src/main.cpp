@@ -1,6 +1,8 @@
 // bridge — subscribes to Aeron MD + exec report streams, broadcasts JSON
 // messages over WebSocket to the dashboard frontend.
 
+#include <analytics/messaging/toxicity_update.h>
+
 #include "bridge/account_subscriber.h"
 #include "bridge/exec_subscriber.h"
 #include "bridge/md_subscriber.h"
@@ -75,8 +77,8 @@ int main(int argc, char** argv) {
     bridge::ExecSubscriber    exec_sub(aeron, settings.exec_report.channel, settings.exec_report.stream_id);
     bridge::AccountSubscriber account_sub(aeron, settings.account_snapshot.channel, settings.account_snapshot.stream_id);
 
-    // ── Portfolio snapshot subscription (Fenrir → bridge) ────────────────────
-    // Fenrir publishes JSON at ~10Hz with option legs, Greeks, and vol surface.
+    // ── Portfolio snapshot subscription (Strategy → bridge) ────────────────────
+    // Strategy publishes JSON at ~10Hz with option legs, Greeks, and vol surface.
     // The bridge relays it as-is to all WS clients.
     std::shared_ptr<aeron::Subscription> snapshot_sub;
     if (settings.portfolio_snapshot.stream_id != 0) {
@@ -95,7 +97,25 @@ int main(int argc, char** argv) {
         }
     }
 
-    // ── Control publication (bridge → Fenrir) ────────────────────────────────
+    // ── Analytics toxicity subscription (optional) ──────────────────────────────────
+    std::shared_ptr<aeron::Subscription> tyr_sub;
+    if (settings.toxicity.stream_id != 0) {
+        const int64_t reg_id = aeron->addSubscription(
+            settings.toxicity.channel, settings.toxicity.stream_id);
+        for (int i = 0; i < 500; ++i) {
+            tyr_sub = aeron->findSubscription(reg_id);
+            if (tyr_sub) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        if (tyr_sub) {
+            ygg::log::info("[bridge] tyr toxicity subscription ready on stream {}",
+                           settings.toxicity.stream_id);
+        } else {
+            ygg::log::warn("[bridge] tyr toxicity subscription unavailable");
+        }
+    }
+
+    // ── Control publication (bridge → Strategy) ────────────────────────────────
     // 1-byte command: 0x00 = HALT, 0x01 = RESUME.  No SBE — this is a
     // lightweight control path, not a high-throughput data stream.
     std::shared_ptr<aeron::Publication> ctrl_pub;
@@ -133,7 +153,7 @@ int main(int argc, char** argv) {
             return;
         }
 
-        // Publish to Fenrir via Aeron
+        // Publish to Strategy via Aeron
         if (ctrl_pub) {
             aeron::AtomicBuffer buf(reinterpret_cast<uint8_t*>(&ctrl_byte), 1);
             auto result = ctrl_pub->offer(buf, 0, 1);
@@ -159,7 +179,7 @@ int main(int argc, char** argv) {
 
     // ── Position state (bridge is authoritative) ─────────────────────────────
     // Tracker baseline is 0; per-fill `equity` = cumulative realized PnL since
-    // session start. Absolute equity is sourced from heimdall AccountSnapshots
+    // session start. Absolute equity is sourced from order-gateway AccountSnapshots
     // (see account_subscriber + the dashboard's accountHistory).
     bridge::PositionTracker tracker;
     double last_mid = 0.0;
@@ -272,6 +292,31 @@ int main(int argc, char** argv) {
                     ws.publish(bridge::MsgKind::Order, std::move(json));
                 },
                 1);
+        }
+
+        // Poll tyr toxicity updates and relay to frontend.
+        if (tyr_sub) {
+            work += tyr_sub->poll(
+                [&ws](aeron::AtomicBuffer& buffer,
+                      aeron::util::index_t offset,
+                      aeron::util::index_t length,
+                      aeron::Header& /*hdr*/) {
+                    if (static_cast<std::size_t>(length) != sizeof(bpt::analytics::messaging::ToxicityUpdate))
+                        return;
+                    bpt::analytics::messaging::ToxicityUpdate u;
+                    std::memcpy(&u, buffer.buffer() + offset, sizeof(u));
+                    double bid_m = u.bid_markout_5s_bps, ask_m = u.ask_markout_5s_bps;
+                    double bid_ar = u.bid_adverse_rate, ask_ar = u.ask_adverse_rate;
+                    uint32_t bid_n = u.bid_sample_count, ask_n = u.ask_sample_count;
+                    double bid_t = u.bid_toxicity_score, ask_t = u.ask_toxicity_score;
+                    double bid_fr = u.bid_fill_rate, ask_fr = u.ask_fill_rate;
+                    double bid_ttf = u.bid_ttf_ms, ask_ttf = u.ask_ttf_ms;
+                    ws.publish(bridge::MsgKind::Toxicity,
+                               bridge::encode::toxicity(bid_m, ask_m, bid_ar, ask_ar,
+                                                        bid_n, ask_n, bid_t, ask_t,
+                                                        bid_fr, ask_fr, bid_ttf, ask_ttf));
+                },
+                4);
         }
 
         if (work == 0) std::this_thread::sleep_for(std::chrono::microseconds(500));

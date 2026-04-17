@@ -114,7 +114,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure -j$(nproc)
 
   # ── Bifrost-fabric (Gradle / Java 17) ─────────────────────────────────────
-  bifrost-fabric:
+  transport:
     name: Bifrost-fabric build & test
     runs-on: ubuntu-24.04
 
@@ -132,19 +132,19 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Check formatting
-        working-directory: bifrost/fabric
+        working-directory: transport
         run: ./gradlew spotlessCheck
 
       - name: Run tests
-        working-directory: bifrost/fabric
+        working-directory: transport
         run: ./gradlew test
 
       - name: Build shadow JAR
-        working-directory: bifrost/fabric
+        working-directory: transport
         run: ./gradlew shadowJar
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bifrost-fabric-jar
-          path: bifrost/fabric/build/libs/*-all.jar
+          name: transport-jar
+          path: transport/build/libs/*-all.jar

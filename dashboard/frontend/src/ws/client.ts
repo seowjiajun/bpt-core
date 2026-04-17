@@ -23,6 +23,8 @@ const VALID_TYPES = new Set<string>([
   'order',
   'portfolio',
   'account',
+  'toxicity',
+  'strategyState',
 ])
 
 function isValidMessage(x: unknown): x is Msg {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-hl.sh — Run the Fenrir stack against Hyperliquid TESTNET with the
+# test-hl.sh — Run the Strategy stack against Hyperliquid TESTNET with the
 # Avellaneda-Stoikov market maker.
 #
 # No real money. Uses testnet USDC and qa-hyperliquid service configs.
@@ -13,16 +13,16 @@ set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-BIFROST_DIR="$STACK_DIR/bifrost/fabric"
-MUNINN_DIR="$STACK_DIR/muninn"
-HUGINN_DIR="$STACK_DIR/huginn"
-HEIMDALL_DIR="$STACK_DIR/heimdall"
-FENRIR_DIR="$STACK_DIR/fenrir"
+TRANSPORT_DIR="$STACK_DIR/transport/aeron"
+REFDATA_DIR="$STACK_DIR/bpt-refdata"
+MD_GATEWAY_DIR="$STACK_DIR/bpt-md-gateway"
+ORDER_GATEWAY_DIR="$STACK_DIR/bpt-order-gateway"
+STRATEGY_DIR="$STACK_DIR/bpt-strategy"
 
-FENRIR_CONFIG="$FENRIR_DIR/config/avellaneda_stoikov.qa-hyperliquid.toml"
-MUNINN_CONFIG="$MUNINN_DIR/config/muninn.qa-hyperliquid.toml"
-HUGINN_CONFIG="$HUGINN_DIR/config/huginn.qa-hyperliquid.toml"
-HEIMDALL_CONFIG="$HEIMDALL_DIR/config/heimdall.qa-hyperliquid.toml"
+STRATEGY_CONFIG="$STRATEGY_DIR/config/avellaneda_stoikov.qa-hyperliquid.toml"
+REFDATA_CONFIG="$REFDATA_DIR/config/bpt-refdata.qa-hyperliquid.toml"
+MD_GATEWAY_CONFIG="$MD_GATEWAY_DIR/config/bpt-md-gateway.qa-hyperliquid.toml"
+ORDER_GATEWAY_CONFIG="$ORDER_GATEWAY_DIR/config/order-gateway.qa-hyperliquid.toml"
 
 is_running() {
     local pid_file="$1"
@@ -41,19 +41,19 @@ service_status() {
 
 do_status() {
     echo "TEST-HL stack status:"
-    service_status "bifrost-fabric" "$BIFROST_DIR/.bifrost.pid"
-    service_status "muninn"         "$MUNINN_DIR/.muninn.pid"
-    service_status "huginn"         "$HUGINN_DIR/.huginn.pid"
-    service_status "heimdall"       "$HEIMDALL_DIR/.heimdall.pid"
-    service_status "fenrir"         "$FENRIR_DIR/.fenrir.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
+    service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
+    service_status "order-gateway"       "$ORDER_GATEWAY_DIR/.order-gateway.pid"
+    service_status "bpt-strategy"         "$STRATEGY_DIR/.bpt-strategy.pid"
 }
 
 check_preflight() {
     local missing=()
-    [ -f "$MUNINN_CONFIG"   ] || missing+=("$MUNINN_CONFIG")
-    [ -f "$HUGINN_CONFIG"   ] || missing+=("$HUGINN_CONFIG")
-    [ -f "$HEIMDALL_CONFIG" ] || missing+=("$HEIMDALL_CONFIG")
-    [ -f "$FENRIR_CONFIG"   ] || missing+=("$FENRIR_CONFIG")
+    [ -f "$REFDATA_CONFIG"   ] || missing+=("$REFDATA_CONFIG")
+    [ -f "$MD_GATEWAY_CONFIG"   ] || missing+=("$MD_GATEWAY_CONFIG")
+    [ -f "$ORDER_GATEWAY_CONFIG" ] || missing+=("$ORDER_GATEWAY_CONFIG")
+    [ -f "$STRATEGY_CONFIG"   ] || missing+=("$STRATEGY_CONFIG")
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo "ERROR: cannot start TEST-HL stack — missing:"
@@ -65,26 +65,26 @@ check_preflight() {
 do_start() {
     check_preflight
 
-    echo "=== Starting Fenrir TESTNET stack (Hyperliquid testnet / AS) ==="
+    echo "=== Starting Strategy TESTNET stack (Hyperliquid testnet / AS) ==="
     echo "  Strategy     : Avellaneda-Stoikov market maker"
     echo "  Instrument   : BTC/USD:PERPETUAL @ HYPERLIQUID testnet"
-    echo "  Fenrir cfg   : $FENRIR_CONFIG"
+    echo "  Strategy cfg   : $STRATEGY_CONFIG"
     echo
 
-    "$BIFROST_DIR/scripts/dev_start.sh"
+    "$TRANSPORT_DIR/scripts/dev_start.sh"
     echo
-    "$MUNINN_DIR/scripts/start.sh" "$MUNINN_CONFIG"
-    echo
-
-    "$HUGINN_DIR/scripts/start.sh" "$HUGINN_CONFIG" &
-    HUGINN_PID=$!
-    "$HEIMDALL_DIR/scripts/start.sh" "$HEIMDALL_CONFIG" &
-    HEIMDALL_PID=$!
-    wait "$HUGINN_PID"
-    wait "$HEIMDALL_PID"
+    "$REFDATA_DIR/scripts/start.sh" "$REFDATA_CONFIG"
     echo
 
-    "$FENRIR_DIR/scripts/start.sh" "$FENRIR_CONFIG"
+    "$MD_GATEWAY_DIR/scripts/start.sh" "$MD_GATEWAY_CONFIG" &
+    MD_GATEWAY_PID=$!
+    "$ORDER_GATEWAY_DIR/scripts/start.sh" "$ORDER_GATEWAY_CONFIG" &
+    ORDER_GATEWAY_PID=$!
+    wait "$MD_GATEWAY_PID"
+    wait "$ORDER_GATEWAY_PID"
+    echo
+
+    "$STRATEGY_DIR/scripts/start.sh" "$STRATEGY_CONFIG"
     echo
 
     echo "=== TEST-HL stack is up ==="
@@ -92,23 +92,23 @@ do_start() {
     do_status
     echo
     echo "Metrics:"
-    echo "  bifrost-fabric : http://localhost:9100/metrics"
-    echo "  muninn         : http://localhost:9101/metrics"
-    echo "  huginn         : http://localhost:9102/metrics"
-    echo "  heimdall       : http://localhost:9103/metrics"
-    echo "  fenrir         : http://localhost:9104/metrics"
+    echo "  transport : http://localhost:9100/metrics"
+    echo "  bpt-refdata         : http://localhost:9101/metrics"
+    echo "  bpt-md-gateway         : http://localhost:9102/metrics"
+    echo "  order-gateway       : http://localhost:9103/metrics"
+    echo "  bpt-strategy         : http://localhost:9104/metrics"
     echo
     echo "Stop with: $0 stop"
-    echo "Tail logs: tail -f $FENRIR_DIR/logs/fenrir.log"
+    echo "Tail logs: tail -f $STRATEGY_DIR/logs/bpt-strategy.log"
 }
 
 do_stop() {
     echo "=== Stopping TEST-HL stack ==="
-    "$FENRIR_DIR/scripts/stop.sh"      2>/dev/null || true
-    "$HEIMDALL_DIR/scripts/stop.sh"    2>/dev/null || true
-    "$HUGINN_DIR/scripts/stop.sh"      2>/dev/null || true
-    "$MUNINN_DIR/scripts/stop.sh"      2>/dev/null || true
-    "$BIFROST_DIR/scripts/dev_stop.sh" 2>/dev/null || true
+    "$STRATEGY_DIR/scripts/stop.sh"      2>/dev/null || true
+    "$ORDER_GATEWAY_DIR/scripts/stop.sh"    2>/dev/null || true
+    "$MD_GATEWAY_DIR/scripts/stop.sh"      2>/dev/null || true
+    "$REFDATA_DIR/scripts/stop.sh"      2>/dev/null || true
+    "$TRANSPORT_DIR/scripts/dev_stop.sh" 2>/dev/null || true
     echo "=== TEST-HL stack is down ==="
 }
 

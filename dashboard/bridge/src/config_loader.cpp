@@ -46,6 +46,8 @@ Settings load(const std::string& path) {
             (*aeron)["portfolio_snapshot"].as_table(), s.portfolio_snapshot.channel, s.portfolio_snapshot.stream_id);
         s.account_snapshot = load_stream(
             (*aeron)["account_snapshot"].as_table(), s.account_snapshot.channel, s.account_snapshot.stream_id);
+        s.toxicity = load_stream(
+            (*aeron)["toxicity"].as_table(), s.toxicity.channel, s.toxicity.stream_id);
     }
 
     // WebSocket

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(bpt-core VERSION 0.1.0 LANGUAGES CXX)
 
-# C++23 globally — all services use at least C++20, heimdall/jormungandr use C++23.
+# C++23 globally — all services use at least C++20, order-gateway/jormungandr use C++23.
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -25,7 +25,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(aeron)
 
-# fast_float — header-only, SWAR-accelerated string-to-float (used by huginn)
+# fast_float — header-only, SWAR-accelerated string-to-float (used by md-gateway)
 FetchContent_Declare(
     fast_float
     GIT_REPOSITORY https://github.com/fastfloat/fast_float.git
@@ -63,15 +63,16 @@ find_package(Parquet REQUIRED)
 
 # ── Internal libraries ────────────────────────────────────────────────────────
 add_subdirectory(third_party/yggdrasil)
-add_subdirectory(bifrost/protocol)
+add_subdirectory(messages)
 
 # ── Services ──────────────────────────────────────────────────────────────────
 enable_testing()
 
-add_subdirectory(fenrir)
-add_subdirectory(huginn)
-add_subdirectory(heimdall)
-add_subdirectory(muninn)
-add_subdirectory(surtr)
-add_subdirectory(jormungandr)
+add_subdirectory(bpt-strategy)
+add_subdirectory(bpt-md-gateway)
+add_subdirectory(bpt-order-gateway)
+add_subdirectory(bpt-refdata)
+add_subdirectory(bpt-pricer)
+add_subdirectory(bpt-analytics)
+add_subdirectory(bpt-backtester)
 add_subdirectory(dashboard/bridge)

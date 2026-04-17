@@ -60,11 +60,13 @@ html, body, #root {
 .shell {
   display: grid;
   height: 100vh;
-  grid-template-rows: var(--header-h) 1fr 140px 140px 160px 180px;
+  grid-template-rows: var(--header-h) 1fr 140px 185px 90px 140px 160px 180px;
   grid-template-areas:
     "topbar"
     "main"
     "equity"
+    "stratstate"
+    "toxicity"
     "orders"
     "holdings"
     "blotter";

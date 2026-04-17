@@ -1,0 +1,52 @@
+# Instance config — LIVE, Hyperliquid mainnet.
+# Pairs with scripts/live-hl.sh. Credentials for HL mainnet are loaded
+# via exchange_config → config/exchanges/live.toml → secret_name
+# "bpt/prod/HYPERLIQUID" (AWS Secrets Manager in deployed mode, or
+# ~/.bpt-secrets/ locally — see muninn/config/exchanges/testnet.toml
+# header comment for the local loading convention).
+environment = "live"
+exchange_config = "config/exchanges/live.toml"
+exchanges = ["HYPERLIQUID"]
+instrument_poll_interval_s = 3600
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bifrost"
+
+[aeron.snapshot]
+channel = "aeron:ipc"
+stream_id = 1001
+
+[aeron.delta]
+channel = "aeron:ipc"
+stream_id = 1002
+
+[aeron.control]
+channel = "aeron:ipc"
+stream_id = 1003
+
+[aeron.fee_schedule]
+channel = "aeron:ipc"
+stream_id = 1004
+
+[aeron.muninn_status]
+channel = "aeron:ipc"
+stream_id = 1006
+
+[instrument_mapping]
+local_path = "/opt/bpt/data/instrument_mapping.json"
+
+[instrument_mapping.s3]
+bucket = "bpt-data-dev"
+region = "ap-southeast-1"
+
+[instrument_mapping.s3.keys]
+hyperliquid = "instrument-mapping/current/hyperliquid.json"
+
+[metrics]
+port = 9101
+
+[logging]
+level             = "info"
+dir               = "logs"
+flush_level       = "warn"
+flush_interval_ms = 1000

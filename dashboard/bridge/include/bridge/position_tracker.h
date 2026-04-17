@@ -9,7 +9,7 @@ namespace bridge {
 // Running position state derived from a stream of fills.
 //
 // Tracks net qty / avg entry and the cumulative realized PnL since session
-// start. Absolute account equity is sourced from heimdall AccountSnapshots
+// start. Absolute account equity is sourced from order-gateway AccountSnapshots
 // in the dashboard — this class deliberately has no notion of a starting
 // capital baseline.
 class PositionTracker {

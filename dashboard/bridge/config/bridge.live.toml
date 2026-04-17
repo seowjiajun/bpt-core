@@ -16,6 +16,10 @@ stream_id = 3002               # Heimdall → Fenrir (ExecutionReport)
 channel   = "aeron:ipc"
 stream_id = 3004               # Heimdall → bridge (live balance/equity)
 
+[aeron.toxicity]
+channel   = "aeron:ipc"
+stream_id = 5001               # Tyr → bridge (ToxicityUpdate)
+
 [ws]
 port = 8080
 

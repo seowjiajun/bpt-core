@@ -3,7 +3,7 @@
 #
 # Starts:
 #   1. Monitoring stack (Prometheus + Grafana via docker compose)
-#   2. Trading stack (bifrost-fabric, muninn, huginn, heimdall, fenrir)
+#   2. Trading stack (transport, bpt-refdata, bpt-md-gateway, order-gateway, bpt-strategy)
 #   3. Dashboard bridge (WebSocket :8080)
 #
 # Frontend (vite dev server) is also started under paper_run.sh.
@@ -13,7 +13,7 @@
 #
 # Usage:
 #   ./scripts/up.sh                                        # default Hyperliquid stoikov
-#   ./scripts/up.sh fenrir/config/<strategy>.qa-<venue>.toml
+#   ./scripts/up.sh bpt-strategy/config/<strategy>.qa-<venue>.toml
 #   ./scripts/up.sh ... --no-monitoring                    # skip Grafana
 #
 # Monitoring is intentionally treated like a prod always-on service:
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEFAULT_CFG="$ROOT/fenrir/config/avellaneda_stoikov.qa-hyperliquid.toml"
+DEFAULT_CFG="$ROOT/bpt-strategy/config/avellaneda_stoikov.qa-hyperliquid.toml"
 
 SKIP_MONITORING=0
 CFG=""
@@ -41,7 +41,7 @@ done
 CFG="${CFG:-$DEFAULT_CFG}"
 
 if [ ! -f "$CFG" ]; then
-    echo "ERROR: fenrir config not found: $CFG"
+    echo "ERROR: bpt-strategy config not found: $CFG"
     exit 1
 fi
 
@@ -65,10 +65,10 @@ cat <<EOF
   Prometheus   : http://localhost:9090          (targets at /targets)
 
 Logs:
-  heimdall : tail -f $ROOT/heimdall/logs/heimdall.log
-  huginn   : tail -f $ROOT/huginn/logs/huginn.log
-  muninn   : tail -f $ROOT/muninn/logs/muninn.log
-  fenrir   : tail -f $ROOT/fenrir/logs/fenrir.log
+  order-gateway : tail -f $ROOT/order-gateway/logs/order-gateway.log
+  bpt-md-gateway   : tail -f $ROOT/bpt-md-gateway/logs/bpt-md-gateway.log
+  bpt-refdata   : tail -f $ROOT/bpt-refdata/logs/bpt-refdata.log
+  bpt-strategy   : tail -f $ROOT/bpt-strategy/logs/bpt-strategy.log
   bridge   : tail -f $ROOT/dashboard/bridge/logs/bridge.stdout
   frontend : tail -f $ROOT/dashboard/frontend/logs/vite.stdout
 

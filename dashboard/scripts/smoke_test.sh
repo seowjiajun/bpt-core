@@ -1,7 +1,7 @@
 #!/bin/bash
 # smoke_test.sh — End-to-end dashboard smoke test.
 #
-# Launches the full backtest stack (bifrost + muninn + huginn + heimdall +
+# Launches the full backtest stack (bifrost + bpt-refdata + huginn + order-gateway +
 # fenrir + jormungandr) via the existing backtest.sh, then starts the bridge
 # on top and prints the command to run the frontend.
 #
@@ -16,7 +16,7 @@
 #
 # --starting-capital N (default: 100000) is forwarded to BOTH jormungandr and
 # the bridge so the equity curve on the dashboard matches the one written to
-# summary.json.  Fenrir's risk limits (max_position_usd etc.) are separate
+# summary.json.  Strategy's risk limits (max_position_usd etc.) are separate
 # and stay whatever the strategy config says.
 #
 # What a passing smoke test looks like:

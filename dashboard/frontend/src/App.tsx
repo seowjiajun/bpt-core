@@ -16,6 +16,8 @@ import { VolSmileChart } from './components/VolSmileChart'
 import { VolSurfaceHeatmap } from './components/VolSurfaceHeatmap'
 import { VolTermStructure } from './components/VolTermStructure'
 import { RiskLimitsPanel, MOCK_LIMITS } from './components/RiskLimitsPanel'
+import { ToxicityPanel } from './components/ToxicityPanel'
+import { StrategyStatePanel } from './components/StrategyStatePanel'
 import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
@@ -146,6 +148,8 @@ export default function App() {
         <EquityChart />
       </div>
 
+      <StrategyStatePanel />
+      <ToxicityPanel />
       <OpenOrdersPanel />
       <HoldingsPanel />
       <Blotter />

@@ -70,10 +70,10 @@ cmake --build "$BUILD_DIR" -j"$(nproc)"
 echo
 
 # ── Step 2: Bifrost-fabric shadowJar ──────────────────────────────
-echo "--- Building bifrost-fabric shadowJar ---"
-BIFROST_DIR="$REPO_DIR/bifrost/fabric"
-"$BIFROST_DIR/gradlew" -p "$BIFROST_DIR" shadowJar -q
-BIFROST_JAR=$(find "$BIFROST_DIR/build/libs" -name "*-all.jar" -type f | head -1)
+echo "--- Building transport shadowJar ---"
+TRANSPORT_DIR="$REPO_DIR/transport"
+"$TRANSPORT_DIR/gradlew" -p "$TRANSPORT_DIR" shadowJar -q
+BIFROST_JAR=$(find "$TRANSPORT_DIR/build/libs" -name "*-all.jar" -type f | head -1)
 echo "  JAR: $BIFROST_JAR"
 echo
 
@@ -114,24 +114,24 @@ copy_service() {
     echo "  $svc -> $svc_dir"
 }
 
-copy_service fenrir
-copy_service huginn
-copy_service heimdall
-copy_service muninn
-copy_service surtr surtr_app surtr
-copy_service jormungandr
+copy_service bpt-strategy
+copy_service bpt-md-gateway
+copy_service order-gateway
+copy_service bpt-refdata
+copy_service bpt-pricer bpt-pricer_app bpt-pricer
+copy_service bpt-backtester
 
 # Bifrost-fabric
-BF_DIR="$PKG_DIR/bifrost/fabric"
+BF_DIR="$PKG_DIR/transport"
 mkdir -p "$BF_DIR/bin" "$BF_DIR/logs"
-cp "$BIFROST_JAR" "$BF_DIR/bin/bifrost-fabric-all.jar"
-if [ -d "$BIFROST_DIR/config" ]; then
-    cp -r "$BIFROST_DIR/config" "$BF_DIR/"
+cp "$BIFROST_JAR" "$BF_DIR/bin/transport-all.jar"
+if [ -d "$TRANSPORT_DIR/config" ]; then
+    cp -r "$TRANSPORT_DIR/config" "$BF_DIR/"
 fi
 mkdir -p "$BF_DIR/scripts"
-cp "$BIFROST_DIR/scripts"/*.sh "$BF_DIR/scripts/" 2>/dev/null || true
+cp "$TRANSPORT_DIR/scripts"/*.sh "$BF_DIR/scripts/" 2>/dev/null || true
 chmod 755 "$BF_DIR/scripts"/*.sh 2>/dev/null || true
-echo "  bifrost/fabric -> $BF_DIR"
+echo "  transport -> $BF_DIR"
 
 # Top-level orchestration scripts
 mkdir -p "$PKG_DIR/scripts"
@@ -159,7 +159,7 @@ apt-get install -y libarrow-dev libparquet-dev
 # OpenSSL 3, libstdc++
 apt-get install -y libssl3 libstdc++6
 
-# Java 17 (for bifrost-fabric)
+# Java 17 (for transport)
 apt-get install -y openjdk-17-jre-headless
 
 echo "Done. Extract the package and update configs, then run: ./scripts/stack.sh start"

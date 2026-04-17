@@ -1,0 +1,67 @@
+environment = "qa"
+strategy_config = "strategies/avellaneda_stoikov.toml"
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bifrost"
+
+[aeron.refdata_control]
+channel = "aeron:ipc"
+stream_id = 1003
+
+[aeron.refdata_snapshot]
+channel = "aeron:ipc"
+stream_id = 1001
+
+[aeron.refdata_delta]
+channel = "aeron:ipc"
+stream_id = 1002
+
+[aeron.fee_schedule]
+channel = "aeron:ipc"
+stream_id = 1004
+
+[aeron.funding_rate]
+channel = "aeron:ipc"
+stream_id = 1005
+
+[aeron.refdata_status]
+channel = "aeron:ipc"
+stream_id = 1006
+
+[aeron.md_control]
+channel = "aeron:ipc"
+stream_id = 2001
+
+[aeron.md_data]
+channel = "aeron:ipc"
+stream_id = 2002
+
+[aeron.md_ack_hb]
+channel = "aeron:ipc"
+stream_id = 2003
+
+[aeron.order]
+channel = "aeron:ipc"
+stream_id = 3001
+
+[aeron.exec_report]
+channel = "aeron:ipc"
+stream_id = 3002
+
+[aeron.heartbeat]
+channel = "aeron:ipc"
+stream_id = 3003
+
+[aeron.account_snapshot]
+channel = "aeron:ipc"
+stream_id = 3004    # Heimdall → Fenrir (AccountSnapshot)
+
+[aeron.toxicity]
+channel = "aeron:ipc"
+stream_id = 5001
+
+[fenrir]
+correlation_id = 1003
+
+[metrics]
+port = 9104

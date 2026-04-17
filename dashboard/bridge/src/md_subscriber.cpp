@@ -1,7 +1,7 @@
 #include "bridge/md_subscriber.h"
 
-#include <bifrost_protocol/MdMarketData.h>
-#include <bifrost_protocol/MessageHeader.h>
+#include <messages/MdMarketData.h>
+#include <messages/MessageHeader.h>
 #include <chrono>
 #include <thread>
 #include <yggdrasil/logging.h>
@@ -38,7 +38,7 @@ void MdSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffer,
                                aeron::util::index_t offset,
                                aeron::util::index_t length,
                                const aeron::Header& /*header*/) {
-    using namespace bifrost::protocol;
+    using namespace bpt::messages;
 
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength())) return;
 

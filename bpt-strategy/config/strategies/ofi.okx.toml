@@ -1,0 +1,77 @@
+[fenrir.strategy]
+type = "OFIStrategy"
+enabled = true
+# BTC spot only — OKX demo derivatives are gated behind accredited-
+# investor tier in SG, so we run against spot for the first live run.
+instruments = ["BTC/USDT:SPOT"]
+md_exchanges = ["OKX"]
+
+[fenrir.strategy.venue_exec.OKX]
+enabled = true
+latency_budget_us = 1000
+# OFI fires aggressive LIMIT IOCs to cross the spread — the strategy
+# picks an aggressive price and the IOC guarantees no resting liquidity.
+order_type = "LIMIT"
+tif = "IOC"
+max_retries = 1
+
+[fenrir.strategy.risk]
+# Conservative for first live paper session. Bump once the signal
+# distribution + hit rate are understood.
+max_position_usd = 500.0
+max_order_size_usd = 250.0
+max_daily_loss_usd = 200.0
+max_open_orders = 2   # one entry + one exit at most per instrument
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 5000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["OKX"]
+
+[fenrir.strategy.params]
+# ── OFI signal ────────────────────────────────────────────────────
+# Multi-level Cont-Kukanov-Stoikov; 1/(k+1) depth weighting across
+# book_levels, summed over a rolling window, normalised by the
+# window's average top-K depth.
+book_levels      = 5
+ofi_window_ms    = 1000     # 1s rolling sum — OFI decays fast in crypto
+order_book_depth = 5        # forwarded to bpt-md-gateway via md subscription
+
+# ── Entry / exit thresholds ───────────────────────────────────────
+# v2 tuning from 30-min live run on OKX demo BTC/USDT spot. v1
+# entry=0.35 was below the 50th percentile of crossings and fired
+# on mostly-noise, producing 94 entries / 86 signal-flips / mean
+# pnl ~0 bps. v2 targets the p90 of the observed distribution
+# (abs ofi 1.03 at p90) to keep only the conviction signals, and
+# widens the exit threshold so signal-flip exits require a real
+# reversal rather than the noise bounce we saw.
+entry_threshold  = 1.0
+exit_threshold   = 0.4
+
+# ── Risk per position ─────────────────────────────────────────────
+# v3: price-stop disabled (0 = off). The 20-min v2 smoke showed exits
+# carrying 2-4x the tail loss of entries (-48 bps worst vs -26 bps on
+# entries); every catastrophic exit was a price-stop firing during a
+# fast move and its IOC walking the book. Hypothesis: the price stop
+# costs more than it saves. Run with time-stop only (max_hold) and
+# compare exit markouts to v2. Target also disabled since none hit
+# under the v2 config — re-enable once the stop question is answered.
+stop_bps         = 0
+target_bps       = 0
+max_hold_seconds = 30
+cooldown_ticks   = 40
+
+# ── Execution gates ───────────────────────────────────────────────
+qty_usd          = 200      # fixed notional per entry
+max_spread_bps   = 5        # skip trading when book is wide — bad signal hygiene
+
+# ── Volatility halt ───────────────────────────────────────────────
+# Sit out fast moves. If mid moves more than `vol_gate_max_bps` within
+# `vol_gate_window_ms`, block new entries for `vol_gate_halt_ms`. Open
+# positions still exit on time_stop naturally. Set max_bps=0 to disable.
+# Default: 10 bps / 1s window / 5s halt — catches obvious spikes without
+# tripping on normal noise. Tune per instrument volatility profile.
+vol_gate_max_bps   = 10.0
+vol_gate_window_ms = 1000
+vol_gate_halt_ms   = 5000

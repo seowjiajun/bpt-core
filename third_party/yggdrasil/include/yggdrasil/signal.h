@@ -1,6 +1,6 @@
 #pragma once
 
-// yggdrasil/signal.h — Unified signal handling for all Fenrir services.
+// yggdrasil/signal.h — Unified signal handling for all Strategy services.
 //
 // Usage:
 //   ygg::signal::install();          // call once in main
@@ -36,7 +36,7 @@ inline bool is_running() noexcept {
 }
 
 // Programmatic shutdown — equivalent to receiving a signal.
-// Use when application logic determines it must halt (e.g. Fenrir halting on
+// Use when application logic determines it must halt (e.g. Strategy halting on
 // missing RefDataReady exchanges).
 inline void stop() noexcept {
     detail::g_running = 0;

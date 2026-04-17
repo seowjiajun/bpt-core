@@ -1,0 +1,50 @@
+# Instance config — LIVE, Hyperliquid mainnet.
+# Risk limits are tightened well below the qa variant: this config is for
+# the OFI first-run smoke against real money, intended to buy information
+# (does OFI have edge on HL perps?) at minimum cost, not to scale P&L.
+environment = "live"
+exchange_config = "config/exchanges/live.toml"
+exchanges = ["HYPERLIQUID"]
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bifrost"
+
+[aeron.order]
+channel = "aeron:ipc"
+stream_id = 3001
+
+[aeron.exec_report]
+channel = "aeron:ipc"
+stream_id = 3002
+
+[aeron.heartbeat]
+channel = "aeron:ipc"
+stream_id = 3003
+
+[aeron.account_snapshot]
+channel = "aeron:ipc"
+stream_id = 3004
+
+[order-gateway]
+heartbeat_interval_ms = 1000
+stale_order_timeout_ms = 30000
+refdata_correlation_id = 3001
+
+[order-gateway.risk]
+trading_enabled = true
+# Tight limits for the first mainnet smoke. The strategy asks for $10
+# orders; these caps are the OMS-level failsafe in case a strategy
+# config edit accidentally tries to size up.
+max_order_size_usd         = 50.0
+max_notional_per_order_usd = 50.0
+max_open_orders_per_venue  = 5
+max_orders_per_second      = 5
+
+[metrics]
+port = 9103
+
+[logging]
+level             = "info"
+dir               = "logs"
+flush_level       = "warn"
+flush_interval_ms = 0
