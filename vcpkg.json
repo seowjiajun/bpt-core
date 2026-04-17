@@ -14,7 +14,6 @@
         "secp256k1",
         "nlohmann-json",
         "gtest",
-        {"name": "prometheus-cpp", "features": ["pull"]},
-        {"name": "aws-sdk-cpp", "default-features": false, "features": ["s3"]}
+        {"name": "prometheus-cpp", "features": ["pull"]}
     ]
 }

@@ -1,7 +1,7 @@
 # Refdata Library
 add_library(refdata_lib
     mapping/instrument_mapping_loader.cpp
-    mapping/instrument_mapping_s3_fetcher.cpp
+    mapping/instrument_mapping_merger.cpp
     registry/instrument_registry.cpp
     resolver/instrument_resolver.cpp
     messaging/refdata_control_subscriber.cpp
@@ -33,7 +33,6 @@ target_link_libraries(refdata_lib PUBLIC
     Threads::Threads
     bifrost::protocol
     prometheus-cpp::pull
-    aws-cpp-sdk-s3
 )
 
 target_include_directories(refdata_lib PUBLIC

@@ -90,16 +90,10 @@ Settings load(const std::string& path) {
     if (auto* m = root["instrument_mapping"].as_table()) {
         if (auto v = (*m)["local_path"].value<std::string>())
             settings.instrument_mapping.local_path = *v;
-        if (auto* s3 = (*m)["s3"].as_table()) {
-            if (auto v = (*s3)["bucket"].value<std::string>())
-                settings.instrument_mapping.s3.bucket = *v;
-            if (auto v = (*s3)["region"].value<std::string>())
-                settings.instrument_mapping.s3.region = *v;
-            if (auto* keys = (*s3)["keys"].as_table()) {
-                for (const auto& [exchange, key] : *keys) {
-                    if (auto v = key.value<std::string>())
-                        settings.instrument_mapping.s3.keys[std::string(exchange)] = *v;
-                }
+        if (auto* srcs = (*m)["sources"].as_table()) {
+            for (const auto& [exchange, path] : *srcs) {
+                if (auto v = path.value<std::string>())
+                    settings.instrument_mapping.sources.paths[std::string(exchange)] = *v;
             }
         }
     }

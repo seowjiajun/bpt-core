@@ -55,8 +55,6 @@ find_package(prometheus-cpp CONFIG REQUIRED)
 find_package(Threads        REQUIRED)
 find_package(nlohmann_json  REQUIRED)
 find_package(GTest          REQUIRED)
-find_package(aws-cpp-sdk-core CONFIG REQUIRED)
-find_package(aws-cpp-sdk-s3   CONFIG REQUIRED)
 find_package(Arrow   REQUIRED)
 find_package(Parquet REQUIRED)
 

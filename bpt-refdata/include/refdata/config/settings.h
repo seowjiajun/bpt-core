@@ -26,19 +26,16 @@ struct AdapterConfig {
 struct InstrumentMappingConfig {
     std::string local_path{"/opt/bpt/data/instrument_mapping.json"};
 
-    // S3 source — if bucket is non-empty, Refdata fetches the per-exchange mapping
-    // files from S3 at startup (and daily thereafter), merges them in memory, and
-    // writes the merged result atomically to local_path.
-    // If bucket is empty, the file must already exist at local_path.
+    // Per-exchange source files produced by the data-forge pipeline.
+    // Refdata merges them at startup and writes the result atomically to
+    // local_path. If sources is empty, local_path must already exist.
     //
-    // keys: exchange_name (lowercase) → S3 object key
-    //   e.g. { "okx" → "instrument-mapping/current/okx.json" }
-    // Only the exchanges listed in keys are fetched — omit exchanges Refdata doesn't need.
-    struct S3 {
-        std::string bucket;
-        std::string region{"ap-southeast-1"};
-        std::map<std::string, std::string> keys;  // exchange_name → s3_key
-    } s3;
+    // Keys: exchange_name (lowercase). Values: file paths, typically
+    // "config/generated/instrument_mapping.<exchange>.json" shipped with the
+    // deploy tarball. Only exchanges Refdata needs go here.
+    struct Sources {
+        std::map<std::string, std::string> paths;
+    } sources;
 };
 
 struct Settings {

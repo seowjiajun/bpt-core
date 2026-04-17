@@ -50,13 +50,13 @@ RefdataApp::RefdataApp(config::Settings settings,
       registry_(std::make_shared<registry::InstrumentRegistry>()) {
     const auto& im_cfg = settings_.instrument_mapping;
 
-    // If an S3 bucket is configured, pull the mapping file from S3 now.
-    // Fall back to the local file if the fetch fails (e.g. first boot with cached copy).
-    if (!im_cfg.s3.bucket.empty() && !im_cfg.s3.keys.empty()) {
-        s3_fetcher_.emplace(
-            mapping::InstrumentMappingS3Fetcher::Config{im_cfg.s3.bucket, im_cfg.s3.region, im_cfg.s3.keys});
-        if (!s3_fetcher_->fetch(im_cfg.local_path))
-            ygg::log::warn("[Refdata] S3 fetch failed — attempting to load cached local file");
+    // If per-exchange sources are configured, merge them into the canonical
+    // file now. Falls back to whatever's already at local_path if the merge
+    // fails (e.g. running from a stale deploy with no new sources).
+    if (!im_cfg.sources.paths.empty()) {
+        mapping_merger_.emplace(mapping::InstrumentMappingMerger::Config{im_cfg.sources.paths});
+        if (!mapping_merger_->merge(im_cfg.local_path))
+            ygg::log::warn("[Refdata] Merge failed — attempting to load cached local file");
     }
 
     instrument_mapping_->load(im_cfg.local_path);
@@ -214,9 +214,9 @@ void RefdataApp::run() {
             last_snapshot_republish = now;
         }
 
-        if (s3_fetcher_ && now - last_mapping_refresh >= mapping_refresh_interval) {
+        if (mapping_merger_ && now - last_mapping_refresh >= mapping_refresh_interval) {
             const auto& local = settings_.instrument_mapping.local_path;
-            if (s3_fetcher_->fetch(local)) {
+            if (mapping_merger_->merge(local)) {
                 try {
                     instrument_mapping_->load(local);
                     std::size_t delta_count = 0;
@@ -226,7 +226,7 @@ void RefdataApp::run() {
                     });
                     ygg::log::info("[Refdata] Republished {} instrument deltas after mapping refresh", delta_count);
                 } catch (const std::exception& e) {
-                    ygg::log::error("[Refdata] Mapping reload failed after S3 refresh: {}", e.what());
+                    ygg::log::error("[Refdata] Mapping reload failed after refresh: {}", e.what());
                 }
             }
             last_mapping_refresh = now;

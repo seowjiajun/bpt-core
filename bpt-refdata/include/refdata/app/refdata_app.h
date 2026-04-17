@@ -4,7 +4,7 @@
 #include "refdata/adapter/credentials.h"
 #include "refdata/config/settings.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
-#include "refdata/mapping/instrument_mapping_s3_fetcher.h"
+#include "refdata/mapping/instrument_mapping_merger.h"
 #include "refdata/messaging/fee_schedule_publisher.h"
 #include "refdata/messaging/refdata_status_publisher.h"
 #include "refdata/messaging/refdata_control_subscriber.h"
@@ -37,7 +37,7 @@ private:
     std::shared_ptr<aeron::Aeron> aeron_;
     metrics::RefdataMetrics metrics_;
     std::shared_ptr<mapping::InstrumentMappingLoader> instrument_mapping_;
-    std::optional<mapping::InstrumentMappingS3Fetcher> s3_fetcher_;
+    std::optional<mapping::InstrumentMappingMerger> mapping_merger_;
     std::shared_ptr<registry::InstrumentRegistry> registry_;
     std::unique_ptr<messaging::RefdataControlSubscriber> control_sub_;
     std::unique_ptr<messaging::RefdataSnapshotPublisher> snapshot_pub_;

@@ -36,11 +36,8 @@ WantedBy=bpt-dev-stack.target
 EOF
 
 # ── Binary path resolution (Bazel for most; CMake for refdata) ───────────────
-# bpt-refdata still uses CMake because its app binary depends on aws-sdk-cpp
-# (S3 fetcher for the instrument mapping). Once that's replaced with curl +
-# SigV4, move it to bazel-bin like the others.
 declare -A BIN
-BIN[bpt-refdata]="$BPT_ROOT/build/bpt-refdata/src/bpt-refdata"
+BIN[bpt-refdata]="$BPT_ROOT/bazel-bin/bpt-refdata/bpt-refdata"
 BIN[bpt-md-gateway]="$BPT_ROOT/bazel-bin/bpt-md-gateway/bpt-md-gateway"
 BIN[bpt-order-gateway]="$BPT_ROOT/bazel-bin/bpt-order-gateway/bpt-order-gateway"
 BIN[bpt-strategy]="$BPT_ROOT/bazel-bin/bpt-strategy/bpt-strategy"

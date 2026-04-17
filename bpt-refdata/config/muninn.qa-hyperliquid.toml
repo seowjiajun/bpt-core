@@ -30,12 +30,10 @@ stream_id = 1006
 [instrument_mapping]
 local_path = "/opt/bpt/data/instrument_mapping.json"
 
-[instrument_mapping.s3]
-bucket = "bpt-data-dev"
-region = "ap-southeast-1"
-
-[instrument_mapping.s3.keys]
-hyperliquid = "instrument-mapping/current/hyperliquid.json"
+[instrument_mapping.sources]
+# Per-exchange mapping files produced by bpt/data-forge (daily). Shipped with
+# the deploy tarball under config/generated/. Edit the data-forge job to change.
+hyperliquid = "config/generated/instrument_mapping.hyperliquid.json"
 
 [metrics]
 port = 9101

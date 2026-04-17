@@ -2,7 +2,6 @@
 #include "refdata/app/refdata_app.h"
 #include "refdata/config/settings.h"
 
-#include <aws/core/Aws.h>
 #include <chrono>
 #include <map>
 #include <string>
@@ -34,9 +33,6 @@ int main(int argc, char** argv) {
     ygg::util::TscClock::calibrate();
     ygg::log::info("Starting Refdata Reference Data Service...");
 
-    Aws::SDKOptions aws_options;
-    Aws::InitAPI(aws_options);
-
     std::map<std::string, bpt::refdata::adapter::ExchangeCredentials> creds;
     for (const auto& a_cfg : settings.adapters) {
         if (a_cfg.secret_name.empty()) {
@@ -50,22 +46,19 @@ int main(int argc, char** argv) {
             ygg::log::info("[Refdata] Loaded credentials for {}", a_cfg.exchange);
         } catch (const std::exception& e) {
             ygg::log::error("[Refdata] Failed to load credentials for {}: {}", a_cfg.exchange, e.what());
-            Aws::ShutdownAPI(aws_options);
             return 1;
         }
     }
 
     auto aeron = ygg::aeron::connect(settings.media_driver_dir);
 
-    int rc = 0;
     try {
         bpt::refdata::RefdataApp app(std::move(settings), std::move(aeron), std::move(creds));
         app.run();
     } catch (const std::exception& e) {
         ygg::log::error("Fatal: {}", e.what());
-        rc = 1;
+        return 1;
     }
 
-    Aws::ShutdownAPI(aws_options);
-    return rc;
+    return 0;
 }

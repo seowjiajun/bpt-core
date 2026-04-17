@@ -1,14 +1,12 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
-# NOTE: `mapping/instrument_mapping_s3_fetcher.cpp` and `main.cpp`/`app/`
-# are NOT included — they depend on aws-sdk-cpp, which has no BCR module
-# and is costly to build via rules_foreign_cc. Tests don't touch S3, so
-# this test-only lib is sufficient. The app binary stays on CMake for now.
 cc_library(
     name = "refdata_lib",
     srcs = [
         "src/mapping/instrument_mapping_loader.cpp",
+        "src/mapping/instrument_mapping_merger.cpp",
         "src/registry/instrument_registry.cpp",
         "src/resolver/instrument_resolver.cpp",
         "src/messaging/refdata_control_subscriber.cpp",
@@ -52,5 +50,19 @@ cc_test(
     deps = [
         ":refdata_lib",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "bpt-refdata",
+    srcs = [
+        "src/main.cpp",
+        "src/app/refdata_app.cpp",
+    ],
+    deps = [
+        ":refdata_lib",
+        "//third_party/yggdrasil",
+        "@fmt",
+        "@tomlplusplus//:tomlplusplus",
     ],
 )
