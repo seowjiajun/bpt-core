@@ -1,0 +1,19 @@
+# C++ toolchain
+build --cxxopt=-std=c++23
+build --host_cxxopt=-std=c++23
+build --copt=-Wall
+build --copt=-Wextra
+build --copt=-Wno-unused-parameter
+
+# Use C++ linker
+build --linkopt=-lstdc++
+build --linkopt=-lm
+
+# Test output
+test --test_output=errors
+
+# Compatibility — allow external deps that haven't migrated to Bazel 9 yet
+build --incompatible_autoload_externally=+@rules_cc
+
+# Performance
+build --jobs=auto

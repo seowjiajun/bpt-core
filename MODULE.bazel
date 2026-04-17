@@ -1,0 +1,14 @@
+module(
+    name = "bpt-core",
+    version = "0.1.0",
+)
+
+# ── Google Test ──────────────────────────────────────────────────────────────
+bazel_dep(name = "googletest", version = "1.17.0")
+
+# ── fmt ──────────────────────────────────────────────────────────────────────
+bazel_dep(name = "fmt", version = "11.1.4")
+
+# ── Rules ────────────────────────────────────────────────────────────────────
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_cc", version = "0.2.17")
