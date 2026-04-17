@@ -1,80 +1,93 @@
 # bpt-core
 
-Monorepo for the Fenrir low-latency algorithmic trading system. All inter-service communication runs over [Aeron](https://github.com/real-logic/aeron) via the Bifrost-fabric media driver.
+Monorepo for a low-latency algorithmic trading system. All inter-service communication runs over [Aeron](https://github.com/real-logic/aeron) via the `transport/aeron` media driver.
 
 ## Services
 
 | Service | Language | Role |
 |---|---|---|
-| **fenrir** | C++ | Trading engine — strategy logic, order management |
-| **huginn** | C++ | Market data gateway (Binance, OKX, Hyperliquid, Deribit) |
-| **heimdall** | C++ | Order gateway — routes orders to exchanges, returns execution reports |
-| **muninn** | C++ | Reference data service — instruments, fee schedules |
-| **surtr** | C++ | Implied volatility surface computation |
-| **jormungandr** | C++ | Backtester — exchange simulator, reads Parquet data from S3 |
-| **bifrost/fabric** | Java | Aeron media driver — central messaging backbone |
-| **bifrost/protocol** | C++ | SBE message schemas and generated codecs |
+| **bpt-strategy** | C++ | Trading engine — strategy logic, order management, risk checks |
+| **bpt-md-gateway** | C++ | Market data gateway (Binance, OKX, Hyperliquid, Deribit) |
+| **bpt-order-gateway** | C++ | Order gateway — routes orders to exchanges, returns execution reports |
+| **bpt-refdata** | C++ | Reference data service — instruments, fee schedules |
+| **bpt-analytics** | C++ | Live markouts, toxicity scoring, fill rate, TTF |
+| **bpt-pricer** | C++ | Implied volatility surface computation |
+| **bpt-backtester** | C++ | Exchange simulator, reads Parquet market data |
+| **dashboard/bridge** | C++ | Aeron → WebSocket forwarder for the dashboard frontend |
+| **transport/aeron** | Java | Aeron media driver — central messaging backbone |
+| **messages** | C++ | SBE message schemas and generated codecs (legacy alias: `bifrost::protocol`) |
 
 ## Requirements
 
 ### System
 
 - GCC 13+ (C++23)
-- CMake 3.20+
-- Ninja
 - OpenSSL 3
+- Java 17 (for the Aeron media driver)
+
+Plus one of the two supported build systems below.
+
+### Build system — pick one
+
+Both are supported side-by-side; they produce equivalent binaries. Bazel gives hermetic, reproducible builds with a remote cache; CMake has the existing deploy integration.
+
+**Bazel (recommended for development):**
+
+- Bazel 7+ with bzlmod enabled
+- All deps fetched automatically via `MODULE.bazel` (BCR modules + `http_archive` for the rest)
+
+**CMake (legacy / current production path):**
+
+- CMake 3.20+ and Ninja
+- vcpkg for most C++ deps; FetchContent for Aeron + fast_float
 - Arrow & Parquet (Apache apt repo — see CI workflow for install steps)
-- Java 17 (for bifrost-fabric)
 
-### vcpkg packages
-
-Installed automatically during CMake configure:
+vcpkg packages installed automatically during CMake configure:
 
 ```
 fmt  spdlog  tomlplusplus  boost-beast  boost-asio  boost-json  boost-system
-simdjson  openssl  nlohmann-json  gtest  prometheus-cpp  aws-sdk-cpp[s3,secretsmanager]
+simdjson  openssl  nlohmann-json  gtest  prometheus-cpp  libsecp256k1
 ```
-
-### FetchContent (auto-downloaded during configure)
-
-- [Aeron](https://github.com/real-logic/aeron) 1.44.1
-- [fast_float](https://github.com/fastfloat/fast_float) v6.1.6
 
 ## Building
 
+### Bazel
+
 ```bash
-# Clone vcpkg
+bazel build //...                       # everything
+bazel test  //...                       # run all test targets
+bazel build -c opt //...                # release build
+bazel build //bpt-md-gateway/...        # one service
+bazel build //bpt-order-gateway:bpt-order-gateway  # just a binary
+```
+
+Built artifacts land under `bazel-bin/<path>/`. These are symlinks into Bazel's out-of-tree cache; the `bazel-*` symlinks are `.gitignore`'d.
+
+### CMake
+
+```bash
 git clone https://github.com/microsoft/vcpkg.git
 ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
 
-# Configure (Debug)
 cmake -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
-
-# Build everything
 cmake --build build -j$(nproc)
-
-# Run tests
 ctest --test-dir build --output-on-failure -j$(nproc)
 ```
 
 ## Running the stack (OKX demo)
 
 ```bash
-# Start all services with testnet/demo configs
 ./scripts/stack-testnet.sh start
-
-# Check status
 ./scripts/stack-testnet.sh status
-
-# Stop
 ./scripts/stack-testnet.sh stop
 ```
 
-**Startup order:** bifrost-fabric → muninn → huginn + heimdall (parallel) → fenrir
+**Startup order:**
+`transport/aeron` → `bpt-refdata` → `bpt-md-gateway` + `bpt-order-gateway` (parallel) → `bpt-strategy`
 
-Fenrir blocks at startup until muninn publishes `RefDataReady` on stream 1006. If any configured exchange is missing from that signal, fenrir halts.
+`bpt-strategy` blocks at startup until `bpt-refdata` publishes `RefDataReady` on stream 1006. If any configured exchange is missing from that signal, strategy halts.
 
 ## Deploying to a remote host
 
@@ -93,56 +106,67 @@ ssh user@host 'cd /opt/bpt && tar -xzf bpt-core-1.0.0-linux-x86_64.tar.gz \
   && cd bpt-core-1.0.0-linux-x86_64 && sudo ./install.sh'
 ```
 
-Tagged releases are also published automatically as GitHub Release assets — push a `v*` tag to trigger the release workflow.
+Tagged releases are also published as GitHub Release assets — push a `v*` tag to trigger the release workflow.
 
 ## Project layout
 
 ```
 bpt-core/
-  fenrir/
-    include/fenrir/   # public headers
-    src/              # implementation + main.cpp
-    config/           # per-environment TOML configs
+  bpt-strategy/
+    include/strategy/   # public headers
+    src/                # implementation + main.cpp
+    config/             # per-environment TOML configs
     tests/
-  huginn/             # same layout
-  heimdall/
-  muninn/
-  surtr/
-  jormungandr/
-  bifrost/
-    fabric/           # Java media driver (Gradle)
-    protocol/         # SBE schemas + generated C++ codecs
+  bpt-md-gateway/       # same layout
+  bpt-order-gateway/
+  bpt-refdata/
+  bpt-analytics/
+  bpt-pricer/
+  bpt-backtester/
+  dashboard/
+    bridge/             # Aeron → WebSocket forwarder (C++)
+    frontend/           # dashboard UI (not covered here)
+  messages/             # SBE schemas + generated C++ codecs (alias: bifrost::protocol)
+  transport/
+    aeron/              # Java media driver (Gradle)
   third_party/
-    yggdrasil/        # shared C++ utility library (logging, Aeron utils, WS, ...)
+    yggdrasil/          # shared C++ utility library (logging, Aeron utils, secrets, ...)
+    *.BUILD             # Bazel build files for non-BCR http_archive deps
+  deploy/
+    generate-units.sh   # emit systemd user units for the stack
+    env/                # per-environment env files
   scripts/
-    stack.sh          # start/stop/status full stack
-    stack-testnet.sh  # start/stop/status with OKX demo configs
-    package.sh        # build release tarball
+    stack.sh            # start/stop/status full stack
+    stack-testnet.sh    # start/stop/status with OKX demo configs
+    package.sh          # build release tarball
+  MODULE.bazel          # Bazel module definition
+  CMakeLists.txt        # CMake top-level (legacy path)
   .github/workflows/
-    ci.yml            # build + test on push/PR
-    release.yml       # package + publish on v* tags
+    ci.yml              # build + test on push/PR
+    release.yml         # package + publish on v* tags
 ```
 
 ## Aeron stream assignments
 
 | Stream | Direction | Messages |
 |---|---|---|
-| 1001 | muninn → fenrir | RefDataSnapshot |
-| 1002 | muninn → fenrir | RefDataDelta, Heartbeat |
-| 1003 | fenrir → muninn | RefDataSubscriptionRequest |
-| 1004 | muninn → fenrir | FeeSchedule |
-| 1005 | huginn → fenrir | FundingRate |
-| 1006 | muninn → fenrir | RefDataReady, RefDataError |
-| 2001 | fenrir → huginn | MdSubscribeBatch |
-| 2002 | huginn → fenrir | MdMarketData, MdTrade, MdOrderBook |
-| 2003 | huginn → fenrir | MdSubscriptionAck, Heartbeats |
-| 3001 | fenrir → heimdall | NewOrder, CancelOrder, ModifyOrder, CancelAll |
-| 3002 | heimdall → fenrir | ExecutionReport |
-| 3003 | heimdall → fenrir | HeimdallHeartbeat |
-| 4001 | surtr → fenrir | VolSurface |
-| 4002 | surtr → fenrir | SurtrHeartbeat, SurtrReady |
-| 9001 | fenrir → jormungandr | BacktestAck (backtest mode only) |
-| 9002 | jormungandr → fenrir | BacktestControl (backtest mode only) |
+| 1001 | refdata → strategy | RefDataSnapshot |
+| 1002 | refdata → strategy | RefDataDelta, Heartbeat |
+| 1003 | strategy → refdata | RefDataSubscriptionRequest |
+| 1004 | refdata → strategy | FeeSchedule |
+| 1005 | md-gateway → strategy | FundingRate |
+| 1006 | refdata → strategy | RefDataReady, RefDataError |
+| 2001 | strategy → md-gateway | MdSubscribeBatch |
+| 2002 | md-gateway → strategy | MdMarketData, MdTrade, MdOrderBook |
+| 2003 | md-gateway → strategy | MdSubscriptionAck, Heartbeats |
+| 3001 | strategy → order-gateway | NewOrder, CancelOrder, ModifyOrder, CancelAll |
+| 3002 | order-gateway → strategy | ExecutionReport |
+| 3003 | order-gateway → strategy | OrderGatewayHeartbeat |
+| 4001 | pricer → strategy | VolSurface |
+| 4002 | pricer → strategy | PricerHeartbeat, PricerReady |
+| 5001 | analytics → strategy/dashboard | MarkoutReport, ToxicityScore, FillRateReport |
+| 9001 | strategy → backtester | BacktestAck (backtest mode only) |
+| 9002 | backtester → strategy | BacktestControl (backtest mode only) |
 
 ## Configuration
 
@@ -160,7 +184,27 @@ max_file_size_mb  = 10
 max_files         = 3
 ```
 
-Exchange credentials are loaded from AWS Secrets Manager at runtime. Set `BPT_ENV=local` to load from `~/.bpt-secrets/` instead (see each service's config for the expected secret names).
+## Secrets
+
+Exchange API credentials are delivered to services via **systemd-creds**. Each service's unit declares:
+
+```ini
+LoadCredentialEncrypted=bpt-okx:/etc/bpt/creds/bpt-okx.cred
+```
+
+systemd decrypts the `.cred` at service start and mounts plaintext at `$CREDENTIALS_DIRECTORY/bpt-okx` on a per-service tmpfs. Encrypted files are bound to the TPM (or host key as fallback) and stored in the config repo. Secret files are parsed as `KEY=value` per line.
+
+Encrypt a secret (one-time, at deploy):
+
+```bash
+sudo systemd-creds encrypt --name=bpt-okx - /etc/bpt/creds/bpt-okx.cred <<'EOF'
+OKX_API_KEY=...
+OKX_SECRET=...
+OKX_PASSPHRASE=...
+EOF
+```
+
+**Dev fallback:** when `$CREDENTIALS_DIRECTORY` is unset (running outside systemd), secrets are read from `~/.bpt-secrets/<name>` in the same `KEY=value` format.
 
 ## CI
 
@@ -169,4 +213,4 @@ Two GitHub Actions workflows:
 - **ci.yml** — runs on every push and PR to `main`; builds Debug and runs all tests
 - **release.yml** — runs on `v*` tags; builds Release and publishes a deployment tarball as a GitHub Release asset
 
-Caches: vcpkg installation, compiled vcpkg packages (keyed on `vcpkg.json`), and FetchContent downloads (keyed on `CMakeLists.txt`).
+Caches: vcpkg installation, compiled vcpkg packages (keyed on `vcpkg.json`), FetchContent downloads (keyed on `CMakeLists.txt`), and Bazel's remote cache.
