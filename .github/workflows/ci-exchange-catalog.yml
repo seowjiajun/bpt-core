@@ -1,0 +1,52 @@
+name: ci-exchange-catalog
+
+# Guards against drift between the three sources that reference ExchangeId:
+#   1. messages/exchanges.yaml (source of truth)
+#   2. bpt-ops/bpt_ops/common/_exchanges_generated.py (code-generated)
+#   3. messages/generated/cpp/messages/ExchangeId.h (hand-committed)
+#
+# Fails the PR if:
+#   - YAML changed but the Python module wasn't regenerated
+#   - YAML and C++ header disagree on any exchange name/id
+
+on:
+  pull_request:
+    paths:
+      - "messages/exchanges.yaml"
+      - "messages/generated/cpp/messages/ExchangeId.h"
+      - "bpt-ops/bpt_ops/common/_exchanges_generated.py"
+      - "bpt-ops/bpt_ops/jobs/exchange_catalog/**"
+      - ".github/workflows/ci-exchange-catalog.yml"
+  push:
+    branches: [main]
+    paths:
+      - "messages/exchanges.yaml"
+      - "messages/generated/cpp/messages/ExchangeId.h"
+      - "bpt-ops/bpt_ops/common/_exchanges_generated.py"
+      - "bpt-ops/bpt_ops/jobs/exchange_catalog/**"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bpt-ops
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install bpt-ops
+        run: uv sync --extra dev
+
+      - name: Verify C++ header agrees with YAML
+        run: uv run bpt-ops exchange-catalog check-cpp
+
+      - name: Verify _exchanges_generated.py is up to date
+        run: uv run bpt-ops exchange-catalog check-generated
+
+      - name: Run exchange-catalog tests
+        run: uv run pytest tests/jobs/exchange_catalog

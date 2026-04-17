@@ -1,0 +1,28 @@
+# Source of truth for exchange identity.
+#
+# These IDs are wire-format values — they appear inside SBE messages travelling
+# over Aeron. Once an ID is assigned, it is frozen forever: changing it would
+# silently corrupt every strategy's internal routing tables and every line of
+# audit log that references it. Add new exchanges with the next unused ID.
+#
+# Consumers:
+#   - bpt-ops exchange-catalog generate-python  → _exchanges_generated.py
+#   - bpt-ops exchange-catalog emit-json        → config/exchanges/catalog.json
+#   - bpt-ops exchange-catalog check-cpp        → verifies
+#       messages/generated/cpp/messages/ExchangeId.h matches this file
+#
+# CI fails if the YAML and the C++ header drift apart.
+
+exchanges:
+  - id: 1
+    name: BINANCE
+    display_name: "Binance"
+  - id: 2
+    name: OKX
+    display_name: "OKX"
+  - id: 3
+    name: HYPERLIQUID
+    display_name: "Hyperliquid"
+  - id: 4
+    name: DERIBIT
+    display_name: "Deribit"

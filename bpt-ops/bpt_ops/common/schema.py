@@ -6,18 +6,18 @@ in the same PR.
 """
 from __future__ import annotations
 
-from enum import IntEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+# Single source of truth for ExchangeId lives in messages/exchanges.yaml and is
+# code-generated into _exchanges_generated.py by `bpt-ops exchange-catalog
+# generate-python`. CI (ci-exchange-catalog.yml) fails if anyone edits the
+# YAML without regenerating, or if the C++ ExchangeId.h drifts from the YAML.
+from bpt_ops.common._exchanges_generated import EXCHANGE_DISPLAY_NAMES, ExchangeId
 
-# Must match messages/generated/cpp/messages/ExchangeId.h (values are stable wire IDs).
-class ExchangeId(IntEnum):
-    BINANCE = 1
-    OKX = 2
-    HYPERLIQUID = 3
-    DERIBIT = 4
+__all__ = ["ExchangeId", "EXCHANGE_DISPLAY_NAMES", "VALID_INSTRUMENT_TYPES",
+           "ReverseEntry", "InstrumentMapping"]
 
 
 VALID_INSTRUMENT_TYPES: frozenset[str] = frozenset({"SPOT", "PERP", "FUTURES"})

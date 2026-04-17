@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.8",
     "tenacity>=9.0",
     "tomli>=2.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

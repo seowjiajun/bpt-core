@@ -1,0 +1,24 @@
+{
+  "exchanges": [
+    {
+      "id": 1,
+      "name": "BINANCE",
+      "display_name": "Binance"
+    },
+    {
+      "id": 2,
+      "name": "OKX",
+      "display_name": "OKX"
+    },
+    {
+      "id": 3,
+      "name": "HYPERLIQUID",
+      "display_name": "Hyperliquid"
+    },
+    {
+      "id": 4,
+      "name": "DERIBIT",
+      "display_name": "Deribit"
+    }
+  ]
+}
