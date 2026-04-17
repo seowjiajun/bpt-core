@@ -4,50 +4,51 @@ from bpt_ops.jobs.instrument_mapping.fetchers.base import RawInstrument
 
 
 def _okx_btc_spot() -> RawInstrument:
-    return RawInstrument(
-        exchange=ExchangeId.OKX,
-        venue_symbol="BTC-USDT",
-        base="BTC",
-        quote="USDT",
-        instrument_type="SPOT",
-    )
+    return RawInstrument(ExchangeId.OKX, "BTC-USDT", "BTC", "USDT", "SPOT")
+
+
+def _okx_xrp_spot() -> RawInstrument:
+    return RawInstrument(ExchangeId.OKX, "XRP-USDT", "XRP", "USDT", "SPOT")
 
 
 def _binance_btc_spot() -> RawInstrument:
-    return RawInstrument(
-        exchange=ExchangeId.BINANCE,
-        venue_symbol="BTCUSDT",
-        base="BTC",
-        quote="USDT",
-        instrument_type="SPOT",
-    )
+    return RawInstrument(ExchangeId.BINANCE, "BTCUSDT", "BTC", "USDT", "SPOT")
 
 
-def test_canonical_id_is_stable():
-    a = reconcile.canonical_id("BTC", "USDT", "SPOT")
-    b = reconcile.canonical_id("BTC", "USDT", "SPOT")
-    assert a == b
-    assert 0 <= a < 2**32
+def test_build_seeds_major_pairs_even_with_no_fetched_data():
+    m = reconcile.build([], now_ms=1745000000000)
+    # 3 PERP seeds + 3 SPOT seeds
+    assert m.instrument_count == 6
+    assert "1001" in m.reverse  # BTC PERP
+    assert "2001" in m.reverse  # BTC SPOT
 
 
-def test_canonical_id_differs_per_instrument():
-    spot = reconcile.canonical_id("BTC", "USDT", "SPOT")
-    perp = reconcile.canonical_id("BTC", "USDT", "PERP")
-    assert spot != perp
+def test_build_reuses_seed_id_for_btc_spot():
+    # OKX fetches BTC-USDT spot; should land on the seeded id 2001, not a new one
+    m = reconcile.build([_okx_btc_spot()], now_ms=1745000000000)
+    assert m.forward[f"{int(ExchangeId.OKX)}_BTC-USDT"] == 2001
 
 
-def test_build_merges_exchanges_under_same_canonical_id():
-    mapping = reconcile.build([_okx_btc_spot(), _binance_btc_spot()], now_ms=1745000000000)
+def test_build_allocates_next_id_for_non_seed_instrument():
+    # XRP-USDT SPOT is not seeded, so should get id 2004 (next after 2001/2002/2003)
+    m = reconcile.build([_okx_xrp_spot()], now_ms=1745000000000)
+    xrp_id = m.forward[f"{int(ExchangeId.OKX)}_XRP-USDT"]
+    assert xrp_id == 2004
+    assert m.reverse[str(xrp_id)].base == "XRP"
 
-    assert mapping.instrument_count == 1
-    assert len(mapping.reverse) == 1
 
-    cid_str = next(iter(mapping.reverse))
-    entry = mapping.reverse[cid_str]
-    assert entry.base == "BTC"
-    assert entry.quote == "USDT"
-    assert entry.type == "SPOT"
-    assert entry.exchanges == {"1": "BTCUSDT", "2": "BTC-USDT"}
+def test_build_unions_exchanges_on_same_canonical_id():
+    m = reconcile.build([_okx_btc_spot(), _binance_btc_spot()], now_ms=1745000000000)
 
-    assert mapping.forward[f"{ExchangeId.OKX.value}_BTC-USDT"] == int(cid_str)
-    assert mapping.forward[f"{ExchangeId.BINANCE.value}_BTCUSDT"] == int(cid_str)
+    entry = m.reverse["2001"]
+    assert entry.exchanges[str(int(ExchangeId.OKX))] == "BTC-USDT"
+    assert entry.exchanges[str(int(ExchangeId.BINANCE))] == "BTCUSDT"
+
+    # Forward keys present for both venues
+    assert m.forward[f"{int(ExchangeId.OKX)}_BTC-USDT"] == 2001
+    assert m.forward[f"{int(ExchangeId.BINANCE)}_BTCUSDT_SPOT"] == 2001
+
+
+def test_instrument_count_matches_reverse():
+    m = reconcile.build([_okx_btc_spot(), _okx_xrp_spot()], now_ms=1745000000000)
+    assert m.instrument_count == len(m.reverse)

@@ -19,7 +19,10 @@ def test_emit_writes_one_file_per_present_exchange(tmp_path: Path):
     written = emit.write_per_exchange(mapping, tmp_path)
 
     names = sorted(p.name for p in written)
-    assert names == ["instrument_mapping.binance.json", "instrument_mapping.okx.json"]
+    # Seeds touch BINANCE/OKX/HYPERLIQUID; _fixture_raws adds no HL rows but
+    # seeds do, so all three show up.
+    assert "instrument_mapping.okx.json" in names
+    assert "instrument_mapping.binance.json" in names
 
 
 def test_emit_produces_deterministic_json(tmp_path: Path):
@@ -37,18 +40,28 @@ def test_emit_produces_deterministic_json(tmp_path: Path):
 
 
 def test_emit_okx_file_matches_bpt_refdata_schema(tmp_path: Path):
-    """Golden-schema check: the shape must be what bpt-refdata's loader parses."""
+    """The per-exchange JSON shape must be what bpt-refdata's loader parses."""
     mapping = reconcile.build(_fixture_raws(), now_ms=1745000000000)
     emit.write_per_exchange(mapping, tmp_path)
 
     parsed = json.loads((tmp_path / "instrument_mapping.okx.json").read_text())
 
     assert set(parsed.keys()) == {"forward", "reverse", "exported_at", "instrument_count"}
-    # forward keys: only OKX (exchange id 2)
-    assert all(k.startswith("2_") for k in parsed["forward"])
-    # reverse entries carry base/quote/type/exchanges
+    assert all(k.startswith(f"{int(ExchangeId.OKX)}_") for k in parsed["forward"])
     for entry in parsed["reverse"].values():
         assert set(entry.keys()) == {"base", "quote", "type", "exchanges"}
-        assert list(entry["exchanges"].keys()) == ["2"]  # scoped to OKX only
-    assert parsed["instrument_count"] == len(parsed["reverse"]) == 2
+        assert list(entry["exchanges"].keys()) == [str(int(ExchangeId.OKX))]
+    assert parsed["instrument_count"] == len(parsed["reverse"])
     assert parsed["exported_at"] == 1745000000000
+
+
+def test_emit_binance_spot_has_suffix_in_forward_key(tmp_path: Path):
+    mapping = reconcile.build(_fixture_raws(), now_ms=1745000000000)
+    emit.write_per_exchange(mapping, tmp_path)
+
+    binance = json.loads((tmp_path / "instrument_mapping.binance.json").read_text())
+    # Binance SPOT keys must carry _SPOT suffix in the forward map
+    spot_keys = [k for k in binance["forward"] if k.endswith("_SPOT")]
+    assert spot_keys, "expected at least one _SPOT-suffixed forward key for Binance"
+    for k in spot_keys:
+        assert binance["reverse"][str(binance["forward"][k])]["type"] == "SPOT"

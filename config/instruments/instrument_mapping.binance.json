@@ -1,0 +1,62 @@
+{
+  "forward": {
+    "1_BTCUSDT": 1001,
+    "1_BTCUSDT_SPOT": 2001,
+    "1_ETHUSDT": 1002,
+    "1_ETHUSDT_SPOT": 2002,
+    "1_SOLUSDT": 1003,
+    "1_SOLUSDT_SPOT": 2003
+  },
+  "reverse": {
+    "1001": {
+      "base": "BTC",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "1": "BTCUSDT"
+      }
+    },
+    "1002": {
+      "base": "ETH",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "1": "ETHUSDT"
+      }
+    },
+    "1003": {
+      "base": "SOL",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "1": "SOLUSDT"
+      }
+    },
+    "2001": {
+      "base": "BTC",
+      "quote": "USDT",
+      "type": "SPOT",
+      "exchanges": {
+        "1": "BTCUSDT"
+      }
+    },
+    "2002": {
+      "base": "ETH",
+      "quote": "USDT",
+      "type": "SPOT",
+      "exchanges": {
+        "1": "ETHUSDT"
+      }
+    },
+    "2003": {
+      "base": "SOL",
+      "quote": "USDT",
+      "type": "SPOT",
+      "exchanges": {
+        "1": "SOLUSDT"
+      }
+    }
+  },
+  "exported_at": 1776450537661,
+  "instrument_count": 6
+}

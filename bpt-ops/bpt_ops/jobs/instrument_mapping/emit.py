@@ -35,8 +35,10 @@ def _filter_to(mapping: InstrumentMapping, exchange: ExchangeId) -> InstrumentMa
 def write_per_exchange(mapping: InstrumentMapping, out_dir: Path) -> list[Path]:
     """Write one instrument_mapping.<exchange>.json file per exchange that appears in `mapping`.
 
-    Keys in reverse are sorted for deterministic output (helps git diffs). Writes via
-    .tmp + rename so a partial write can't corrupt the target file.
+    Each scoped file is re-validated through InstrumentMapping (pydantic) before
+    hitting disk, so a schema violation fails the run rather than shipping
+    corrupt output. Writes via .tmp + rename so a partial write can't corrupt
+    the target.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
@@ -48,6 +50,10 @@ def write_per_exchange(mapping: InstrumentMapping, out_dir: Path) -> list[Path]:
 
     for ex in sorted(present, key=lambda e: e.value):
         scoped = _filter_to(mapping, ex)
+        # Re-validate the scoped mapping — catches any invariant drift
+        # (e.g. instrument_count mismatch after filtering).
+        InstrumentMapping.model_validate(scoped.model_dump())
+
         payload = _serialise(scoped)
 
         target = out_dir / f"instrument_mapping.{ex.name.lower()}.json"

@@ -47,6 +47,7 @@ cc_library(
 cc_test(
     name = "refdata_tests",
     srcs = glob(["tests/*.cpp"]),
+    data = ["//config/instruments:mapping_files"],
     deps = [
         ":refdata_lib",
         "@googletest//:gtest_main",

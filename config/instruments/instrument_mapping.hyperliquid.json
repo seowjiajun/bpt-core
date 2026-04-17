@@ -1,0 +1,35 @@
+{
+  "forward": {
+    "3_BTC": 1001,
+    "3_ETH": 1002,
+    "3_SOL": 1003
+  },
+  "reverse": {
+    "1001": {
+      "base": "BTC",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "3": "BTC"
+      }
+    },
+    "1002": {
+      "base": "ETH",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "3": "ETH"
+      }
+    },
+    "1003": {
+      "base": "SOL",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "3": "SOL"
+      }
+    }
+  },
+  "exported_at": 1776450537661,
+  "instrument_count": 3
+}
