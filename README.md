@@ -168,6 +168,55 @@ bpt-core/
 | 9001 | strategy → backtester | BacktestAck (backtest mode only) |
 | 9002 | backtester → strategy | BacktestControl (backtest mode only) |
 
+## How new instruments reach prod
+
+Two pipelines run on independent cadences:
+
+```
+Code changes (days–weeks)                   Config changes (daily)
+──────────────────────                       ──────────────────────
+Dev pushes C++ / Python change      bpt-ops instrument-mapping runs
+         │                                      │ (GitHub Actions, 04:00 UTC)
+         ▼                                      ▼
+`v*` tag triggers release.yml       Opens PR to main with refreshed
+         │                          config/instruments/*.json if changed
+         ▼                                      │
+Tarball uploaded as release asset               ▼
+         │                          CI validates schema + refdata
+         ▼                          fixture test still loads
+Operator scps + `systemctl restart`             │
+         │                                      ▼
+         ▼                          Merged to main (auto-merge on green)
+Running service picks up new binary             │
+                                                ▼
+                                    bpt-config-sync.timer on the trading
+                                    box fires at 06:00 UTC daily
+                                                │
+                                    `sync-config.sh` does git pull --ff-only
+                                                │
+                                                ▼
+                                    refdata's internal daily refresh tick
+                                    re-reads config/instruments/ → publishes
+                                    RefDataDelta on Aeron → strategies update
+                                    their InstrumentCache.
+```
+
+Key property: mapping updates **never restart services**. Code changes **do**
+restart the affected service. The two paths are deliberately orthogonal —
+`git pull` on the trading box only makes sense because it's config-only from
+the running-process perspective; the compiled binary lives outside the git
+tree in the release tarball.
+
+Set up on a trading box:
+
+```bash
+./deploy/generate-units.sh
+systemctl --user enable --now bpt-config-sync.timer
+systemctl --user start bpt-stack.target
+systemctl --user list-timers bpt-config-sync.timer   # next scheduled run
+journalctl --user -u bpt-config-sync -f              # tail the sync
+```
+
 ## Configuration
 
 Each service has a TOML config. The `[logging]` section is common to all:

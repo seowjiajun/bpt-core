@@ -3,13 +3,15 @@
 #
 # Differences from generate-units.sh:
 #   1. Unit names prefixed bpt-dev-* (so they don't collide with the prod set)
-#   2. ExecStart points at Bazel-built binaries in bazel-bin/
-#      (exception: bpt-refdata still uses the CMake build — AWS SDK blocker)
+#   2. ExecStart points at Bazel-built binaries in bazel-bin/ (all services,
+#      including bpt-refdata — the AWS SDK blocker is gone)
 #   3. Restart=no — dev should surface crashes, not hide them in restart loops
 #   4. Own env file (deploy/env/dev.env) with isolated Aeron dir + metrics ports
 #   5. Own stack target (bpt-dev-stack.target)
 #   6. Dev transport points at config-dev.yaml so the prod stack can run at the
 #      same time on the same machine.
+#   7. No config-sync timer — dev workflow is `git pull` by hand; the cron
+#      equivalent only makes sense for unattended prod hosts.
 set -euo pipefail
 
 BPT_ROOT="/home/jseow/code/bpt-core"

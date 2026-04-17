@@ -1,5 +1,14 @@
 #!/bin/bash
-# generate-units.sh — Generates systemd user units for the BPT trading stack.
+# generate-units.sh — Generate systemd user units for the BPT trading stack
+# (production/live variant). Writes units to ~/.config/systemd/user/.
+#
+# Binaries are taken from bazel-bin/ (Bazel-built). The one exception used to
+# be bpt-refdata (blocked on aws-sdk-cpp); now that refdata is AWS-free, the
+# whole stack runs off bazel-bin/ and CMake is no longer referenced here.
+#
+# The config-sync timer is also emitted — it git-pulls the repo daily so that
+# mapping/fee/config PRs merged to main propagate to the running services on
+# their next refresh tick. Code changes still ship via release tarballs.
 set -euo pipefail
 
 BPT_ROOT="/home/jseow/code/bpt-core"
@@ -8,6 +17,16 @@ ENV_FILE="$BPT_ROOT/deploy/env/active.env"
 
 mkdir -p "$UNIT_DIR"
 
+# ── Binary path resolution (all Bazel-built) ────────────────────────────────
+declare -A BIN
+BIN[bpt-refdata]="$BPT_ROOT/bazel-bin/bpt-refdata/bpt-refdata"
+BIN[bpt-md-gateway]="$BPT_ROOT/bazel-bin/bpt-md-gateway/bpt-md-gateway"
+BIN[bpt-order-gateway]="$BPT_ROOT/bazel-bin/bpt-order-gateway/bpt-order-gateway"
+BIN[bpt-strategy]="$BPT_ROOT/bazel-bin/bpt-strategy/bpt-strategy"
+BIN[bpt-analytics]="$BPT_ROOT/bazel-bin/bpt-analytics/bpt-analytics"
+BIN[bpt-bridge]="$BPT_ROOT/bazel-bin/dashboard/bridge/bridge"
+
+# ── bpt-transport (Aeron media driver, Gradle-built Java) ───────────────────
 cat > "$UNIT_DIR/bpt-transport.service" <<EOF
 [Unit]
 Description=BPT Transport (Aeron MediaDriver)
@@ -25,8 +44,8 @@ TimeoutStopSec=10
 WantedBy=bpt-stack.target
 EOF
 
+# ── bpt-{refdata,md-gateway,order-gateway} ──────────────────────────────────
 for svc in bpt-refdata bpt-md-gateway bpt-order-gateway; do
-    # Strip bpt- prefix for env var lookup: bpt-md-gateway → MD_GATEWAY
     env_key=$(echo "$svc" | sed 's/^bpt-//' | tr '[:lower:]-' '[:upper:]_')
     cfg_var="BPT_${env_key}_CONFIG"
 
@@ -34,11 +53,7 @@ for svc in bpt-refdata bpt-md-gateway bpt-order-gateway; do
     [ "$svc" = "bpt-md-gateway" ] && after="bpt-refdata.service"
     [ "$svc" = "bpt-order-gateway" ] && after="bpt-refdata.service"
 
-    # Services without bpt- prefix get it added for the unit name
-    unit_name="$svc"
-    [[ "$svc" != bpt-* ]] && unit_name="bpt-$svc"
-
-    cat > "$UNIT_DIR/$unit_name.service" <<EOF
+    cat > "$UNIT_DIR/$svc.service" <<EOF
 [Unit]
 Description=BPT ${svc^} Service
 After=$after
@@ -49,7 +64,7 @@ PartOf=bpt-stack.target
 Type=simple
 EnvironmentFile=$ENV_FILE
 WorkingDirectory=$BPT_ROOT/$svc
-ExecStart=$BPT_ROOT/build/$svc/src/$svc $([ "$svc" = "bpt-refdata" ] && echo "--config") \${$cfg_var}
+ExecStart=${BIN[$svc]} $([ "$svc" = "bpt-refdata" ] && echo "--config") \${$cfg_var}
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=15
@@ -59,9 +74,10 @@ WantedBy=bpt-stack.target
 EOF
 done
 
+# ── bpt-strategy ─────────────────────────────────────────────────────────────
 cat > "$UNIT_DIR/bpt-strategy.service" <<EOF
 [Unit]
-Description=BPT Strategy Strategy Engine
+Description=BPT Strategy Engine
 After=bpt-md-gateway.service bpt-order-gateway.service
 Requires=bpt-transport.service
 PartOf=bpt-stack.target
@@ -70,7 +86,7 @@ PartOf=bpt-stack.target
 Type=simple
 EnvironmentFile=$ENV_FILE
 WorkingDirectory=$BPT_ROOT/bpt-strategy
-ExecStart=$BPT_ROOT/build/bpt-strategy/src/bpt-strategy \${BPT_STRATEGY_CONFIG}
+ExecStart=${BIN[bpt-strategy]} \${BPT_STRATEGY_CONFIG}
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -79,9 +95,10 @@ TimeoutStopSec=30
 WantedBy=bpt-stack.target
 EOF
 
+# ── bpt-analytics ────────────────────────────────────────────────────────────
 cat > "$UNIT_DIR/bpt-analytics.service" <<EOF
 [Unit]
-Description=BPT Analytics Toxic Flow Analyzer
+Description=BPT Analytics (markouts, toxicity, fill rate)
 After=bpt-strategy.service
 Requires=bpt-transport.service
 PartOf=bpt-stack.target
@@ -90,7 +107,7 @@ PartOf=bpt-stack.target
 Type=simple
 EnvironmentFile=$ENV_FILE
 WorkingDirectory=$BPT_ROOT/bpt-analytics
-ExecStart=$BPT_ROOT/build/bpt-analytics/src/bpt-analytics \${BPT_ANALYTICS_CONFIG}
+ExecStart=${BIN[bpt-analytics]} \${BPT_ANALYTICS_CONFIG}
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=10
@@ -99,6 +116,7 @@ TimeoutStopSec=10
 WantedBy=bpt-stack.target
 EOF
 
+# ── bpt-bridge (dashboard WebSocket forwarder) ──────────────────────────────
 cat > "$UNIT_DIR/bpt-bridge.service" <<EOF
 [Unit]
 Description=BPT Dashboard Bridge
@@ -110,7 +128,7 @@ PartOf=bpt-stack.target
 Type=simple
 EnvironmentFile=$ENV_FILE
 WorkingDirectory=$BPT_ROOT
-ExecStart=$BPT_ROOT/build/dashboard/bridge/bridge --config \${BPT_BRIDGE_CONFIG} --mode \${BPT_BRIDGE_MODE} --strategy-name \${BPT_BRIDGE_STRATEGY} --symbol \${BPT_BRIDGE_SYMBOL} --exchange \${BPT_BRIDGE_EXCHANGE} --instrument-type \${BPT_BRIDGE_INST_TYPE}
+ExecStart=${BIN[bpt-bridge]} --config \${BPT_BRIDGE_CONFIG} --mode \${BPT_BRIDGE_MODE} --strategy-name \${BPT_BRIDGE_STRATEGY} --symbol \${BPT_BRIDGE_SYMBOL} --exchange \${BPT_BRIDGE_EXCHANGE} --instrument-type \${BPT_BRIDGE_INST_TYPE}
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=10
@@ -119,6 +137,7 @@ TimeoutStopSec=10
 WantedBy=bpt-stack.target
 EOF
 
+# ── bpt-frontend (dashboard UI, Vite dev server) ────────────────────────────
 cat > "$UNIT_DIR/bpt-frontend.service" <<EOF
 [Unit]
 Description=BPT Dashboard Frontend
@@ -139,6 +158,33 @@ TimeoutStopSec=5
 WantedBy=bpt-stack.target
 EOF
 
+# ── bpt-config-sync.{service,timer} ─────────────────────────────────────────
+# Pulls config changes (instrument mapping, fees, service TOMLs) from origin
+# daily. Services pick up the new files on their next internal refresh tick;
+# nothing restarts.
+cat > "$UNIT_DIR/bpt-config-sync.service" <<EOF
+[Unit]
+Description=BPT Config Sync (git pull for config-only updates)
+
+[Service]
+Type=oneshot
+ExecStart=$BPT_ROOT/deploy/sync-config.sh
+Environment=BPT_ROOT=$BPT_ROOT
+EOF
+
+cat > "$UNIT_DIR/bpt-config-sync.timer" <<EOF
+[Unit]
+Description=Daily BPT config sync (runs at 06:00 local, 2h after the GHA cron)
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# ── bpt-stack.target ─────────────────────────────────────────────────────────
 cat > "$UNIT_DIR/bpt-stack.target" <<EOF
 [Unit]
 Description=BPT Trading Stack
@@ -149,11 +195,15 @@ WantedBy=default.target
 EOF
 
 systemctl --user daemon-reload
-echo "Generated $(ls "$UNIT_DIR"/bpt-* | wc -l) units in $UNIT_DIR"
-echo "Active env: $(readlink -f "$ENV_FILE")"
+
+echo "Generated $(ls "$UNIT_DIR"/bpt-*.service "$UNIT_DIR"/bpt-*.timer "$UNIT_DIR"/bpt-*.target 2>/dev/null | wc -l) units in $UNIT_DIR"
+echo "Active env: $(readlink -f "$ENV_FILE" 2>/dev/null || echo "$ENV_FILE")"
 echo
-echo "Usage:"
-echo "  systemctl --user start bpt-stack.target    # start everything"
-echo "  systemctl --user stop bpt-stack.target     # stop everything"
-echo "  systemctl --user status 'bpt-*'            # check all services"
-echo "  journalctl --user -u bpt-strategy -f         # tail bpt-strategy logs"
+echo "Enable + start:"
+echo "  systemctl --user enable --now bpt-config-sync.timer   # daily config pull"
+echo "  systemctl --user start bpt-stack.target               # bring the stack up"
+echo
+echo "Inspect:"
+echo "  systemctl --user status 'bpt-*'"
+echo "  systemctl --user list-timers bpt-config-sync.timer"
+echo "  journalctl --user -u bpt-config-sync -f   # tail sync logs"
