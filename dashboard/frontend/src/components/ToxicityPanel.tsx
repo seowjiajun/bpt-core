@@ -1,37 +1,38 @@
 import { useStore } from '../store'
 
-const fmt1 = (v: number) => (isNaN(v) ? '—' : v.toFixed(1))
-const fmtPct = (v: number) => (isNaN(v) ? '—' : `${(v * 100).toFixed(0)}%`)
-const fmtScore = (v: number) => (isNaN(v) ? '—' : v.toFixed(2))
-const fmtMs = (v: number) => (isNaN(v) ? '—' : `${v.toFixed(0)}ms`)
+type Num = number | null | undefined
+const nullish = (v: Num): v is null | undefined => v == null || isNaN(v as number)
 
-function scoreClass(v: number): string {
-  if (isNaN(v)) return 'stat-value--muted'
-  if (v > 0) return 'stat-value--green'
-  if (v > -2) return 'stat-value--muted'
+const fmt1 = (v: Num) => (nullish(v) ? '—' : (v as number).toFixed(1))
+const fmtPct = (v: Num) => (nullish(v) ? '—' : `${((v as number) * 100).toFixed(0)}%`)
+const fmtScore = (v: Num) => (nullish(v) ? '—' : (v as number).toFixed(2))
+const fmtMs = (v: Num) => (nullish(v) ? '—' : `${(v as number).toFixed(0)}ms`)
+
+function scoreClass(v: Num): string {
+  if (nullish(v)) return 'stat-value--muted'
+  if ((v as number) > 0) return 'stat-value--green'
+  if ((v as number) > -2) return 'stat-value--muted'
   return 'stat-value--red'
 }
 
-function rateClass(v: number): string {
-  if (isNaN(v)) return 'stat-value--muted'
-  if (v < 0.4) return 'stat-value--green'
-  if (v < 0.6) return 'stat-value--muted'
+function rateClass(v: Num): string {
+  if (nullish(v)) return 'stat-value--muted'
+  if ((v as number) < 0.4) return 'stat-value--green'
+  if ((v as number) < 0.6) return 'stat-value--muted'
   return 'stat-value--red'
 }
 
-// Fill rate: high = getting swept (red), normal = green
-function fillRateClass(v: number): string {
-  if (isNaN(v)) return 'stat-value--muted'
-  if (v > 0.8) return 'stat-value--red'
-  if (v > 0.5) return 'stat-value--muted'
+function fillRateClass(v: Num): string {
+  if (nullish(v)) return 'stat-value--muted'
+  if ((v as number) > 0.8) return 'stat-value--red'
+  if ((v as number) > 0.5) return 'stat-value--muted'
   return 'stat-value--green'
 }
 
-// TTF: fast = getting sniped (red), slow = normal (green)
-function ttfClass(v: number): string {
-  if (isNaN(v)) return 'stat-value--muted'
-  if (v < 500) return 'stat-value--red'
-  if (v < 2000) return 'stat-value--muted'
+function ttfClass(v: Num): string {
+  if (nullish(v)) return 'stat-value--muted'
+  if ((v as number) < 500) return 'stat-value--red'
+  if ((v as number) < 2000) return 'stat-value--muted'
   return 'stat-value--green'
 }
 

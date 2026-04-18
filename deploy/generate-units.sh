@@ -45,6 +45,10 @@ WantedBy=bpt-stack.target
 EOF
 
 # ── bpt-{refdata,md-gateway,order-gateway} ──────────────────────────────────
+# refdata and order-gateway need exchange credentials. systemd delivers them
+# via LoadCredentialEncrypted= — decrypted files land in $CREDENTIALS_DIRECTORY
+# keyed by secret_name. Configs reference bpt/testnet/OKX → bpt-testnet-OKX.
+CRED_DIR="$HOME/.config/systemd/creds"
 for svc in bpt-refdata bpt-md-gateway bpt-order-gateway; do
     env_key=$(echo "$svc" | sed 's/^bpt-//' | tr '[:lower:]-' '[:upper:]_')
     cfg_var="BPT_${env_key}_CONFIG"
@@ -52,6 +56,16 @@ for svc in bpt-refdata bpt-md-gateway bpt-order-gateway; do
     after="bpt-transport.service"
     [ "$svc" = "bpt-md-gateway" ] && after="bpt-refdata.service"
     [ "$svc" = "bpt-order-gateway" ] && after="bpt-refdata.service"
+
+    creds_lines=""
+    if [ "$svc" = "bpt-refdata" ] || [ "$svc" = "bpt-order-gateway" ]; then
+        for cred in bpt-testnet-OKX; do
+            if [ -f "$CRED_DIR/$cred.cred" ]; then
+                creds_lines+="LoadCredentialEncrypted=$cred:$CRED_DIR/$cred.cred
+"
+            fi
+        done
+    fi
 
     cat > "$UNIT_DIR/$svc.service" <<EOF
 [Unit]
@@ -65,7 +79,7 @@ Type=simple
 EnvironmentFile=$ENV_FILE
 WorkingDirectory=$BPT_ROOT/$svc
 ExecStart=${BIN[$svc]} $([ "$svc" = "bpt-refdata" ] && echo "--config") \${$cfg_var}
-Restart=on-failure
+${creds_lines}Restart=on-failure
 RestartSec=3
 TimeoutStopSec=15
 
