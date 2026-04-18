@@ -78,7 +78,8 @@ std::string position(std::string_view symbol,
 std::string account(uint64_t ts_ns,
                     double balance,
                     double equity,
-                    const std::vector<AccountPosition>& positions) {
+                    const std::vector<AccountPosition>& positions,
+                    const std::vector<AccountCurrencyBalance>& currency_balances) {
     auto positions_json = json::array();
     for (const auto& p : positions) {
         positions_json.push_back({
@@ -88,12 +89,21 @@ std::string account(uint64_t ts_ns,
             {"unrealizedPnl", p.unrealized_pnl},
         });
     }
+    auto currency_balances_json = json::array();
+    for (const auto& cb : currency_balances) {
+        currency_balances_json.push_back({
+            {"ccy", cb.ccy},
+            {"equity", cb.equity},
+            {"availableBalance", cb.available_balance},
+        });
+    }
     return json{
         {"type", "account"},
         {"ts", ts_ns},
         {"balance", balance},
         {"equity", equity},
         {"positions", std::move(positions_json)},
+        {"currencyBalances", std::move(currency_balances_json)},
     }.dump();
 }
 

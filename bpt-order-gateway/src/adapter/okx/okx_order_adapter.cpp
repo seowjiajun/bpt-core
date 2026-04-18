@@ -235,9 +235,9 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
                 if (d.contains("totalEq"))
                     snap.total_equity_e8 =
                         static_cast<int64_t>(std::round(std::stod(std::string(d.at("totalEq").as_string())) * 1e8));
-                // Per-ccy detail scan: capture USDT availBal AND log every
-                // non-zero eq line so we can see what the account actually
-                // holds even when USDT is empty.
+                // Per-ccy detail scan: record non-zero currency balances in
+                // snap.currency_balances (one row per ccy for the dashboard)
+                // AND capture the USDT availBal for snap.available_balance_e8.
                 if (d.contains("details") && d.at("details").is_array()) {
                     for (const auto& detail : d.at("details").as_array()) {
                         if (!detail.is_object())
@@ -247,13 +247,23 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
                         const std::string eq = de.contains("eq") ? std::string(de.at("eq").as_string()) : "0";
                         const std::string avail =
                             de.contains("availBal") ? std::string(de.at("availBal").as_string()) : "0";
-                        // Log anything with non-trivial equity so funding-account
-                        // vs trading-account / wrong-ccy mismatches show up.
-                        if (!eq.empty() && std::stod(eq) > 0.0)
+                        const double eq_d = eq.empty() ? 0.0 : std::stod(eq);
+                        const double avail_d = avail.empty() ? 0.0 : std::stod(avail);
+                        if (eq_d > 0.0)
                             ygg::log::info("[OKX balance detail] ccy={} eq={} availBal={}", ccy, eq, avail);
+                        // Cap ccy name to 8 chars — SBE group field is Char8.
+                        // Any OKX ccy code in the wild is ≤ 5 chars so this
+                        // is a safety clamp, not a real concern.
+                        if (eq_d > 0.0 && !ccy.empty()) {
+                            snap.currency_balances.push_back({
+                                ccy.substr(0, 8),
+                                static_cast<int64_t>(std::round(eq_d * 1e8)),
+                                static_cast<int64_t>(std::round(avail_d * 1e8)),
+                            });
+                        }
                         if (ccy == "USDT" && de.contains("availBal"))
                             snap.available_balance_e8 =
-                                static_cast<int64_t>(std::round(std::stod(avail) * 1e8));
+                                static_cast<int64_t>(std::round(avail_d * 1e8));
                     }
                 }
                 ygg::log::info("[OrderGateway] OKXOrderAdapter: /account/balance totalEq={:.4f} USDT availBal={:.4f}",

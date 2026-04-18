@@ -242,8 +242,14 @@ int main(int argc, char** argv) {
         for (const auto& p : s.positions) {
             positions.push_back({p.exchange_symbol, p.net_qty, p.avg_entry, p.unrealized_pnl});
         }
+        std::vector<bridge::encode::AccountCurrencyBalance> ccy_balances;
+        ccy_balances.reserve(s.currency_balances.size());
+        for (const auto& cb : s.currency_balances) {
+            ccy_balances.push_back({cb.ccy, cb.equity, cb.available_balance});
+        }
         ws.publish(bridge::MsgKind::Order,
-                   bridge::encode::account(s.ts_ns, s.available_balance, s.total_equity, positions));
+                   bridge::encode::account(s.ts_ns, s.available_balance, s.total_equity,
+                                           positions, ccy_balances));
     });
 
     exec_sub.set_handler([&](const bridge::ExecSubscriber::Fill& f) {

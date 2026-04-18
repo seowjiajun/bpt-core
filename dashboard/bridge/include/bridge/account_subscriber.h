@@ -26,12 +26,23 @@ public:
         double unrealized_pnl;        // natural units (quote currency)
     };
 
+    // Per-currency cash row (e.g. USDT, USDC, SGD, USD). OKX accounts
+    // typically carry balances in several currencies at once; the
+    // dashboard renders one Holdings row per ccy in addition to the
+    // crypto positions.
+    struct CurrencyBalance {
+        std::string ccy;              // currency code, ≤ 8 chars
+        double equity;                // currency equity (natural units)
+        double available_balance;     // withdrawable amount (natural units)
+    };
+
     struct Snapshot {
         uint64_t ts_ns;
         uint8_t  exchange_id;
-        double   available_balance;  // natural units (e.g. USDC)
+        double   available_balance;  // natural units (quote currency available)
         double   total_equity;       // natural units; falls back to balance when 0
         std::vector<Position> positions;
+        std::vector<CurrencyBalance> currency_balances;
     };
 
     using Handler = std::function<void(const Snapshot&)>;

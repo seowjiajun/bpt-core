@@ -87,6 +87,25 @@ void AccountSubscriber::on_fragment(const aeron::concurrent::AtomicBuffer& buffe
         s.positions.push_back(std::move(p));
     }
 
+    // SBE repeating groups share a read cursor with the parent message;
+    // positions must be fully iterated above before accessing the next
+    // group. currencyBalances is gated on acting version ≥ 13 — older
+    // serialized snapshots decode cleanly with an empty group.
+    if (msg.currencyBalancesInActingVersion()) {
+        auto& ccy_group = msg.currencyBalances();
+        const std::size_t m = ccy_group.count();
+        s.currency_balances.reserve(m);
+        for (std::size_t i = 0; i < m; ++i) {
+            ccy_group.next();
+            CurrencyBalance cb;
+            cb.ccy               = ccy_group.getCcyAsString();
+            cb.equity            = static_cast<double>(ccy_group.equityE8())            / kE8;
+            cb.available_balance = static_cast<double>(ccy_group.availableBalanceE8()) / kE8;
+            if (cb.equity == 0.0 && cb.available_balance == 0.0) continue;
+            s.currency_balances.push_back(std::move(cb));
+        }
+    }
+
     if (handler_) handler_(s);
 }
 

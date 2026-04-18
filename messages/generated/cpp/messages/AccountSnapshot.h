@@ -121,8 +121,8 @@ public:
     static const std::uint16_t SBE_BLOCK_LENGTH = static_cast<std::uint16_t>(33);
     static const std::uint16_t SBE_TEMPLATE_ID = static_cast<std::uint16_t>(27);
     static const std::uint16_t SBE_SCHEMA_ID = static_cast<std::uint16_t>(1);
-    static const std::uint16_t SBE_SCHEMA_VERSION = static_cast<std::uint16_t>(12);
-    static constexpr const char* SBE_SEMANTIC_VERSION = "1.12.0";
+    static const std::uint16_t SBE_SCHEMA_VERSION = static_cast<std::uint16_t>(13);
+    static constexpr const char* SBE_SEMANTIC_VERSION = "1.13.0";
 
     enum MetaAttribute
     {
@@ -196,12 +196,12 @@ public:
 
     SBE_NODISCARD static SBE_CONSTEXPR std::uint16_t sbeSchemaVersion() SBE_NOEXCEPT
     {
-        return static_cast<std::uint16_t>(12);
+        return static_cast<std::uint16_t>(13);
     }
 
     SBE_NODISCARD static const char *sbeSemanticVersion() SBE_NOEXCEPT
     {
-        return "1.12.0";
+        return "1.13.0";
     }
 
     SBE_NODISCARD static SBE_CONSTEXPR const char *sbeSemanticType() SBE_NOEXCEPT
@@ -1238,6 +1238,553 @@ public:
         return true;
     }
 
+    class CurrencyBalances
+    {
+    private:
+        char *m_buffer = nullptr;
+        std::uint64_t m_bufferLength = 0;
+        std::uint64_t m_initialPosition = 0;
+        std::uint64_t *m_positionPtr = nullptr;
+        std::uint64_t m_blockLength = 0;
+        std::uint64_t m_count = 0;
+        std::uint64_t m_index = 0;
+        std::uint64_t m_offset = 0;
+        std::uint64_t m_actingVersion = 0;
+
+        SBE_NODISCARD std::uint64_t *sbePositionPtr() SBE_NOEXCEPT
+        {
+            return m_positionPtr;
+        }
+
+    public:
+        CurrencyBalances() = default;
+
+        inline void wrapForDecode(
+            char *buffer,
+            std::uint64_t *pos,
+            const std::uint64_t actingVersion,
+            const std::uint64_t bufferLength)
+        {
+            GroupSizeEncoding dimensions(buffer, *pos, bufferLength, actingVersion);
+            m_buffer = buffer;
+            m_bufferLength = bufferLength;
+            m_blockLength = dimensions.blockLength();
+            m_count = dimensions.numInGroup();
+            m_index = 0;
+            m_actingVersion = actingVersion;
+            m_initialPosition = *pos;
+            m_positionPtr = pos;
+            *m_positionPtr = *m_positionPtr + 4;
+        }
+
+        inline void wrapForEncode(
+            char *buffer,
+            const std::uint16_t count,
+            std::uint64_t *pos,
+            const std::uint64_t actingVersion,
+            const std::uint64_t bufferLength)
+        {
+    #if defined(__GNUG__) && !defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wtype-limits"
+    #endif
+            if (count > 65534)
+            {
+                throw std::runtime_error("count outside of allowed range [E110]");
+            }
+    #if defined(__GNUG__) && !defined(__clang__)
+    #pragma GCC diagnostic pop
+    #endif
+            m_buffer = buffer;
+            m_bufferLength = bufferLength;
+            GroupSizeEncoding dimensions(buffer, *pos, bufferLength, actingVersion);
+            dimensions.blockLength(static_cast<std::uint16_t>(24));
+            dimensions.numInGroup(static_cast<std::uint16_t>(count));
+            m_index = 0;
+            m_count = count;
+            m_blockLength = 24;
+            m_actingVersion = actingVersion;
+            m_initialPosition = *pos;
+            m_positionPtr = pos;
+            *m_positionPtr = *m_positionPtr + 4;
+        }
+
+        static SBE_CONSTEXPR std::uint64_t sbeHeaderSize() SBE_NOEXCEPT
+        {
+            return 4;
+        }
+
+        static SBE_CONSTEXPR std::uint64_t sbeBlockLength() SBE_NOEXCEPT
+        {
+            return 24;
+        }
+
+        SBE_NODISCARD std::uint64_t sbePosition() const SBE_NOEXCEPT
+        {
+            return *m_positionPtr;
+        }
+
+        // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+        std::uint64_t sbeCheckPosition(const std::uint64_t position)
+        {
+            if (SBE_BOUNDS_CHECK_EXPECT((position > m_bufferLength), false))
+            {
+                throw std::runtime_error("buffer too short [E100]");
+            }
+            return position;
+        }
+
+        void sbePosition(const std::uint64_t position)
+        {
+            *m_positionPtr = sbeCheckPosition(position);
+        }
+
+        SBE_NODISCARD inline std::uint64_t count() const SBE_NOEXCEPT
+        {
+            return m_count;
+        }
+
+        SBE_NODISCARD inline bool hasNext() const SBE_NOEXCEPT
+        {
+            return m_index < m_count;
+        }
+
+        inline CurrencyBalances &next()
+        {
+            if (m_index >= m_count)
+            {
+                throw std::runtime_error("index >= count [E108]");
+            }
+            m_offset = *m_positionPtr;
+            if (SBE_BOUNDS_CHECK_EXPECT(((m_offset + m_blockLength) > m_bufferLength), false))
+            {
+                throw std::runtime_error("buffer too short for next group index [E108]");
+            }
+            *m_positionPtr = m_offset + m_blockLength;
+            ++m_index;
+
+            return *this;
+        }
+
+        inline std::uint64_t resetCountToIndex()
+        {
+            m_count = m_index;
+            GroupSizeEncoding dimensions(m_buffer, m_initialPosition, m_bufferLength, m_actingVersion);
+            dimensions.numInGroup(static_cast<std::uint16_t>(m_count));
+            return m_count;
+        }
+
+        template<class Func> inline void forEach(Func &&func)
+        {
+            while (hasNext())
+            {
+                next();
+                func(*this);
+            }
+        }
+
+
+        SBE_NODISCARD static const char *ccyMetaAttribute(const MetaAttribute metaAttribute) SBE_NOEXCEPT
+        {
+            switch (metaAttribute)
+            {
+                case MetaAttribute::PRESENCE: return "required";
+                default: return "";
+            }
+        }
+
+        static SBE_CONSTEXPR std::uint16_t ccyId() SBE_NOEXCEPT
+        {
+            return 1;
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR std::uint64_t ccySinceVersion() SBE_NOEXCEPT
+        {
+            return 0;
+        }
+
+        SBE_NODISCARD bool ccyInActingVersion() SBE_NOEXCEPT
+        {
+            return true;
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR std::size_t ccyEncodingOffset() SBE_NOEXCEPT
+        {
+            return 0;
+        }
+
+        static SBE_CONSTEXPR char ccyNullValue() SBE_NOEXCEPT
+        {
+            return static_cast<char>(0);
+        }
+
+        static SBE_CONSTEXPR char ccyMinValue() SBE_NOEXCEPT
+        {
+            return static_cast<char>(32);
+        }
+
+        static SBE_CONSTEXPR char ccyMaxValue() SBE_NOEXCEPT
+        {
+            return static_cast<char>(126);
+        }
+
+        static SBE_CONSTEXPR std::size_t ccyEncodingLength() SBE_NOEXCEPT
+        {
+            return 8;
+        }
+
+        static SBE_CONSTEXPR std::uint64_t ccyLength() SBE_NOEXCEPT
+        {
+            return 8;
+        }
+
+        SBE_NODISCARD const char *ccy() const SBE_NOEXCEPT
+        {
+            return m_buffer + m_offset + 0;
+        }
+
+        SBE_NODISCARD char *ccy() SBE_NOEXCEPT
+        {
+            return m_buffer + m_offset + 0;
+        }
+
+        SBE_NODISCARD char ccy(const std::uint64_t index) const
+        {
+            if (index >= 8)
+            {
+                throw std::runtime_error("index out of range for ccy [E104]");
+            }
+
+            char val;
+            std::memcpy(&val, m_buffer + m_offset + 0 + (index * 1), sizeof(char));
+            return (val);
+        }
+
+        CurrencyBalances &ccy(const std::uint64_t index, const char value)
+        {
+            if (index >= 8)
+            {
+                throw std::runtime_error("index out of range for ccy [E105]");
+            }
+
+            char val = (value);
+            std::memcpy(m_buffer + m_offset + 0 + (index * 1), &val, sizeof(char));
+            return *this;
+        }
+
+        std::uint64_t getCcy(char *const dst, const std::uint64_t length) const
+        {
+            if (length > 8)
+            {
+                throw std::runtime_error("length too large for getCcy [E106]");
+            }
+
+            std::memcpy(dst, m_buffer + m_offset + 0, sizeof(char) * static_cast<std::size_t>(length));
+            return length;
+        }
+
+        CurrencyBalances &putCcy(const char *const src) SBE_NOEXCEPT
+        {
+            std::memcpy(m_buffer + m_offset + 0, src, sizeof(char) * 8);
+            return *this;
+        }
+
+        SBE_NODISCARD std::string getCcyAsString() const
+        {
+            const char *buffer = m_buffer + m_offset + 0;
+            std::size_t length = 0;
+
+            for (; length < 8 && *(buffer + length) != '\0'; ++length);
+            std::string result(buffer, length);
+
+            return result;
+        }
+
+        std::string getCcyAsJsonEscapedString()
+        {
+            std::ostringstream oss;
+            std::string s = getCcyAsString();
+
+            for (const auto c : s)
+            {
+                switch (c)
+                {
+                    case '"': oss << "\\\""; break;
+                    case '\\': oss << "\\\\"; break;
+                    case '\b': oss << "\\b"; break;
+                    case '\f': oss << "\\f"; break;
+                    case '\n': oss << "\\n"; break;
+                    case '\r': oss << "\\r"; break;
+                    case '\t': oss << "\\t"; break;
+
+                    default:
+                        if ('\x00' <= c && c <= '\x1f')
+                        {
+                            oss << "\\u" << std::hex << std::setw(4)
+                                << std::setfill('0') << (int)(c);
+                        }
+                        else
+                        {
+                            oss << c;
+                        }
+                }
+            }
+
+            return oss.str();
+        }
+
+        #if __cplusplus >= 201703L
+        SBE_NODISCARD std::string_view getCcyAsStringView() const SBE_NOEXCEPT
+        {
+            const char *buffer = m_buffer + m_offset + 0;
+            std::size_t length = 0;
+
+            for (; length < 8 && *(buffer + length) != '\0'; ++length);
+            std::string_view result(buffer, length);
+
+            return result;
+        }
+        #endif
+
+        #if __cplusplus >= 201703L
+        CurrencyBalances &putCcy(const std::string_view str)
+        {
+            const std::size_t srcLength = str.length();
+            if (srcLength > 8)
+            {
+                throw std::runtime_error("string too large for putCcy [E106]");
+            }
+
+            std::memcpy(m_buffer + m_offset + 0, str.data(), srcLength);
+            for (std::size_t start = srcLength; start < 8; ++start)
+            {
+                m_buffer[m_offset + 0 + start] = 0;
+            }
+
+            return *this;
+        }
+        #else
+        CurrencyBalances &putCcy(const std::string &str)
+        {
+            const std::size_t srcLength = str.length();
+            if (srcLength > 8)
+            {
+                throw std::runtime_error("string too large for putCcy [E106]");
+            }
+
+            std::memcpy(m_buffer + m_offset + 0, str.c_str(), srcLength);
+            for (std::size_t start = srcLength; start < 8; ++start)
+            {
+                m_buffer[m_offset + 0 + start] = 0;
+            }
+
+            return *this;
+        }
+        #endif
+
+        SBE_NODISCARD static const char *equityE8MetaAttribute(const MetaAttribute metaAttribute) SBE_NOEXCEPT
+        {
+            switch (metaAttribute)
+            {
+                case MetaAttribute::PRESENCE: return "required";
+                default: return "";
+            }
+        }
+
+        static SBE_CONSTEXPR std::uint16_t equityE8Id() SBE_NOEXCEPT
+        {
+            return 2;
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR std::uint64_t equityE8SinceVersion() SBE_NOEXCEPT
+        {
+            return 0;
+        }
+
+        SBE_NODISCARD bool equityE8InActingVersion() SBE_NOEXCEPT
+        {
+            return true;
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR std::size_t equityE8EncodingOffset() SBE_NOEXCEPT
+        {
+            return 8;
+        }
+
+        static SBE_CONSTEXPR std::int64_t equityE8NullValue() SBE_NOEXCEPT
+        {
+            return SBE_NULLVALUE_INT64;
+        }
+
+        static SBE_CONSTEXPR std::int64_t equityE8MinValue() SBE_NOEXCEPT
+        {
+            return INT64_C(-9223372036854775807);
+        }
+
+        static SBE_CONSTEXPR std::int64_t equityE8MaxValue() SBE_NOEXCEPT
+        {
+            return INT64_C(9223372036854775807);
+        }
+
+        static SBE_CONSTEXPR std::size_t equityE8EncodingLength() SBE_NOEXCEPT
+        {
+            return 8;
+        }
+
+        SBE_NODISCARD std::int64_t equityE8() const SBE_NOEXCEPT
+        {
+            std::int64_t val;
+            std::memcpy(&val, m_buffer + m_offset + 8, sizeof(std::int64_t));
+            return SBE_LITTLE_ENDIAN_ENCODE_64(val);
+        }
+
+        CurrencyBalances &equityE8(const std::int64_t value) SBE_NOEXCEPT
+        {
+            std::int64_t val = SBE_LITTLE_ENDIAN_ENCODE_64(value);
+            std::memcpy(m_buffer + m_offset + 8, &val, sizeof(std::int64_t));
+            return *this;
+        }
+
+        SBE_NODISCARD static const char *availableBalanceE8MetaAttribute(const MetaAttribute metaAttribute) SBE_NOEXCEPT
+        {
+            switch (metaAttribute)
+            {
+                case MetaAttribute::PRESENCE: return "required";
+                default: return "";
+            }
+        }
+
+        static SBE_CONSTEXPR std::uint16_t availableBalanceE8Id() SBE_NOEXCEPT
+        {
+            return 3;
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR std::uint64_t availableBalanceE8SinceVersion() SBE_NOEXCEPT
+        {
+            return 0;
+        }
+
+        SBE_NODISCARD bool availableBalanceE8InActingVersion() SBE_NOEXCEPT
+        {
+            return true;
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR std::size_t availableBalanceE8EncodingOffset() SBE_NOEXCEPT
+        {
+            return 16;
+        }
+
+        static SBE_CONSTEXPR std::int64_t availableBalanceE8NullValue() SBE_NOEXCEPT
+        {
+            return SBE_NULLVALUE_INT64;
+        }
+
+        static SBE_CONSTEXPR std::int64_t availableBalanceE8MinValue() SBE_NOEXCEPT
+        {
+            return INT64_C(-9223372036854775807);
+        }
+
+        static SBE_CONSTEXPR std::int64_t availableBalanceE8MaxValue() SBE_NOEXCEPT
+        {
+            return INT64_C(9223372036854775807);
+        }
+
+        static SBE_CONSTEXPR std::size_t availableBalanceE8EncodingLength() SBE_NOEXCEPT
+        {
+            return 8;
+        }
+
+        SBE_NODISCARD std::int64_t availableBalanceE8() const SBE_NOEXCEPT
+        {
+            std::int64_t val;
+            std::memcpy(&val, m_buffer + m_offset + 16, sizeof(std::int64_t));
+            return SBE_LITTLE_ENDIAN_ENCODE_64(val);
+        }
+
+        CurrencyBalances &availableBalanceE8(const std::int64_t value) SBE_NOEXCEPT
+        {
+            std::int64_t val = SBE_LITTLE_ENDIAN_ENCODE_64(value);
+            std::memcpy(m_buffer + m_offset + 16, &val, sizeof(std::int64_t));
+            return *this;
+        }
+
+        template<typename CharT, typename Traits>
+        friend std::basic_ostream<CharT, Traits> & operator << (
+            std::basic_ostream<CharT, Traits> &builder, CurrencyBalances &writer)
+        {
+            builder << '{';
+            builder << R"("ccy": )";
+            builder << '"' <<
+                writer.getCcyAsJsonEscapedString().c_str() << '"';
+
+            builder << ", ";
+            builder << R"("equityE8": )";
+            builder << +writer.equityE8();
+
+            builder << ", ";
+            builder << R"("availableBalanceE8": )";
+            builder << +writer.availableBalanceE8();
+
+            builder << '}';
+
+            return builder;
+        }
+
+        void skip()
+        {
+        }
+
+        SBE_NODISCARD static SBE_CONSTEXPR bool isConstLength() SBE_NOEXCEPT
+        {
+            return true;
+        }
+
+        SBE_NODISCARD static std::size_t computeLength()
+        {
+#if defined(__GNUG__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
+            std::size_t length = sbeBlockLength();
+
+            return length;
+#if defined(__GNUG__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+        }
+    };
+
+private:
+    CurrencyBalances m_currencyBalances;
+
+public:
+    SBE_NODISCARD static SBE_CONSTEXPR std::uint16_t currencyBalancesId() SBE_NOEXCEPT
+    {
+        return 7;
+    }
+
+    SBE_NODISCARD inline CurrencyBalances &currencyBalances()
+    {
+        m_currencyBalances.wrapForDecode(m_buffer, sbePositionPtr(), m_actingVersion, m_bufferLength);
+        return m_currencyBalances;
+    }
+
+    CurrencyBalances &currencyBalancesCount(const std::uint16_t count)
+    {
+        m_currencyBalances.wrapForEncode(m_buffer, count, sbePositionPtr(), m_actingVersion, m_bufferLength);
+        return m_currencyBalances;
+    }
+
+    SBE_NODISCARD static SBE_CONSTEXPR std::uint64_t currencyBalancesSinceVersion() SBE_NOEXCEPT
+    {
+        return 0;
+    }
+
+    SBE_NODISCARD bool currencyBalancesInActingVersion() const SBE_NOEXCEPT
+    {
+        return true;
+    }
+
 template<typename CharT, typename Traits>
 friend std::basic_ostream<CharT, Traits> & operator << (
     std::basic_ostream<CharT, Traits> &builder, const AccountSnapshot &_writer)
@@ -1291,6 +1838,23 @@ friend std::basic_ostream<CharT, Traits> & operator << (
         builder << ']';
     }
 
+    builder << ", ";
+    {
+        bool atLeastOne = false;
+        builder << R"("currencyBalances": [)";
+        writer.currencyBalances().forEach(
+            [&](CurrencyBalances &currencyBalances)
+            {
+                if (atLeastOne)
+                {
+                    builder << ", ";
+                }
+                atLeastOne = true;
+                builder << currencyBalances;
+            });
+        builder << ']';
+    }
+
     builder << '}';
 
     return builder;
@@ -1303,6 +1867,11 @@ void skip()
     {
         positionsGroup.next().skip();
     }
+    auto &currencyBalancesGroup { currencyBalances() };
+    while (currencyBalancesGroup.hasNext())
+    {
+        currencyBalancesGroup.next().skip();
+    }
 }
 
 SBE_NODISCARD static SBE_CONSTEXPR bool isConstLength() SBE_NOEXCEPT
@@ -1310,7 +1879,9 @@ SBE_NODISCARD static SBE_CONSTEXPR bool isConstLength() SBE_NOEXCEPT
     return false;
 }
 
-SBE_NODISCARD static std::size_t computeLength(std::size_t positionsLength = 0)
+SBE_NODISCARD static std::size_t computeLength(
+    std::size_t positionsLength = 0,
+    std::size_t currencyBalancesLength = 0)
 {
 #if defined(__GNUG__) && !defined(__clang__)
 #pragma GCC diagnostic push
@@ -1324,6 +1895,13 @@ SBE_NODISCARD static std::size_t computeLength(std::size_t positionsLength = 0)
         throw std::runtime_error("positionsLength outside of allowed range [E110]");
     }
     length += positionsLength *Positions::sbeBlockLength();
+
+    length += CurrencyBalances::sbeHeaderSize();
+    if (currencyBalancesLength > 65534LL)
+    {
+        throw std::runtime_error("currencyBalancesLength outside of allowed range [E110]");
+    }
+    length += currencyBalancesLength *CurrencyBalances::sbeBlockLength();
 
     return length;
 #if defined(__GNUG__) && !defined(__clang__)

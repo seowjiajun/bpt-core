@@ -71,16 +71,27 @@ export interface AccountPosition {
   unrealizedPnl: number   // quote currency, MTM'd by the exchange
 }
 
-// Live exchange account snapshot from heimdall, relayed by the bridge.
+// One per-currency cash balance row reported by the exchange — e.g.
+// OKX accounts hold USDT + USDC + SGD + USD all at once. Distinct from
+// AccountPosition (which is for non-stable crypto holdings).
+export interface AccountCurrencyBalance {
+  ccy: string                       // currency code, ≤ 8 chars (e.g. "USDT", "SGD")
+  equity: number                    // total holdings in that currency
+  availableBalance: number          // withdrawable amount in that currency
+}
+
+// Live exchange account snapshot from order-gateway, relayed by the bridge.
 // The dashboard uses these as the canonical equity baseline so the equity
 // curve reflects the actual exchange balance, not a static config value.
-// `positions` powers the holdings breakdown panel.
+// `positions` feeds crypto rows in the holdings panel; `currencyBalances`
+// feeds per-stable-ccy rows.
 export interface AccountMsg {
   type: 'account'
   ts: number                        // ns since epoch
-  balance: number                   // available balance (e.g. USDC)
+  balance: number                   // quote-ccy available balance (USDT for OKX, USDC for HL)
   equity: number                    // total account equity (falls back to balance when 0)
   positions: AccountPosition[]      // open positions with per-leg uPnL
+  currencyBalances?: AccountCurrencyBalance[]  // per-ccy cash rows (since v13 — may be absent on older snapshots)
 }
 
 // Current net position.  Emitted by the bridge after every fill.

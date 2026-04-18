@@ -57,17 +57,25 @@ struct AccountPosition {
     double      unrealized_pnl; // quote currency
 };
 
+// Per-currency cash row. Mirrors the `CurrencyBalances` SBE group.
+struct AccountCurrencyBalance {
+    std::string ccy;                // currency code, ≤ 8 chars
+    double      equity;             // per-currency equity (natural units)
+    double      available_balance;  // per-currency withdrawable amount
+};
+
 // { "type":"account", "ts":..., "balance":..., "equity":...,
-//   "positions":[{"symbol":..., "netQty":..., "avgEntry":...,
-//                 "unrealizedPnl":...}, ...] }
+//   "positions":[...],
+//   "currencyBalances":[{"ccy":"USDT", "equity":..., "availableBalance":...}, ...] }
 //
 // Live exchange account snapshot from order-gateway — the canonical equity
-// baseline for the dashboard and the source of the holdings breakdown
-// panel.
+// baseline for the dashboard. `positions` feeds crypto rows in the
+// holdings panel; `currencyBalances` feeds per-stable-ccy rows.
 std::string account(uint64_t ts_ns,
                     double balance,
                     double equity,
-                    const std::vector<AccountPosition>& positions);
+                    const std::vector<AccountPosition>& positions,
+                    const std::vector<AccountCurrencyBalance>& currency_balances);
 
 // { "type":"order", "ts":..., "orderId":..., "symbol":"...", "side":"BUY",
 //   "orderType":"LIMIT", "price":..., "qty":..., "filledQty":...,

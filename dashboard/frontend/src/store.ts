@@ -73,6 +73,10 @@ interface State {
   // Open positions from the latest AccountSnapshot. Drives the holdings
   // breakdown panel. Per-position PnL here is MTM'd by the exchange.
   accountPositions: import('./types/messages').AccountPosition[]
+  // Per-currency cash balances — populated from the `currencyBalances`
+  // array on `account` messages. Empty when the exchange doesn't report
+  // per-ccy detail (e.g. Hyperliquid — USDC-only).
+  accountCurrencyBalances: import('./types/messages').AccountCurrencyBalance[]
 
   // Market
   firstPrice: number     // set on the first tick; used for top-bar % change
@@ -148,6 +152,7 @@ const initialState = {
   accountEquity: 0,
   accountHistory: [] as Array<{ ts: number; equity: number }>,
   accountPositions: [] as State['accountPositions'],
+  accountCurrencyBalances: [] as State['accountCurrencyBalances'],
   firstPrice: 0,
   price: 0,
   netQty: 0,
@@ -264,6 +269,7 @@ export const useStore = create<State>((set) => ({
             accountEquity: msg.equity,
             accountHistory: history,
             accountPositions: msg.positions ?? [],
+            accountCurrencyBalances: msg.currencyBalances ?? [],
           }
         }
 

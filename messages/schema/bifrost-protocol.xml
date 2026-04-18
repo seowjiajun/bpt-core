@@ -2,8 +2,8 @@
 <sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
                    package="bpt.messages"
                    id="1"
-                   version="12"
-                   semanticVersion="1.12.0"
+                   version="13"
+                   semanticVersion="1.13.0"
                    description="BPT trading stack — reconstructed from generated C++"
                    byteOrder="littleEndian">
 
@@ -394,6 +394,15 @@
       <field name="netQtyE8" id="2" type="int64"/>
       <field name="avgEntryPriceE8" id="3" type="int64"/>
       <field name="unrealizedPnlE8" id="4" type="int64"/>
+    </group>
+    <!-- Per-currency cash balances. OKX reports per-ccy equity + availBal in
+         the /account/balance `details[]` array; we want the dashboard to show
+         a separate cash row per currency instead of collapsing everything to
+         a single USDC-labeled line. -->
+    <group name="currencyBalances" id="7" dimensionType="groupSizeEncoding">
+      <field name="ccy" id="1" type="Char8"/>
+      <field name="equityE8" id="2" type="int64"/>
+      <field name="availableBalanceE8" id="3" type="int64"/>
     </group>
   </sbe:message>
 

@@ -10,6 +10,7 @@ import { useStore } from '../store'
 // canonical answer to "what am I actually carrying on this account".
 export function HoldingsPanel() {
   const positions = useStore((s) => s.accountPositions)
+  const currencyBalances = useStore((s) => s.accountCurrencyBalances)
   const balance = useStore((s) => s.accountBalance)
   const equity = useStore((s) => s.accountEquity)
   const exchange = useStore((s) => s.exchange)
@@ -17,7 +18,7 @@ export function HoldingsPanel() {
   // Show panel whenever we have ANY account state: cash only, positions
   // only, or both. Previously this hid when positions.length === 0, which
   // meant a flat account looked like "no data" instead of "just cash".
-  const hasData = positions.length > 0 || balance > 0 || equity > 0
+  const hasData = positions.length > 0 || currencyBalances.length > 0 || balance > 0 || equity > 0
   if (!hasData) {
     return (
       <div className="panel" style={{ gridArea: 'holdings' }}>
@@ -72,20 +73,41 @@ export function HoldingsPanel() {
           </tr>
         </thead>
         <tbody>
-          {/* Cash row — always present so user can see USDC balance alongside crypto positions. */}
-          <tr key="__usdc__">
-            <td>USDC</td>
-            <td className="stat-value--muted">CASH</td>
-            <td className="num">
-              {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </td>
-            <td className="num">—</td>
-            <td className="num">—</td>
-            <td className="num">
-              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </td>
-            <td className="num stat-value--muted">—</td>
-          </tr>
+          {/* Cash rows — one per currency reported by the exchange. When
+              the exchange only reports a single quote-ccy balance (e.g.
+              Hyperliquid's USDC-only account), fall back to a single row
+              labeled by the venue convention (USDT on OKX, USDC on HL). */}
+          {currencyBalances.length > 0 ? (
+            currencyBalances.map((cb) => (
+              <tr key={`__ccy_${cb.ccy}__`}>
+                <td>{cb.ccy}</td>
+                <td className="stat-value--muted">CASH</td>
+                <td className="num">
+                  {cb.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className="num">—</td>
+                <td className="num">—</td>
+                <td className="num">
+                  {cb.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className="num stat-value--muted">—</td>
+              </tr>
+            ))
+          ) : (
+            <tr key="__cash__">
+              <td>{exchange === 'OKX' ? 'USDT' : 'USDC'}</td>
+              <td className="stat-value--muted">CASH</td>
+              <td className="num">
+                {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </td>
+              <td className="num">—</td>
+              <td className="num">—</td>
+              <td className="num">
+                ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </td>
+              <td className="num stat-value--muted">—</td>
+            </tr>
+          )}
           {rows.map((r) => {
             const long = r.netQty > 0
             const sideClass = long ? 'side-buy' : 'side-sell'
