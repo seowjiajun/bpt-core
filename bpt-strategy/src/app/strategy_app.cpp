@@ -422,18 +422,42 @@ void StrategyApp::shutdown_flatten() {
         ygg::log::error("[Strategy] on_shutdown_flatten threw: {}", e.what());
     }
 
-    // Post-drain: the cancel/unwind orders we just fired need to ack
-    // before we exit. Longer budget because it's a real round-trip to
-    // the exchange, not just in-process fragment processing.
+    // Post-drain: loop until the strategy says all its
+    // cancels/unwinds have reached a terminal status, or until the
+    // drain budget expires. Previous implementation sleep-spun the
+    // full 5s regardless of whether orders had already ack'd — fine
+    // in the happy path, wasteful; and worse, if the exchange was
+    // slow (network hiccup, adapter reconnect mid-flatten) the budget
+    // could expire with orders still live. We now log clearly when
+    // the budget expires so ops know to look.
     const uint64_t drain_start_ns = ygg::util::TscClock::now_epoch_ns();
     constexpr uint64_t kDrainBudgetNs = 5ULL * 1'000'000'000ULL;
+    bool drained_cleanly = true;
     if (order_gw_) {
-        while (ygg::util::TscClock::now_epoch_ns() - drain_start_ns < kDrainBudgetNs) {
+        while (true) {
+            const uint64_t elapsed = ygg::util::TscClock::now_epoch_ns() - drain_start_ns;
+            if (elapsed >= kDrainBudgetNs) {
+                if (strategy_->has_pending_flatten()) {
+                    ygg::log::error(
+                        "[Strategy] shutdown drain budget ({} ms) expired with pending "
+                        "orders still in flight — process exiting with live exchange-side "
+                        "state. Investigate via order-gateway logs and exchange console.",
+                        kDrainBudgetNs / 1'000'000ULL);
+                    drained_cleanly = false;
+                }
+                break;
+            }
+            if (!strategy_->has_pending_flatten()) {
+                ygg::log::info("[Strategy] shutdown drain completed cleanly in {} ms",
+                               elapsed / 1'000'000ULL);
+                break;
+            }
             const int frags = order_gw_->poll();
             if (frags == 0)
                 __builtin_ia32_pause();
         }
     }
+    (void)drained_cleanly;  // reserved: may gate exit code in the future
 
     // Request a fresh AccountSnapshot from every configured exchange so the
     // dashboard HoldingsPanel reflects the post-flatten state (instead of

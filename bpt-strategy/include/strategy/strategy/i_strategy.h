@@ -127,6 +127,14 @@ public:
     // host reboot) is NOT covered here; that needs an exchange-side
     // dead-man switch in the order-gateway HL adapter.
     virtual void on_shutdown_flatten() {}
+
+    // True if the strategy has resting orders or in-flight unwind
+    // orders that haven't reached a terminal state yet. StrategyApp's
+    // shutdown drain loops on this to exit early once everything is
+    // clean, instead of blindly sleep-spinning for the full timeout
+    // budget. A strategy that doesn't override it returns false —
+    // appropriate for stateless / non-inventory strategies.
+    [[nodiscard]] virtual bool has_pending_flatten() const { return false; }
 };
 
 }  // namespace bpt::strategy::strategy

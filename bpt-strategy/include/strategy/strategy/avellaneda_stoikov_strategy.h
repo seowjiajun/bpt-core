@@ -77,6 +77,7 @@ public:
     void on_toxicity_update(const bpt::analytics::messaging::ToxicityUpdate& update) override;
     std::string get_strategy_state_json() override;
     void on_shutdown_flatten() override;
+    [[nodiscard]] bool has_pending_flatten() const override;
 
 private:
     struct InstrumentState {

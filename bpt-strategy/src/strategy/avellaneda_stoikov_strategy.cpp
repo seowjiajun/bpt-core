@@ -1092,4 +1092,16 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
                        cancels, unwinds);
 }
 
+bool AvellanedaStoikovStrategy::has_pending_flatten() const {
+    // "Pending" = any instrument still has a resting bid, resting ask,
+    // or in-flight unwind IOC. Each is cleared by on_exec_report on the
+    // FILLED / CANCELLED / REJECTED terminal status, so this returns
+    // false once the shutdown drain has processed the acks.
+    for (const auto& [_, st] : state_) {
+        if (st.bid_order_id != 0 || st.ask_order_id != 0 || st.unwind_order_id != 0)
+            return true;
+    }
+    return false;
+}
+
 }  // namespace bpt::strategy::strategy
