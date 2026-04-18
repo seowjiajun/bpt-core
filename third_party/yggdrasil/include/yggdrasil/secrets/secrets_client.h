@@ -20,6 +20,14 @@
 // When $CREDENTIALS_DIRECTORY is unset (e.g. running outside systemd), reads
 // from ~/.bpt-secrets/<name>. Same KEY=value format.
 //
+// The dev fallback is gated on $BPT_ENV. In "prod" the fallback is refused
+// and the process throws — systemd-creds (or equivalent delivery of
+// CREDENTIALS_DIRECTORY) MUST be configured. In any other value (or unset,
+// which we treat as "dev"), the fallback is allowed. This follows the
+// environment-identity pattern: production asserts its identity at startup
+// and refuses to run in a degraded/less-secure mode even if the environment
+// happens to allow it.
+//
 // NAME NORMALIZATION
 // ------------------
 // Forward slashes in `secret_name` are rewritten to hyphens for the filename
