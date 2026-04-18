@@ -115,10 +115,31 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
         ws_client_.send(deribit::build_simple_rpc(
             "private/subscribe", "{\"channels\":[\"user.orders.any.raw\"]}", next_id()));
 
+        // Drain pending sends one-at-a-time, removing each AFTER a
+        // successful dispatch. If a mid-drain failure throws, we leave
+        // the remaining unsent frames queued for the next login attempt
+        // AND drop the frame that threw (conservative — the bytes may
+        // have reached the wire before the throw, and replaying would
+        // risk a duplicate order even with Deribit's label dedup).
+        //
+        // Previous implementation used a single for-loop over the whole
+        // vector + clear() after the loop; if send() threw mid-loop,
+        // the clear didn't run and on reconnect EVERY frame in the
+        // queue (including ones already successfully sent) got replayed.
+        // That was the idempotency hole.
         std::lock_guard<std::mutex> lk(pending_mu_);
-        for (const auto& frame : pending_sends_)
-            ws_client_.send(frame);
-        pending_sends_.clear();
+        while (!pending_sends_.empty()) {
+            try {
+                if (!ws_client_.send(pending_sends_.front())) break;
+            } catch (const std::exception& e) {
+                ygg::log::error("[OrderGateway] DeribitOrderAdapter: mid-drain send threw ({}) — "
+                                "dropping frame, {} remaining queued",
+                                e.what(), pending_sends_.size() - 1);
+                pending_sends_.erase(pending_sends_.begin());
+                break;
+            }
+            pending_sends_.erase(pending_sends_.begin());
+        }
         return;
     }
 
