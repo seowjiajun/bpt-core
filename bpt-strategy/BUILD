@@ -9,7 +9,9 @@ cc_library(
     srcs = [
         "src/strategy/hurst_estimator.cpp",
         "src/strategy/ofi_calculator.cpp",
+        "src/strategy/order_book_state.cpp",
         "src/strategy/position_tracker.cpp",
+        "src/strategy/queue_tracker.cpp",
         "src/strategy/regime_detector.cpp",
         "src/strategy/realized_vol_estimator.cpp",
         "src/refdata/instrument_cache.cpp",
@@ -28,7 +30,9 @@ cc_test(
     srcs = [
         "tests/unit/test_instrument_cache.cpp",
         "tests/unit/test_ofi_calculator.cpp",
+        "tests/unit/test_order_book_state.cpp",
         "tests/unit/test_position_tracker.cpp",
+        "tests/unit/test_queue_tracker.cpp",
         "tests/unit/test_regime_detector.cpp",
         "tests/unit/test_volatility_gate.cpp",
     ],

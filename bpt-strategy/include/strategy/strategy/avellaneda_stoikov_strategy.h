@@ -6,13 +6,16 @@
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
+#include "strategy/strategy/order_book_state.h"
 #include "strategy/strategy/position_tracker.h"
+#include "strategy/strategy/queue_tracker.h"
 #include "strategy/strategy/regime_detector.h"
 #include "strategy/strategy/volatility_gate.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecutionReport.h>
 #include <messages/MdMarketData.h>
+#include <messages/MdOrderBook.h>
 #include <messages/MdTrade.h>
 #include <messages/OrderSide.h>
 
@@ -69,6 +72,7 @@ public:
     void on_delta(const refdata::Instrument& inst, bpt::messages::DeltaUpdateType::Value update_type) override;
     void on_bbo(const bpt::messages::MdMarketData& tick) override;
     void on_trade(const bpt::messages::MdTrade& tick) override;
+    void on_order_book(const bpt::messages::MdOrderBook& book) override;
     void on_exec_report(const bpt::messages::ExecutionReport& rpt) override;
     void on_toxicity_update(const bpt::analytics::messaging::ToxicityUpdate& update) override;
     std::string get_strategy_state_json() override;
@@ -153,6 +157,15 @@ private:
         double tyr_bid_toxicity{0.0};
         double tyr_ask_toxicity{0.0};
         bool tyr_data_received{false};
+
+        // Maintained L2 ladder. Populated from MdOrderBook deltas in
+        // on_order_book(); read by the queuing logic in Phase 3+.
+        OrderBookState book;
+
+        // Queue-position estimate per resting order at this instrument.
+        // Populated on order placement (in send_limit_order), updated on
+        // trade prints (in on_trade) and our own fills (in on_exec_report).
+        QueueTracker queue;
     };
 
     // Compute new bid/ask from the AS model.
@@ -205,6 +218,7 @@ private:
     double max_inventory_;            // max |net position| in base units
     double order_qty_;                // quote size in natural units (e.g. 0.001 BTC)
     double min_half_spread_bps_;      // floor on half-spread expressed in basis points
+    uint8_t order_book_depth_;        // 0 = BBO only, >0 subscribes to L2 ladder
 
     // Drift (momentum) detection — Cartea-Jaimungal extension of AS.
     double drift_halflife_s_;         // EWMA half-life for µ estimation (seconds)
@@ -213,6 +227,11 @@ private:
     // Analytics toxicity suppression — suppress side when tyr score < threshold.
     // 0 disables. Typical value: -2.0 (suppress when 5s markout is -2bps or worse).
     double tyr_suppress_threshold_;   // negative value; 0 disables
+
+    // Queue-position suppression — suppress a side if the projected
+    // fill probability at the candidate quote price (our_qty /
+    // (our_qty + queue_ahead)) drops below this floor. 0 disables.
+    double queue_suppress_fill_prob_min_;
 
     // Regime detector config — applied per-instrument at snapshot time.
     RegimeDetector::Config regime_cfg_;

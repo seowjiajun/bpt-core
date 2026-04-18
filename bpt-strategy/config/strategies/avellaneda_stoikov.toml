@@ -44,12 +44,39 @@ requote_threshold = 0.00005
 max_inventory = 0.001
 min_half_spread_bps = 1.5
 
+# ── Order book depth ─────────────────────────────────────────────────
+# 0 = BBO only (subscribes to OKX `bbo-tbt`).
+# 1..5 = top-N levels from OKX `books5` — a FULL snapshot every 100ms.
+# >5 = full depth from OKX `books` — delivered as SPARSE deltas (each
+#     message carries only changed levels). Queue-aware quoting needs
+#     stateful merging before that's usable, and the current parser
+#     generates spurious BBO from `books` deltas (handle_book publishes
+#     bids[0]/asks[0] of each delta as BBO, which is the top of the
+#     DELTA not the top of the BOOK).
+# Until the parser does proper delta-merging AND snapshot-aware BBO
+# derivation (tracked as Phase 5 follow-up), cap at 5 so we stay on the
+# snapshot channel.
+order_book_depth = 5
+
 # ── Drift / momentum defence ────────────────────────────────────
 drift_halflife_s    = 15.0
 drift_suppress_bps  = 1.5
 
 # ── Tyr toxicity feedback ───────────────────────────────────────
 tyr_suppress_threshold = -2.0
+
+# ── Queue-position-based side suppression ───────────────────────
+# Computed at quote time: fill_prob = our_qty / (our_qty + queue_ahead)
+# where queue_ahead is bid_vol_above(candidate_px) + size_at(candidate_px).
+# If projected fill_prob on a side falls below this floor, the side is
+# suppressed (we don't quote there) — the order would sit so deep in the
+# queue that its expected fill_prob doesn't cover the inventory risk of
+# holding a stale quote.
+#
+# 0 disables the feature. Start conservative (0.001 = suppress when
+# buried behind 1000× our own size); tighten to e.g. 0.01 once we have
+# markout data to confirm deep-queue fills are negatively selected.
+queue_suppress_fill_prob_min = 0.001
 
 # ── Volatility halt ─────────────────────────────────────────────
 vol_gate_max_bps    = 8.0

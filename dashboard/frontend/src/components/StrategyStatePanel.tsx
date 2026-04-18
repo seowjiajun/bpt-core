@@ -11,8 +11,18 @@ function SuppressIndicator({ suppressed, reason }: { suppressed: boolean; reason
     tyr: 'TYR',
     inventory: 'INV',
     vol_gate: 'VHALT',
+    queue: 'QUEUE',
   }
   return <span className="stat-value--red">{labels[reason] ?? 'OFF'}</span>
+}
+
+// Format fill probability as a compact percentage. The typical range on
+// live OKX spot is 0.01%..10%, so tiny numbers need 3 sig figs to be
+// readable.
+function fmtProb(p: number | undefined): string {
+  if (p == null) return '—'
+  if (p >= 0.01) return `${(p * 100).toFixed(1)}%`
+  return `${(p * 100).toFixed(2)}%`
 }
 
 function InventoryBar({ pct }: { pct: number }) {
@@ -117,6 +127,23 @@ export function StrategyStatePanel() {
             </td>
             <td style={{ color: 'var(--text-muted)' }}>KAPPA</td>
             <td className="num">{fmt(ss.kappa, 3)}{ss.kappaLive ? '' : ' (fb)'}</td>
+          </tr>
+          <tr>
+            <td style={{ color: 'var(--text-muted)' }}>FPROJ</td>
+            <td className="num" style={{ fontSize: 10 }}>
+              <span className="stat-value--muted">B </span>
+              <span className={(ss.bidProjectedFillProb ?? 1) < (ss.queueSuppressMin ?? 0) ? 'stat-value--red' : ''}>
+                {fmtProb(ss.bidProjectedFillProb)}
+              </span>
+              <span className="stat-value--muted"> / A </span>
+              <span className={(ss.askProjectedFillProb ?? 1) < (ss.queueSuppressMin ?? 0) ? 'stat-value--red' : ''}>
+                {fmtProb(ss.askProjectedFillProb)}
+              </span>
+            </td>
+            <td style={{ color: 'var(--text-muted)' }}>DEPTH</td>
+            <td className="num" style={{ fontSize: 10 }}>
+              {ss.bookBidLevels ?? 0} × {ss.bookAskLevels ?? 0}
+            </td>
           </tr>
         </tbody>
       </table>

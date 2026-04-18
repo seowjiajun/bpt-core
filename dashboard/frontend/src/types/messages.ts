@@ -208,6 +208,28 @@ export interface StrategyStateMsg {
   gammaBase: number
   gammaEffective: number
   gammaMultiplier: number
+  // Queue-position state (added when L2 depth consumption landed).
+  // bookBidLevels/bookAskLevels: live ladder depth — 0 means the book
+  //   hasn't warmed up yet (early frames arrive before the instrument
+  //   snapshot is resolved).
+  // bidQueueAhead/askQueueAhead: total qty sitting in front of our
+  //   resting order at its price, in base units. 0 when no order is live.
+  // bidFillProb/askFillProb: actual fill-probability proxy for the
+  //   resting order = our_qty / (our_qty + queue_ahead).
+  // bidProjectedFillProb/askProjectedFillProb: same ratio but computed
+  //   at the *candidate* quote price on the current tick — what the
+  //   strategy WOULD see if it placed now.
+  // queueSuppressMin: config floor; a side is queue-suppressed when its
+  //   projected fill prob dips below this.
+  bookBidLevels?: number
+  bookAskLevels?: number
+  bidQueueAhead?: number
+  askQueueAhead?: number
+  bidFillProb?: number
+  askFillProb?: number
+  bidProjectedFillProb?: number
+  askProjectedFillProb?: number
+  queueSuppressMin?: number
 }
 
 export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg | OrderMsg | PortfolioMsg | AccountMsg | ToxicityMsg | StrategyStateMsg

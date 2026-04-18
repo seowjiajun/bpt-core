@@ -7,6 +7,9 @@
 #include <messages/OrderType.h>
 #include <messages/RejectSource.h>
 #include <messages/TimeInForce.h>
+#include <messages/TradeSide.h>
+
+#include <yggdrasil/util/tsc_clock.h>
 
 #include <algorithm>
 #include <chrono>
@@ -42,9 +45,11 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       max_inventory_(cfg.params["max_inventory"].value<double>().value_or(0.1)),
       order_qty_(cfg.params["order_qty"].value<double>().value_or(0.001)),
       min_half_spread_bps_(cfg.params["min_half_spread_bps"].value<double>().value_or(1.0)),
+      order_book_depth_(static_cast<uint8_t>(cfg.params["order_book_depth"].value<int64_t>().value_or(0))),
       drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
       drift_suppress_bps_(cfg.params["drift_suppress_bps"].value<double>().value_or(0.0)),
       tyr_suppress_threshold_(cfg.params["tyr_suppress_threshold"].value<double>().value_or(0.0)),
+      queue_suppress_fill_prob_min_(cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0)),
       regime_cfg_{
           cfg.params["regime_mean_revert_h"].value<double>().value_or(0.45),
           cfg.params["regime_trend_h"].value<double>().value_or(0.55),
@@ -91,6 +96,9 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                    cfg.risk.max_position_usd,
                    cfg.risk.max_order_size_usd,
                    cfg.risk.max_daily_loss_usd);
+    ygg::log::info("[AS] order_book_depth={} queue_suppress_fill_prob_min={:.4f}",
+                   static_cast<int>(order_book_depth_),
+                   queue_suppress_fill_prob_min_);
 
     if (vol_gate_cfg_.max_bps_per_window > 0.0) {
         ygg::log::info("[AS] vol_gate max_bps={:.1f} window={}ms halt={}ms",
@@ -185,9 +193,10 @@ void AvellanedaStoikovStrategy::on_snapshot(const refdata::InstrumentCache& cach
     std::vector<md::MdClient::InstrumentDesc> subs;
     subs.reserve(state_.size());
     for (const auto& [id, st] : state_)
-        subs.push_back({id, st.exchange, st.symbol});
+        subs.push_back({id, st.exchange, st.symbol, order_book_depth_});
 
-    ygg::log::info("[AS] Subscribing MD to {} instrument(s)", subs.size());
+    ygg::log::info("[AS] Subscribing MD to {} instrument(s) depth={}",
+                   subs.size(), static_cast<int>(order_book_depth_));
     md_client_->subscribe(correlation_id_, subs);
 }
 
@@ -227,6 +236,37 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
     }
 }
 
+void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& book) {
+    auto it = state_.find(book.instrumentId());
+    if (it == state_.end())
+        return;
+    InstrumentState& st = it->second;
+    // With order_book_depth_ <= 5 we're on OKX `books5` (or equivalent
+    // snapshot-only channels), where every frame is a full top-N
+    // snapshot — clear+rebuild avoids stale-level accumulation. Above 5
+    // we're on a delta channel and fold-only is correct.
+    const bool is_snapshot = order_book_depth_ <= 5;
+    st.book.apply(book, is_snapshot);
+
+    // Diagnostic: log maintained-ladder state periodically so we can
+    // confirm deltas are merging correctly. The raw per-frame delta
+    // counts are unhelpful (OKX sends 2-8 levels per message); what
+    // matters is that the folded ladder has real depth.
+    static uint64_t ob_count = 0;
+    ++ob_count;
+    if (ob_count > 5 && ob_count % 500 != 0)
+        return;
+    if (!st.book.ready())
+        return;
+    ygg::log::info("[AS] Book #{}: id={} ladder bids={} asks={} "
+                   "best_bid={:.4f}@{:.6f} best_ask={:.4f}@{:.6f} mid={:.4f}",
+                   ob_count, book.instrumentId(),
+                   st.book.n_bid_levels(), st.book.n_ask_levels(),
+                   st.book.best_bid(), st.book.best_bid_qty(),
+                   st.book.best_ask(), st.book.best_ask_qty(),
+                   st.book.mid());
+}
+
 void AvellanedaStoikovStrategy::on_trade(const bpt::messages::MdTrade& tick) {
     auto it = state_.find(tick.instrumentId());
     if (it == state_.end())
@@ -234,6 +274,17 @@ void AvellanedaStoikovStrategy::on_trade(const bpt::messages::MdTrade& tick) {
 
     InstrumentState& st = it->second;
     const uint64_t ts_ns = tick.timestampNs();
+
+    // Queue-position decrement: a trade hitting the passive side of our
+    // price level shrinks queue_ahead for any of our resting orders at
+    // that price. TradeSide carries the aggressor side — same BUY/SELL
+    // values as OrderSide.
+    using bpt::messages::TradeSide;
+    const OrderSide::Value aggressor = (tick.side() == TradeSide::BUY)
+                                           ? OrderSide::BUY
+                                           : OrderSide::SELL;
+    st.queue.on_trade(aggressor, tick.price(),
+                      static_cast<double>(tick.qty()) / 1e8, ts_ns);
 
     if (st.last_trade_ns > 0 && ts_ns > st.last_trade_ns) {
         const double dt_s = static_cast<double>(ts_ns - st.last_trade_ns) * 1e-9;
@@ -396,6 +447,7 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
 
     if (status == ExecStatus::FILLED || status == ExecStatus::PARTIAL) {
         positions_.on_fill(canonical_id, st.exchange_id, rpt.side(), rpt.filledQty(), rpt.price());
+        st.queue.on_fill(order_id, static_cast<double>(rpt.filledQty()) / 1e8);
 
         if (const auto pos = positions_.get(canonical_id, st.exchange_id)) {
             ygg::log::info("[AS] Position {} @ {}  net_qty={:.6f}  avg_price={:.2f}  rpnl={:.4f}",
@@ -409,6 +461,7 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
 
     // Terminal statuses: clear order slot and cancel-pending flags.
     if (status == ExecStatus::FILLED || status == ExecStatus::CANCELLED || status == ExecStatus::REJECTED) {
+        st.queue.on_cancel(order_id);
         if (st.bid_order_id == order_id) {
             st.bid_order_id = 0;
             st.bid_cancel_pending = false;
@@ -568,9 +621,30 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
         }
     }
 
-    // Combine drift and tyr suppression — either can suppress a side.
-    const bool final_suppress_bids = suppress_bids || tyr_suppress_bids;
-    const bool final_suppress_asks = suppress_asks || tyr_suppress_asks;
+    // ── Queue-position side suppression ───────────────────────────────────
+    // Project fill_prob at the candidate quote price using the current
+    // ladder. If we'd land behind so much size that our expected fill
+    // probability is tiny, quoting there only accumulates stale-inventory
+    // risk without meaningful edge.
+    //
+    // Gated on st.book.ready() — before the ladder warms up we default to
+    // "not suppressed" (equivalent to queue_ahead=0, fill_prob=1).
+    bool queue_suppress_bids = false;
+    bool queue_suppress_asks = false;
+    double fp_bid = 1.0;
+    double fp_ask = 1.0;
+    if (queue_suppress_fill_prob_min_ > 0.0 && st.book.ready()) {
+        const double qa_bid = st.book.bid_vol_above(new_bid) + st.book.size_at_bid(new_bid);
+        const double qa_ask = st.book.ask_vol_below(new_ask) + st.book.size_at_ask(new_ask);
+        fp_bid = order_qty_ / (order_qty_ + qa_bid);
+        fp_ask = order_qty_ / (order_qty_ + qa_ask);
+        queue_suppress_bids = fp_bid < queue_suppress_fill_prob_min_;
+        queue_suppress_asks = fp_ask < queue_suppress_fill_prob_min_;
+    }
+
+    // Combine drift, tyr, and queue suppression — any can suppress a side.
+    const bool final_suppress_bids = suppress_bids || tyr_suppress_bids || queue_suppress_bids;
+    const bool final_suppress_asks = suppress_asks || tyr_suppress_asks || queue_suppress_asks;
 
     if (drift_suppressing) {
         ygg::log::info("[AS] {} drift suppress |µ|={:.1f}bps > {:.1f}bps — suppressing {}",
@@ -578,6 +652,14 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
                         drift_bps,
                         drift_suppress_bps_,
                         suppress_asks ? "asks" : "bids");
+    }
+    if (queue_suppress_bids) {
+        ygg::log::info("[AS] {} queue suppress bids: fp={:.5f} < {:.5f} at px={:.4f}",
+                       st.symbol, fp_bid, queue_suppress_fill_prob_min_, new_bid);
+    }
+    if (queue_suppress_asks) {
+        ygg::log::info("[AS] {} queue suppress asks: fp={:.5f} < {:.5f} at px={:.4f}",
+                       st.symbol, fp_ask, queue_suppress_fill_prob_min_, new_ask);
     }
 
     // ── Bid side ──────────────────────────────────────────────────────────
@@ -738,6 +820,16 @@ uint64_t AvellanedaStoikovStrategy::send_limit_order(uint64_t instrument_id,
                    order_id);
 
     order_to_instrument_[order_id] = instrument_id;
+    st.queue.track(order_id, side, price, qty,
+                   ygg::util::WallClock::now_ns(), st.book);
+    if (const auto* e = st.queue.lookup(order_id)) {
+        ygg::log::info("[AS] Queue track order_id={} side={} px={:.4f} qty={:.6f} "
+                       "queue_ahead={:.6f} fill_prob={:.3f}",
+                       order_id,
+                       (side == OrderSide::BUY ? "BID" : "ASK"),
+                       e->price, e->our_qty, e->queue_ahead,
+                       st.queue.fill_probability(order_id));
+    }
     return order_id;
 }
 
@@ -839,6 +931,43 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     // Vol gate
     const bool vol_halted = st.vol_gate.is_halted(st.last_tick_ns);
 
+    // Queue suppression — projected fill_prob at the *candidate* quote price.
+    // Same math the quoting path uses in maybe_requote, so the dashboard
+    // agrees with the actual decision the strategy will make on the next
+    // quote.
+    bool queue_suppress_bids = false;
+    bool queue_suppress_asks = false;
+    double projected_fp_bid = 1.0;
+    double projected_fp_ask = 1.0;
+    if (quotes_valid && queue_suppress_fill_prob_min_ > 0.0 && st.book.ready()) {
+        const double qa_bid = st.book.bid_vol_above(bid_quote) + st.book.size_at_bid(bid_quote);
+        const double qa_ask = st.book.ask_vol_below(ask_quote) + st.book.size_at_ask(ask_quote);
+        projected_fp_bid = order_qty_ / (order_qty_ + qa_bid);
+        projected_fp_ask = order_qty_ / (order_qty_ + qa_ask);
+        queue_suppress_bids = projected_fp_bid < queue_suppress_fill_prob_min_;
+        queue_suppress_asks = projected_fp_ask < queue_suppress_fill_prob_min_;
+    }
+
+    // queue_ahead for any live resting orders — the ACTUAL tracked queue,
+    // not the projected one. Used by the dashboard to show how buried the
+    // current resting orders are.
+    double bid_queue_ahead = 0.0;
+    double ask_queue_ahead = 0.0;
+    double bid_fill_prob = 0.0;
+    double ask_fill_prob = 0.0;
+    if (st.bid_order_id != 0) {
+        if (const auto* e = st.queue.lookup(st.bid_order_id)) {
+            bid_queue_ahead = e->queue_ahead;
+            bid_fill_prob = st.queue.fill_probability(st.bid_order_id);
+        }
+    }
+    if (st.ask_order_id != 0) {
+        if (const auto* e = st.queue.lookup(st.ask_order_id)) {
+            ask_queue_ahead = e->queue_ahead;
+            ask_fill_prob = st.queue.fill_probability(st.ask_order_id);
+        }
+    }
+
     nlohmann::json j;
     j["type"] = "strategyState";
     j["symbol"] = st.symbol;
@@ -870,11 +999,22 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["maxInventory"] = max_inventory_;
     j["inventoryPct"] = max_inventory_ > 0 ? std::abs(net_qty) / max_inventory_ * 100.0 : 0;
 
-    // Suppression state per side
-    j["bidSuppressed"] = drift_suppress_bids || tyr_suppress_bids || inv_suppress_bids || vol_halted;
-    j["bidSuppressReason"] = vol_halted ? "vol_gate" : inv_suppress_bids ? "inventory" : drift_suppress_bids ? "drift" : tyr_suppress_bids ? "tyr" : "";
-    j["askSuppressed"] = drift_suppress_asks || tyr_suppress_asks || inv_suppress_asks || vol_halted;
-    j["askSuppressReason"] = vol_halted ? "vol_gate" : inv_suppress_asks ? "inventory" : drift_suppress_asks ? "drift" : tyr_suppress_asks ? "tyr" : "";
+    // Suppression state per side — order matters for reason priority:
+    // vol_gate → inventory → drift → tyr → queue (most to least severe).
+    j["bidSuppressed"] = drift_suppress_bids || tyr_suppress_bids || inv_suppress_bids || vol_halted || queue_suppress_bids;
+    j["bidSuppressReason"] = vol_halted           ? "vol_gate"
+                           : inv_suppress_bids    ? "inventory"
+                           : drift_suppress_bids  ? "drift"
+                           : tyr_suppress_bids    ? "tyr"
+                           : queue_suppress_bids  ? "queue"
+                           :                        "";
+    j["askSuppressed"] = drift_suppress_asks || tyr_suppress_asks || inv_suppress_asks || vol_halted || queue_suppress_asks;
+    j["askSuppressReason"] = vol_halted           ? "vol_gate"
+                           : inv_suppress_asks    ? "inventory"
+                           : drift_suppress_asks  ? "drift"
+                           : tyr_suppress_asks    ? "tyr"
+                           : queue_suppress_asks  ? "queue"
+                           :                        "";
 
     // Vol gate
     j["volGateHalted"] = vol_halted;
@@ -890,6 +1030,18 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["volTicks"] = st.ewma_ticks;
     j["volWarmup"] = vol_warmup_ticks_;
     j["warmedUp"] = st.ewma_ticks >= vol_warmup_ticks_;
+
+    // Queue state — actual (for resting orders) and projected (for the
+    // quote the strategy would place on the next tick).
+    j["bookBidLevels"] = st.book.n_bid_levels();
+    j["bookAskLevels"] = st.book.n_ask_levels();
+    j["bidQueueAhead"] = bid_queue_ahead;
+    j["askQueueAhead"] = ask_queue_ahead;
+    j["bidFillProb"] = bid_fill_prob;
+    j["askFillProb"] = ask_fill_prob;
+    j["bidProjectedFillProb"] = projected_fp_bid;
+    j["askProjectedFillProb"] = projected_fp_ask;
+    j["queueSuppressMin"] = queue_suppress_fill_prob_min_;
 
     return j.dump();
 }
