@@ -2,17 +2,15 @@
 
 #include <cstdint>
 #include <string>
+#include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
 
 namespace bpt::analytics::config {
 
-struct LoggingConfig {
-    std::string level{"info"};
-    std::string dir{"logs"};
-};
-
 struct Settings {
-    std::string media_driver_dir;
+    // Shared lifecycle config (environment, media_driver_dir, logging,
+    // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
+    bpt::app::BaseSettings base;
 
     // Inputs (read-only subscriptions)
     bpt::common::config::StreamConfig exec_report;   // order-gateway → stream 3002
@@ -27,9 +25,6 @@ struct Settings {
     uint64_t scorer_window_duration_ns{0};   // 0 = size-only
     std::size_t scorer_min_samples{5};
     uint32_t publish_interval_ms{5000};      // how often to publish ToxicityUpdate
-
-    LoggingConfig logging;
-    uint16_t metrics_port{9105};
 };
 
 Settings load(const std::string& path);

@@ -42,6 +42,7 @@ cc_binary(
     ],
     deps = [
         ":analytics_core",
+        "//bpt-app",
         "//bpt-common",
         "@cli11",
         "@tomlplusplus//:tomlplusplus",

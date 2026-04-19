@@ -10,13 +10,14 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
+#include <bpt_app/app.h>
 
 namespace bpt::analytics {
 
-class AnalyticsApp {
+class AnalyticsApp : public bpt::app::IService {
 public:
     AnalyticsApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron);
-    void run();
+    void run() override;
 
 private:
     void on_bbo(uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns);

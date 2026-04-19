@@ -1,15 +1,14 @@
 #include "analytics/config/settings.h"
 
 #include <toml++/toml.hpp>
-#include <bpt_common/logging.h>
+#include <bpt_app/base_settings.h>
 
 namespace bpt::analytics::config {
 
 Settings load(const std::string& path) {
     auto tbl = toml::parse_file(path);
     Settings s;
-
-    s.media_driver_dir = tbl["aeron"]["media_driver_dir"].value_or(std::string{"/dev/shm/aeron-bifrost"});
+    bpt::app::load_base_settings(tbl, s.base);
 
     auto aeron = [&](const char* section) -> bpt::common::config::StreamConfig {
         auto node = tbl["aeron"][section];
@@ -30,13 +29,6 @@ Settings load(const std::string& path) {
         s.scorer_min_samples = t["scorer_min_samples"].value_or(std::size_t{5});
         s.publish_interval_ms = t["publish_interval_ms"].value_or(uint32_t{5000});
     }
-
-    if (auto l = tbl["logging"]) {
-        s.logging.level = l["level"].value_or(std::string{"info"});
-        s.logging.dir = l["dir"].value_or(std::string{"logs"});
-    }
-
-    s.metrics_port = tbl["metrics"]["port"].value_or(uint16_t{9105});
 
     return s;
 }
