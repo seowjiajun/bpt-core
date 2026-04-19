@@ -19,15 +19,17 @@
 
 #include <cstdint>
 #include <memory>
+#include <bpt_app/app.h>
 #include <bpt_common/util/latency_histogram.h>
 #include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::strategy {
 
-class StrategyApp {
+class StrategyApp : public bpt::app::IService {
 public:
     StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> aeron);
-    void run();
+    void run() override;
+    void stop() override;
 
 private:
     void wire_refdata_callbacks();

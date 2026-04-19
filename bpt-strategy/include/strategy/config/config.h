@@ -5,8 +5,8 @@
 #include <toml++/toml.hpp>
 #include <unordered_map>
 #include <vector>
+#include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
-#include <bpt_common/logging.h>
 
 // Forward declaration for ScheduleConfig::configured_exchanges_mask conversion.
 
@@ -14,7 +14,7 @@ namespace bpt::strategy {
 namespace config {
 
 struct AeronConfig {
-    std::string media_driver_dir;
+    // media_driver_dir moved to BaseSettings; kept streams-only.
     // Reference data streams (required)
     bpt::common::config::StreamConfig refdata_control{"aeron:ipc", 1003};
     bpt::common::config::StreamConfig refdata_snapshot{"aeron:ipc", 1001};
@@ -119,10 +119,12 @@ struct EngineConfig {
 };
 
 struct AppConfig {
+    // Shared lifecycle config (environment, media_driver_dir, logging,
+    // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
+    bpt::app::BaseSettings base;
+
     AeronConfig aeron;
     EngineConfig strat;
-    bpt::common::logging::LogConfig logging;
-    int metrics_port{9104};
     bool backtest_mode{false};  // When true, Strategy gates on BacktestControl ticks from Backtester
 
     // Load configuration from YAML file

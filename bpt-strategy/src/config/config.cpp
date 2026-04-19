@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
-#include <bpt_common/logging_toml.h>
+#include <bpt_app/base_settings.h>
 
 namespace bpt::strategy {
 namespace config {
@@ -34,11 +34,12 @@ AppConfig AppConfig::load(const std::string& path) {
         throw std::runtime_error(fmt::format("Failed to load config {}: {}", path, std::string(e.description())));
     }
 
+    bpt::app::load_base_settings(cfg, app_cfg.base);
+
     const auto* a = cfg["aeron"].as_table();
     if (!a)
         throw std::runtime_error("Missing 'aeron' block in config");
 
-    app_cfg.aeron.media_driver_dir = (*a)["media_driver_dir"].value<std::string>().value_or("");
     app_cfg.aeron.refdata_control = load_stream((*a)["refdata_control"].as_table(), "aeron:ipc", 1003);
     app_cfg.aeron.refdata_snapshot = load_stream((*a)["refdata_snapshot"].as_table(), "aeron:ipc", 1001);
     app_cfg.aeron.refdata_delta = load_stream((*a)["refdata_delta"].as_table(), "aeron:ipc", 1002);
@@ -155,13 +156,6 @@ AppConfig AppConfig::load(const std::string& path) {
 
     if (auto v = cfg["backtest_mode"].value<bool>())
         app_cfg.backtest_mode = *v;
-
-    if (auto* l = cfg["logging"].as_table())
-        app_cfg.logging = bpt::common::logging::from_toml(*l);
-
-    if (auto* m = cfg["metrics"].as_table())
-        if (auto v = (*m)["port"].value<int64_t>())
-            app_cfg.metrics_port = static_cast<int>(*v);
 
     return app_cfg;
 }

@@ -26,7 +26,7 @@ namespace bpt::strategy {
 StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> aeron)
     : cfg_(std::move(cfg)),
       aeron_(aeron),
-      metrics_(cfg_.metrics_port),
+      metrics_(cfg_.base.metrics_port),
       fee_cache_(cfg_.strat.strategy.schedule.max_refdata_staleness_ns),
       funding_rate_cache_(cfg_.strat.strategy.schedule.max_refdata_staleness_ns) {
     const auto& ac = cfg_.aeron;
@@ -375,11 +375,15 @@ void StrategyApp::run() {
             __builtin_ia32_pause();
     }
 
-    // ── Graceful shutdown: flatten positions + refresh dashboard ────────
-    shutdown_flatten();
+}
 
+void StrategyApp::stop() {
+    // Called by bpt::app::run() after run() exits on signal. Graceful
+    // shutdown does two things in order: (1) cancel resting orders and
+    // flatten inventory while the dashboard can still observe, (2) drain
+    // the Prometheus exposer. Both are symmetric with startup side-effects.
+    shutdown_flatten();
     metrics_.shutdown();
-    bpt::common::log::info("Shutting down");
 }
 
 void StrategyApp::shutdown_flatten() {
