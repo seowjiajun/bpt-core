@@ -35,7 +35,7 @@ public:
     // All dependencies are non-owning references.  The adapters vector is also
     // referenced rather than copied so that the processor always sees the live
     // set without needing to be rebuilt if an adapter is added at runtime.
-    OrderProcessor(messaging::ExecReportPublisher& exec_pub,
+    OrderProcessor(messaging::IExecReportPublisher& exec_pub,
                    OrderStateManager& state_mgr,
                    risk::RiskChecker& risk_checker,
                    risk::PnlTracker& pnl_tracker,
@@ -114,7 +114,7 @@ private:
     static const char* lifecycle_str(OrderLifecycle lc);
     static const char* exchange_str(bpt::messages::ExchangeId::Value id);
 
-    messaging::ExecReportPublisher& exec_pub_;
+    messaging::IExecReportPublisher& exec_pub_;
     OrderStateManager& state_mgr_;
     risk::RiskChecker& risk_checker_;
     risk::PnlTracker& pnl_tracker_;

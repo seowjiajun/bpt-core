@@ -7,8 +7,13 @@ namespace bpt::order_gateway::metrics {
 OrderGatewayMetrics::OrderGatewayMetrics(uint16_t port) {
     registry = std::make_shared<prometheus::Registry>();
 
-    exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
-    exposer->RegisterCollectable(registry);
+    // port == 0 skips Exposer creation — used by unit tests that just
+    // need counter pointers populated. Production callers always pass
+    // a real port (defaulted in config).
+    if (port != 0) {
+        exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
+        exposer->RegisterCollectable(registry);
+    }
 
     auto& h = prometheus::BuildGauge().Name("order_gateway_healthy").Help("1 if OrderGateway is running").Register(*registry);
     healthy = &h.Add({});

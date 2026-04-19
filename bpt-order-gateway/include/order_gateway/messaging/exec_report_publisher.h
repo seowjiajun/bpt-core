@@ -1,20 +1,15 @@
 #pragma once
 
-#include <Aeron.h>
+#include "order_gateway/messaging/i_exec_report_publisher.h"
 
-#include <messages/ExchangeId.h>
-#include <messages/ExecStatus.h>
-#include <messages/FeeCurrency.h>
-#include <messages/OrderSide.h>
-#include <messages/OrderType.h>
-#include <messages/RejectReason.h>
+#include <Aeron.h>
 
 #include <memory>
 #include <string>
 
 namespace bpt::order_gateway::messaging {
 
-class ExecReportPublisher {
+class ExecReportPublisher : public IExecReportPublisher {
 public:
     ExecReportPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
@@ -32,7 +27,7 @@ public:
                  int64_t fee,
                  bpt::messages::FeeCurrency::Value fee_currency,
                  uint64_t exchange_ts_ns,
-                 uint64_t local_ts_ns);
+                 uint64_t local_ts_ns) override;
 
 private:
     std::shared_ptr<aeron::Publication> publication_;
