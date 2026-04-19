@@ -230,15 +230,19 @@ void OFIStrategy::on_order_book(const bpt::messages::MdOrderBook& book) {
     bids.reserve(static_cast<size_t>(book_levels_));
     asks.reserve(static_cast<size_t>(book_levels_));
 
+    // MdOrderBook.qty is a native SBE double (not fixed-point) — see
+    // MdOrderBook.h::qty(). order_book_state.cpp treats it as such;
+    // this path was double-scaling by 1e8 so OFI values came out off
+    // by 8 orders of magnitude. Caught before OFI went live.
     auto& bids_grp = mutable_book.bids();
     while (bids_grp.hasNext()) {
         auto& lvl = bids_grp.next();
-        bids.emplace_back(lvl.price(), static_cast<double>(lvl.qty()) / kQtyScale);
+        bids.emplace_back(lvl.price(), lvl.qty());
     }
     auto& asks_grp = mutable_book.asks();
     while (asks_grp.hasNext()) {
         auto& lvl = asks_grp.next();
-        asks.emplace_back(lvl.price(), static_cast<double>(lvl.qty()) / kQtyScale);
+        asks.emplace_back(lvl.price(), lvl.qty());
     }
 
     const uint64_t now_ns = book.timestampNs();
