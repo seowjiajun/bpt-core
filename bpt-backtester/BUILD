@@ -19,6 +19,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//messages",
+        "//bpt-app",
         "//bpt-common",
         "@boost.json",
         "@fmt",

@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::backtester::config {
 
@@ -56,20 +56,22 @@ struct ResultsConfig {
 // Backtester publishes BacktestControl on backtest_control and subscribes
 // to BacktestAck on backtest_ack.  Stream IDs must match Strategy's config.
 struct AeronConfig {
-    std::string media_driver_dir;
+    // media_driver_dir moved to BaseSettings; kept streams-only.
     bpt::common::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // pub: Backtester → Strategy
     bpt::common::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // sub: Strategy → Backtester
 };
 
 struct Settings {
+    // Shared lifecycle config (environment, media_driver_dir, logging,
+    // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
+    bpt::app::BaseSettings base;
+
     SimulationConfig simulation;
     DataConfig data;
     EndpointConfig endpoints;
     AeronConfig aeron;
     std::vector<InstrumentConfig> instruments;
-    bpt::common::logging::LogConfig logging;
     ResultsConfig results;
-    uint16_t metrics_port{9105};
 };
 
 Settings load(const std::string& path);

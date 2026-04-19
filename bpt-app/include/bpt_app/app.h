@@ -41,6 +41,8 @@
 #include <bpt_common/signal.h>
 #include <bpt_common/util/tsc_clock.h>
 
+#include <execinfo.h>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <utility>
@@ -86,7 +88,20 @@ int run(const std::string& service_name, Settings settings, BuildFn build_fn) {
     if (base.calibrate_tsc)
         bpt::common::util::TscClock::calibrate();
 
-    auto aeron = bpt::common::aeron::connect(base.media_driver_dir);
+    // Default Aeron error handler: log the exception + a capped backtrace
+    // and keep running (Aeron's conductor thread is designed to survive).
+    // Services that want custom behaviour can bypass bpt::app::run() and
+    // build their own Aeron client, but no current service does.
+    auto aeron_error_handler = [svc = service_name](const std::exception& e) {
+        bpt::common::log::error("[{}][Aeron] {}", svc, e.what());
+        void* frames[32];
+        int n = ::backtrace(frames, 32);
+        char** syms = ::backtrace_symbols(frames, n);
+        for (int i = 0; i < n; ++i)
+            bpt::common::log::error("  {}", syms ? syms[i] : "???");
+        std::free(syms);
+    };
+    auto aeron = bpt::common::aeron::connect(base.media_driver_dir, aeron_error_handler);
     bpt::common::log::info("[{}] Connected to Aeron MediaDriver", service_name);
 
     AppContext ctx{std::move(aeron)};

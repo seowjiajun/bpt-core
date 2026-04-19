@@ -15,15 +15,16 @@
 #include <Aeron.h>
 
 #include <memory>
+#include <bpt_app/app.h>
 
 namespace bpt::backtester {
 
-class BacktesterApp {
+class BacktesterApp : public bpt::app::IService {
 public:
-    explicit BacktesterApp(config::Settings settings);
+    BacktesterApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron);
 
     // Blocking run loop — feeds ticks until the backtest window is exhausted or a signal fires.
-    void run();
+    void run() override;
 
 private:
     config::Settings settings_;

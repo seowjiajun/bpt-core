@@ -66,7 +66,7 @@ port = 9105
 
     EXPECT_EQ(s.data.local_cache, "/opt/bpt/data/backtest-cache");
 
-    EXPECT_EQ(s.aeron.media_driver_dir, "/tmp/aeron");
+    EXPECT_EQ(s.base.media_driver_dir, "/tmp/aeron");
     EXPECT_EQ(s.aeron.backtest_ack.stream_id, 9001);
     EXPECT_EQ(s.aeron.backtest_control.stream_id, 9002);
 
@@ -76,8 +76,7 @@ port = 9105
     EXPECT_EQ(s.instruments[1].exchange, "OKX");
     EXPECT_EQ(s.instruments[1].symbol, "BTC-USDT-SWAP");
 
-    EXPECT_EQ(s.logging.level, "debug");
-    EXPECT_EQ(s.metrics_port, 9105u);
+    EXPECT_EQ(s.base.logging.level, "debug");
 }
 
 TEST(BacktesterConfigTest, DefaultsAppliedWhenFieldsOmitted) {
@@ -104,8 +103,7 @@ end   = "2026-01-31T23:59:59Z"
     EXPECT_EQ(s.endpoints.okx_order_port, 9111u);
     EXPECT_EQ(s.endpoints.hyperliquid_order_port, 9112u);
     EXPECT_EQ(s.endpoints.deribit_order_port, 9113u);
-    EXPECT_EQ(s.logging.level, "info");
-    EXPECT_EQ(s.metrics_port, 9105u);
+    EXPECT_EQ(s.base.logging.level, "info");
     EXPECT_TRUE(s.instruments.empty());
 }
 

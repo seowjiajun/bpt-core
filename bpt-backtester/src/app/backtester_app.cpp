@@ -7,21 +7,12 @@
 
 namespace bpt::backtester {
 
-BacktesterApp::BacktesterApp(config::Settings settings) : settings_(std::move(settings)) {
+BacktesterApp::BacktesterApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron)
+    : settings_(std::move(settings)), aeron_(std::move(aeron)) {
     bpt::common::log::info("[Backtester] Initialising — window: {} → {}, {} instrument(s)",
                    settings_.simulation.start,
                    settings_.simulation.end,
                    settings_.instruments.size());
-
-    // ── Aeron (tick-gating) ────────────────────────────────────────────────
-    {
-        ::aeron::Context ctx;
-        if (!settings_.aeron.media_driver_dir.empty())
-            ctx.aeronDir(settings_.aeron.media_driver_dir);
-        ctx.errorHandler([](const std::exception& e) { bpt::common::log::error("[Backtester][Aeron] {}", e.what()); });
-        aeron_ = ::aeron::Aeron::connect(ctx);
-        bpt::common::log::info("[Backtester] Connected to Aeron MediaDriver");
-    }
 
     const auto& ac = settings_.aeron;
 

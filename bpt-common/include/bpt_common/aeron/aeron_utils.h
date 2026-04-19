@@ -9,12 +9,19 @@
 #include <Aeron.h>
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
 namespace bpt::common::aeron {
+
+// Error handler signature used by the Aeron client when it catches an
+// exception on the client-driver conductor thread. Services typically
+// want to log + optionally print a backtrace, without crashing the
+// process (Aeron is designed to keep running on its side too).
+using ErrorHandler = std::function<void(const std::exception&)>;
 
 // Register a publication and spin until Aeron connects it.
 // Throws std::runtime_error if not connected within max_retries * 10 ms.
@@ -56,15 +63,18 @@ inline std::shared_ptr<::aeron::Subscription> wait_for_subscription(std::shared_
     return sub;  // unreachable
 }
 
-// Connect to an Aeron media driver.
-// Equivalent to:
-//   aeron::Context ctx;
-//   if (!media_driver_dir.empty()) ctx.aeronDir(media_driver_dir);
-//   return aeron::Aeron::connect(ctx);
-inline std::shared_ptr<::aeron::Aeron> connect(const std::string& media_driver_dir = "") {
+// Connect to an Aeron media driver. Optional error_handler is wired to
+// aeron::Context::errorHandler and fires on the client-driver conductor
+// thread whenever Aeron catches an exception. Services should pass a
+// handler that logs (and optionally captures a backtrace) — default is
+// to do nothing, which makes Aeron fall back to its own stderr output.
+inline std::shared_ptr<::aeron::Aeron> connect(const std::string& media_driver_dir = "",
+                                               ErrorHandler error_handler = {}) {
     ::aeron::Context ctx;
     if (!media_driver_dir.empty())
         ctx.aeronDir(media_driver_dir);
+    if (error_handler)
+        ctx.errorHandler(std::move(error_handler));
     return ::aeron::Aeron::connect(ctx);
 }
 
