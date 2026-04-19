@@ -2,14 +2,14 @@
 
 #include <messages/DeltaUpdateType.h>
 
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::refdata::adapter {
 
 namespace {
 
 uint64_t now_ns() {
-    return ygg::util::TscClock::now_epoch_ns();
+    return bpt::common::util::TscClock::now_epoch_ns();
 }
 
 }  // namespace
@@ -26,7 +26,7 @@ BinanceRefDataAdapter::BinanceRefDataAdapter(const config::AdapterConfig& cfg,
       parser_(mapping) {}
 
 void BinanceRefDataAdapter::fetchSnapshot() {
-    ygg::log::info("[BinanceRefData] Starting snapshot fetch...");
+    bpt::common::log::info("[BinanceRefData] Starting snapshot fetch...");
     const uint64_t ts = now_ns();
 
     // 1. Spot instruments
@@ -35,7 +35,7 @@ void BinanceRefDataAdapter::fetchSnapshot() {
         for (auto& inst : parser_.parse_spot_exchange_info(body, ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
-        ygg::log::error("[BinanceRefData] Failed to fetch spot exchangeInfo: {}", e.what());
+        bpt::common::log::error("[BinanceRefData] Failed to fetch spot exchangeInfo: {}", e.what());
         throw;
     }
 
@@ -45,7 +45,7 @@ void BinanceRefDataAdapter::fetchSnapshot() {
         for (auto& inst : parser_.parse_futures_exchange_info(body, ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
-        ygg::log::error("[BinanceRefData] Failed to fetch fapi exchangeInfo: {}", e.what());
+        bpt::common::log::error("[BinanceRefData] Failed to fetch fapi exchangeInfo: {}", e.what());
         // Non-fatal — continue without perp instruments
     }
 
@@ -57,18 +57,18 @@ void BinanceRefDataAdapter::fetchSnapshot() {
                 if (on_fee_schedule)
                     on_fee_schedule(fs);
         } catch (const std::exception& e) {
-            ygg::log::warn("[BinanceRefData] Failed to fetch trade fee (continuing): {}", e.what());
+            bpt::common::log::warn("[BinanceRefData] Failed to fetch trade fee (continuing): {}", e.what());
         }
     } else {
-        ygg::log::warn("[BinanceRefData] No API key configured — skipping trade fee fetch");
+        bpt::common::log::warn("[BinanceRefData] No API key configured — skipping trade fee fetch");
     }
 
     ready_.store(true, std::memory_order_release);
-    ygg::log::info("[BinanceRefData] Snapshot complete. Registry has {} instruments.", registry_->getAll().size());
+    bpt::common::log::info("[BinanceRefData] Snapshot complete. Registry has {} instruments.", registry_->getAll().size());
 }
 
 void BinanceRefDataAdapter::fetchInstrumentListing() {
-    ygg::log::info("[BinanceRefData] Hourly instrument listing refresh...");
+    bpt::common::log::info("[BinanceRefData] Hourly instrument listing refresh...");
     const uint64_t ts = now_ns();
 
     auto notify = [this, ts](refdata::Instrument& inst) {
@@ -81,7 +81,7 @@ void BinanceRefDataAdapter::fetchInstrumentListing() {
         for (auto& inst : parser_.parse_spot_exchange_info(body, ts))
             notify(inst);
     } catch (const std::exception& e) {
-        ygg::log::error("[BinanceRefData] Hourly spot refresh failed: {}", e.what());
+        bpt::common::log::error("[BinanceRefData] Hourly spot refresh failed: {}", e.what());
     }
 
     try {
@@ -89,7 +89,7 @@ void BinanceRefDataAdapter::fetchInstrumentListing() {
         for (auto& inst : parser_.parse_futures_exchange_info(body, ts))
             notify(inst);
     } catch (const std::exception& e) {
-        ygg::log::error("[BinanceRefData] Hourly futures refresh failed: {}", e.what());
+        bpt::common::log::error("[BinanceRefData] Hourly futures refresh failed: {}", e.what());
     }
 }
 

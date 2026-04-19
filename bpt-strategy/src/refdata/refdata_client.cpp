@@ -11,9 +11,9 @@
 
 #include <cstring>
 #include <x86intrin.h>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::strategy::refdata {
 
@@ -29,12 +29,12 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
                              FundingRateCache& funding_rate_cache)
     : fee_cache_(fee_cache),
       funding_rate_cache_(funding_rate_cache) {
-    ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, channel, control_stream);
-    snap_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, snapshot_stream);
-    delta_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, delta_stream);
-    fee_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, fee_schedule_stream);
-    funding_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, funding_rate_stream);
-    status_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, status_stream);
+    ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, control_stream);
+    snap_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, snapshot_stream);
+    delta_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, delta_stream);
+    fee_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, fee_schedule_stream);
+    funding_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, funding_rate_stream);
+    status_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, status_stream);
 
     snap_assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
@@ -61,7 +61,7 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
             handle_status_fragment(buf, off, len, hdr);
         });
 
-    ygg::log::info("RefdataClient connected: ctrl={} snap={} delta={} fee={} funding={} status={}",
+    bpt::common::log::info("RefdataClient connected: ctrl={} snap={} delta={} fee={} funding={} status={}",
                    control_stream,
                    snapshot_stream,
                    delta_stream,
@@ -87,7 +87,7 @@ void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilt
     RefDataSubscriptionRequest req;
     req.wrapAndApplyHeader(buf.data(), 0, buf_size)
         .correlationId(correlation_id)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     req.instrumentsCount(0);  // empty — filter is in canonicalFilter group
 
@@ -104,7 +104,7 @@ void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilt
     while (ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size)) < 0)
         _mm_pause();
 
-    ygg::log::info("Subscription request sent: correlation_id={} canonical_filters={}", correlation_id, nf);
+    bpt::common::log::info("Subscription request sent: correlation_id={} canonical_filters={}", correlation_id, nf);
 }
 
 void RefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
@@ -133,7 +133,7 @@ void RefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
         return;
 
     cache_.apply_snapshot(msg);
-    ygg::log::info("Snapshot received: {} instruments", cache_.size());
+    bpt::common::log::info("Snapshot received: {} instruments", cache_.size());
 
     if (on_snapshot_complete)
         on_snapshot_complete(cache_);
@@ -175,7 +175,7 @@ void RefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
 
     bool ok = cache_.apply_delta(msg);
     if (!ok) {
-        ygg::log::warn(
+        bpt::common::log::warn(
             "Delta sequence gap detected (last={} received={}), resetting cache — "
             "resubscription required",
             cache_.last_delta_seq(),
@@ -216,7 +216,7 @@ void RefdataClient::handle_fee_schedule_fragment(aeron::AtomicBuffer& buffer,
 
     fee_cache_.update(msg.exchangeId(), msg.instrumentId(), msg.makerFeeBps(), msg.takerFeeBps(), msg.updatedTs());
 
-    ygg::log::debug("[Strategy] FeeSchedule: exchange={} instrument={} maker={}bps taker={}bps",
+    bpt::common::log::debug("[Strategy] FeeSchedule: exchange={} instrument={} maker={}bps taker={}bps",
                     ExchangeId::c_str(msg.exchangeId()),
                     msg.instrumentId(),
                     msg.makerFeeBps(),
@@ -251,7 +251,7 @@ void RefdataClient::handle_funding_rate_fragment(aeron::AtomicBuffer& buffer,
                                msg.nextFundingTs(),
                                msg.collectedTs());
 
-    ygg::log::debug("[Strategy] FundingRate: exchange={} instrument={} rate={}bps",
+    bpt::common::log::debug("[Strategy] FundingRate: exchange={} instrument={} rate={}bps",
                     ExchangeId::c_str(msg.exchangeId()),
                     msg.instrumentId(),
                     msg.rateBps());
@@ -277,7 +277,7 @@ void RefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                           hdr.version(),
                           static_cast<std::size_t>(length));
 
-        ygg::log::debug("[Strategy] RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
+        bpt::common::log::debug("[Strategy] RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
                         msg.exchangesLoaded(),
                         msg.instrumentCount(),
                         msg.feeSchedulesLoaded(),
@@ -297,7 +297,7 @@ void RefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                           hdr.version(),
                           static_cast<std::size_t>(length));
 
-        ygg::log::error("[Strategy] RefDataError: type={} exchange={} instrument={}",
+        bpt::common::log::error("[Strategy] RefDataError: type={} exchange={} instrument={}",
                         RefDataErrorType::c_str(msg.errorType()),
                         ExchangeId::c_str(msg.exchangeId()),
                         msg.instrumentId());

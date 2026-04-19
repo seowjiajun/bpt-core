@@ -14,8 +14,8 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <yggdrasil/util/spsc_queue.h>
-#include <yggdrasil/ws/ws_connect.h>
+#include <bpt_common/util/spsc_queue.h>
+#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -40,7 +40,7 @@ public:
     // depth=255: ~15 KiB).  Increase SLOT_BYTES if larger frames are needed.
     static constexpr size_t QUEUE_CAPACITY = 512;
     static constexpr size_t SLOT_BYTES = 16384;
-    using FrameQueue = ygg::util::SpscQueue<QUEUE_CAPACITY, SLOT_BYTES>;
+    using FrameQueue = bpt::common::util::SpscQueue<QUEUE_CAPACITY, SLOT_BYTES>;
 
     AdapterBase(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub);
     ~AdapterBase() override = default;
@@ -60,11 +60,11 @@ protected:
 
     // Establish the WebSocket connection and send all initial subscribe frames.
     // Return nullptr if no subscriptions exist yet (run() will retry after 100ms).
-    virtual std::unique_ptr<ygg::ws::AnyWsStream> connect_and_subscribe() = 0;
+    virtual std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() = 0;
 
     // Run the synchronous message-receive loop.  Call push_frame() for each
     // data message.  Throw on any fatal error to trigger a reconnect.
-    virtual void read_loop(ygg::ws::AnyWsStream& ws) = 0;
+    virtual void read_loop(bpt::common::ws::AnyWsStream& ws) = 0;
 
     // Called by the publisher thread for each frame dequeued from frame_queue_.
     // Implementations call their parser then md_pub_ publish methods.

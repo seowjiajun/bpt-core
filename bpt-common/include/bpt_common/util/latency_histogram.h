@@ -5,10 +5,10 @@
 // Dependencies: none (C++ stdlib only).
 //
 // Usage:
-//   ygg::util::LatencyHistogram hist;
+//   bpt::common::util::LatencyHistogram hist;
 //   hist.record(end_ns - start_ns);
 //   auto snap = hist.snapshot_and_reset();
-//   ygg::log::info("p99={}ns", snap.percentile_ns(0.99));
+//   bpt::common::log::info("p99={}ns", snap.percentile_ns(0.99));
 
 #include <array>
 #include <atomic>
@@ -16,7 +16,7 @@
 #include <cstdint>
 #include <limits>
 
-namespace ygg::util {
+namespace bpt::common::util {
 
 // Lock-free, power-of-2 bucket latency histogram for HFT hot paths.
 //
@@ -90,4 +90,4 @@ private:
     alignas(64) std::atomic<uint64_t> counts_[kBuckets]{};
 };
 
-}  // namespace ygg::util
+}  // namespace bpt::common::util

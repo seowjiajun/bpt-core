@@ -24,7 +24,7 @@
 #include <string>
 #include <variant>
 
-namespace ygg::ws {
+namespace bpt::common::ws {
 
 // ── Stream type aliases ───────────────────────────────────────────────────────
 
@@ -172,4 +172,4 @@ inline std::unique_ptr<PlainWsStream> ws_connect_plain(boost::asio::io_context& 
     return ws;
 }
 
-}  // namespace ygg::ws
+}  // namespace bpt::common::ws

@@ -10,8 +10,8 @@
 #include <chrono>
 #include <stdexcept>
 #include <thread>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter::binance {
 
@@ -55,11 +55,11 @@ void BinanceUserDataWs::delete_listen_key(const std::string& listen_key) {
 }
 
 void BinanceUserDataWs::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
-    ygg::log::info("[OrderGateway] BinanceUserDataWs: creating listen key");
+    bpt::common::log::info("[OrderGateway] BinanceUserDataWs: creating listen key");
     const std::string listen_key = create_listen_key();
 
     if (listen_key.empty()) {
-        ygg::log::warn(
+        bpt::common::log::warn(
             "[OrderGateway] BinanceUserDataWs: no listen key — REST-only "
             "mode (exec reports from order response)");
         connected.store(true, std::memory_order_relaxed);
@@ -68,7 +68,7 @@ void BinanceUserDataWs::run(std::atomic<bool>& stop_flag, std::atomic<bool>& con
         return;
     }
 
-    ygg::log::info("[OrderGateway] BinanceUserDataWs: connecting WS for user data stream");
+    bpt::common::log::info("[OrderGateway] BinanceUserDataWs: connecting WS for user data stream");
     const std::string ws_path = cfg_.ws_path + "/" + listen_key;
 
     tcp::resolver resolver(ioc_);
@@ -86,7 +86,7 @@ void BinanceUserDataWs::run(std::atomic<bool>& stop_flag, std::atomic<bool>& con
     ws.handshake(cfg_.ws_host, ws_path);
 
     connected.store(true, std::memory_order_relaxed);
-    ygg::log::info("[OrderGateway] BinanceUserDataWs: connected");
+    bpt::common::log::info("[OrderGateway] BinanceUserDataWs: connected");
 
     auto last_ping = std::chrono::steady_clock::now();
 
@@ -109,7 +109,7 @@ void BinanceUserDataWs::run(std::atomic<bool>& stop_flag, std::atomic<bool>& con
         if (ec)
             throw beast::system_error(ec);
 
-        const uint64_t recv_ns = ygg::util::WallClock::now_ns();
+        const uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
         std::string payload(static_cast<const char*>(buf.data().data()), buf.data().size());
         buf.consume(buf.size());
 
@@ -120,7 +120,7 @@ void BinanceUserDataWs::run(std::atomic<bool>& stop_flag, std::atomic<bool>& con
     try {
         delete_listen_key(listen_key);
     } catch (const std::exception& e) {
-        ygg::log::warn("[OrderGateway] BinanceUserDataWs: delete_listen_key failed: {}", e.what());
+        bpt::common::log::warn("[OrderGateway] BinanceUserDataWs: delete_listen_key failed: {}", e.what());
     }
     beast::error_code ec;
     ws.close(websocket::close_code::normal, ec);

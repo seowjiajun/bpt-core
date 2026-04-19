@@ -3,12 +3,12 @@
 #include <chrono>
 #include <format>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
+#include <bpt_common/aeron/aeron_utils.h>
 
 namespace bpt::backtester {
 
 BacktesterApp::BacktesterApp(config::Settings settings) : settings_(std::move(settings)) {
-    ygg::log::info("[Backtester] Initialising — window: {} → {}, {} instrument(s)",
+    bpt::common::log::info("[Backtester] Initialising — window: {} → {}, {} instrument(s)",
                    settings_.simulation.start,
                    settings_.simulation.end,
                    settings_.instruments.size());
@@ -18,22 +18,22 @@ BacktesterApp::BacktesterApp(config::Settings settings) : settings_(std::move(se
         ::aeron::Context ctx;
         if (!settings_.aeron.media_driver_dir.empty())
             ctx.aeronDir(settings_.aeron.media_driver_dir);
-        ctx.errorHandler([](const std::exception& e) { ygg::log::error("[Backtester][Aeron] {}", e.what()); });
+        ctx.errorHandler([](const std::exception& e) { bpt::common::log::error("[Backtester][Aeron] {}", e.what()); });
         aeron_ = ::aeron::Aeron::connect(ctx);
-        ygg::log::info("[Backtester] Connected to Aeron MediaDriver");
+        bpt::common::log::info("[Backtester] Connected to Aeron MediaDriver");
     }
 
     const auto& ac = settings_.aeron;
 
     auto ctrl_pub =
-        ygg::aeron::wait_for_publication(aeron_, ac.backtest_control.channel, ac.backtest_control.stream_id);
+        bpt::common::aeron::wait_for_publication(aeron_, ac.backtest_control.channel, ac.backtest_control.stream_id);
     auto ack_sub =
-        ygg::aeron::wait_for_subscription(aeron_, ac.backtest_ack.channel, ac.backtest_ack.stream_id);
+        bpt::common::aeron::wait_for_subscription(aeron_, ac.backtest_ack.channel, ac.backtest_ack.stream_id);
 
     ctrl_pub_ = std::make_unique<messaging::BacktestControlPublisher>(std::move(ctrl_pub));
     ack_sub_ = std::make_unique<messaging::BacktestAckSubscriber>(std::move(ack_sub));
 
-    ygg::log::info("[Backtester] Backtest tick-gating ready: ctrl_pub=stream:{} ack_sub=stream:{}",
+    bpt::common::log::info("[Backtester] Backtest tick-gating ready: ctrl_pub=stream:{} ack_sub=stream:{}",
                    ac.backtest_control.stream_id,
                    ac.backtest_ack.stream_id);
 
@@ -74,7 +74,7 @@ BacktesterApp::BacktesterApp(config::Settings settings) : settings_(std::move(se
         } else if (fill.exchange == "OKX") {
             okx_order_server_->push_fill(fill);
         } else {
-            ygg::log::warn("[BacktesterApp] No order server for exchange '{}' — fill dropped", fill.exchange);
+            bpt::common::log::warn("[BacktesterApp] No order server for exchange '{}' — fill dropped", fill.exchange);
         }
     });
 
@@ -87,7 +87,7 @@ BacktesterApp::BacktesterApp(config::Settings settings) : settings_(std::move(se
                                                          ctrl_pub_.get(),
                                                          ack_sub_.get());
 
-    ygg::log::info("[Backtester] Ready — results will be written to {}", out_dir);
+    bpt::common::log::info("[Backtester] Ready — results will be written to {}", out_dir);
 }
 
 void BacktesterApp::run() {
@@ -95,24 +95,24 @@ void BacktesterApp::run() {
     // Without this gate, Backtester would exhaust all data before MdGateway has
     // had a chance to connect and subscribe.
     const uint32_t timeout_s = settings_.simulation.subscriber_wait_timeout_s;
-    ygg::log::info("[Backtester] Waiting for subscriber (timeout={}s)...", timeout_s);
+    bpt::common::log::info("[Backtester] Waiting for subscriber (timeout={}s)...", timeout_s);
 
     uint32_t waited = 0;
     while (okx_md_server_ && okx_md_server_->session_count() == 0) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if (++waited >= timeout_s) {
-            ygg::log::warn("[Backtester] No subscriber after {}s — starting anyway", timeout_s);
+            bpt::common::log::warn("[Backtester] No subscriber after {}s — starting anyway", timeout_s);
             break;
         }
     }
 
     if (okx_md_server_ && okx_md_server_->session_count() > 0)
-        ygg::log::info("[Backtester] Subscriber connected, starting backtest");
+        bpt::common::log::info("[Backtester] Subscriber connected, starting backtest");
 
-    ygg::log::info("[Backtester] Starting backtest");
+    bpt::common::log::info("[Backtester] Starting backtest");
     clock_master_->run();
     results_->write();
-    ygg::log::info("[Backtester] Backtest complete");
+    bpt::common::log::info("[Backtester] Backtest complete");
 }
 
 }  // namespace bpt::backtester

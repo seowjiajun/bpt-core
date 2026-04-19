@@ -4,7 +4,7 @@
 //
 // Include this only in config-loading translation units (e.g. config/loader.cpp).
 // It pulls in toml++ headers; keeping it separate avoids inflating compile times
-// for files that only need to call ygg::logging::init().
+// for files that only need to call bpt::common::logging::init().
 //
 // Expected TOML schema (all fields optional; defaults match LogConfig defaults):
 //
@@ -22,9 +22,9 @@
 //   # pattern         = ""        # custom spdlog format string (omit for default)
 
 #include <toml++/toml.hpp>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
-namespace ygg::logging {
+namespace bpt::common::logging {
 
 inline LogConfig from_toml(const toml::table& t) {
     LogConfig cfg;
@@ -53,4 +53,4 @@ inline LogConfig from_toml(const toml::table& t) {
     return cfg;
 }
 
-}  // namespace ygg::logging
+}  // namespace bpt::common::logging

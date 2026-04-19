@@ -5,8 +5,8 @@
 #include <toml++/toml.hpp>
 #include <unordered_map>
 #include <vector>
-#include <yggdrasil/aeron/stream_config.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/stream_config.h>
+#include <bpt_common/logging.h>
 
 // Forward declaration for ScheduleConfig::configured_exchanges_mask conversion.
 
@@ -16,34 +16,34 @@ namespace config {
 struct AeronConfig {
     std::string media_driver_dir;
     // Reference data streams (required)
-    ygg::config::StreamConfig refdata_control{"aeron:ipc", 1003};
-    ygg::config::StreamConfig refdata_snapshot{"aeron:ipc", 1001};
-    ygg::config::StreamConfig refdata_delta{"aeron:ipc", 1002};
+    bpt::common::config::StreamConfig refdata_control{"aeron:ipc", 1003};
+    bpt::common::config::StreamConfig refdata_snapshot{"aeron:ipc", 1001};
+    bpt::common::config::StreamConfig refdata_delta{"aeron:ipc", 1002};
     // Refdata live streams
-    ygg::config::StreamConfig fee_schedule{"aeron:ipc", 1004};    // FeeSchedule id=19
-    ygg::config::StreamConfig funding_rate{"aeron:ipc", 1005};    // FundingRate id=18
-    ygg::config::StreamConfig refdata_status{"aeron:ipc", 1006};  // RefDataReady id=16, RefDataError id=17
+    bpt::common::config::StreamConfig fee_schedule{"aeron:ipc", 1004};    // FeeSchedule id=19
+    bpt::common::config::StreamConfig funding_rate{"aeron:ipc", 1005};    // FundingRate id=18
+    bpt::common::config::StreamConfig refdata_status{"aeron:ipc", 1006};  // RefDataReady id=16, RefDataError id=17
     // Market data streams (optional — stream_id 0 means MD client is not started)
-    ygg::config::StreamConfig md_control{"aeron:ipc", 0};
-    ygg::config::StreamConfig md_data{"aeron:ipc", 0};
-    ygg::config::StreamConfig md_ack_hb{"aeron:ipc", 0};
+    bpt::common::config::StreamConfig md_control{"aeron:ipc", 0};
+    bpt::common::config::StreamConfig md_data{"aeron:ipc", 0};
+    bpt::common::config::StreamConfig md_ack_hb{"aeron:ipc", 0};
     // Order gateway streams (optional — stream_id 0 means OrderGateway client is not started)
-    ygg::config::StreamConfig order{"aeron:ipc", 0};             // Strategy → OrderGateway
-    ygg::config::StreamConfig exec_report{"aeron:ipc", 0};       // OrderGateway → Strategy (ExecutionReport)
-    ygg::config::StreamConfig heartbeat{"aeron:ipc", 0};         // OrderGateway → Strategy (OrderGatewayHeartbeat)
-    ygg::config::StreamConfig account_snapshot{"aeron:ipc", 0};  // OrderGateway → Strategy (AccountSnapshot id=27)
+    bpt::common::config::StreamConfig order{"aeron:ipc", 0};             // Strategy → OrderGateway
+    bpt::common::config::StreamConfig exec_report{"aeron:ipc", 0};       // OrderGateway → Strategy (ExecutionReport)
+    bpt::common::config::StreamConfig heartbeat{"aeron:ipc", 0};         // OrderGateway → Strategy (OrderGatewayHeartbeat)
+    bpt::common::config::StreamConfig account_snapshot{"aeron:ipc", 0};  // OrderGateway → Strategy (AccountSnapshot id=27)
     // Pricer vol surface streams (optional — stream_id 0 means vol surface client is not started)
-    ygg::config::StreamConfig vol_surface{"aeron:ipc", 0};   // Pricer → Strategy (VolSurface id=21)
-    ygg::config::StreamConfig pricer_status{"aeron:ipc", 0};  // PricerHeartbeat id=22, PricerReady id=23
+    bpt::common::config::StreamConfig vol_surface{"aeron:ipc", 0};   // Pricer → Strategy (VolSurface id=21)
+    bpt::common::config::StreamConfig pricer_status{"aeron:ipc", 0};  // PricerHeartbeat id=22, PricerReady id=23
     // Analytics toxicity stream (optional — stream_id 0 disables)
-    ygg::config::StreamConfig toxicity{"aeron:ipc", 0};  // Analytics → Strategy (ToxicityUpdate)
+    bpt::common::config::StreamConfig toxicity{"aeron:ipc", 0};  // Analytics → Strategy (ToxicityUpdate)
     // Backtest streams (optional — only used when backtest_mode = true)
-    ygg::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // Backtester → Strategy (BacktestControl id=25)
-    ygg::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // Strategy → Backtester (BacktestAck id=24)
+    bpt::common::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // Backtester → Strategy (BacktestControl id=25)
+    bpt::common::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // Strategy → Backtester (BacktestAck id=24)
     // Dashboard control (optional — stream_id 0 disables; bridge → Strategy)
-    ygg::config::StreamConfig dashboard_control{"aeron:ipc", 9003};
+    bpt::common::config::StreamConfig dashboard_control{"aeron:ipc", 9003};
     // Portfolio snapshot (optional — Strategy → bridge; published every ~100ms)
-    ygg::config::StreamConfig dashboard_snapshot{"aeron:ipc", 9004};
+    bpt::common::config::StreamConfig dashboard_snapshot{"aeron:ipc", 9004};
 };
 
 // Per-venue execution parameters.
@@ -121,7 +121,7 @@ struct EngineConfig {
 struct AppConfig {
     AeronConfig aeron;
     EngineConfig strat;
-    ygg::logging::LogConfig logging;
+    bpt::common::logging::LogConfig logging;
     int metrics_port{9104};
     bool backtest_mode{false};  // When true, Strategy gates on BacktestControl ticks from Backtester
 

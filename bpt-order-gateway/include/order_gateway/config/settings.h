@@ -3,17 +3,17 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <yggdrasil/aeron/stream_config.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/stream_config.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::config {
 
 struct AeronConfig {
     std::string media_driver_dir;
-    ygg::config::StreamConfig order{"aeron:ipc", 3001};
-    ygg::config::StreamConfig exec_report{"aeron:ipc", 3002};
-    ygg::config::StreamConfig heartbeat{"aeron:ipc", 3003};
-    ygg::config::StreamConfig account_snapshot{"aeron:ipc", 3004};
+    bpt::common::config::StreamConfig order{"aeron:ipc", 3001};
+    bpt::common::config::StreamConfig exec_report{"aeron:ipc", 3002};
+    bpt::common::config::StreamConfig heartbeat{"aeron:ipc", 3003};
+    bpt::common::config::StreamConfig account_snapshot{"aeron:ipc", 3004};
 };
 
 struct RiskConfig {
@@ -98,7 +98,7 @@ struct Settings {
     std::vector<std::string> exchanges;  // exchanges to activate from exchange_config (e.g. ["OKX", "BINANCE"])
     AeronConfig aeron;
     GatewayConfig gateway;
-    ygg::logging::LogConfig logging;
+    bpt::common::logging::LogConfig logging;
     uint16_t metrics_port{9103};
 };
 

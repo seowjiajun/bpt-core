@@ -4,7 +4,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
@@ -220,13 +220,13 @@ void HyperliquidReconciler::worker_loop() {
             auto [open_orders, user_fills] = poller_();
             result = try_match(c, open_orders, user_fills, price_tick_e8_);
         } catch (const std::exception& e) {
-            ygg::log::warn("[OrderGateway] HL reconciler: poll failed for client_id={}: {}",
+            bpt::common::log::warn("[OrderGateway] HL reconciler: poll failed for client_id={}: {}",
                            c.client_order_id, e.what());
             result = {MatchKind::None, 0, 0, 0, 0, 0};
         }
 
         if (result.kind == MatchKind::Ambiguous) {
-            ygg::log::error(
+            bpt::common::log::error(
                 "[OrderGateway] HL reconciler: AMBIGUOUS — multiple candidates match "
                 "client_id={} coin={} side={} qty_e8={} px_e8={}. Emitting REJECTED; "
                 "strategy position reconciler will surface any divergence.",

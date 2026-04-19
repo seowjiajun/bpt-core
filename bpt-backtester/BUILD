@@ -19,7 +19,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//messages",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@boost.json",
         "@fmt",
         "@tomlplusplus//:tomlplusplus",

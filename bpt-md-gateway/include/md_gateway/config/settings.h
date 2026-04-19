@@ -3,17 +3,17 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <yggdrasil/aeron/stream_config.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/stream_config.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::md_gateway::config {
 
 struct AeronConfig {
     std::string media_driver_dir;
-    ygg::config::StreamConfig control{"aeron:ipc", 2001};       // Strategy → MdGateway subscription control
-    ygg::config::StreamConfig data{"aeron:ipc", 2002};          // MdGateway → Strategy market data
-    ygg::config::StreamConfig ack_hb{"aeron:ipc", 2003};        // MdGateway → Strategy acks + heartbeats
-    ygg::config::StreamConfig funding_rate{"aeron:ipc", 1005};  // MdGateway → Strategy funding rates
+    bpt::common::config::StreamConfig control{"aeron:ipc", 2001};       // Strategy → MdGateway subscription control
+    bpt::common::config::StreamConfig data{"aeron:ipc", 2002};          // MdGateway → Strategy market data
+    bpt::common::config::StreamConfig ack_hb{"aeron:ipc", 2003};        // MdGateway → Strategy acks + heartbeats
+    bpt::common::config::StreamConfig funding_rate{"aeron:ipc", 1005};  // MdGateway → Strategy funding rates
 };
 
 struct AdapterConfig {
@@ -79,7 +79,7 @@ struct Settings {
     // Interval (ms) between MdServiceHeartbeat messages on the ack/hb stream.
     uint32_t service_heartbeat_interval_ms{5000};
 
-    ygg::logging::LogConfig logging;
+    bpt::common::logging::LogConfig logging;
 
     // Prometheus metrics endpoint.
     // Restrict host to "127.0.0.1" in prod to prevent exposure to external networks.

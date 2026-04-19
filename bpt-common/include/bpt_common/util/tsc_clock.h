@@ -6,9 +6,9 @@
 // Requires: x86-64 with invariant TSC (all modern Intel/AMD CPUs since ~2008).
 //
 // Usage:
-//   ygg::util::TscClock::calibrate();                  // once at startup, blocks ~10ms
-//   uint64_t t = ygg::util::TscClock::now_epoch_ns();  // ~4ns (intra-process only)
-//   uint64_t w = ygg::util::WallClock::now_ns();       // ~20ns (cross-process safe)
+//   bpt::common::util::TscClock::calibrate();                  // once at startup, blocks ~10ms
+//   uint64_t t = bpt::common::util::TscClock::now_epoch_ns();  // ~4ns (intra-process only)
+//   uint64_t w = bpt::common::util::WallClock::now_ns();       // ~20ns (cross-process safe)
 //
 // TscClock is per-process: two services running on the same host calibrate
 // independently and their TSC→wall extrapolations drift relative to each
@@ -20,7 +20,7 @@
 #include <time.h>
 #include <x86intrin.h>
 
-namespace ygg::util {
+namespace bpt::common::util {
 
 // CLOCK_REALTIME wrapper, for cross-process / cross-service timestamps.
 // Slower than TscClock (~20 ns vs ~4 ns) but not subject to per-process
@@ -71,4 +71,4 @@ private:
     inline static uint64_t wall_anchor_ns_ = 0;
 };
 
-}  // namespace ygg::util
+}  // namespace bpt::common::util

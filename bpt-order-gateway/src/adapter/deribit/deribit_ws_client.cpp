@@ -2,8 +2,8 @@
 
 #include <boost/beast/websocket.hpp>
 #include <chrono>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/ws/ws_connect.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::order_gateway::adapter::deribit {
 
@@ -31,10 +31,10 @@ void DeribitWsClient::on_frame(std::string_view payload, uint64_t recv_ns) {
 }
 
 void DeribitWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
-    ygg::log::info("[OrderGateway] DeribitWsClient connecting {}:{}{}",
+    bpt::common::log::info("[OrderGateway] DeribitWsClient connecting {}:{}{}",
                    cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
 
-    auto ws_ptr = ygg::ws::ws_connect(ioc_, ssl_ctx_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
+    auto ws_ptr = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
                                       /*so_rcvbuf_bytes=*/0,
                                       /*connect_timeout_ms=*/30000,
                                       /*user_agent=*/"bpt-order-gateway/0.1");
@@ -48,8 +48,8 @@ void DeribitWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& conne
         false,                           // no Beast keep-alive pings
     });
 
-    ygg::log::info("[OrderGateway] DeribitWsClient connected, waiting for auth");
-    RunLoop::run(ygg::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
+    bpt::common::log::info("[OrderGateway] DeribitWsClient connected, waiting for auth");
+    RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
 }
 
 }  // namespace bpt::order_gateway::adapter::deribit

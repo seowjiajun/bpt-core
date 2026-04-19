@@ -1,6 +1,6 @@
-#include "yggdrasil/secrets/secrets_client.h"
+#include "bpt_common/secrets/secrets_client.h"
 
-#include "yggdrasil/logging.h"
+#include "bpt_common/logging.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace ygg::secrets {
+namespace bpt::common::secrets {
 
 namespace {
 // BPT_ENV declares which tier this process believes it's running in:
@@ -38,7 +38,7 @@ bool resolve_strict_mode() {
                 "' (expected dev | qa | prod). Every process must declare "
                 "its environment identity — refusing to guess.");
         }
-        ygg::log::info("[secrets] BPT_ENV='{}' strict={}", value, is_strict);
+        bpt::common::log::info("[secrets] BPT_ENV='{}' strict={}", value, is_strict);
         return is_strict;
     }();
     return strict;
@@ -85,8 +85,8 @@ std::map<std::string, std::string> fetch(const std::string& secret_name) {
         out[line.substr(0, eq)] = line.substr(eq + 1);
     }
 
-    ygg::log::info("[secrets] Loaded '{}' ({} keys)", name, out.size());
+    bpt::common::log::info("[secrets] Loaded '{}' ({} keys)", name, out.size());
     return out;
 }
 
-}  // namespace ygg::secrets
+}  // namespace bpt::common::secrets

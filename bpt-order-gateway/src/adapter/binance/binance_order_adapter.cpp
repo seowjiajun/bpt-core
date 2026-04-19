@@ -13,7 +13,7 @@
 #include <boost/json.hpp>
 #include <chrono>
 #include <string>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -27,7 +27,7 @@ BinanceOrderAdapter::BinanceOrderAdapter(const config::AdapterConfig& cfg, const
       user_data_ws_(ioc_, ssl_ctx_, cfg_, https_client_) {
     parser_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
-            ygg::log::error("[Binance] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
+            bpt::common::log::error("[Binance] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
     user_data_ws_.set_message_handler(
         [this](const std::string& payload, uint64_t recv_ns) { handle_user_data_message(payload, recv_ns); });
@@ -62,7 +62,7 @@ void BinanceOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     const std::string signed_params = binance::sign_query(secret_key_, params);
 
     auto emit_rejection = [&]() {
-        const uint64_t ts = ygg::util::WallClock::now_ns();
+        const uint64_t ts = bpt::common::util::WallClock::now_ns();
         ExecEvent rej;
         rej.order_id = order.orderId();
         rej.exchange_id = bpt::messages::ExchangeId::BINANCE;
@@ -74,20 +74,20 @@ void BinanceOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
         rej.status = bpt::messages::ExecStatus::REJECTED;
         rej.reject_reason = bpt::messages::RejectReason::EXCHANGE_ERROR;
         if (!exec_queue_.try_push(rej))
-            ygg::log::error("[Binance] exec_queue full — dropped rejection order_id={}", rej.order_id);
+            bpt::common::log::error("[Binance] exec_queue full — dropped rejection order_id={}", rej.order_id);
     };
 
     try {
         const std::string resp = https_client_.request("POST", "/api/v3/order?" + signed_params, "", true);
-        ygg::log::debug("[OrderGateway] BinanceOrderAdapter: new order resp={}", resp);
+        bpt::common::log::debug("[OrderGateway] BinanceOrderAdapter: new order resp={}", resp);
 
-        const uint64_t recv_ns = ygg::util::WallClock::now_ns();
+        const uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
         auto root = json::parse(resp);
         if (!root.is_object())
             return;
         parser_.handle_order_response(root.as_object(), order.orderId(), order.side(), order.orderType(), recv_ns);
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] BinanceOrderAdapter: send_new_order failed: {}", e.what());
+        bpt::common::log::error("[OrderGateway] BinanceOrderAdapter: send_new_order failed: {}", e.what());
         emit_rejection();
     }
 }
@@ -99,15 +99,15 @@ void BinanceOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel, 
 
     try {
         const std::string resp = https_client_.request("DELETE", "/api/v3/order?" + signed_params, "", true);
-        ygg::log::debug("[OrderGateway] BinanceOrderAdapter: cancel resp={}", resp);
+        bpt::common::log::debug("[OrderGateway] BinanceOrderAdapter: cancel resp={}", resp);
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] BinanceOrderAdapter: send_cancel failed: {}", e.what());
+        bpt::common::log::error("[OrderGateway] BinanceOrderAdapter: send_cancel failed: {}", e.what());
     }
 }
 
 void BinanceOrderAdapter::send_cancel_all(uint64_t instrument_id) {
     (void)instrument_id;
-    ygg::log::warn(
+    bpt::common::log::warn(
         "[OrderGateway] BinanceOrderAdapter: send_cancel_all called with "
         "instrument_id={}",
         instrument_id);
@@ -129,13 +129,13 @@ void BinanceOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify, 
         https_client_.request("DELETE", "/api/v3/order?" + signed_cancel, "", true);
         https_client_.request("POST", "/api/v3/order?" + signed_new, "", true);
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] BinanceOrderAdapter: send_modify failed: {}", e.what());
+        bpt::common::log::error("[OrderGateway] BinanceOrderAdapter: send_modify failed: {}", e.what());
     }
 }
 
 AccountSnapshotData BinanceOrderAdapter::fetch_account_snapshot(uint64_t correlation_id) {
     using namespace std::chrono;
-    const uint64_t ts_ns = ygg::util::WallClock::now_ns();
+    const uint64_t ts_ns = bpt::common::util::WallClock::now_ns();
     const uint64_t ts_ms =
         static_cast<uint64_t>(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
 
@@ -187,10 +187,10 @@ AccountSnapshotData BinanceOrderAdapter::fetch_account_snapshot(uint64_t correla
             }
         }
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] BinanceOrderAdapter: failed to parse account snapshot: {}", e.what());
+        bpt::common::log::error("[OrderGateway] BinanceOrderAdapter: failed to parse account snapshot: {}", e.what());
     }
 
-    ygg::log::info("[OrderGateway] BinanceOrderAdapter: account snapshot fetched — balance={:.2f} positions={}",
+    bpt::common::log::info("[OrderGateway] BinanceOrderAdapter: account snapshot fetched — balance={:.2f} positions={}",
                    static_cast<double>(snap.available_balance_e8) / 1e8,
                    snap.positions.size());
     return snap;

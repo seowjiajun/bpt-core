@@ -4,9 +4,9 @@
 #include <messages/TradeSide.h>
 
 #include <cmath>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/parse_double.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/parse_double.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -16,7 +16,7 @@ void OkxParser::parse(std::string_view payload,
                       uint64_t recv_ns,
                       messaging::IMdPublisher& pub,
                       messaging::FundingRateCallback& on_funding_rate) {
-    const uint64_t parse_start_ns = ygg::util::TscClock::now_mono_ns();
+    const uint64_t parse_start_ns = bpt::common::util::TscClock::now_mono_ns();
     pad(payload);
 
     simdjson::ondemand::document doc;
@@ -28,7 +28,7 @@ void OkxParser::parse(std::string_view payload,
         bool has_event = !doc.find_field_unordered("event").get_string().get(event_sv);
         doc.rewind();
         if (has_event) {
-            ygg::log::info("OKX event: {}", event_sv);
+            bpt::common::log::info("OKX event: {}", event_sv);
             return;
         }
     }
@@ -119,10 +119,10 @@ void OkxParser::handle_bbo(simdjson::ondemand::object& entry,
         auto it = lvl.begin();
         if (it.error())
             return;
-        (void)ygg::util::ff_double(*it, bbo.bid_price);
+        (void)bpt::common::util::ff_double(*it, bbo.bid_price);
         if ((++it).error())
             return;
-        (void)ygg::util::ff_double(*it, bbo.bid_qty);
+        (void)bpt::common::util::ff_double(*it, bbo.bid_qty);
     }
     {
         simdjson::ondemand::array outer, lvl;
@@ -133,16 +133,16 @@ void OkxParser::handle_bbo(simdjson::ondemand::object& entry,
         auto it = lvl.begin();
         if (it.error())
             return;
-        (void)ygg::util::ff_double(*it, bbo.ask_price);
+        (void)bpt::common::util::ff_double(*it, bbo.ask_price);
         if ((++it).error())
             return;
-        (void)ygg::util::ff_double(*it, bbo.ask_qty);
+        (void)bpt::common::util::ff_double(*it, bbo.ask_qty);
     }
 
-    uint64_t lat_ns = ygg::util::TscClock::now_mono_ns() - parse_start_ns;
+    uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;
     decode_lat_.record(lat_ns);
     if (++tick_count_ <= 20 || tick_count_ % 500 == 0)
-        ygg::log::info("OKX BBO decode: {}ns tick={}", lat_ns, tick_count_);
+        bpt::common::log::info("OKX BBO decode: {}ns tick={}", lat_ns, tick_count_);
     pub.publish(bbo);
 }
 
@@ -175,10 +175,10 @@ void OkxParser::handle_book(simdjson::ondemand::object& entry,
             auto it = lvl.begin();
             if (it.error())
                 continue;
-            (void)ygg::util::ff_double(*it, px);
+            (void)bpt::common::util::ff_double(*it, px);
             if ((++it).error())
                 continue;
-            (void)ygg::util::ff_double(*it, qty);
+            (void)bpt::common::util::ff_double(*it, qty);
             if (qty == 0.0)
                 side.erase(px);
             else
@@ -215,10 +215,10 @@ void OkxParser::handle_book(simdjson::ondemand::object& entry,
     for (auto it = state.asks.begin(); it != state.asks.end() && book.asks.size() < depth; ++it)
         book.asks.emplace_back(it->first, it->second);
 
-    uint64_t lat_ns = ygg::util::TscClock::now_mono_ns() - parse_start_ns;
+    uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;
     decode_lat_.record(lat_ns);
     if (++tick_count_ <= 20 || tick_count_ % 500 == 0)
-        ygg::log::info("OKX book decode: {}ns tick={}", lat_ns, tick_count_);
+        bpt::common::log::info("OKX book decode: {}ns tick={}", lat_ns, tick_count_);
 
     md::MdBbo bbo{recv_ns,
                   instrument_id,
@@ -237,9 +237,9 @@ void OkxParser::handle_trades(simdjson::ondemand::object& entry,
     md::MdTrade trade;
     trade.timestamp_ns = recv_ns;
     trade.instrument_id = instrument_id;
-    if (ygg::util::ff_double(entry["px"], trade.price))
+    if (bpt::common::util::ff_double(entry["px"], trade.price))
         return;
-    if (ygg::util::ff_double(entry.find_field_unordered("sz"), trade.qty))
+    if (bpt::common::util::ff_double(entry.find_field_unordered("sz"), trade.qty))
         return;
 
     std::string_view side_sv;
@@ -258,7 +258,7 @@ void OkxParser::handle_funding_rate(simdjson::ondemand::object& entry,
         return;
 
     double rate = 0.0;
-    (void)ygg::util::ff_double(entry["fundingRate"], rate);
+    (void)bpt::common::util::ff_double(entry["fundingRate"], rate);
 
     uint64_t next_ms = 0;
     (void)entry.find_field_unordered("nextFundingTime").get_uint64_in_string().get(next_ms);

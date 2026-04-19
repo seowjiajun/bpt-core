@@ -7,9 +7,9 @@
 #include <messages/RefDataSnapshot.h>
 
 #include <vector>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::refdata::messaging {
 
@@ -67,7 +67,7 @@ bool matches(const refdata::Instrument& inst, const RefdataRequest& req) {
 RefdataSnapshotPublisher::RefdataSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                                    const std::string& channel,
                                                    int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& registry,
@@ -80,7 +80,7 @@ void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& regis
             matched.push_back(inst);
     });
 
-    ygg::log::info("Snapshot correlation_id={}: {} instrument(s)", request.correlation_id, matched.size());
+    bpt::common::log::info("Snapshot correlation_id={}: {} instrument(s)", request.correlation_id, matched.size());
 
     using namespace bpt::messages;
 
@@ -92,7 +92,7 @@ void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& regis
 
     std::vector<char> buf(buf_size, '\0');
 
-    uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+    uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
     RefDataSnapshot msg;
     msg.wrapAndApplyHeader(buf.data(), 0, buf_size)
@@ -123,7 +123,7 @@ void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& regis
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf.data()), static_cast<aeron::util::index_t>(buf_size));
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(buf_size), "snapshot");
 
-    ygg::log::info("Snapshot sent correlation_id={}", request.correlation_id);
+    bpt::common::log::info("Snapshot sent correlation_id={}", request.correlation_id);
 }
 
 }  // namespace bpt::refdata::messaging

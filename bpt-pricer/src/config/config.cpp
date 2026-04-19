@@ -6,8 +6,8 @@ namespace bpt::pricer::config {
 
 namespace {
 
-ygg::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
-    ygg::config::StreamConfig s{std::move(default_channel), default_stream_id};
+bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
     if (auto v = (*t)["channel"].value<std::string>())

@@ -6,8 +6,8 @@
 
 #include <atomic>
 #include <cstdint>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::md {
 
@@ -65,11 +65,11 @@ private:
         }
 
         const bool is_drop = (validator_.validate(msg) != ValidationResult::OK);
-        const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+        const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
         const bool was_tripped = breaker_.tripped();
         breaker_.record(is_drop, now_ns);
         if (!was_tripped && breaker_.tripped()) {
-            ygg::log::error(
+            bpt::common::log::error(
                 "[MdGateway] {} VALIDATION-DROP BREAKER TRIPPED — {}/{} publishes "
                 "dropped in last {}s (threshold {:.1f}%). Publishing suppressed. "
                 "Restart service after human review to resume.",

@@ -4,8 +4,8 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <yggdrasil/aeron/stream_config.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/stream_config.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::config {
 
@@ -44,14 +44,14 @@ struct Settings {
     std::string media_driver_dir;        // Path to Aeron driver dir
 
     // Instrument refdata (existing streams 1001-1003)
-    ygg::config::StreamConfig snapshot;
-    ygg::config::StreamConfig delta;
-    ygg::config::StreamConfig control;
+    bpt::common::config::StreamConfig snapshot;
+    bpt::common::config::StreamConfig delta;
+    bpt::common::config::StreamConfig control;
 
     // Exchange-sourced refdata streams (1004, 1006)
     // Note: stream 1005 (FundingRate) has moved to MdGateway
-    ygg::config::StreamConfig fee_schedule;
-    ygg::config::StreamConfig refdata_status;
+    bpt::common::config::StreamConfig fee_schedule;
+    bpt::common::config::StreamConfig refdata_status;
 
     // Only exchange adapters listed here will be initialised.
     // Any runtime request for an unlisted exchange returns EXCHANGE_NOT_CONFIGURED.
@@ -62,7 +62,7 @@ struct Settings {
     uint32_t instrument_poll_interval_s{3600};
 
     InstrumentMappingConfig instrument_mapping;
-    ygg::logging::LogConfig logging;
+    bpt::common::logging::LogConfig logging;
 
     uint16_t metrics_port{9101};
 };

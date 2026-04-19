@@ -6,19 +6,19 @@
 //
 // Usage:
 //   double val = 0;
-//   if (ygg::util::ff_double(field, val)) return;  // non-zero = error
+//   if (bpt::common::util::ff_double(field, val)) return;  // non-zero = error
 
 #include <fast_float/fast_float.h>
 #include <simdjson.h>
 #include <system_error>
 
-namespace ygg::util {
+namespace bpt::common::util {
 
 // Parse a quoted JSON number string using fast_float (Eisel-Lemire algorithm).
 // Drop-in replacement for simdjson's get_double_in_string().get(out):
 //
 //   Before: (void) field.get_double_in_string().get(val);
-//   After:  (void) ygg::util::ff_double(field, val);
+//   After:  (void) bpt::common::util::ff_double(field, val);
 //
 // Returns simdjson::SUCCESS (0) on success, non-zero on error — matching
 // simdjson's convention so existing if/void patterns work unchanged.
@@ -31,4 +31,4 @@ inline simdjson::error_code ff_double(simdjson::simdjson_result<simdjson::ondema
     return (res.ec == std::errc{}) ? simdjson::SUCCESS : simdjson::NUMBER_ERROR;
 }
 
-}  // namespace ygg::util
+}  // namespace bpt::common::util

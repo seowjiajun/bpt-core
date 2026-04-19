@@ -12,9 +12,9 @@
 #include <string>
 #include <thread>
 #include <x86intrin.h>
-#include <yggdrasil/signal.h>
-#include <yggdrasil/util/thread_pin.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/signal.h>
+#include <bpt_common/util/thread_pin.h>
+#include <bpt_common/util/tsc_clock.h>
 
 using namespace std::chrono_literals;
 using bpt::messages::ExchangeId;
@@ -55,7 +55,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
 
     for (const auto& a_cfg : cfg_.gateway.adapters) {
         if (a_cfg.testnet)
-            ygg::log::warn("[OrderGateway] *** TESTNET MODE *** adapter={} host={}",
+            bpt::common::log::warn("[OrderGateway] *** TESTNET MODE *** adapter={} host={}",
                            a_cfg.exchange,
                            a_cfg.rest_host.empty() ? a_cfg.ws_host : a_cfg.rest_host);
 
@@ -75,14 +75,14 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
         } else if (a_cfg.exchange == "HYPERLIQUID") {
             adapter = std::make_shared<adapter::HyperliquidOrderAdapter>(a_cfg, exchange_creds);
         } else {
-            ygg::log::warn("[OrderGateway] Unknown exchange in config: {}", a_cfg.exchange);
+            bpt::common::log::warn("[OrderGateway] Unknown exchange in config: {}", a_cfg.exchange);
             continue;
         }
 
         adapter->set_disconnect_breaker_config(disc_cfg);
         adapter->start();
         adapters_.push_back(std::move(adapter));
-        ygg::log::info("[OrderGateway] Started adapter: {}", a_cfg.exchange);
+        bpt::common::log::info("[OrderGateway] Started adapter: {}", a_cfg.exchange);
     }
 
     risk::RejectRateBreaker::Config breaker_cfg;
@@ -125,7 +125,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
                     auto snap = adapter->fetch_account_snapshot(correlation_id);
                     account_snap_pub_->publish(snap);
                 } catch (const std::exception& e) {
-                    ygg::log::error("[OrderGateway] AccountSnapshot fetch failed for exchange={}: {}",
+                    bpt::common::log::error("[OrderGateway] AccountSnapshot fetch failed for exchange={}: {}",
                                     bpt::messages::ExchangeId::c_str(exchange_id),
                                     e.what());
                     // Publish empty snapshot so Strategy's gate doesn't hang.
@@ -140,16 +140,16 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
             }).detach();
             return;
         }
-        ygg::log::warn("[OrderGateway] AccountSnapshotRequest for unconfigured exchange={}",
+        bpt::common::log::warn("[OrderGateway] AccountSnapshotRequest for unconfigured exchange={}",
                        bpt::messages::ExchangeId::c_str(exchange_id));
     };
 
-    ygg::log::info("[OrderGateway] Ready — polling order stream {}", cfg_.aeron.order.stream_id);
+    bpt::common::log::info("[OrderGateway] Ready — polling order stream {}", cfg_.aeron.order.stream_id);
 }
 
 void OrderGatewayApp::run() {
-    ygg::util::TscClock::calibrate();
-    ygg::util::pin_thread_to_cpu(cfg_.gateway.poll_cpu, "poll");
+    bpt::common::util::TscClock::calibrate();
+    bpt::common::util::pin_thread_to_cpu(cfg_.gateway.poll_cpu, "poll");
 
     const uint64_t hb_interval_ns = static_cast<uint64_t>(cfg_.gateway.heartbeat_interval_ms) * 1'000'000ULL;
     const uint64_t stale_timeout_ns = static_cast<uint64_t>(cfg_.gateway.stale_order_timeout_ms) * 1'000'000ULL;
@@ -162,17 +162,17 @@ void OrderGatewayApp::run() {
     // path additionally sends an on-demand AccountSnapshotRequest to
     // trigger an immediate republish before the process exits.
     constexpr uint64_t kAccountSnapIntervalNs = 5'000'000'000ULL;
-    uint64_t last_hb_ns = ygg::util::TscClock::now_epoch_ns();
+    uint64_t last_hb_ns = bpt::common::util::TscClock::now_epoch_ns();
     uint64_t last_account_snap_ns = 0;
 
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         // Drain exec events from all adapter SPSC queues first — lowest latency path.
         for (auto& a : adapters_)
             a->drain_exec_events([this](const adapter::ExecEvent& ev) { processor_->on_exec_event(ev); });
 
         int fragments = order_sub_->poll(10);
 
-        const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+        const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
         if (now_ns - last_hb_ns >= hb_interval_ns) {
             uint8_t exchange_status = 0;
@@ -213,7 +213,7 @@ void OrderGatewayApp::run() {
                         auto snap = a->fetch_account_snapshot(/*correlation_id=*/0);
                         account_snap_pub_->publish(snap);
                     } catch (const std::exception& e) {
-                        ygg::log::warn("[OrderGateway] Periodic AccountSnapshot fetch failed for {}: {}",
+                        bpt::common::log::warn("[OrderGateway] Periodic AccountSnapshot fetch failed for {}: {}",
                                        bpt::messages::ExchangeId::c_str(a->exchange_id()),
                                        e.what());
                     }
@@ -229,7 +229,7 @@ void OrderGatewayApp::run() {
         a->stop();
 
     metrics_.shutdown();
-    ygg::log::info("[OrderGateway] Shutting down");
+    bpt::common::log::info("[OrderGateway] Shutting down");
 }
 
 }  // namespace bpt::order_gateway

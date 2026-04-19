@@ -10,7 +10,7 @@
 #include <boost/json.hpp>
 #include <cmath>
 #include <string>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -67,7 +67,7 @@ void OKXExecParser::handle_order_ack(const json::object& d, uint64_t recv_ns) {
             order_id = it->second;
     }
     if (order_id == 0) {
-        ygg::log::warn("[OrderGateway] OKXExecParser: op=order response unknown cloid={}", cloid);
+        bpt::common::log::warn("[OrderGateway] OKXExecParser: op=order response unknown cloid={}", cloid);
         return;
     }
 
@@ -85,10 +85,10 @@ void OKXExecParser::handle_order_ack(const json::object& d, uint64_t recv_ns) {
             if (!oid_str.empty())
                 exch_oid = static_cast<uint64_t>(std::stoull(oid_str));
         }
-        ygg::log::info("[OrderGateway] OKXExecParser: order acked cloid={} ordId={}", cloid, exch_oid);
+        bpt::common::log::info("[OrderGateway] OKXExecParser: order acked cloid={} ordId={}", cloid, exch_oid);
         // ACKED events come from the orders channel — skip emitting here.
     } else {
-        ygg::log::error("[OrderGateway] OKXExecParser: order rejected cloid={} sCode={} sMsg={}", cloid, s_code, s_msg);
+        bpt::common::log::error("[OrderGateway] OKXExecParser: order rejected cloid={} sCode={} sMsg={}", cloid, s_code, s_msg);
         ExecEvent ev{};
         ev.order_id = order_id;
         ev.exchange_id = bpt::messages::ExchangeId::OKX;
@@ -118,7 +118,7 @@ void OKXExecParser::handle_orders_channel_item(const json::object& d, uint64_t r
             order_id = it->second;
     }
     if (order_id == 0) {
-        ygg::log::warn("[OrderGateway] OKXExecParser: unknown cloid={}", cloid);
+        bpt::common::log::warn("[OrderGateway] OKXExecParser: unknown cloid={}", cloid);
         return;
     }
 
@@ -184,13 +184,13 @@ void OKXExecParser::handle_orders_channel_item(const json::object& d, uint64_t r
     if (ev.status == ES::ACKED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!acked_orders_.insert(ev.order_id).second) {
-            ygg::log::debug("[OrderGateway] OKXExecParser: suppressed duplicate ACKED order_id={}", ev.order_id);
+            bpt::common::log::debug("[OrderGateway] OKXExecParser: suppressed duplicate ACKED order_id={}", ev.order_id);
             return;
         }
     } else if (ev.status == ES::CANCELLED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!cancelled_orders_.insert(ev.order_id).second) {
-            ygg::log::debug("[OrderGateway] OKXExecParser: suppressed duplicate CANCELLED order_id={}", ev.order_id);
+            bpt::common::log::debug("[OrderGateway] OKXExecParser: suppressed duplicate CANCELLED order_id={}", ev.order_id);
             return;
         }
         acked_orders_.erase(ev.order_id);

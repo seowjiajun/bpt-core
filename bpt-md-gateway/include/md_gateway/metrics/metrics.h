@@ -7,7 +7,7 @@
 #include <prometheus/gauge.h>
 #include <prometheus/registry.h>
 #include <string>
-#include <yggdrasil/util/latency_histogram.h>
+#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway::metrics {
 
@@ -60,7 +60,7 @@ struct MdGatewayMetrics {
     }
 
     // Record a histogram snapshot into the latency gauge family for one exchange.
-    void update_decode_latency(const std::string& exchange, ygg::util::LatencyHistogram& hist) {
+    void update_decode_latency(const std::string& exchange, bpt::common::util::LatencyHistogram& hist) {
         auto snap = hist.snapshot_and_reset();
         if (snap.total == 0)
             return;

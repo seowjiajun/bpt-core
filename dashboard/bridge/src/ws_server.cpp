@@ -5,7 +5,7 @@
 #include <boost/beast/websocket.hpp>
 #include <deque>
 #include <nlohmann/json.hpp>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bridge {
 
@@ -29,7 +29,7 @@ public:
 
         ws_.async_accept([self = shared_from_this()](beast::error_code ec) {
             if (ec) {
-                ygg::log::warn("[WsSession] accept failed: {}", ec.message());
+                bpt::common::log::warn("[WsSession] accept failed: {}", ec.message());
                 return;
             }
             self->server_.add_session(self);
@@ -70,12 +70,12 @@ private:
             if (j.value("type", "") == "command") {
                 std::string cmd = j.value("cmd", "");
                 if (!cmd.empty() && server_.on_command) {
-                    ygg::log::info("[WsSession] received command: {}", cmd);
+                    bpt::common::log::info("[WsSession] received command: {}", cmd);
                     server_.on_command(cmd);
                 }
             }
         } catch (const std::exception& e) {
-            ygg::log::warn("[WsSession] bad inbound message: {}", e.what());
+            bpt::common::log::warn("[WsSession] bad inbound message: {}", e.what());
         }
     }
 
@@ -113,23 +113,23 @@ void WsServer::start() {
     tcp::endpoint endpoint{tcp::v4(), port_};
 
     acceptor_.open(endpoint.protocol(), ec);
-    if (ec) { ygg::log::error("[WsServer] open: {}", ec.message()); return; }
+    if (ec) { bpt::common::log::error("[WsServer] open: {}", ec.message()); return; }
 
     acceptor_.set_option(net::socket_base::reuse_address(true), ec);
     acceptor_.bind(endpoint, ec);
-    if (ec) { ygg::log::error("[WsServer] bind {}: {}", port_, ec.message()); return; }
+    if (ec) { bpt::common::log::error("[WsServer] bind {}: {}", port_, ec.message()); return; }
 
     acceptor_.listen(net::socket_base::max_listen_connections, ec);
-    if (ec) { ygg::log::error("[WsServer] listen: {}", ec.message()); return; }
+    if (ec) { bpt::common::log::error("[WsServer] listen: {}", ec.message()); return; }
 
-    ygg::log::info("[WsServer] listening on :{}", port_);
+    bpt::common::log::info("[WsServer] listening on :{}", port_);
     do_accept();
 
     io_thread_ = std::thread([this] {
         try {
             io_ctx_.run();
         } catch (const std::exception& e) {
-            ygg::log::error("[WsServer] io_context crashed: {}", e.what());
+            bpt::common::log::error("[WsServer] io_context crashed: {}", e.what());
         }
     });
 }
@@ -158,7 +158,7 @@ void WsServer::do_accept() {
         if (ec == net::error::operation_aborted) return;
 
         if (ec) {
-            ygg::log::warn("[WsServer] accept: {}", ec.message());
+            bpt::common::log::warn("[WsServer] accept: {}", ec.message());
         } else {
             std::make_shared<WsSession>(std::move(socket), *this)->run();
         }

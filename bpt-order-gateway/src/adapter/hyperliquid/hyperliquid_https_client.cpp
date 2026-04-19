@@ -6,8 +6,8 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
 #include <stdexcept>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
@@ -41,7 +41,7 @@ void HyperliquidHttpsClient::connect() {
     beast::get_lowest_layer(*stream_).connect(results);
     stream_->handshake(ssl::stream_base::client);
 
-    ygg::log::info("[OrderGateway] HyperliquidHttpsClient: TLS connected to {}:{}", host_, port_);
+    bpt::common::log::info("[OrderGateway] HyperliquidHttpsClient: TLS connected to {}:{}", host_, port_);
 }
 
 void HyperliquidHttpsClient::close() noexcept {
@@ -67,19 +67,19 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
     // once and resend before giving up.
     for (int attempt = 0; attempt < 2; ++attempt) {
         try {
-            const uint64_t t0 = ygg::util::TscClock::now_epoch_ns();
+            const uint64_t t0 = bpt::common::util::TscClock::now_epoch_ns();
 
             const bool needed_connect = !stream_;
             if (needed_connect) connect();
-            const uint64_t t_conn = ygg::util::TscClock::now_epoch_ns();
+            const uint64_t t_conn = bpt::common::util::TscClock::now_epoch_ns();
 
             http::write(*stream_, req);
-            const uint64_t t_write = ygg::util::TscClock::now_epoch_ns();
+            const uint64_t t_write = bpt::common::util::TscClock::now_epoch_ns();
 
             beast::flat_buffer buf;
             http::response<http::string_body> res;
             http::read(*stream_, buf, res);
-            const uint64_t t_read = ygg::util::TscClock::now_epoch_ns();
+            const uint64_t t_read = bpt::common::util::TscClock::now_epoch_ns();
 
             if (!res.keep_alive()) close();
 
@@ -88,7 +88,7 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
             // for block inclusion on HL's L1 (~500 ms blocks). TLS pooling
             // eliminates connect cost but HL's commit latency is upstream of
             // us. `/info` queries don't hit the chain so they're always fast.
-            ygg::log::debug("[OrderGateway] HyperliquidHttpsClient: post {} "
+            bpt::common::log::debug("[OrderGateway] HyperliquidHttpsClient: post {} "
                             "total={:.1f}ms connect={:.1f}ms write={:.2f}ms server+read={:.1f}ms reused={}",
                             path,
                             (t_read - t0) / 1e6,
@@ -99,7 +99,7 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
 
             return res.body();
         } catch (const std::exception& e) {
-            ygg::log::warn("[OrderGateway] HyperliquidHttpsClient: post attempt {} failed: {}",
+            bpt::common::log::warn("[OrderGateway] HyperliquidHttpsClient: post attempt {} failed: {}",
                            attempt, e.what());
             close();
             if (attempt == 1) throw;

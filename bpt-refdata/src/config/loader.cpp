@@ -3,14 +3,14 @@
 #include <fmt/ranges.h>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <yggdrasil/logging_toml.h>
+#include <bpt_common/logging_toml.h>
 
 namespace bpt::refdata::config {
 
 namespace {
 
-ygg::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
-    ygg::config::StreamConfig s{std::move(default_channel), default_stream_id};
+bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
     if (auto v = (*t)["channel"].value<std::string>())
@@ -23,7 +23,7 @@ ygg::config::StreamConfig load_stream(const toml::table* t, std::string default_
 }  // namespace
 
 Settings load(const std::string& path) {
-    ygg::log::info("Loading configuration from: {}", path);
+    bpt::common::log::info("Loading configuration from: {}", path);
 
     toml::table root = toml::parse_file(path);
 
@@ -49,12 +49,12 @@ Settings load(const std::string& path) {
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
         if ((settings.environment == "prod" && path_has_testnet) ||
             ((settings.environment == "qa" || settings.environment == "dev") && path_has_live))
-            ygg::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
+            bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
                            settings.environment,
                            exchange_config_path);
     }
 
-    ygg::log::info("Environment: {}", settings.environment.empty() ? "(not set)" : settings.environment);
+    bpt::common::log::info("Environment: {}", settings.environment.empty() ? "(not set)" : settings.environment);
 
     // Read the exchanges filter from the instance config.
     std::unordered_set<std::string> exchange_filter;
@@ -63,7 +63,7 @@ Settings load(const std::string& path) {
             if (auto v = elem.value<std::string>())
                 exchange_filter.insert(*v);
         settings.exchanges = {exchange_filter.begin(), exchange_filter.end()};
-        ygg::log::info("Exchange filter: [{}]", fmt::join(settings.exchanges, ", "));
+        bpt::common::log::info("Exchange filter: [{}]", fmt::join(settings.exchanges, ", "));
     }
 
     if (auto* aeron = root["aeron"].as_table()) {
@@ -81,7 +81,7 @@ Settings load(const std::string& path) {
         settings.instrument_poll_interval_s = static_cast<uint32_t>(*v);
 
     if (auto* l = root["logging"].as_table())
-        settings.logging = ygg::logging::from_toml(*l);
+        settings.logging = bpt::common::logging::from_toml(*l);
 
     if (auto* m = root["metrics"].as_table())
         if (auto v = (*m)["port"].value<int64_t>())

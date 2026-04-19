@@ -6,7 +6,7 @@
 #include <atomic>
 #include <string>
 #include <unordered_map>
-#include <yggdrasil/util/latency_histogram.h>
+#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -42,7 +42,7 @@ public:
     // Remove gap-detection state for an unsubscribed instrument.
     void forget(const std::string& symbol);
 
-    ygg::util::LatencyHistogram decode_lat_;
+    bpt::common::util::LatencyHistogram decode_lat_;
 
 private:
     SubscriptionMap& subs_;  // non-const: requeue() is called on order book gaps

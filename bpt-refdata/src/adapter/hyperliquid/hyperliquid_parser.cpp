@@ -5,7 +5,7 @@
 
 #include <cmath>
 #include <nlohmann/json.hpp>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 using json = nlohmann::json;
 
@@ -48,7 +48,7 @@ std::vector<refdata::Instrument> HyperliquidParser::parse_meta(const std::string
         result.push_back(std::move(inst));
     }
 
-    ygg::log::info("[HyperliquidParser] Parsed {} perpetual instruments from /info meta", result.size());
+    bpt::common::log::info("[HyperliquidParser] Parsed {} perpetual instruments from /info meta", result.size());
     return result;
 }
 
@@ -57,7 +57,7 @@ std::vector<refdata::FeeScheduleState> HyperliquidParser::parse_user_fees(const 
     auto j = json::parse(body);
     const auto& sched = j.value("feeSchedule", json{});
     if (sched.is_null() || !sched.is_object()) {
-        ygg::log::warn("[HyperliquidParser] userFees response missing feeSchedule");
+        bpt::common::log::warn("[HyperliquidParser] userFees response missing feeSchedule");
         return {};
     }
 

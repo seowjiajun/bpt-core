@@ -34,12 +34,12 @@ public:
     void stop() override;
 
     [[nodiscard]] const char* exchange_name() const override { return "BINANCE"; }
-    [[nodiscard]] ygg::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
+    [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
 
 protected:
     // Returns nullptr if there are no subscriptions yet (run() will retry).
-    std::unique_ptr<ygg::ws::AnyWsStream> connect_and_subscribe() override;
-    void read_loop(ygg::ws::AnyWsStream& ws) override;
+    std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() override;
+    void read_loop(bpt::common::ws::AnyWsStream& ws) override;
     void parse_frame(std::string_view payload, uint64_t recv_ns) override;
 
 private:

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <string>
-#include <yggdrasil/aeron/stream_config.h>
+#include <bpt_common/aeron/stream_config.h>
 
 namespace bpt::analytics::config {
 
@@ -15,11 +15,11 @@ struct Settings {
     std::string media_driver_dir;
 
     // Inputs (read-only subscriptions)
-    ygg::config::StreamConfig exec_report;   // order-gateway → stream 3002
-    ygg::config::StreamConfig md_data;       // bpt-md-gateway → stream 2002
+    bpt::common::config::StreamConfig exec_report;   // order-gateway → stream 3002
+    bpt::common::config::StreamConfig md_data;       // bpt-md-gateway → stream 2002
 
     // Output
-    ygg::config::StreamConfig toxicity;      // tyr → stream 5001
+    bpt::common::config::StreamConfig toxicity;      // tyr → stream 5001
 
     // Analysis parameters
     std::size_t markout_max_pending{64};

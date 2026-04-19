@@ -1,10 +1,10 @@
-#include "yggdrasil/util/tsc_clock.h"
+#include "bpt_common/util/tsc_clock.h"
 
 #include <time.h>
 #include <x86intrin.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
-namespace ygg::util {
+namespace bpt::common::util {
 
 namespace {
 
@@ -81,7 +81,7 @@ void TscClock::calibrate() noexcept {
     ref_tsc_ = best_tsc;
     wall_anchor_ns_ = best_wall;
 
-    ygg::log::info("TscClock calibrated: {:.4f} GHz, wall anchor err ~{}ns", tsc_ghz(), best_gap / 2);
+    bpt::common::log::info("TscClock calibrated: {:.4f} GHz, wall anchor err ~{}ns", tsc_ghz(), best_gap / 2);
 }
 
-}  // namespace ygg::util
+}  // namespace bpt::common::util

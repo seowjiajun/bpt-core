@@ -2,8 +2,8 @@
 
 #include <boost/beast/websocket.hpp>
 #include <chrono>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/ws/ws_connect.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::order_gateway::adapter::okx {
 
@@ -35,20 +35,20 @@ void OKXWsClient::on_frame(std::string_view payload, uint64_t recv_ns) {
     if (message_handler_) message_handler_(std::string(payload), recv_ns);
 }
 
-std::optional<ygg::ws::PingConfig> OKXWsClient::ping_config() const {
+std::optional<bpt::common::ws::PingConfig> OKXWsClient::ping_config() const {
     // OKX closes idle connections at 30s; 10s ping keeps us well
     // inside that window with a margin for network jitter.
-    return ygg::ws::PingConfig{
+    return bpt::common::ws::PingConfig{
         std::chrono::seconds(10),
         [] {
-            ygg::log::info("[OrderGateway] OKXWsClient heartbeat ping sent");
+            bpt::common::log::info("[OrderGateway] OKXWsClient heartbeat ping sent");
             return std::string("ping");
         },
     };
 }
 
 void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
-    ygg::log::info("[OrderGateway] OKXWsClient connecting {}:{}{} (tls={})",
+    bpt::common::log::info("[OrderGateway] OKXWsClient connecting {}:{}{} (tls={})",
                    cfg_.ws_host, cfg_.ws_port, cfg_.ws_path, cfg_.use_tls);
 
     if (!cfg_.use_tls) {
@@ -57,17 +57,17 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
         // here; installing it would take over the lowest-layer timer
         // and silently nullify the read-timeout in RunLoop, breaking
         // the periodic wakeup that lets the ping thread actually fire.
-        auto ws_ptr = ygg::ws::ws_connect_plain(ioc_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
+        auto ws_ptr = bpt::common::ws::ws_connect_plain(ioc_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
                                                 /*so_rcvbuf_bytes=*/0,
                                                 /*connect_timeout_ms=*/30000,
                                                 /*user_agent=*/"bpt-order-gateway/0.1");
-        ygg::log::info("[OrderGateway] OKXWsClient connected (plain), waiting for login");
-        RunLoop::run(ygg::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
+        bpt::common::log::info("[OrderGateway] OKXWsClient connected (plain), waiting for login");
+        RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
         return;
     }
 
     // TLS path — production.
-    auto ws_ptr = ygg::ws::ws_connect(ioc_, ssl_ctx_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
+    auto ws_ptr = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
                                       /*so_rcvbuf_bytes=*/0,
                                       /*connect_timeout_ms=*/30000,
                                       /*user_agent=*/"bpt-order-gateway/0.1");
@@ -75,8 +75,8 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
     // already established, but setting idle=none here would clobber
     // RunLoop's per-read timeout. Leave stream_base::timeout unset on
     // the TLS path too — RunLoop drives both timing and heartbeat.
-    ygg::log::info("[OrderGateway] OKXWsClient connected (tls), waiting for login");
-    RunLoop::run(ygg::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
+    bpt::common::log::info("[OrderGateway] OKXWsClient connected (tls), waiting for login");
+    RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
 }
 
 }  // namespace bpt::order_gateway::adapter::okx

@@ -3,7 +3,7 @@
 // Persistent WebSocket client for the OKX private endpoint. Owns one
 // connection session's read loop, ping cadence, and thread-safe send.
 //
-// Inherits the connect/read/send/ping scaffolding from ygg::ws::RunLoop;
+// Inherits the connect/read/send/ping scaffolding from bpt::common::ws::RunLoop;
 // this class only supplies the OKX-specific bits:
 //   - build & send the `{"op":"login",...}` envelope on handshake
 //   - intercept raw "ping"/"pong" text frames (OKX's application-level
@@ -28,11 +28,11 @@
 #include <functional>
 #include <optional>
 #include <string>
-#include <yggdrasil/ws/run_loop.h>
+#include <bpt_common/ws/run_loop.h>
 
 namespace bpt::order_gateway::adapter::okx {
 
-class OKXWsClient : public ygg::ws::RunLoop {
+class OKXWsClient : public bpt::common::ws::RunLoop {
 public:
     using MessageHandler = std::function<void(const std::string& payload, uint64_t recv_ns)>;
     using LoginMsgBuilder = std::function<std::string()>;
@@ -49,7 +49,7 @@ public:
 protected:
     void on_handshake_complete() override;
     void on_frame(std::string_view payload, uint64_t recv_ns) override;
-    std::optional<ygg::ws::PingConfig> ping_config() const override;
+    std::optional<bpt::common::ws::PingConfig> ping_config() const override;
 
 private:
     boost::asio::io_context& ioc_;

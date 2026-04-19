@@ -1,8 +1,8 @@
 #include "strategy/dashboard/portfolio_snapshot_publisher.h"
 
 #include <nlohmann/json.hpp>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::strategy::dashboard {
 
@@ -11,8 +11,8 @@ PortfolioSnapshotPublisher::PortfolioSnapshotPublisher(std::shared_ptr<aeron::Ae
                                                        int32_t stream_id) {
     if (channel.empty() || stream_id == 0) return;
 
-    pub_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
-    ygg::log::info("[Strategy] Dashboard snapshot publication ready on stream {}", stream_id);
+    pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
+    bpt::common::log::info("[Strategy] Dashboard snapshot publication ready on stream {}", stream_id);
 }
 
 void PortfolioSnapshotPublisher::publish_if_due(const strategy::PortfolioState& state, uint64_t now_ns) {

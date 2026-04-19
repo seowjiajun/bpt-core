@@ -12,7 +12,7 @@
 #include <format>
 #include <set>
 #include <string>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;
@@ -111,7 +111,7 @@ public:
 private:
     void on_accept(beast::error_code ec) {
         if (ec) {
-            ygg::log::warn("[BinanceMdServer] accept error: {}", ec.message());
+            bpt::common::log::warn("[BinanceMdServer] accept error: {}", ec.message());
             closed_ = true;
             return;
         }
@@ -140,7 +140,7 @@ private:
             if (method == "SUBSCRIBE") {
                 for (const auto& p : obj["params"].as_array())
                     subs_.insert(std::string(p.as_string()));
-                ygg::log::debug("[BinanceMdServer] subscribed: {} streams", subs_.size());
+                bpt::common::log::debug("[BinanceMdServer] subscribed: {} streams", subs_.size());
             } else if (method == "UNSUBSCRIBE") {
                 for (const auto& p : obj["params"].as_array())
                     subs_.erase(std::string(p.as_string()));
@@ -151,7 +151,7 @@ private:
             ack["id"] = id;
             send(std::make_shared<std::string>(boost::json::serialize(ack)));
         } catch (const std::exception& e) {
-            ygg::log::warn("[BinanceMdServer] parse error: {}", e.what());
+            bpt::common::log::warn("[BinanceMdServer] parse error: {}", e.what());
         }
 
         do_read();
@@ -194,7 +194,7 @@ void BinanceMdServer::start() {
     acceptor_.set_option(net::socket_base::reuse_address(true));
     acceptor_.bind(ep);
     acceptor_.listen();
-    ygg::log::info("[BinanceMdServer] Listening on port {}", port_);
+    bpt::common::log::info("[BinanceMdServer] Listening on port {}", port_);
     do_accept();
     thread_ = std::thread([this] { ioc_.run(); });
 }
@@ -209,7 +209,7 @@ void BinanceMdServer::stop() {
 void BinanceMdServer::do_accept() {
     acceptor_.async_accept([this](beast::error_code ec, tcp::socket socket) {
         if (!ec) {
-            ygg::log::info("[BinanceMdServer] New connection");
+            bpt::common::log::info("[BinanceMdServer] New connection");
             auto session = std::make_shared<BinanceSession>(std::move(socket));
             // Prune stale sessions before adding the new one.
             sessions_.erase(

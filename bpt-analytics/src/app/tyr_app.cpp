@@ -10,9 +10,9 @@
 #include <chrono>
 #include <cstring>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
 
 namespace bpt::analytics {
 
@@ -37,21 +37,21 @@ AnalyticsApp::AnalyticsApp(config::Settings settings, std::shared_ptr<aeron::Aer
     };
 
     // Subscribe to exec reports (stream 3002)
-    exec_sub_ = ygg::aeron::wait_for_subscription(aeron_, settings_.exec_report.channel,
+    exec_sub_ = bpt::common::aeron::wait_for_subscription(aeron_, settings_.exec_report.channel,
                                                    settings_.exec_report.stream_id);
-    ygg::log::info("[Analytics] Exec report subscription ready: {} stream {}",
+    bpt::common::log::info("[Analytics] Exec report subscription ready: {} stream {}",
                    settings_.exec_report.channel, settings_.exec_report.stream_id);
 
     // Subscribe to MD (stream 2002)
-    md_sub_ = ygg::aeron::wait_for_subscription(aeron_, settings_.md_data.channel,
+    md_sub_ = bpt::common::aeron::wait_for_subscription(aeron_, settings_.md_data.channel,
                                                  settings_.md_data.stream_id);
-    ygg::log::info("[Analytics] MD subscription ready: {} stream {}",
+    bpt::common::log::info("[Analytics] MD subscription ready: {} stream {}",
                    settings_.md_data.channel, settings_.md_data.stream_id);
 
     // Publisher for toxicity updates (stream 5001)
-    toxicity_pub_ = ygg::aeron::wait_for_publication(aeron_, settings_.toxicity.channel,
+    toxicity_pub_ = bpt::common::aeron::wait_for_publication(aeron_, settings_.toxicity.channel,
                                                       settings_.toxicity.stream_id);
-    ygg::log::info("[Analytics] Toxicity publication ready: {} stream {}",
+    bpt::common::log::info("[Analytics] Toxicity publication ready: {} stream {}",
                    settings_.toxicity.channel, settings_.toxicity.stream_id);
 }
 
@@ -77,7 +77,7 @@ void AnalyticsApp::on_bbo(uint64_t instrument_id, double bid, double ask, uint64
         auto observations = st.tracker.consume();
         for (const auto& obs : observations) {
             st.scorer.add(obs);
-            ygg::log::info("[Analytics] Markout inst={} side={} fill_px={:.2f} 1s={:.1f}bps 5s={:.1f}bps 30s={:.1f}bps",
+            bpt::common::log::info("[Analytics] Markout inst={} side={} fill_px={:.2f} 1s={:.1f}bps 5s={:.1f}bps 30s={:.1f}bps",
                            obs.instrument_id,
                            obs.side_sign > 0 ? "BUY" : "SELL",
                            obs.fill_price,
@@ -101,7 +101,7 @@ void AnalyticsApp::on_exec_fill(uint64_t instrument_id, int side_sign, double fi
 
     auto& st = get_or_create(instrument_id == 0 && !state_.empty() ? state_.begin()->first : instrument_id);
     st.tracker.on_fill(st.last_mid > 0 ? instrument_id : 0, side_sign, fill_price, st.last_mid, timestamp_ns);
-    ygg::log::info("[Analytics] Fill recorded: inst={} side={} px={:.2f} mid={:.2f}",
+    bpt::common::log::info("[Analytics] Fill recorded: inst={} side={} px={:.2f} mid={:.2f}",
                     instrument_id,
                     side_sign > 0 ? "BUY" : "SELL",
                     fill_price,
@@ -155,7 +155,7 @@ void AnalyticsApp::maybe_publish(uint64_t now_ns) {
             double a_fr = update.ask_fill_rate;
             double b_ttf = update.bid_ttf_ms;
             double a_ttf = update.ask_ttf_ms;
-            ygg::log::info("[Analytics] Published inst={} bid={:.1f}bps(n={}) ask={:.1f}bps(n={}) "
+            bpt::common::log::info("[Analytics] Published inst={} bid={:.1f}bps(n={}) ask={:.1f}bps(n={}) "
                            "tox={:.2f}/{:.2f} fill_rate={:.0f}%/{:.0f}% ttf={:.0f}/{:.0f}ms",
                            instrument_id, bid_m, bid_n, ask_m, ask_n,
                            bid_t, ask_t, b_fr * 100, a_fr * 100, b_ttf, a_ttf);
@@ -164,12 +164,12 @@ void AnalyticsApp::maybe_publish(uint64_t now_ns) {
 }
 
 void AnalyticsApp::run() {
-    ygg::log::info("[Analytics] Starting main loop (publish every {}ms, window={} fills, min_samples={})",
+    bpt::common::log::info("[Analytics] Starting main loop (publish every {}ms, window={} fills, min_samples={})",
                    settings_.publish_interval_ms,
                    settings_.scorer_window_size,
                    settings_.scorer_min_samples);
 
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         // Poll exec reports
         if (exec_sub_) {
             exec_sub_->poll(
@@ -250,7 +250,7 @@ void AnalyticsApp::run() {
         maybe_publish(now_ns);
     }
 
-    ygg::log::info("[Analytics] Shutting down");
+    bpt::common::log::info("[Analytics] Shutting down");
 }
 
 }  // namespace bpt::analytics

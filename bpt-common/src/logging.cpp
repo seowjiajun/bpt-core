@@ -1,4 +1,4 @@
-#include "yggdrasil/logging.h"
+#include "bpt_common/logging.h"
 
 #include <filesystem>
 #include <quill/Backend.h>
@@ -9,7 +9,7 @@
 #include <quill/sinks/RotatingFileSink.h>
 #include <quill/sinks/RotatingSink.h>
 
-namespace ygg::logging {
+namespace bpt::common::logging {
 
 namespace {
 
@@ -74,4 +74,4 @@ void init(const std::string& service_name, const LogConfig& cfg) {
     g_logger = logger;
 }
 
-}  // namespace ygg::logging
+}  // namespace bpt::common::logging

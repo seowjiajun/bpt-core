@@ -13,7 +13,7 @@
 #include <future>
 #include <set>
 #include <string>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;
@@ -131,7 +131,7 @@ public:
 private:
     void on_accept(beast::error_code ec) {
         if (ec) {
-            ygg::log::warn("[OkxMdServer] accept error: {}", ec.message());
+            bpt::common::log::warn("[OkxMdServer] accept error: {}", ec.message());
             closed_ = true;
             return;
         }
@@ -182,7 +182,7 @@ private:
                         ack["event"] = "subscribe";
                         ack["arg"] = std::move(ack_arg);
                         send(std::make_shared<std::string>(boost::json::serialize(ack)));
-                        ygg::log::debug("[OkxMdServer] subscribed: {} {}", channel, inst_id);
+                        bpt::common::log::debug("[OkxMdServer] subscribed: {} {}", channel, inst_id);
                     } else {
                         subs_.erase(key);
                     }
@@ -192,7 +192,7 @@ private:
                 send(std::make_shared<std::string>("pong"));
             }
         } catch (const std::exception& e) {
-            ygg::log::warn("[OkxMdServer] parse error: {}", e.what());
+            bpt::common::log::warn("[OkxMdServer] parse error: {}", e.what());
         }
 
         do_read();
@@ -235,7 +235,7 @@ void OkxMdServer::start() {
     acceptor_.set_option(net::socket_base::reuse_address(true));
     acceptor_.bind(ep);
     acceptor_.listen();
-    ygg::log::info("[OkxMdServer] Listening on port {}", port_);
+    bpt::common::log::info("[OkxMdServer] Listening on port {}", port_);
     do_accept();
     thread_ = std::thread([this] { ioc_.run(); });
 }
@@ -250,7 +250,7 @@ void OkxMdServer::stop() {
 void OkxMdServer::do_accept() {
     acceptor_.async_accept([this](beast::error_code ec, tcp::socket socket) {
         if (!ec) {
-            ygg::log::info("[OkxMdServer] New connection");
+            bpt::common::log::info("[OkxMdServer] New connection");
             auto session = std::make_shared<OkxMdSession>(std::move(socket));
             sessions_.erase(
                 std::remove_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return s->closed(); }),

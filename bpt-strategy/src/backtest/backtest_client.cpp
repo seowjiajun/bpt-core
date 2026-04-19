@@ -7,8 +7,8 @@
 #include <chrono>
 #include <stdexcept>
 #include <x86intrin.h>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 using namespace bpt::messages;
 
@@ -18,9 +18,9 @@ BacktestClient::BacktestClient(std::shared_ptr<aeron::Aeron> aeron,
                                const std::string& channel,
                                int32_t control_stream_id,
                                int32_t ack_stream_id) {
-    ctrl_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, control_stream_id);
-    ack_pub_ = ygg::aeron::wait_for_publication(aeron, channel, ack_stream_id);
-    ygg::log::info("[BacktestClient] connected: ctrl_sub={} ack_pub={}", control_stream_id, ack_stream_id);
+    ctrl_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, control_stream_id);
+    ack_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, ack_stream_id);
+    bpt::common::log::info("[BacktestClient] connected: ctrl_sub={} ack_pub={}", control_stream_id, ack_stream_id);
 }
 
 void BacktestClient::send_ack(uint64_t tick_seq, uint64_t simulation_ts) {

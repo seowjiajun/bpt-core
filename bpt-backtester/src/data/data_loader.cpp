@@ -121,13 +121,13 @@ void DataLoader::validate() {
     }
 
     if (missing.empty()) {
-        ygg::log::info("[DataLoader] All data files present");
+        bpt::common::log::info("[DataLoader] All data files present");
         return;
     }
 
     if (allow_partial_data_) {
         for (const auto& p : missing)
-            ygg::log::warn("[DataLoader] Missing (will skip): {}", p);
+            bpt::common::log::warn("[DataLoader] Missing (will skip): {}", p);
         return;
     }
 
@@ -223,10 +223,10 @@ void DataLoader::load_day(InstrumentReader& reader) {
                                      std::make_move_iterator(evs.end()));
             has_real_trades = true;
         } catch (const std::exception& e) {
-            ygg::log::error("[DataLoader] Failed to read {}: {}", tp, e.what());
+            bpt::common::log::error("[DataLoader] Failed to read {}: {}", tp, e.what());
         }
     } else if (!allow_partial_data_) {
-        ygg::log::warn("[DataLoader] Trades file missing: {}", tp);
+        bpt::common::log::warn("[DataLoader] Trades file missing: {}", tp);
     }
 
     // Order book
@@ -237,17 +237,17 @@ void DataLoader::load_day(InstrumentReader& reader) {
                                      std::make_move_iterator(evs.begin()),
                                      std::make_move_iterator(evs.end()));
         } catch (const std::exception& e) {
-            ygg::log::error("[DataLoader] Failed to read {}: {}", op, e.what());
+            bpt::common::log::error("[DataLoader] Failed to read {}: {}", op, e.what());
         }
     } else if (!allow_partial_data_) {
-        ygg::log::warn("[DataLoader] Orderbook file missing: {}", op);
+        bpt::common::log::warn("[DataLoader] Orderbook file missing: {}", op);
     }
 
     // When no real trades exist, generate one synthetic trade per orderbook snapshot
     // at the mid-price with unit quantity.  This gives trade-dependent strategies
     // (e.g. VWAP) a price stream equivalent to a mid-price moving average.
     if (!has_real_trades && !reader.day_events.empty()) {
-        ygg::log::debug("[DataLoader] No trades for {}/{} on {} — synthesising from orderbook mid",
+        bpt::common::log::debug("[DataLoader] No trades for {}/{} on {} — synthesising from orderbook mid",
                         ex,
                         sym,
                         format_date(d));
@@ -278,7 +278,7 @@ void DataLoader::load_day(InstrumentReader& reader) {
         return a.timestamp_ns < b.timestamp_ns;
     });
 
-    ygg::log::debug("[DataLoader] Loaded {} events for {}/{} on {}", reader.day_events.size(), ex, sym, format_date(d));
+    bpt::common::log::debug("[DataLoader] Loaded {} events for {}/{} on {}", reader.day_events.size(), ex, sym, format_date(d));
 }
 
 bool DataLoader::InstrumentReader::advance() {

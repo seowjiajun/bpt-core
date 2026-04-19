@@ -27,7 +27,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//messages",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@boost.json",
         "@fmt",
         "@openssl",
@@ -84,7 +84,7 @@ cc_binary(
     ],
     deps = [
         ":order_gateway_core",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@boost.asio",
         "@boost.beast",
         "@boost.json",

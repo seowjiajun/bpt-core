@@ -4,9 +4,9 @@
 #include <messages/TradeSide.h>
 
 #include <cmath>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/parse_double.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/parse_double.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -14,7 +14,7 @@ void HyperliquidParser::parse(std::string_view payload,
                               uint64_t recv_ns,
                               messaging::IMdPublisher& pub,
                               messaging::FundingRateCallback& on_funding_rate) {
-    const uint64_t parse_start_ns = ygg::util::TscClock::now_mono_ns();
+    const uint64_t parse_start_ns = bpt::common::util::TscClock::now_mono_ns();
     pad(payload);
 
     simdjson::ondemand::document doc;
@@ -67,18 +67,18 @@ void HyperliquidParser::parse(std::string_view payload,
             }
             double& px = (side_idx == 0) ? bbo.bid_price : bbo.ask_price;
             double& qty = (side_idx == 0) ? bbo.bid_qty : bbo.ask_qty;
-            (void)ygg::util::ff_double(lvl["px"], px);
-            (void)ygg::util::ff_double(lvl.find_field_unordered("sz"), qty);
+            (void)bpt::common::util::ff_double(lvl["px"], px);
+            (void)bpt::common::util::ff_double(lvl.find_field_unordered("sz"), qty);
             ++side_idx;
         }
 
         if (side_idx < 2)
             return;
 
-        uint64_t lat_ns = ygg::util::TscClock::now_mono_ns() - parse_start_ns;
+        uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;
         decode_lat_.record(lat_ns);
         if (++tick_count_ <= 20 || tick_count_ % 500 == 0)
-            ygg::log::info("Hyperliquid BBO decode: {}ns tick={}", lat_ns, tick_count_);
+            bpt::common::log::info("Hyperliquid BBO decode: {}ns tick={}", lat_ns, tick_count_);
         pub.publish(bbo);
 
         // --- Trades ---
@@ -103,8 +103,8 @@ void HyperliquidParser::parse(std::string_view payload,
             md::MdTrade trade;
             trade.timestamp_ns = recv_ns;
             trade.instrument_id = instrument_id;
-            (void)ygg::util::ff_double(obj.find_field_unordered("px"), trade.price);
-            (void)ygg::util::ff_double(obj.find_field_unordered("sz"), trade.qty);
+            (void)bpt::common::util::ff_double(obj.find_field_unordered("px"), trade.price);
+            (void)bpt::common::util::ff_double(obj.find_field_unordered("sz"), trade.qty);
 
             std::string_view side_sv;
             obj.find_field_unordered("side").get_string().get(side_sv);
@@ -134,7 +134,7 @@ void HyperliquidParser::parse(std::string_view payload,
             return;
 
         double rate = 0.0;
-        (void)ygg::util::ff_double(ctx["funding"], rate);
+        (void)bpt::common::util::ff_double(ctx["funding"], rate);
 
         messaging::FundingRateUpdate fr;
         fr.instrument_id = instrument_id;

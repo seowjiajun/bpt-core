@@ -3,7 +3,7 @@
 #include <boost/json.hpp>
 #include <string>
 #include <vector>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter::okx {
 
@@ -53,10 +53,10 @@ void OKXInstrumentsService::fetch() {
                 contract_sizes_[inst_id] = ctval;
             }
         } catch (const std::exception& e) {
-            ygg::log::warn("[OrderGateway] OKXInstrumentsService: fetch({}) failed: {}", inst_type, e.what());
+            bpt::common::log::warn("[OrderGateway] OKXInstrumentsService: fetch({}) failed: {}", inst_type, e.what());
         }
     }
-    ygg::log::info("[OrderGateway] OKXInstrumentsService: loaded {} instIdCodes, {} contract sizes from REST",
+    bpt::common::log::info("[OrderGateway] OKXInstrumentsService: loaded {} instIdCodes, {} contract sizes from REST",
                    inst_id_codes_.size(),
                    contract_sizes_.size());
 }

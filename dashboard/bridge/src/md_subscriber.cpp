@@ -4,7 +4,7 @@
 #include <messages/MessageHeader.h>
 #include <chrono>
 #include <thread>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bridge {
 
@@ -18,9 +18,9 @@ MdSubscriber::MdSubscriber(std::shared_ptr<aeron::Aeron> aeron,
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!sub_) {
-        ygg::log::error("[bridge/MD] failed to register subscription on {} stream {}", channel, stream_id);
+        bpt::common::log::error("[bridge/MD] failed to register subscription on {} stream {}", channel, stream_id);
     } else {
-        ygg::log::info("[bridge/MD] subscribed on {} stream {}", channel, stream_id);
+        bpt::common::log::info("[bridge/MD] subscribed on {} stream {}", channel, stream_id);
     }
 }
 

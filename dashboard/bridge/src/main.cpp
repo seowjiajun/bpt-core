@@ -16,12 +16,12 @@
 #include <chrono>
 #include <string>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
 
 int main(int argc, char** argv) {
-    ygg::signal::install();
+    bpt::common::signal::install();
 
     CLI::App app{"bpt-bridge — Aeron → WebSocket forwarder for dashboard"};
     std::string config_path = "config/bridge.toml";
@@ -47,8 +47,8 @@ int main(int argc, char** argv) {
     try {
         settings = bridge::config::load(config_path);
     } catch (const std::exception& e) {
-        ygg::logging::init("bridge");
-        ygg::log::error("Failed to load config: {}", e.what());
+        bpt::common::logging::init("bridge");
+        bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
 
@@ -60,17 +60,17 @@ int main(int argc, char** argv) {
     if (!instrument_type_override.empty()) settings.instrument_type  = instrument_type_override;
     if (instrument_id_override > 0)        settings.instrument_id    = instrument_id_override;
 
-    ygg::logging::init("bridge", settings.logging);
-    ygg::log::info("bridge starting — ws :{}  aeron {}", settings.ws_port, settings.media_driver_dir);
-    ygg::log::info("[bridge] md_data stream={}  exec_report stream={}  control stream={}",
+    bpt::common::logging::init("bridge", settings.logging);
+    bpt::common::log::info("bridge starting — ws :{}  aeron {}", settings.ws_port, settings.media_driver_dir);
+    bpt::common::log::info("[bridge] md_data stream={}  exec_report stream={}  control stream={}",
                    settings.md_data.stream_id, settings.exec_report.stream_id,
                    settings.control_command.stream_id);
-    ygg::log::info("[bridge] mode={} strategy={} symbol={}@{} instrument_filter={}",
+    bpt::common::log::info("[bridge] mode={} strategy={} symbol={}@{} instrument_filter={}",
                    settings.mode, settings.strategy, settings.symbol, settings.exchange,
                    settings.instrument_id == 0 ? "(none)" : std::to_string(settings.instrument_id));
 
     // ── Aeron ────────────────────────────────────────────────────────────────
-    auto aeron = ygg::aeron::connect(settings.media_driver_dir);
+    auto aeron = bpt::common::aeron::connect(settings.media_driver_dir);
 
     bridge::MdSubscriber      md_sub(aeron, settings.md_data.channel, settings.md_data.stream_id);
     bridge::ExecSubscriber    exec_sub(aeron, settings.exec_report.channel, settings.exec_report.stream_id);
@@ -81,18 +81,18 @@ int main(int argc, char** argv) {
     // The bridge relays it as-is to all WS clients.
     std::shared_ptr<aeron::Subscription> snapshot_sub;
     if (settings.portfolio_snapshot.stream_id != 0) {
-        snapshot_sub = ygg::aeron::wait_for_subscription(
+        snapshot_sub = bpt::common::aeron::wait_for_subscription(
             aeron, settings.portfolio_snapshot.channel, settings.portfolio_snapshot.stream_id);
-        ygg::log::info("[bridge] portfolio snapshot subscription ready on stream {}",
+        bpt::common::log::info("[bridge] portfolio snapshot subscription ready on stream {}",
                        settings.portfolio_snapshot.stream_id);
     }
 
     // ── Analytics toxicity subscription (optional) ──────────────────────────────────
     std::shared_ptr<aeron::Subscription> tyr_sub;
     if (settings.toxicity.stream_id != 0) {
-        tyr_sub = ygg::aeron::wait_for_subscription(
+        tyr_sub = bpt::common::aeron::wait_for_subscription(
             aeron, settings.toxicity.channel, settings.toxicity.stream_id);
-        ygg::log::info("[bridge] tyr toxicity subscription ready on stream {}",
+        bpt::common::log::info("[bridge] tyr toxicity subscription ready on stream {}",
                        settings.toxicity.stream_id);
     }
 
@@ -101,9 +101,9 @@ int main(int argc, char** argv) {
     // lightweight control path, not a high-throughput data stream.
     std::shared_ptr<aeron::Publication> ctrl_pub;
     if (settings.control_command.stream_id != 0) {
-        ctrl_pub = ygg::aeron::wait_for_publication(
+        ctrl_pub = bpt::common::aeron::wait_for_publication(
             aeron, settings.control_command.channel, settings.control_command.stream_id);
-        ygg::log::info("[bridge] control publication ready on stream {}",
+        bpt::common::log::info("[bridge] control publication ready on stream {}",
                        settings.control_command.stream_id);
     }
 
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
             ctrl_byte = 0x01;
             status_str = "live";
         } else {
-            ygg::log::warn("[bridge] unknown command: {}", cmd);
+            bpt::common::log::warn("[bridge] unknown command: {}", cmd);
             return;
         }
 
@@ -130,13 +130,13 @@ int main(int argc, char** argv) {
             aeron::AtomicBuffer buf(reinterpret_cast<uint8_t*>(&ctrl_byte), 1);
             auto result = ctrl_pub->offer(buf, 0, 1);
             if (result < 0) {
-                ygg::log::warn("[bridge] control offer failed: {}", result);
+                bpt::common::log::warn("[bridge] control offer failed: {}", result);
             }
         }
 
         // Broadcast status to all connected dashboard clients
         ws.publish(bridge::MsgKind::Status, bridge::encode::status(status_str));
-        ygg::log::info("[bridge] command '{}' → status '{}'", cmd, status_str);
+        bpt::common::log::info("[bridge] command '{}' → status '{}'", cmd, status_str);
     };
 
     ws.start();
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
     });
 
     // ── Poll loop ────────────────────────────────────────────────────────────
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         int work = 0;
         work += md_sub.poll(32);
         work += exec_sub.poll(32);
@@ -300,7 +300,7 @@ int main(int argc, char** argv) {
         if (work == 0) std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
 
-    ygg::log::info("bridge shutting down");
+    bpt::common::log::info("bridge shutting down");
     ws.publish(bridge::MsgKind::Status, bridge::encode::status("off"));
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     ws.stop();

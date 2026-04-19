@@ -37,8 +37,8 @@
 #include <map>
 #include <string>
 
-namespace ygg::secrets {
+namespace bpt::common::secrets {
 
 std::map<std::string, std::string> fetch(const std::string& secret_name);
 
-}  // namespace ygg::secrets
+}  // namespace bpt::common::secrets

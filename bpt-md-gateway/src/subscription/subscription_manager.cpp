@@ -5,7 +5,7 @@
 
 #include <cstring>
 #include <unordered_set>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::md_gateway::subscription {
 
@@ -65,7 +65,7 @@ void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, mess
             adapter::IAdapter* adapter = find_adapter(it->second.exchange);
             if (adapter)
                 adapter->unsubscribe(it->first);
-            ygg::log::info("SubscriptionManager: unsubscribed {} on {}", it->first, it->second.exchange);
+            bpt::common::log::info("SubscriptionManager: unsubscribed {} on {}", it->first, it->second.exchange);
             it = active_.erase(it);
         } else {
             ++it;
@@ -77,7 +77,7 @@ void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, mess
         adapter::IAdapter* adapter = find_adapter(d.exchange);
 
         if (!adapter) {
-            ygg::log::warn("SubscriptionManager: no adapter for exchange {}", d.exchange);
+            bpt::common::log::warn("SubscriptionManager: no adapter for exchange {}", d.exchange);
             ack_pub.publish_ack(correlation_id, d.id, d.exchange.c_str(), AckStatus::NOT_FOUND);
             continue;
         }
@@ -85,7 +85,7 @@ void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, mess
         if (active_.find(d.id) == active_.end()) {
             adapter->subscribe(d.id, d.symbol, d.depth);
             active_[d.id] = {d.id, d.exchange, d.symbol, d.depth};
-            ygg::log::info("SubscriptionManager: subscribed {} ({}) on {} depth={}",
+            bpt::common::log::info("SubscriptionManager: subscribed {} ({}) on {} depth={}",
                            d.id,
                            d.symbol,
                            d.exchange,

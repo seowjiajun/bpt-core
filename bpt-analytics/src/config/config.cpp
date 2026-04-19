@@ -1,7 +1,7 @@
 #include "analytics/config/settings.h"
 
 #include <toml++/toml.hpp>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::analytics::config {
 
@@ -11,7 +11,7 @@ Settings load(const std::string& path) {
 
     s.media_driver_dir = tbl["aeron"]["media_driver_dir"].value_or(std::string{"/dev/shm/aeron-bifrost"});
 
-    auto aeron = [&](const char* section) -> ygg::config::StreamConfig {
+    auto aeron = [&](const char* section) -> bpt::common::config::StreamConfig {
         auto node = tbl["aeron"][section];
         return {
             .channel = node["channel"].value_or(std::string{"aeron:ipc"}),

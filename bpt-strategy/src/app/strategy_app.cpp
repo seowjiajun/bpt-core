@@ -12,8 +12,8 @@
 #include <chrono>
 #include <cstring>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/signal.h>
 
 using namespace std::chrono_literals;
 using bpt::messages::ExchangeId;
@@ -65,14 +65,14 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
                                                               ac.vol_surface.channel,
                                                               ac.vol_surface.stream_id,
                                                               ac.pricer_status.stream_id);
-        ygg::log::info("[Strategy] VolSurfaceClient ready: surface={} status={}",
+        bpt::common::log::info("[Strategy] VolSurfaceClient ready: surface={} status={}",
                        ac.vol_surface.stream_id,
                        ac.pricer_status.stream_id);
     }
 
     if (ac.toxicity.stream_id != 0) {
-        tyr_sub_ = ygg::aeron::wait_for_subscription(aeron, ac.toxicity.channel, ac.toxicity.stream_id);
-        ygg::log::info("[Strategy] Analytics toxicity subscription ready: {} stream {}",
+        tyr_sub_ = bpt::common::aeron::wait_for_subscription(aeron, ac.toxicity.channel, ac.toxicity.stream_id);
+        bpt::common::log::info("[Strategy] Analytics toxicity subscription ready: {} stream {}",
                        ac.toxicity.channel, ac.toxicity.stream_id);
     }
 
@@ -100,7 +100,7 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
                                                        ac.backtest_control.channel,
                                                        ac.backtest_control.stream_id,  // sub: Backtester → Strategy
                                                        ac.backtest_ack.stream_id);     // pub: Strategy → Backtester
-        ygg::log::info("[Strategy] Backtest mode enabled: ctrl_sub={} ack_pub={}",
+        bpt::common::log::info("[Strategy] Backtest mode enabled: ctrl_sub={} ack_pub={}",
                        ac.backtest_control.stream_id,
                        ac.backtest_ack.stream_id);
     }
@@ -117,10 +117,10 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         if (dashboard_ctrl_sub_) {
-            ygg::log::info("[Strategy] Dashboard control subscription ready on stream {}",
+            bpt::common::log::info("[Strategy] Dashboard control subscription ready on stream {}",
                            ac.dashboard_control.stream_id);
         } else {
-            ygg::log::warn("[Strategy] Dashboard control subscription unavailable");
+            bpt::common::log::warn("[Strategy] Dashboard control subscription unavailable");
         }
     }
 
@@ -143,7 +143,7 @@ void StrategyApp::wire_refdata_callbacks() {
     };
 
     refdata_->on_error = [](RefDataErrorType::Value error_type, ExchangeId::Value exchange_id, uint64_t instrument_id) {
-        ygg::log::error("[Strategy] RefDataError: type={} exchange={} instrument={}",
+        bpt::common::log::error("[Strategy] RefDataError: type={} exchange={} instrument={}",
                         RefDataErrorType::c_str(error_type),
                         ExchangeId::c_str(exchange_id),
                         instrument_id);
@@ -172,7 +172,7 @@ void StrategyApp::wire_md_callbacks() {
     md_client_->on_bbo = [this](const bpt::messages::MdMarketData& tick) {
         static uint64_t bbo_count = 0;
         if (++bbo_count <= 10 || bbo_count % 1000 == 0) {
-            ygg::log::info("[Strategy] BBO tick #{}: id={} bid={:.4f} ask={:.4f}",
+            bpt::common::log::info("[Strategy] BBO tick #{}: id={} bid={:.4f} ask={:.4f}",
                            bbo_count, tick.instrumentId(), tick.bidPrice(), tick.askPrice());
         }
         metrics_.md_ticks_total->Increment();
@@ -185,11 +185,11 @@ void StrategyApp::wire_md_callbacks() {
         // bpt-md-gateway's.
         curr_tick_ts_ns_ = tick.timestampNs();
         strategy_->on_bbo(tick);
-        const uint64_t t3 = ygg::util::WallClock::now_ns();
+        const uint64_t t3 = bpt::common::util::WallClock::now_ns();
         if (t3 > curr_tick_ts_ns_) {
             const uint64_t delta = t3 - curr_tick_ts_ns_;
             if (bbo_count <= 3)
-                ygg::log::debug("[Latency] bbo raw delta={}ns", delta);
+                bpt::common::log::debug("[Latency] bbo raw delta={}ns", delta);
             tick_lat_hist_.record(delta);
             metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
         }
@@ -201,7 +201,7 @@ void StrategyApp::wire_md_callbacks() {
 
         curr_tick_ts_ns_ = tick.timestampNs();
         strategy_->on_trade(tick);
-        const uint64_t t3 = ygg::util::WallClock::now_ns();
+        const uint64_t t3 = bpt::common::util::WallClock::now_ns();
         if (t3 > curr_tick_ts_ns_) {
             const uint64_t delta = t3 - curr_tick_ts_ns_;
             tick_lat_hist_.record(delta);
@@ -213,7 +213,7 @@ void StrategyApp::wire_md_callbacks() {
         if (!trading_paused_ && !trading_halted_) {
             curr_tick_ts_ns_ = book.timestampNs();
             strategy_->on_order_book(book);
-            const uint64_t t3 = ygg::util::WallClock::now_ns();
+            const uint64_t t3 = bpt::common::util::WallClock::now_ns();
             if (t3 > curr_tick_ts_ns_) {
                 const uint64_t delta = t3 - curr_tick_ts_ns_;
                 tick_lat_hist_.record(delta);
@@ -227,14 +227,14 @@ void StrategyApp::wire_vol_callbacks() {
     if (!vol_client_) return;
 
     vol_client_->on_vol_surface = [this](bpt::messages::VolSurface& surface) {
-        ygg::log::info("[Strategy] VolSurface received: exchange={} underlying={}",
+        bpt::common::log::info("[Strategy] VolSurface received: exchange={} underlying={}",
                        ExchangeId::c_str(surface.exchangeId()),
                        surface.getUnderlyingAsString());
         strategy_->on_vol_surface(surface);
     };
 
     vol_client_->on_ready = [this](uint8_t exchanges_loaded, uint16_t underlying_count, uint32_t point_count) {
-        ygg::log::info("[Strategy] PricerReady: exchanges=0x{:02x} underlyings={} points={}",
+        bpt::common::log::info("[Strategy] PricerReady: exchanges=0x{:02x} underlyings={} points={}",
                        exchanges_loaded, underlying_count, point_count);
         pricer_ready_ = true;
     };
@@ -245,7 +245,7 @@ void StrategyApp::wire_order_callbacks() {
         order_mgr_->on_order_placed = [this](uint64_t /*order_id*/) {
             // curr_tick_ts_ns_ is WallClock-sourced (stamped by bpt-md-gateway and
             // re-read via tick.timestampNs()), so this side must match.
-            const uint64_t now = ygg::util::WallClock::now_ns();
+            const uint64_t now = bpt::common::util::WallClock::now_ns();
             if (now <= curr_tick_ts_ns_) return;
             const uint64_t delta = now - curr_tick_ts_ns_;
             order_lat_hist_.record(delta);
@@ -259,13 +259,13 @@ void StrategyApp::wire_order_callbacks() {
         const auto status = rpt.status();
         const double price_d = static_cast<double>(rpt.price()) / 1e8;
         if (status == ExecStatus::ACKED) {
-            ygg::log::debug("[Strategy] ExecReport order_id={} ACKED price={:.2f}",
+            bpt::common::log::debug("[Strategy] ExecReport order_id={} ACKED price={:.2f}",
                             rpt.orderId(), price_d);
         } else if (status == ExecStatus::REJECTED) {
-            ygg::log::info("[Strategy] ExecReport order_id={} REJECTED reason={} price={:.2f}",
+            bpt::common::log::info("[Strategy] ExecReport order_id={} REJECTED reason={} price={:.2f}",
                            rpt.orderId(), RejectReason::c_str(rpt.rejectReason()), price_d);
         } else {
-            ygg::log::info("[Strategy] ExecReport order_id={} status={} filled_qty={:.6f} price={:.2f}",
+            bpt::common::log::info("[Strategy] ExecReport order_id={} status={} filled_qty={:.6f} price={:.2f}",
                            rpt.orderId(), ExecStatus::c_str(status),
                            static_cast<double>(rpt.filledQty()) / 1e8, price_d);
         }
@@ -281,7 +281,7 @@ void StrategyApp::wire_order_callbacks() {
 
     order_gw_->on_account_snapshot = [this](bpt::messages::AccountSnapshot& snap) {
         const auto exchange_id = snap.exchangeId();
-        ygg::log::info(
+        bpt::common::log::info(
             "[Strategy] AccountSnapshot received: exchange={} balance={:.2f} positions={}",
             ExchangeId::c_str(exchange_id),
             static_cast<double>(snap.availableBalanceE8()) / 1e8,
@@ -293,9 +293,9 @@ void StrategyApp::wire_order_callbacks() {
 }
 
 void StrategyApp::run() {
-    ygg::log::info("Polling... waiting for RefDataReady before subscribing (Ctrl+C to exit)");
+    bpt::common::log::info("Polling... waiting for RefDataReady before subscribing (Ctrl+C to exit)");
 
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         int frags = refdata_->poll();
         if (md_client_)
             frags += md_client_->poll();
@@ -329,10 +329,10 @@ void StrategyApp::run() {
                     const uint8_t cmd = *reinterpret_cast<const uint8_t*>(buffer.buffer() + offset);
                     if (cmd == 0x00 && !trading_halted_) {
                         trading_halted_ = true;
-                        ygg::log::warn("[Strategy] TRADING HALTED via dashboard kill-switch");
+                        bpt::common::log::warn("[Strategy] TRADING HALTED via dashboard kill-switch");
                     } else if (cmd == 0x01 && trading_halted_) {
                         trading_halted_ = false;
-                        ygg::log::info("[Strategy] Trading RESUMED via dashboard");
+                        bpt::common::log::info("[Strategy] Trading RESUMED via dashboard");
                     }
                 },
                 1);
@@ -352,7 +352,7 @@ void StrategyApp::run() {
             report_latency_stats();
 
             if (portfolio_snap_pub_ && portfolio_snap_pub_->is_active()) {
-                const auto now_ns = ygg::util::TscClock::now_epoch_ns();
+                const auto now_ns = bpt::common::util::TscClock::now_epoch_ns();
                 portfolio_snap_pub_->publish_if_due(strategy_->get_portfolio_state(), now_ns);
 
                 // Publish strategy state at ~2 Hz (every 500ms).
@@ -379,14 +379,14 @@ void StrategyApp::run() {
     shutdown_flatten();
 
     metrics_.shutdown();
-    ygg::log::info("Shutting down");
+    bpt::common::log::info("Shutting down");
 }
 
 void StrategyApp::shutdown_flatten() {
     if (!strategy_) {
         return;
     }
-    ygg::log::warn("[Strategy] Shutdown flatten starting — cancelling resting orders and closing open positions");
+    bpt::common::log::warn("[Strategy] Shutdown flatten starting — cancelling resting orders and closing open positions");
 
     // Pre-drain: process any exec reports already queued on the gateway
     // BEFORE we ask the strategy to flatten. If a fill happened in the
@@ -397,9 +397,9 @@ void StrategyApp::shutdown_flatten() {
     // poll the order gateway — fresh MD ticks would re-invoke strategy
     // handlers and could fire new entries.
     if (order_gw_) {
-        const uint64_t pre_drain_start = ygg::util::TscClock::now_epoch_ns();
+        const uint64_t pre_drain_start = bpt::common::util::TscClock::now_epoch_ns();
         constexpr uint64_t kPreDrainBudgetNs = 1'000'000'000ULL;
-        while (ygg::util::TscClock::now_epoch_ns() - pre_drain_start < kPreDrainBudgetNs) {
+        while (bpt::common::util::TscClock::now_epoch_ns() - pre_drain_start < kPreDrainBudgetNs) {
             const int frags = order_gw_->poll();
             if (frags == 0)
                 __builtin_ia32_pause();
@@ -409,7 +409,7 @@ void StrategyApp::shutdown_flatten() {
     try {
         strategy_->on_shutdown_flatten();
     } catch (const std::exception& e) {
-        ygg::log::error("[Strategy] on_shutdown_flatten threw: {}", e.what());
+        bpt::common::log::error("[Strategy] on_shutdown_flatten threw: {}", e.what());
     }
 
     // Post-drain: loop until the strategy says all its
@@ -420,15 +420,15 @@ void StrategyApp::shutdown_flatten() {
     // slow (network hiccup, adapter reconnect mid-flatten) the budget
     // could expire with orders still live. We now log clearly when
     // the budget expires so ops know to look.
-    const uint64_t drain_start_ns = ygg::util::TscClock::now_epoch_ns();
+    const uint64_t drain_start_ns = bpt::common::util::TscClock::now_epoch_ns();
     constexpr uint64_t kDrainBudgetNs = 5ULL * 1'000'000'000ULL;
     bool drained_cleanly = true;
     if (order_gw_) {
         while (true) {
-            const uint64_t elapsed = ygg::util::TscClock::now_epoch_ns() - drain_start_ns;
+            const uint64_t elapsed = bpt::common::util::TscClock::now_epoch_ns() - drain_start_ns;
             if (elapsed >= kDrainBudgetNs) {
                 if (strategy_->has_pending_flatten()) {
-                    ygg::log::error(
+                    bpt::common::log::error(
                         "[Strategy] shutdown drain budget ({} ms) expired with pending "
                         "orders still in flight — process exiting with live exchange-side "
                         "state. Investigate via order-gateway logs and exchange console.",
@@ -438,7 +438,7 @@ void StrategyApp::shutdown_flatten() {
                 break;
             }
             if (!strategy_->has_pending_flatten()) {
-                ygg::log::info("[Strategy] shutdown drain completed cleanly in {} ms",
+                bpt::common::log::info("[Strategy] shutdown drain completed cleanly in {} ms",
                                elapsed / 1'000'000ULL);
                 break;
             }
@@ -456,23 +456,23 @@ void StrategyApp::shutdown_flatten() {
         try {
             startup_gate_->refresh_account_snapshots();
         } catch (const std::exception& e) {
-            ygg::log::error("[Strategy] refresh_account_snapshots threw: {}", e.what());
+            bpt::common::log::error("[Strategy] refresh_account_snapshots threw: {}", e.what());
         }
     }
 
     // Brief secondary drain so the refresh snapshot propagates through the
     // bus before we exit.
     if (order_gw_) {
-        const uint64_t t1 = ygg::util::TscClock::now_epoch_ns();
+        const uint64_t t1 = bpt::common::util::TscClock::now_epoch_ns();
         constexpr uint64_t kSnapDrainBudgetNs = 1'000'000'000ULL;
-        while (ygg::util::TscClock::now_epoch_ns() - t1 < kSnapDrainBudgetNs) {
+        while (bpt::common::util::TscClock::now_epoch_ns() - t1 < kSnapDrainBudgetNs) {
             const int frags = order_gw_->poll();
             if (frags == 0)
                 __builtin_ia32_pause();
         }
     }
 
-    ygg::log::warn("[Strategy] Shutdown flatten complete");
+    bpt::common::log::warn("[Strategy] Shutdown flatten complete");
 }
 
 void StrategyApp::check_service_liveness() {
@@ -491,7 +491,7 @@ void StrategyApp::check_service_liveness() {
     if (md_client_ && last_md_hb_recv_ns_ != 0) {
         const uint64_t age_ns = now_ns - last_md_hb_recv_ns_;
         if (age_ns > threshold_ns) {
-            ygg::log::warn("[Strategy] MD Gateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
+            bpt::common::log::warn("[Strategy] MD Gateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
                            age_ns / 1e9,
                            threshold_ns / 1e9);
             stale = true;
@@ -501,7 +501,7 @@ void StrategyApp::check_service_liveness() {
     if (order_gw_ && last_gw_hb_recv_ns_ != 0) {
         const uint64_t age_ns = now_ns - last_gw_hb_recv_ns_;
         if (age_ns > threshold_ns) {
-            ygg::log::warn("[Strategy] OrderGateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
+            bpt::common::log::warn("[Strategy] OrderGateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
                            age_ns / 1e9,
                            threshold_ns / 1e9);
             stale = true;
@@ -511,18 +511,18 @@ void StrategyApp::check_service_liveness() {
     if (stale && !trading_paused_) {
         trading_paused_ = true;
         metrics_.trading_paused->Set(1.0);
-        ygg::log::warn("[Strategy] Trading PAUSED — service heartbeat(s) stale");
+        bpt::common::log::warn("[Strategy] Trading PAUSED — service heartbeat(s) stale");
     } else if (!stale && trading_paused_) {
         trading_paused_ = false;
         metrics_.trading_paused->Set(0.0);
-        ygg::log::info("[Strategy] Trading RESUMED — all service heartbeats healthy");
+        bpt::common::log::info("[Strategy] Trading RESUMED — all service heartbeats healthy");
     }
 }
 
 void StrategyApp::report_latency_stats() {
     constexpr uint64_t kReportIntervalNs = 30'000'000'000ULL;  // 30 s
 
-    const uint64_t now = ygg::util::TscClock::now_epoch_ns();
+    const uint64_t now = bpt::common::util::TscClock::now_epoch_ns();
     if (now - last_lat_report_ns_ < kReportIntervalNs)
         return;
     last_lat_report_ns_ = now;
@@ -531,14 +531,14 @@ void StrategyApp::report_latency_stats() {
     auto ord = order_lat_hist_.snapshot_and_reset();
 
     if (tick.total == 0) {
-        ygg::log::info("[Latency] No MD ticks processed in last 30s");
+        bpt::common::log::info("[Latency] No MD ticks processed in last 30s");
         return;
     }
 
     // T0 = bpt-md-gateway TSC at wire receipt; T3 = strategy TSC after strategy returns.
     // Both services calibrate TscClock independently — cross-process skew is
     // typically <1µs on a single host with invariant TSC, so delta is valid.
-    ygg::log::info(
+    bpt::common::log::info(
         "[Latency] MD tick→strategy (T0→T3): n={} "
         "p50={:.1f}µs p90={:.1f}µs p99={:.1f}µs p99.9={:.1f}µs max={:.1f}µs mean={:.1f}µs",
         tick.total,
@@ -550,7 +550,7 @@ void StrategyApp::report_latency_stats() {
         tick.mean_ns() / 1e3);
 
     if (ord.total > 0) {
-        ygg::log::info(
+        bpt::common::log::info(
             "[Latency] MD tick→order placed (T0→T3 w/order): n={} "
             "p50={:.1f}µs p90={:.1f}µs p99={:.1f}µs max={:.1f}µs mean={:.1f}µs",
             ord.total,
@@ -560,12 +560,12 @@ void StrategyApp::report_latency_stats() {
             ord.max_ns() / 1e3,
             ord.mean_ns() / 1e3);
     } else {
-        ygg::log::info("[Latency] No orders placed in last 30s");
+        bpt::common::log::info("[Latency] No orders placed in last 30s");
     }
 }
 
 void StrategyApp::run_backtest_loop() {
-    ygg::log::info("[Strategy] Backtest: strategy ready — entering tick-gating loop");
+    bpt::common::log::info("[Strategy] Backtest: strategy ready — entering tick-gating loop");
 
     bool stop_received = false;
 
@@ -576,7 +576,7 @@ void StrategyApp::run_backtest_loop() {
             if (cmd == BacktestCommand::START) {
                 if (seq == 0) {
                     // Initial handshake — Backtester is ready to start ticking.
-                    ygg::log::info("[Strategy] Backtest handshake received, acking");
+                    bpt::common::log::info("[Strategy] Backtest handshake received, acking");
                     backtest_client_->send_ack(0, 0);
                 } else {
                     // Normal tick — drain MD and execution reports for up to 10 ms,
@@ -598,12 +598,12 @@ void StrategyApp::run_backtest_loop() {
                     backtest_client_->send_ack(seq, sim_ts);
                 }
             } else if (cmd == BacktestCommand::STOP) {
-                ygg::log::info("[Strategy] Backtest STOP received — halting");
+                bpt::common::log::info("[Strategy] Backtest STOP received — halting");
                 stop_received = true;
             }
         };
 
-    while (!stop_received && ygg::signal::is_running()) {
+    while (!stop_received && bpt::common::signal::is_running()) {
         int frags = backtest_client_->poll();
         if (frags == 0)
             std::this_thread::sleep_for(10us);

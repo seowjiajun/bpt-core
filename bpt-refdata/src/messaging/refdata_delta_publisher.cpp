@@ -6,16 +6,16 @@
 #include <messages/OptionSide.h>
 #include <messages/RefDataDelta.h>
 
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::refdata::messaging {
 
 RefdataDeltaPublisher::RefdataDeltaPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                              const std::string& channel,
                                              int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value update_type,
@@ -29,7 +29,7 @@ void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     char buf[kBufSize];
 
-    uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+    uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
     RefDataDelta msg;
     msg.wrapAndApplyHeader(buf, 0, kBufSize)
@@ -56,7 +56,7 @@ void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "delta");
 
-    ygg::log::debug("Published delta seq={} uid={} type={}", seq_, inst.inst_uid, DeltaUpdateType::c_str(update_type));
+    bpt::common::log::debug("Published delta seq={} uid={} type={}", seq_, inst.inst_uid, DeltaUpdateType::c_str(update_type));
 }
 
 void RefdataDeltaPublisher::publish_heartbeat() {
@@ -68,7 +68,7 @@ void RefdataDeltaPublisher::publish_heartbeat() {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     char buf[kBufSize];
 
-    uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+    uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
     RefDataDelta msg;
     msg.wrapAndApplyHeader(buf, 0, kBufSize)
@@ -80,7 +80,7 @@ void RefdataDeltaPublisher::publish_heartbeat() {
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "heartbeat");
 
-    ygg::log::debug("Published heartbeat seq={}", seq_);
+    bpt::common::log::debug("Published heartbeat seq={}", seq_);
 }
 
 }  // namespace bpt::refdata::messaging

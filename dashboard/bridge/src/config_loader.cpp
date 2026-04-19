@@ -3,16 +3,16 @@
 #include <fmt/format.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
-#include <yggdrasil/logging_toml.h>
+#include <bpt_common/logging_toml.h>
 
 namespace bridge::config {
 
 namespace {
 
-ygg::config::StreamConfig load_stream(const toml::table* t,
+bpt::common::config::StreamConfig load_stream(const toml::table* t,
                                       std::string default_channel,
                                       int32_t default_stream_id) {
-    ygg::config::StreamConfig s{std::move(default_channel), default_stream_id};
+    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t) return s;
     if (auto v = (*t)["channel"].value<std::string>()) s.channel = *v;
     if (auto v = (*t)["stream_id"].value<int64_t>()) s.stream_id = static_cast<int32_t>(*v);
@@ -67,7 +67,7 @@ Settings load(const std::string& path) {
     }
 
     // Logging
-    if (auto* l = root["logging"].as_table()) s.logging = ygg::logging::from_toml(*l);
+    if (auto* l = root["logging"].as_table()) s.logging = bpt::common::logging::from_toml(*l);
 
     return s;
 }

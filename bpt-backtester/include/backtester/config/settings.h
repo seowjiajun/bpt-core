@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <yggdrasil/aeron/stream_config.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/stream_config.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::backtester::config {
 
@@ -57,8 +57,8 @@ struct ResultsConfig {
 // to BacktestAck on backtest_ack.  Stream IDs must match Strategy's config.
 struct AeronConfig {
     std::string media_driver_dir;
-    ygg::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // pub: Backtester → Strategy
-    ygg::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // sub: Strategy → Backtester
+    bpt::common::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // pub: Backtester → Strategy
+    bpt::common::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // sub: Strategy → Backtester
 };
 
 struct Settings {
@@ -67,7 +67,7 @@ struct Settings {
     EndpointConfig endpoints;
     AeronConfig aeron;
     std::vector<InstrumentConfig> instruments;
-    ygg::logging::LogConfig logging;
+    bpt::common::logging::LogConfig logging;
     ResultsConfig results;
     uint16_t metrics_port{9105};
 };

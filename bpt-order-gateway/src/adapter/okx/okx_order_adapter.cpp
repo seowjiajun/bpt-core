@@ -35,7 +35,7 @@ OKXOrderAdapter::OKXOrderAdapter(const config::AdapterConfig& cfg, const Exchang
 
     parser_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
-            ygg::log::error("[OKX] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
+            bpt::common::log::error("[OKX] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
 
     ws_client_.set_login_msg_builder(
@@ -77,12 +77,12 @@ void OKXOrderAdapter::handle_message(const std::string& payload, uint64_t recv_n
                 code = std::string(cit->value().as_string());
             if (auto mit = obj.find("msg"); mit != obj.end())
                 msg = std::string(mit->value().as_string());
-            ygg::log::error("[OrderGateway] OKXOrderAdapter: error event code={} msg={}", code, msg);
+            bpt::common::log::error("[OrderGateway] OKXOrderAdapter: error event code={} msg={}", code, msg);
         } else {
-            ygg::log::info("[OrderGateway] OKXOrderAdapter: event={}", event);
+            bpt::common::log::info("[OrderGateway] OKXOrderAdapter: event={}", event);
         }
         if (event == "login") {
-            ygg::log::info("[OrderGateway] OKXOrderAdapter: login successful");
+            bpt::common::log::info("[OrderGateway] OKXOrderAdapter: login successful");
             logged_in_.store(true, std::memory_order_release);
             json::object sub_msg;
             sub_msg["op"] = "subscribe";
@@ -161,19 +161,19 @@ void OKXOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
         rej.status = bpt::messages::ExecStatus::REJECTED;
         rej.reject_reason = bpt::messages::RejectReason::EXCHANGE_ERROR;
         if (!exec_queue_.try_push(rej))
-            ygg::log::error("[OKX] exec_queue full — dropped rejection order_id={}", rej.order_id);
+            bpt::common::log::error("[OKX] exec_queue full — dropped rejection order_id={}", rej.order_id);
     };
 
     try {
         if (!ws_client_.send(frame)) {
-            ygg::log::warn(
+            bpt::common::log::warn(
                 "[OrderGateway] OKXOrderAdapter: send_new_order: WS not connected, "
                 "rejecting order={}",
                 order.orderId());
             emit_rejection();
         }
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] OKXOrderAdapter: send_new_order failed: {}", e.what());
+        bpt::common::log::error("[OrderGateway] OKXOrderAdapter: send_new_order failed: {}", e.what());
         emit_rejection();
     }
 }
@@ -187,12 +187,12 @@ void OKXOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel, cons
     try {
         ws_client_.send(frame);
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] OKXOrderAdapter: send_cancel failed: {}", e.what());
+        bpt::common::log::error("[OrderGateway] OKXOrderAdapter: send_cancel failed: {}", e.what());
     }
 }
 
 void OKXOrderAdapter::send_cancel_all(uint64_t instrument_id) {
-    ygg::log::warn("[OrderGateway] OKXOrderAdapter: send_cancel_all called instrument_id={}", instrument_id);
+    bpt::common::log::warn("[OrderGateway] OKXOrderAdapter: send_cancel_all called instrument_id={}", instrument_id);
 }
 
 void OKXOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify, const std::string& native_symbol) {
@@ -204,7 +204,7 @@ void OKXOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify, cons
     try {
         ws_client_.send(frame);
     } catch (const std::exception& e) {
-        ygg::log::error("[OrderGateway] OKXOrderAdapter: send_modify failed: {}", e.what());
+        bpt::common::log::error("[OrderGateway] OKXOrderAdapter: send_modify failed: {}", e.what());
     }
 }
 
@@ -223,7 +223,7 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
         auto bal_resp = https_client_.get_signed("/api/v5/account/balance");
         auto bal_j = json::parse(bal_resp);
         if (!bal_j.is_object()) {
-            ygg::log::warn("[OrderGateway] OKXOrderAdapter: balance response is not an object: {}",
+            bpt::common::log::warn("[OrderGateway] OKXOrderAdapter: balance response is not an object: {}",
                            bal_resp.substr(0, 400));
         } else {
             const auto& root = bal_j.as_object();
@@ -231,7 +231,7 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
             // code prominently so we don't silently swallow auth / clock
             // failures like 50112.
             if (root.contains("code") && std::string(root.at("code").as_string()) != "0") {
-                ygg::log::warn("[OrderGateway] OKXOrderAdapter: /account/balance error code={} msg={} body={}",
+                bpt::common::log::warn("[OrderGateway] OKXOrderAdapter: /account/balance error code={} msg={} body={}",
                                std::string(root.at("code").as_string()),
                                root.contains("msg") ? std::string(root.at("msg").as_string()) : "",
                                bal_resp.substr(0, 400));
@@ -256,7 +256,7 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
                         const double eq_d = eq.empty() ? 0.0 : std::stod(eq);
                         const double avail_d = avail.empty() ? 0.0 : std::stod(avail);
                         if (eq_d > 0.0)
-                            ygg::log::info("[OKX balance detail] ccy={} eq={} availBal={}", ccy, eq, avail);
+                            bpt::common::log::info("[OKX balance detail] ccy={} eq={} availBal={}", ccy, eq, avail);
                         // Cap ccy name to 8 chars — SBE group field is Char8.
                         // Any OKX ccy code in the wild is ≤ 5 chars so this
                         // is a safety clamp, not a real concern.
@@ -272,16 +272,16 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
                                 static_cast<int64_t>(std::round(avail_d * 1e8));
                     }
                 }
-                ygg::log::info("[OrderGateway] OKXOrderAdapter: /account/balance totalEq={:.4f} USDT availBal={:.4f}",
+                bpt::common::log::info("[OrderGateway] OKXOrderAdapter: /account/balance totalEq={:.4f} USDT availBal={:.4f}",
                                static_cast<double>(snap.total_equity_e8) / 1e8,
                                static_cast<double>(snap.available_balance_e8) / 1e8);
             } else {
-                ygg::log::warn("[OrderGateway] OKXOrderAdapter: balance response missing data[]: {}",
+                bpt::common::log::warn("[OrderGateway] OKXOrderAdapter: balance response missing data[]: {}",
                                bal_resp.substr(0, 400));
             }
         }
     } catch (const std::exception& e) {
-        ygg::log::warn("[OrderGateway] OKXOrderAdapter: failed to fetch balance: {}", e.what());
+        bpt::common::log::warn("[OrderGateway] OKXOrderAdapter: failed to fetch balance: {}", e.what());
     }
 
     try {
@@ -313,10 +313,10 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
             }
         }
     } catch (const std::exception& e) {
-        ygg::log::warn("[OrderGateway] OKXOrderAdapter: failed to fetch positions: {}", e.what());
+        bpt::common::log::warn("[OrderGateway] OKXOrderAdapter: failed to fetch positions: {}", e.what());
     }
 
-    ygg::log::info("[OrderGateway] OKXOrderAdapter: account snapshot fetched — balance={:.2f} positions={}",
+    bpt::common::log::info("[OrderGateway] OKXOrderAdapter: account snapshot fetched — balance={:.2f} positions={}",
                    static_cast<double>(snap.available_balance_e8) / 1e8,
                    snap.positions.size());
     return snap;
@@ -327,12 +327,12 @@ void OKXOrderAdapter::fetch_and_log_account_config() {
         auto body = https_client_.get_signed("/api/v5/account/config");
         auto j = json::parse(body);
         if (!j.is_object()) {
-            ygg::log::warn("[OKX account/config] unexpected response shape");
+            bpt::common::log::warn("[OKX account/config] unexpected response shape");
             return;
         }
         auto& obj = j.as_object();
         if (obj.contains("code") && obj.at("code").as_string() != "0") {
-            ygg::log::warn("[OKX account/config] error code={} msg={}",
+            bpt::common::log::warn("[OKX account/config] error code={} msg={}",
                            std::string(obj.at("code").as_string()),
                            obj.contains("msg") ? std::string(obj.at("msg").as_string()) : "");
             return;
@@ -365,11 +365,11 @@ void OKXOrderAdapter::fetch_and_log_account_config() {
             derivatives_allowed = true;
         }
 
-        ygg::log::info("[OKX account/config] uid={} label='{}' acctLv={} ({}) perm={} posMode={}",
+        bpt::common::log::info("[OKX account/config] uid={} label='{}' acctLv={} ({}) perm={} posMode={}",
                        uid, label, acct_lv, lvl_name, perm, pos_mode);
 
         if (!derivatives_allowed) {
-            ygg::log::warn("[OKX account/config] ACCOUNT CANNOT TRADE DERIVATIVES — "
+            bpt::common::log::warn("[OKX account/config] ACCOUNT CANNOT TRADE DERIVATIVES — "
                            "level {} is spot-only. Perp/futures/options orders will reject "
                            "with sCode=51155 'local compliance requirements' (the real cause "
                            "is the account level, not geo-compliance). Upgrade via OKX UI: "
@@ -377,7 +377,7 @@ void OKXOrderAdapter::fetch_and_log_account_config() {
                            acct_lv);
         }
     } catch (const std::exception& e) {
-        ygg::log::warn("[OKX account/config] fetch failed: {}", e.what());
+        bpt::common::log::warn("[OKX account/config] fetch failed: {}", e.what());
     }
 }
 

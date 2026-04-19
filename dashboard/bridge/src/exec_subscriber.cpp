@@ -7,7 +7,7 @@
 
 #include <chrono>
 #include <thread>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bridge {
 
@@ -27,9 +27,9 @@ ExecSubscriber::ExecSubscriber(std::shared_ptr<aeron::Aeron> aeron,
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!sub_) {
-        ygg::log::error("[bridge/Exec] failed to register subscription on {} stream {}", channel, stream_id);
+        bpt::common::log::error("[bridge/Exec] failed to register subscription on {} stream {}", channel, stream_id);
     } else {
-        ygg::log::info("[bridge/Exec] subscribed on {} stream {}", channel, stream_id);
+        bpt::common::log::info("[bridge/Exec] subscribed on {} stream {}", channel, stream_id);
     }
 }
 

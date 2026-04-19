@@ -1,6 +1,6 @@
 #include "refdata/messaging/subscription_manager.h"
 
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::messaging {
 
@@ -13,17 +13,17 @@ void SubscriptionManager::upsert(const RefdataRequest& request) {
     subscriptions_[request.correlation_id] = filter;
 
     if (is_new) {
-        ygg::log::info("New subscription: correlation_id={} filters={}",
+        bpt::common::log::info("New subscription: correlation_id={} filters={}",
                        request.correlation_id,
                        request.instruments.size());
     } else {
-        ygg::log::debug("Refreshed subscription: correlation_id={}", request.correlation_id);
+        bpt::common::log::debug("Refreshed subscription: correlation_id={}", request.correlation_id);
     }
 }
 
 void SubscriptionManager::remove(uint64_t correlation_id) {
     if (subscriptions_.erase(correlation_id)) {
-        ygg::log::info("Removed subscription: correlation_id={}", correlation_id);
+        bpt::common::log::info("Removed subscription: correlation_id={}", correlation_id);
     }
 }
 

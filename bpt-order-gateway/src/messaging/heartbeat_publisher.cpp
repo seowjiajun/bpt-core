@@ -5,12 +5,12 @@
 
 #include <chrono>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
+#include <bpt_common/aeron/aeron_utils.h>
 
 namespace bpt::order_gateway::messaging {
 
 HeartbeatPublisher::HeartbeatPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void HeartbeatPublisher::publish(uint8_t service_id, uint16_t orders_in_flight, uint8_t exchange_status) {

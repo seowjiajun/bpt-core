@@ -3,8 +3,8 @@
 #include <chrono>
 #include <ctime>
 #include <thread>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
 
 namespace {
 inline uint64_t now_ns() noexcept {
@@ -53,7 +53,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
 
     refdata_sub_->set_on_option([this](const surface::OptionInstrument& inst) {
         builder_.add_instrument(inst);
-        ygg::log::info("[Pricer] Option instrument: id={} {} {} K={} exp={}",
+        bpt::common::log::info("[Pricer] Option instrument: id={} {} {} K={} exp={}",
                        inst.instrument_id,
                        inst.underlying,
                        inst.exchange,
@@ -63,7 +63,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
 
     refdata_sub_->set_on_perp([this](const refdata::PerpInstrument& inst) {
         perp_map_[inst.instrument_id] = {inst.underlying, inst.exchange_id};
-        ygg::log::info("[Pricer] Perp instrument registered: id={} {} {}",
+        bpt::common::log::info("[Pricer] Perp instrument registered: id={} {} {}",
                        inst.instrument_id,
                        inst.underlying,
                        inst.exchange);
@@ -71,7 +71,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
 
     refdata_sub_->set_on_remove([this](uint64_t instrument_id) { builder_.remove_instrument(instrument_id); });
 
-    ygg::log::info("[Pricer] Ready — entering main loop");
+    bpt::common::log::info("[Pricer] Ready — entering main loop");
 }
 
 void PricerApp::run() {
@@ -87,7 +87,7 @@ void PricerApp::run() {
     uint64_t heartbeat_seq = 0;
     bool initial_ready_sent = false;
 
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         int fragments = 0;
         fragments += md_sub_->poll(64);
         fragments += refdata_sub_->poll(64);
@@ -100,7 +100,7 @@ void PricerApp::run() {
 
             for (const auto& grid : grids) {
                 vol_pub_->publish(grid, now_ns());
-                ygg::log::debug("[Pricer] Published surface: {} {} points={}",
+                bpt::common::log::debug("[Pricer] Published surface: {} {} points={}",
                                 grid.underlying,
                                 static_cast<int>(grid.exchange_id),
                                 grid.points.size());
@@ -161,7 +161,7 @@ void PricerApp::run() {
             std::this_thread::sleep_for(idle_sleep);
     }
 
-    ygg::log::info("[Pricer] Shutdown complete.");
+    bpt::common::log::info("[Pricer] Shutdown complete.");
 }
 
 }  // namespace bpt::pricer

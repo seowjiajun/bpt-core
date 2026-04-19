@@ -7,7 +7,7 @@
 
 #include <boost/json.hpp>
 #include <string>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -51,7 +51,7 @@ void BinanceExecParser::handle_execution_report(const json::object& obj, uint64_
             order_id = it->second;
     }
     if (order_id == 0) {
-        ygg::log::warn("[OrderGateway] BinanceExecParser: unknown cloid={}", cloid);
+        bpt::common::log::warn("[OrderGateway] BinanceExecParser: unknown cloid={}", cloid);
         return;
     }
 
@@ -127,7 +127,7 @@ void BinanceExecParser::handle_order_response(const json::object& obj,
     if (auto code_it = obj.find("code"); code_it != obj.end()) {
         auto msg_it = obj.find("msg");
         std::string msg = (msg_it != obj.end()) ? std::string(msg_it->value().as_string()) : "?";
-        ygg::log::error(
+        bpt::common::log::error(
             "[OrderGateway] BinanceExecParser: exchange rejected order={} code={} msg={}",
             order_id,
             code_it->value().as_int64(),

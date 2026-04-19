@@ -5,15 +5,15 @@
 #include <messages/FeeSchedule.h>
 #include <messages/MessageHeader.h>
 
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::messaging {
 
 FeeSchedulePublisher::FeeSchedulePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                            const std::string& channel,
                                            int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
@@ -35,7 +35,7 @@ void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "fee_schedule");
 
-    ygg::log::debug("[Refdata] FeeSchedule published exchange={} instrument_id={} maker={}bps taker={}bps",
+    bpt::common::log::debug("[Refdata] FeeSchedule published exchange={} instrument_id={} maker={}bps taker={}bps",
                     ExchangeId::c_str(fs.exchange_id),
                     fs.instrument_id,
                     fs.maker_fee_bps,

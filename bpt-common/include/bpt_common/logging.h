@@ -2,15 +2,15 @@
 
 // yggdrasil/logging.h — Shared logger config, initialisation, and log call API.
 //
-// All services call ygg::log::info/warn/error/debug/trace — never the backend
+// All services call bpt::common::log::info/warn/error/debug/trace — never the backend
 // directly.  Swapping backends (e.g. spdlog → Quill) is a one-file change in
 // logging.cpp; no service code is touched.
 //
 // Usage:
-//   #include <yggdrasil/logging.h>
+//   #include <bpt_common/logging.h>
 //
-//   ygg::logging::init("fenrir");          // once at startup
-//   ygg::log::info("tick {}", n);          // anywhere
+//   bpt::common::logging::init("fenrir");          // once at startup
+//   bpt::common::log::info("tick {}", n);          // anywhere
 //
 // To load LogConfig from a TOML table, include <yggdrasil/logging_toml.h>.
 //
@@ -22,7 +22,7 @@
 // a std::string through Quill's SPSC queue.  The calling-thread overhead is the
 // same as spdlog async; the gain is Quill's faster SPSC queue and I/O backend.
 // If the extra ~50-200ns per log call ever becomes a bottleneck, switch call
-// sites to the LOG_INFO(ygg::logging::get_default_logger(), ...) macros.
+// sites to the LOG_INFO(bpt::common::logging::get_default_logger(), ...) macros.
 
 #include <cstdint>
 #include <fmt/format.h>
@@ -30,7 +30,7 @@
 #include <quill/Logger.h>
 #include <string>
 
-namespace ygg::logging {
+namespace bpt::common::logging {
 
 struct LogConfig {
     std::string log_dir = "logs";
@@ -53,7 +53,7 @@ quill::Logger* get_default_logger();
 
 void init(const std::string& service_name, const LogConfig& cfg = {});
 
-}  // namespace ygg::logging
+}  // namespace bpt::common::logging
 
 // ── Log call API ─────────────────────────────────────────────────────────────
 //
@@ -62,11 +62,11 @@ void init(const std::string& service_name, const LogConfig& cfg = {});
 // std::string via Quill's SPSC lock-free queue.  The backend thread handles
 // all sink I/O.
 //
-namespace ygg::log {
+namespace bpt::common::log {
 
 template <typename... Args>
 inline void trace(fmt::format_string<Args...> fmt, Args&&... args) {
-    auto* l = ygg::logging::get_default_logger();
+    auto* l = bpt::common::logging::get_default_logger();
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_TRACE_L1(l, "{}", msg);
@@ -75,7 +75,7 @@ inline void trace(fmt::format_string<Args...> fmt, Args&&... args) {
 
 template <typename... Args>
 inline void debug(fmt::format_string<Args...> fmt, Args&&... args) {
-    auto* l = ygg::logging::get_default_logger();
+    auto* l = bpt::common::logging::get_default_logger();
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_DEBUG(l, "{}", msg);
@@ -84,7 +84,7 @@ inline void debug(fmt::format_string<Args...> fmt, Args&&... args) {
 
 template <typename... Args>
 inline void info(fmt::format_string<Args...> fmt, Args&&... args) {
-    auto* l = ygg::logging::get_default_logger();
+    auto* l = bpt::common::logging::get_default_logger();
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_INFO(l, "{}", msg);
@@ -93,7 +93,7 @@ inline void info(fmt::format_string<Args...> fmt, Args&&... args) {
 
 template <typename... Args>
 inline void warn(fmt::format_string<Args...> fmt, Args&&... args) {
-    auto* l = ygg::logging::get_default_logger();
+    auto* l = bpt::common::logging::get_default_logger();
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_WARNING(l, "{}", msg);
@@ -102,7 +102,7 @@ inline void warn(fmt::format_string<Args...> fmt, Args&&... args) {
 
 template <typename... Args>
 inline void error(fmt::format_string<Args...> fmt, Args&&... args) {
-    auto* l = ygg::logging::get_default_logger();
+    auto* l = bpt::common::logging::get_default_logger();
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_ERROR(l, "{}", msg);
@@ -111,11 +111,11 @@ inline void error(fmt::format_string<Args...> fmt, Args&&... args) {
 
 template <typename... Args>
 inline void critical(fmt::format_string<Args...> fmt, Args&&... args) {
-    auto* l = ygg::logging::get_default_logger();
+    auto* l = bpt::common::logging::get_default_logger();
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_CRITICAL(l, "{}", msg);
     }
 }
 
-}  // namespace ygg::log
+}  // namespace bpt::common::log

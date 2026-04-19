@@ -10,7 +10,7 @@
 #include <ctime>
 #include <refdata/refdata/instrument.h>
 #include <x86intrin.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::messaging {
 
@@ -34,7 +34,7 @@ inline void aeron_offer(aeron::Publication& pub,
         if (r < 0) {
             _mm_pause();
             if (++spins == kAeronMaxSpins) {
-                ygg::log::warn("[Aeron] Backpressure spin limit reached — dropping {}", context);
+                bpt::common::log::warn("[Aeron] Backpressure spin limit reached — dropping {}", context);
                 return;
             }
         }

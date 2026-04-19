@@ -14,7 +14,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <yggdrasil/util/latency_histogram.h>
+#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway {
 
@@ -34,7 +34,7 @@ private:
     subscription::SubscriptionManager sub_mgr_;
 
     // Collected at construction; used by the periodic latency reporter in run().
-    std::vector<std::pair<std::string, ygg::util::LatencyHistogram*>> lat_reporters_;
+    std::vector<std::pair<std::string, bpt::common::util::LatencyHistogram*>> lat_reporters_;
     std::vector<std::pair<std::string, adapter::IAdapter*>> md_stat_reporters_;
 };
 

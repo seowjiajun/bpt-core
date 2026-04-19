@@ -19,8 +19,8 @@
 
 #include <cstdint>
 #include <memory>
-#include <yggdrasil/util/latency_histogram.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::strategy {
 
@@ -76,8 +76,8 @@ private:
     // Latency histograms — T0 = bpt-md-gateway receipt timestamp in MD message (TSC ns).
     // tick_lat: every MD tick, T0 → strategy callback returns.
     // order_lat: only ticks that result in a placed order, T0 → place_order returns.
-    ygg::util::LatencyHistogram tick_lat_hist_;
-    ygg::util::LatencyHistogram order_lat_hist_;
+    bpt::common::util::LatencyHistogram tick_lat_hist_;
+    bpt::common::util::LatencyHistogram order_lat_hist_;
     uint64_t curr_tick_ts_ns_{0};     // T0 of the tick currently being processed
     uint64_t last_lat_report_ns_{0};  // TSC ns of the last latency report
 };

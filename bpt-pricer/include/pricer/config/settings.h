@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <yggdrasil/aeron/stream_config.h>
+#include <bpt_common/aeron/stream_config.h>
 
 namespace bpt::pricer::config {
 
@@ -16,18 +16,18 @@ struct Settings {
     std::string media_driver_dir;
 
     // MD input (reads from MdGateway stream 2002)
-    ygg::config::StreamConfig md_input;
+    bpt::common::config::StreamConfig md_input;
 
     // Refdata input (reads from Sindri streams 1001-1002)
-    ygg::config::StreamConfig refdata_snapshot;
-    ygg::config::StreamConfig refdata_delta;
-    ygg::config::StreamConfig refdata_control;  // Strategy → Sindri (we reuse for our subscription)
+    bpt::common::config::StreamConfig refdata_snapshot;
+    bpt::common::config::StreamConfig refdata_delta;
+    bpt::common::config::StreamConfig refdata_control;  // Strategy → Sindri (we reuse for our subscription)
 
     // Vol surface output (Pricer → Strategy stream 4001)
-    ygg::config::StreamConfig vol_surface;
+    bpt::common::config::StreamConfig vol_surface;
 
     // Status output (Pricer → Strategy stream 4002)
-    ygg::config::StreamConfig status;
+    bpt::common::config::StreamConfig status;
 
     // Exchanges to track options on
     std::vector<std::string> exchanges;

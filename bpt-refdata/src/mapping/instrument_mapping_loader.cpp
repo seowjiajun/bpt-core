@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <shared_mutex>
 #include <stdexcept>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::mapping {
 
@@ -55,7 +55,7 @@ void InstrumentMappingLoader::load(const std::string& path) {
         instrument_count_ = count;
     }
 
-    ygg::log::info("[InstrumentMapping] Loaded {} instruments, exported_at={}", count, exported_at);
+    bpt::common::log::info("[InstrumentMapping] Loaded {} instruments, exported_at={}", count, exported_at);
 }
 
 std::optional<uint32_t> InstrumentMappingLoader::try_resolve_canonical_id(uint8_t exchange_id,
@@ -71,7 +71,7 @@ std::optional<uint32_t> InstrumentMappingLoader::try_resolve_canonical_id(uint8_
 uint32_t InstrumentMappingLoader::resolve_canonical_id(uint8_t exchange_id, const std::string& exchange_symbol) const {
     auto result = try_resolve_canonical_id(exchange_id, exchange_symbol);
     if (!result) {
-        ygg::log::warn("[InstrumentMapping] No canonical ID for exchange={} symbol={}", exchange_id, exchange_symbol);
+        bpt::common::log::warn("[InstrumentMapping] No canonical ID for exchange={} symbol={}", exchange_id, exchange_symbol);
         return UNKNOWN_INSTRUMENT;
     }
     return *result;
@@ -81,12 +81,12 @@ std::string InstrumentMappingLoader::resolve_symbol(uint32_t canonical_id, uint8
     std::shared_lock lock(mutex_);
     auto it = reverse_.find(canonical_id);
     if (it == reverse_.end()) {
-        ygg::log::warn("[InstrumentMapping] No reverse entry for canonical_id={}", canonical_id);
+        bpt::common::log::warn("[InstrumentMapping] No reverse entry for canonical_id={}", canonical_id);
         return {};
     }
     auto sit = it->second.exchanges.find(exchange_id);
     if (sit == it->second.exchanges.end()) {
-        ygg::log::warn("[InstrumentMapping] No symbol for canonical_id={} exchange={}", canonical_id, exchange_id);
+        bpt::common::log::warn("[InstrumentMapping] No symbol for canonical_id={} exchange={}", canonical_id, exchange_id);
         return {};
     }
     return sit->second;

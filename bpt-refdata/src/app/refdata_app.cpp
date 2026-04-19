@@ -15,7 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include <yggdrasil/signal.h>
+#include <bpt_common/signal.h>
 
 using namespace std::chrono_literals;
 
@@ -56,7 +56,7 @@ RefdataApp::RefdataApp(config::Settings settings,
     if (!im_cfg.sources.paths.empty()) {
         mapping_merger_.emplace(mapping::InstrumentMappingMerger::Config{im_cfg.sources.paths});
         if (!mapping_merger_->merge(im_cfg.local_path))
-            ygg::log::warn("[Refdata] Merge failed — attempting to load cached local file");
+            bpt::common::log::warn("[Refdata] Merge failed — attempting to load cached local file");
     }
 
     instrument_mapping_->load(im_cfg.local_path);
@@ -98,7 +98,7 @@ RefdataApp::RefdataApp(config::Settings settings,
             adapter =
                 std::make_unique<adapter::DeribitRefDataAdapter>(cfg, exchange_creds, registry_, instrument_mapping_);
         } else {
-            ygg::log::error("[Refdata] Unknown exchange '{}' in config — skipping", cfg.exchange);
+            bpt::common::log::error("[Refdata] Unknown exchange '{}' in config — skipping", cfg.exchange);
             continue;
         }
 
@@ -120,7 +120,7 @@ RefdataApp::RefdataApp(config::Settings settings,
     if (adapters_.empty())
         throw std::runtime_error("[Refdata] No adapters configured — nothing to serve.");
 
-    ygg::log::info("[Refdata] Ready — listening on {} stream {}",
+    bpt::common::log::info("[Refdata] Ready — listening on {} stream {}",
                    settings_.control.channel,
                    settings_.control.stream_id);
 }
@@ -135,7 +135,7 @@ void RefdataApp::run() {
         std::vector<std::future<void>> futures;
         futures.reserve(adapters_.size());
         for (auto& adapter : adapters_) {
-            ygg::log::info("[Refdata] Fetching snapshot for {}...", adapter->exchange_name());
+            bpt::common::log::info("[Refdata] Fetching snapshot for {}...", adapter->exchange_name());
             futures.push_back(std::async(std::launch::async, [&adapter]() { adapter->fetchSnapshot(); }));
         }
         for (std::size_t i = 0; i < adapters_.size(); ++i) {
@@ -144,9 +144,9 @@ void RefdataApp::run() {
                 exchanges_loaded |= exchange_id_to_bit(adapters_[i]->exchange_id());
                 fee_schedules_loaded = true;
                 metrics_.exchange_ready(adapters_[i]->exchange_name()).Set(1.0);
-                ygg::log::info("[Refdata] Snapshot complete for {}", adapters_[i]->exchange_name());
+                bpt::common::log::info("[Refdata] Snapshot complete for {}", adapters_[i]->exchange_name());
             } catch (const std::exception& e) {
-                ygg::log::error("[Refdata] Snapshot failed for {}: {}", adapters_[i]->exchange_name(), e.what());
+                bpt::common::log::error("[Refdata] Snapshot failed for {}: {}", adapters_[i]->exchange_name(), e.what());
                 status_pub_->publish_error(bpt::messages::RefDataErrorType::SNAPSHOT_FAILED,
                                            adapters_[i]->exchange_id());
                 metrics_.snapshot_failure(adapters_[i]->exchange_name()).Increment();
@@ -157,7 +157,7 @@ void RefdataApp::run() {
     for (auto& adapter : adapters_) {
         if (adapter->isReady()) {
             adapter->subscribeDeltas();
-            ygg::log::info("[Refdata] Delta subscriptions started for {}", adapter->exchange_name());
+            bpt::common::log::info("[Refdata] Delta subscriptions started for {}", adapter->exchange_name());
         }
     }
 
@@ -179,9 +179,9 @@ void RefdataApp::run() {
     auto last_listing_poll = std::chrono::steady_clock::now();
     auto last_mapping_refresh = std::chrono::steady_clock::now();
 
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         int fragments = control_sub_->poll([this](const messaging::RefdataRequest& request) {
-            ygg::log::info("[Refdata] Request correlation_id={} filters={}",
+            bpt::common::log::info("[Refdata] Request correlation_id={} filters={}",
                            request.correlation_id,
                            request.instruments.size());
             sub_manager_.upsert(request);
@@ -210,7 +210,7 @@ void RefdataApp::run() {
         if (now - last_snapshot_republish >= snapshot_republish_interval) {
             messaging::RefdataRequest empty_req{};
             snapshot_pub_->publish(*registry_, empty_req, delta_pub_->current_sequence());
-            ygg::log::info("[Refdata] Periodic snapshot republish: {} instruments", registry_->count());
+            bpt::common::log::info("[Refdata] Periodic snapshot republish: {} instruments", registry_->count());
             last_snapshot_republish = now;
         }
 
@@ -224,9 +224,9 @@ void RefdataApp::run() {
                         delta_pub_->publish_delta(bpt::messages::DeltaUpdateType::MODIFY, inst);
                         ++delta_count;
                     });
-                    ygg::log::info("[Refdata] Republished {} instrument deltas after mapping refresh", delta_count);
+                    bpt::common::log::info("[Refdata] Republished {} instrument deltas after mapping refresh", delta_count);
                 } catch (const std::exception& e) {
-                    ygg::log::error("[Refdata] Mapping reload failed after refresh: {}", e.what());
+                    bpt::common::log::error("[Refdata] Mapping reload failed after refresh: {}", e.what());
                 }
             }
             last_mapping_refresh = now;
@@ -240,7 +240,7 @@ void RefdataApp::run() {
                     adapter->fetchInstrumentListing();
                     metrics_.listing_refresh(adapter->exchange_name()).Increment();
                 } catch (const std::exception& e) {
-                    ygg::log::error("[Refdata] Instrument listing refresh failed for {}: {}",
+                    bpt::common::log::error("[Refdata] Instrument listing refresh failed for {}: {}",
                                     adapter->exchange_name(),
                                     e.what());
                     status_pub_->publish_error(bpt::messages::RefDataErrorType::SNAPSHOT_FAILED,
@@ -258,7 +258,7 @@ void RefdataApp::run() {
         adapter->stop();
 
     metrics_.shutdown();
-    ygg::log::info("[Refdata] Shutdown complete.");
+    bpt::common::log::info("[Refdata] Shutdown complete.");
 }
 
 }  // namespace bpt::refdata

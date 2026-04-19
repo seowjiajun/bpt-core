@@ -4,15 +4,15 @@
 #include <fmt/format.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
-#include <yggdrasil/logging_toml.h>
+#include <bpt_common/logging_toml.h>
 
 namespace bpt::strategy {
 namespace config {
 
 namespace {
 
-ygg::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
-    ygg::config::StreamConfig s{std::move(default_channel), default_stream_id};
+bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
     if (auto v = (*t)["channel"].value<std::string>())
@@ -157,7 +157,7 @@ AppConfig AppConfig::load(const std::string& path) {
         app_cfg.backtest_mode = *v;
 
     if (auto* l = cfg["logging"].as_table())
-        app_cfg.logging = ygg::logging::from_toml(*l);
+        app_cfg.logging = bpt::common::logging::from_toml(*l);
 
     if (auto* m = cfg["metrics"].as_table())
         if (auto v = (*m)["port"].value<int64_t>())

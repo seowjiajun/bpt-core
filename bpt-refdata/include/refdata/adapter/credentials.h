@@ -17,7 +17,7 @@ struct ExchangeCredentials {
     std::string client_secret;   // DERIBIT
 };
 
-// Map the flat key-value pairs returned by ygg::secrets::fetch into the fields
+// Map the flat key-value pairs returned by bpt::common::secrets::fetch into the fields
 // relevant for the given exchange.  Unknown keys are silently ignored.
 inline ExchangeCredentials credentials_from_secret(const std::string& exchange,
                                                    const std::map<std::string, std::string>& kv) {

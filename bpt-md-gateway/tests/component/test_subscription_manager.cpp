@@ -30,7 +30,7 @@ class MockAdapter : public adapter::IAdapter {
 public:
     explicit MockAdapter(std::string name) : name_(std::move(name)) {}
     [[nodiscard]] const char* exchange_name() const override { return name_.c_str(); }
-    [[nodiscard]] ygg::util::LatencyHistogram& decode_latency_hist() noexcept override { return hist_; }
+    [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return hist_; }
 
     MOCK_METHOD(void, subscribe, (uint64_t, std::string, uint8_t), (override));
     MOCK_METHOD(void, unsubscribe, (uint64_t), (override));
@@ -42,7 +42,7 @@ public:
 
 private:
     std::string name_;
-    ygg::util::LatencyHistogram hist_;
+    bpt::common::util::LatencyHistogram hist_;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

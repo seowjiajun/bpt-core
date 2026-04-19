@@ -3,7 +3,7 @@
 #include "md_gateway/adapter/common/i_exchange_parser.h"
 #include "md_gateway/adapter/common/subscription_map.h"
 
-#include <yggdrasil/util/latency_histogram.h>
+#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -24,7 +24,7 @@ public:
                messaging::IMdPublisher& pub,
                messaging::FundingRateCallback& on_funding_rate) override;
 
-    ygg::util::LatencyHistogram decode_lat_;
+    bpt::common::util::LatencyHistogram decode_lat_;
 
 private:
     const SubscriptionMap& subs_;

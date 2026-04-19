@@ -11,7 +11,7 @@
 #include <cmath>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/util/tsc_clock.h>
 
 using json = nlohmann::json;
 
@@ -20,7 +20,7 @@ namespace bpt::refdata::adapter {
 namespace {
 
 uint64_t now_ns() {
-    return ygg::util::TscClock::now_epoch_ns();
+    return bpt::common::util::TscClock::now_epoch_ns();
 }
 
 // Map bpt-refdata InstrumentType to SBE InstrumentType
@@ -71,7 +71,7 @@ DeribitRefDataAdapter::DeribitRefDataAdapter(const config::AdapterConfig& cfg,
       client_id_(creds.client_id),
       client_secret_(creds.client_secret) {
     if (client_id_.empty() || client_secret_.empty()) {
-        ygg::log::warn(
+        bpt::common::log::warn(
             "[DeribitRefData] Deribit credentials not set — "
             "private endpoints (fee tiers) will not be available; "
             "using per-instrument fees from get_instruments instead.");
@@ -98,13 +98,13 @@ void DeribitRefDataAdapter::parse_instruments(const std::string& body, uint64_t 
     auto j = json::parse(body);
 
     if (j.contains("error")) {
-        ygg::log::error("[DeribitRefData] get_instruments error: {}", j["error"].value("message", "unknown"));
+        bpt::common::log::error("[DeribitRefData] get_instruments error: {}", j["error"].value("message", "unknown"));
         return;
     }
 
     const auto& result = j["result"];
     if (!result.is_array()) {
-        ygg::log::error("[DeribitRefData] get_instruments result is not an array");
+        bpt::common::log::error("[DeribitRefData] get_instruments result is not an array");
         return;
     }
 
@@ -182,7 +182,7 @@ void DeribitRefDataAdapter::parse_instruments(const std::string& body, uint64_t 
         if (on_fee_schedule)
             on_fee_schedule(fs);
     }
-    ygg::log::info("[DeribitRefData] Loaded {} active instruments from get_instruments", loaded);
+    bpt::common::log::info("[DeribitRefData] Loaded {} active instruments from get_instruments", loaded);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ void fetch_all_instruments(const std::vector<std::string>& currencies,
             try {
                 on_body(do_fetch(currency, kind));
             } catch (const std::exception& e) {
-                ygg::log::error("[DeribitRefData] {} {} {} failed: {}", log_prefix, currency, kind, e.what());
+                bpt::common::log::error("[DeribitRefData] {} {} {} failed: {}", log_prefix, currency, kind, e.what());
             }
         }
     }
@@ -207,7 +207,7 @@ void fetch_all_instruments(const std::vector<std::string>& currencies,
 }  // namespace
 
 void DeribitRefDataAdapter::fetchSnapshot() {
-    ygg::log::info("[DeribitRefData] Starting snapshot fetch...");
+    bpt::common::log::info("[DeribitRefData] Starting snapshot fetch...");
 
     if (!rest_client_) {
         const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
@@ -230,14 +230,14 @@ void DeribitRefDataAdapter::fetchSnapshot() {
         [this, ts](const std::string& body) { parse_instruments(body, ts); });
 
     ready_.store(true, std::memory_order_release);
-    ygg::log::info("[DeribitRefData] Snapshot complete. Registry has {} instruments.", registry_->count());
+    bpt::common::log::info("[DeribitRefData] Snapshot complete. Registry has {} instruments.", registry_->count());
 }
 
 // ---------------------------------------------------------------------------
 // fetchInstrumentListing — called hourly
 // ---------------------------------------------------------------------------
 void DeribitRefDataAdapter::fetchInstrumentListing() {
-    ygg::log::info("[DeribitRefData] Hourly instrument listing refresh...");
+    bpt::common::log::info("[DeribitRefData] Hourly instrument listing refresh...");
     if (!rest_client_) {
         const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
         rest_client_ = std::make_unique<bpt::refdata::http::RestClient>(host, cfg_.rest_port, cfg_.use_tls);

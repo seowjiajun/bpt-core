@@ -31,7 +31,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//messages",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@boost.asio",
         "@boost.beast",
         "@boost.system",
@@ -62,7 +62,7 @@ cc_binary(
     ],
     deps = [
         ":refdata_lib",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@cli11",
         "@fmt",
         "@tomlplusplus//:tomlplusplus",

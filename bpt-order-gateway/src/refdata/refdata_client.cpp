@@ -8,8 +8,8 @@
 #include <chrono>
 #include <cstring>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::refdata {
 
@@ -18,9 +18,9 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
                              int control_stream,
                              int snapshot_stream,
                              int delta_stream) {
-    ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, channel, control_stream);
-    snap_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, snapshot_stream);
-    delta_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, delta_stream);
+    ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, control_stream);
+    snap_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, snapshot_stream);
+    delta_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, delta_stream);
 
     snap_assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
@@ -32,7 +32,7 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
             handle_delta_fragment(buf, offset, length, hdr);
         });
 
-    ygg::log::info("[OrderGateway] RefdataClient connected: ctrl={} snap={} delta={}",
+    bpt::common::log::info("[OrderGateway] RefdataClient connected: ctrl={} snap={} delta={}",
                    control_stream,
                    snapshot_stream,
                    delta_stream);
@@ -74,7 +74,7 @@ void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilt
         std::this_thread::yield();
     }
 
-    ygg::log::info(
+    bpt::common::log::info(
         "[OrderGateway] Refdata subscription request sent: correlation_id={} "
         "canonical_filters={}",
         correlation_id,
@@ -107,7 +107,7 @@ void RefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
         return;
 
     cache_.apply_snapshot(msg);
-    ygg::log::info("[OrderGateway] Refdata snapshot received: {} instruments", cache_.size());
+    bpt::common::log::info("[OrderGateway] Refdata snapshot received: {} instruments", cache_.size());
 
     if (on_snapshot_complete)
         on_snapshot_complete(cache_);
@@ -148,7 +148,7 @@ void RefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
 
     bool ok = cache_.apply_delta(msg);
     if (!ok) {
-        ygg::log::warn(
+        bpt::common::log::warn(
             "[OrderGateway] Delta sequence gap detected (last={} received={}), "
             "resetting cache",
             cache_.last_delta_seq(),

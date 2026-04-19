@@ -12,8 +12,8 @@
 
 #include <chrono>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/signal.h>
 
 using namespace std::chrono_literals;
 
@@ -29,7 +29,7 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg, std::shared_ptr<aeron::Aeron> a
                                                                      cfg_.aeron.funding_rate.channel,
                                                                      cfg_.aeron.funding_rate.stream_id);
 
-    ctrl_sub_ = ygg::aeron::wait_for_subscription(aeron, cfg_.aeron.control.channel, cfg_.aeron.control.stream_id);
+    ctrl_sub_ = bpt::common::aeron::wait_for_subscription(aeron, cfg_.aeron.control.channel, cfg_.aeron.control.stream_id);
 
     for (const auto& a_cfg : cfg_.adapters) {
         std::shared_ptr<adapter::IAdapter> adapter;
@@ -42,7 +42,7 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg, std::shared_ptr<aeron::Aeron> a
         } else if (a_cfg.exchange == "DERIBIT") {
             adapter = std::make_shared<adapter::DeribitAdapter>(a_cfg, md_pub_);
         } else {
-            ygg::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
+            bpt::common::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
             continue;
         }
 
@@ -70,7 +70,7 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg, std::shared_ptr<aeron::Aeron> a
         sub_mgr_.add_adapter(std::move(adapter));
     }
 
-    ygg::log::info("MdGateway ready — polling control stream {}", cfg_.aeron.control.stream_id);
+    bpt::common::log::info("MdGateway ready — polling control stream {}", cfg_.aeron.control.stream_id);
 }
 
 void MdGatewayApp::run() {
@@ -104,12 +104,12 @@ void MdGatewayApp::run() {
                           hdr.version(),
                           static_cast<std::size_t>(length));
 
-        ygg::log::info("Received MdSubscribeBatch correlation_id={}", msg.correlationId());
+        bpt::common::log::info("Received MdSubscribeBatch correlation_id={}", msg.correlationId());
         sub_mgr_.apply_batch(msg, ack_pub_);
         metrics_.subscription_batches_total->Increment();
     });
 
-    while (ygg::signal::is_running()) {
+    while (bpt::common::signal::is_running()) {
         int fragments = ctrl_sub_->poll(ctrl_assembler.handler(), 10);
 
         auto now = std::chrono::steady_clock::now();
@@ -146,7 +146,7 @@ void MdGatewayApp::run() {
 
     sub_mgr_.stop_all();
     metrics_.shutdown();
-    ygg::log::info("MdGateway shutting down");
+    bpt::common::log::info("MdGateway shutting down");
 }
 
 }  // namespace bpt::md_gateway

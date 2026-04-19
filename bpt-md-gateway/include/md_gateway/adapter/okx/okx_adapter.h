@@ -16,15 +16,15 @@ public:
     explicit OkxAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub);
 
     [[nodiscard]] const char* exchange_name() const override { return "OKX"; }
-    [[nodiscard]] ygg::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
+    [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
 
 protected:
-    std::unique_ptr<ygg::ws::AnyWsStream> connect_and_subscribe() override;
-    void read_loop(ygg::ws::AnyWsStream& ws) override;
+    std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() override;
+    void read_loop(bpt::common::ws::AnyWsStream& ws) override;
     void parse_frame(std::string_view payload, uint64_t recv_ns) override;
 
 private:
-    void send_instrument_subs(ygg::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth);
+    void send_instrument_subs(bpt::common::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth);
 
     OkxParser parser_;
 };

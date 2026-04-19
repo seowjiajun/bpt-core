@@ -11,9 +11,9 @@
 #include <messages/OrderGatewayHeartbeat.h>
 
 #include <x86intrin.h>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::strategy::order {
 
@@ -23,13 +23,13 @@ OrderGatewayClient::OrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
                                        int exec_report_stream,
                                        int heartbeat_stream,
                                        int account_snapshot_stream) {
-    order_pub_ = ygg::aeron::wait_for_publication(aeron, channel, order_stream);
-    exec_report_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, exec_report_stream);
-    heartbeat_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, heartbeat_stream);
+    order_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, order_stream);
+    exec_report_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, exec_report_stream);
+    heartbeat_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, heartbeat_stream);
 
     if (account_snapshot_stream != 0) {
         account_snapshot_sub_ =
-            ygg::aeron::wait_for_subscription(aeron, channel, account_snapshot_stream);
+            bpt::common::aeron::wait_for_subscription(aeron, channel, account_snapshot_stream);
         account_snapshot_assembler_ = std::make_unique<aeron::FragmentAssembler>(
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
@@ -60,15 +60,15 @@ bool OrderGatewayClient::send_new_order(uint64_t order_id,
     using namespace bpt::messages;
 
     if (quantity == 0) {
-        ygg::log::warn("[OrderGW] Rejected order_id={}: quantity is zero", order_id);
+        bpt::common::log::warn("[OrderGW] Rejected order_id={}: quantity is zero", order_id);
         return false;
     }
     if (order_type != OrderType::MARKET && price <= 0) {
-        ygg::log::warn("[OrderGW] Rejected order_id={}: price={} invalid for non-MARKET order", order_id, price);
+        bpt::common::log::warn("[OrderGW] Rejected order_id={}: price={} invalid for non-MARKET order", order_id, price);
         return false;
     }
     if (exchange_symbol.empty()) {
-        ygg::log::warn("[OrderGW] Rejected order_id={}: exchange_symbol is empty", order_id);
+        bpt::common::log::warn("[OrderGW] Rejected order_id={}: exchange_symbol is empty", order_id);
         return false;
     }
 
@@ -86,7 +86,7 @@ bool OrderGatewayClient::send_new_order(uint64_t order_id,
         .timeInForce(tif)
         .price(price)
         .quantity(quantity)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns())
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns())
         .putExchangeSymbol(exchange_symbol);
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
@@ -109,7 +109,7 @@ void OrderGatewayClient::send_cancel(uint64_t order_id,
         .orderId(order_id)
         .exchangeId(exchange_id)
         .instrumentId(instrument_id)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
     while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
@@ -127,7 +127,7 @@ void OrderGatewayClient::send_cancel_all(bpt::messages::ExchangeId::Value exchan
     msg.wrapAndApplyHeader(buf, 0, kBufSize)
         .exchangeId(exchange_id)
         .instrumentId(instrument_id)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
     while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
@@ -152,7 +152,7 @@ void OrderGatewayClient::send_modify(uint64_t order_id,
         .instrumentId(instrument_id)
         .newPrice(new_price)
         .newQuantity(new_quantity)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
     while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
@@ -171,7 +171,7 @@ void OrderGatewayClient::send_account_snapshot_request(bpt::messages::ExchangeId
     msg.wrapAndApplyHeader(buf, 0, kBufSize)
         .exchangeId(exchange_id)
         .correlationId(correlation_id)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
     while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)

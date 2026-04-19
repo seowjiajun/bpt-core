@@ -3,12 +3,12 @@
 
 #include <CLI/CLI.hpp>
 #include <string>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
 
 int main(int argc, char** argv) {
-    ygg::signal::install();
+    bpt::common::signal::install();
 
     CLI::App app{"bpt-analytics — markouts, toxicity, fill-rate analytics"};
     std::string config_path = "config/tyr.toml";
@@ -21,24 +21,24 @@ int main(int argc, char** argv) {
     try {
         settings = bpt::analytics::config::load(config_path);
     } catch (const std::exception& e) {
-        ygg::logging::init("bpt-analytics");
-        ygg::log::error("Failed to load config: {}", e.what());
+        bpt::common::logging::init("bpt-analytics");
+        bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
 
-    ygg::logging::LogConfig log_cfg;
+    bpt::common::logging::LogConfig log_cfg;
     log_cfg.log_dir = settings.logging.dir;
     log_cfg.level = settings.logging.level;
-    ygg::logging::init("bpt-analytics", log_cfg);
-    ygg::log::info("Starting Analytics Toxic Flow Analyzer...");
+    bpt::common::logging::init("bpt-analytics", log_cfg);
+    bpt::common::log::info("Starting Analytics Toxic Flow Analyzer...");
 
-    auto aeron = ygg::aeron::connect(settings.media_driver_dir);
+    auto aeron = bpt::common::aeron::connect(settings.media_driver_dir);
 
     try {
         bpt::analytics::AnalyticsApp app(std::move(settings), std::move(aeron));
         app.run();
     } catch (const std::exception& e) {
-        ygg::log::error("Fatal: {}", e.what());
+        bpt::common::log::error("Fatal: {}", e.what());
         return 1;
     }
 

@@ -5,7 +5,7 @@
 
 #include <map>
 #include <unordered_map>
-#include <yggdrasil/util/latency_histogram.h>
+#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -33,7 +33,7 @@ public:
                messaging::IMdPublisher& pub,
                messaging::FundingRateCallback& on_funding_rate) override;
 
-    ygg::util::LatencyHistogram decode_lat_;
+    bpt::common::util::LatencyHistogram decode_lat_;
 
 private:
     // Channel is classified by a single char check on channel[0] plus the stored depth:

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <sstream>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::mapping {
 
@@ -45,7 +45,7 @@ InstrumentMappingMerger::InstrumentMappingMerger(const Config& cfg) : cfg_(cfg) 
 
 bool InstrumentMappingMerger::merge(const std::string& local_path) const {
     if (cfg_.sources.empty()) {
-        ygg::log::error("[InstrumentMappingMerger] No sources configured");
+        bpt::common::log::error("[InstrumentMappingMerger] No sources configured");
         return false;
     }
 
@@ -57,7 +57,7 @@ bool InstrumentMappingMerger::merge(const std::string& local_path) const {
     for (const auto& [exchange_name, src_path] : cfg_.sources) {
         std::ifstream in(src_path);
         if (!in) {
-            ygg::log::error("[InstrumentMappingMerger] Cannot open source for {}: {}", exchange_name, src_path);
+            bpt::common::log::error("[InstrumentMappingMerger] Cannot open source for {}: {}", exchange_name, src_path);
             return false;
         }
 
@@ -69,13 +69,13 @@ bool InstrumentMappingMerger::merge(const std::string& local_path) const {
         try {
             parsed = json::parse(body);
         } catch (const json::exception& e) {
-            ygg::log::error("[InstrumentMappingMerger] JSON parse error for {} ({}): {}",
+            bpt::common::log::error("[InstrumentMappingMerger] JSON parse error for {} ({}): {}",
                             exchange_name, src_path, e.what());
             return false;
         }
 
         merge_into(merged, parsed);
-        ygg::log::info("[InstrumentMappingMerger] Loaded {} from {} ({} bytes)",
+        bpt::common::log::info("[InstrumentMappingMerger] Loaded {} from {} ({} bytes)",
                        exchange_name, src_path, body.size());
     }
 
@@ -87,22 +87,22 @@ bool InstrumentMappingMerger::merge(const std::string& local_path) const {
     {
         std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
         if (!out.is_open()) {
-            ygg::log::error("[InstrumentMappingMerger] Cannot open tmp file for writing: {}", tmp_path);
+            bpt::common::log::error("[InstrumentMappingMerger] Cannot open tmp file for writing: {}", tmp_path);
             return false;
         }
         out.write(serialised.data(), static_cast<std::streamsize>(serialised.size()));
         if (!out) {
-            ygg::log::error("[InstrumentMappingMerger] Write to tmp file failed: {}", tmp_path);
+            bpt::common::log::error("[InstrumentMappingMerger] Write to tmp file failed: {}", tmp_path);
             return false;
         }
     }
 
     if (std::rename(tmp_path.c_str(), local_path.c_str()) != 0) {
-        ygg::log::error("[InstrumentMappingMerger] Atomic rename failed: {} → {}", tmp_path, local_path);
+        bpt::common::log::error("[InstrumentMappingMerger] Atomic rename failed: {} → {}", tmp_path, local_path);
         return false;
     }
 
-    ygg::log::info("[InstrumentMappingMerger] Merged {} exchange(s) → {} ({} instruments, {} bytes)",
+    bpt::common::log::info("[InstrumentMappingMerger] Merged {} exchange(s) → {} ({} instruments, {} bytes)",
                    cfg_.sources.size(), local_path, merged["reverse"].size(), serialised.size());
     return true;
 }

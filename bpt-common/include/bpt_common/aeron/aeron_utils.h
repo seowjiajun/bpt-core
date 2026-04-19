@@ -3,8 +3,8 @@
 // yggdrasil/aeron_utils.h — Helpers for Aeron publication and subscription setup.
 //
 // Usage:
-//   auto pub = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
-//   auto sub = ygg::aeron::wait_for_subscription(aeron, channel, stream_id);
+//   auto pub = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
+//   auto sub = bpt::common::aeron::wait_for_subscription(aeron, channel, stream_id);
 
 #include <Aeron.h>
 
@@ -14,7 +14,7 @@
 #include <string>
 #include <thread>
 
-namespace ygg::aeron {
+namespace bpt::common::aeron {
 
 // Register a publication and spin until Aeron connects it.
 // Throws std::runtime_error if not connected within max_retries * 10 ms.
@@ -68,4 +68,4 @@ inline std::shared_ptr<::aeron::Aeron> connect(const std::string& media_driver_d
     return ::aeron::Aeron::connect(ctx);
 }
 
-}  // namespace ygg::aeron
+}  // namespace bpt::common::aeron

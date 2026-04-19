@@ -44,7 +44,7 @@ cc_binary(
     ],
     deps = [
         ":pricer_core",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@cli11",
         "@fmt",
         "@tomlplusplus//:tomlplusplus",

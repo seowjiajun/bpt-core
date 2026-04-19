@@ -9,7 +9,7 @@
 #include <deque>
 #include <format>
 #include <string>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;
@@ -89,11 +89,11 @@ public:
 private:
     void on_accept(beast::error_code ec) {
         if (ec) {
-            ygg::log::warn("[OkxOrderServer] accept error: {}", ec.message());
+            bpt::common::log::warn("[OkxOrderServer] accept error: {}", ec.message());
             closed_ = true;
             return;
         }
-        ygg::log::info("[OkxOrderServer] WS connected");
+        bpt::common::log::info("[OkxOrderServer] WS connected");
         do_read();
     }
 
@@ -142,7 +142,7 @@ private:
                 (void)op;
             }
         } catch (const std::exception& e) {
-            ygg::log::warn("[OkxOrderServer] parse error: {}", e.what());
+            bpt::common::log::warn("[OkxOrderServer] parse error: {}", e.what());
         }
 
         do_read();
@@ -254,7 +254,7 @@ void OkxOrderServer::start() {
     acceptor_.set_option(net::socket_base::reuse_address(true));
     acceptor_.bind(ep);
     acceptor_.listen();
-    ygg::log::info("[OkxOrderServer] Listening on port {}", port_);
+    bpt::common::log::info("[OkxOrderServer] Listening on port {}", port_);
     do_accept();
     thread_ = std::thread([this] { ioc_.run(); });
 }

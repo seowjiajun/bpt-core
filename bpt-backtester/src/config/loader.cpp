@@ -1,12 +1,12 @@
 #include "backtester/config/settings.h"
 
 #include <toml++/toml.hpp>
-#include <yggdrasil/logging_toml.h>
+#include <bpt_common/logging_toml.h>
 
 namespace bpt::backtester::config {
 
 Settings load(const std::string& path) {
-    ygg::log::info("[Backtester] Loading config from: {}", path);
+    bpt::common::log::info("[Backtester] Loading config from: {}", path);
     toml::table root = toml::parse_file(path);
 
     Settings s;
@@ -70,7 +70,7 @@ Settings load(const std::string& path) {
     }
 
     if (auto* l = root["logging"].as_table())
-        s.logging = ygg::logging::from_toml(*l);
+        s.logging = bpt::common::logging::from_toml(*l);
 
     if (auto* r = root["results"].as_table()) {
         if (auto v = (*r)["output_dir"].value<std::string>())
@@ -100,8 +100,8 @@ Settings load(const std::string& path) {
         if (auto v = (*m)["port"].value<int64_t>())
             s.metrics_port = static_cast<uint16_t>(*v);
 
-    ygg::log::info("[Backtester] Backtest window: {} → {}", s.simulation.start, s.simulation.end);
-    ygg::log::info("[Backtester] Instruments: {}", s.instruments.size());
+    bpt::common::log::info("[Backtester] Backtest window: {} → {}", s.simulation.start, s.simulation.end);
+    bpt::common::log::info("[Backtester] Instruments: {}", s.instruments.size());
 
     return s;
 }

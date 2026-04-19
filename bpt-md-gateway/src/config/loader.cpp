@@ -3,14 +3,14 @@
 #include <fmt/ranges.h>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <yggdrasil/logging_toml.h>
+#include <bpt_common/logging_toml.h>
 
 namespace bpt::md_gateway::config {
 
 namespace {
 
-ygg::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
-    ygg::config::StreamConfig s{std::move(default_channel), default_stream_id};
+bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
     if (auto v = (*t)["channel"].value<std::string>())
@@ -47,12 +47,12 @@ Settings load(const std::string& path) {
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
         if ((s.environment == "prod" && path_has_testnet) ||
             ((s.environment == "qa" || s.environment == "dev") && path_has_live))
-            ygg::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
+            bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
                            s.environment,
                            exchange_config_path);
     }
 
-    ygg::log::info("Environment: {}", s.environment.empty() ? "(not set)" : s.environment);
+    bpt::common::log::info("Environment: {}", s.environment.empty() ? "(not set)" : s.environment);
 
     // Read the exchanges filter from the instance config.
     std::unordered_set<std::string> exchange_filter;
@@ -61,7 +61,7 @@ Settings load(const std::string& path) {
             if (auto v = elem.value<std::string>())
                 exchange_filter.insert(*v);
         s.exchanges = {exchange_filter.begin(), exchange_filter.end()};
-        ygg::log::info("Exchange filter: [{}]", fmt::join(s.exchanges, ", "));
+        bpt::common::log::info("Exchange filter: [{}]", fmt::join(s.exchanges, ", "));
     }
 
     if (auto* aeron = root["aeron"].as_table()) {
@@ -118,11 +118,11 @@ Settings load(const std::string& path) {
 
         // Validate required connectivity fields — fail fast rather than crash at connect time.
         if (ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty()) {
-            ygg::log::error("Adapter {} missing required ws_host/ws_port/ws_path — skipping", exchange_name);
+            bpt::common::log::error("Adapter {} missing required ws_host/ws_port/ws_path — skipping", exchange_name);
             continue;
         }
         if (!ac.use_tls)
-            ygg::log::warn("Adapter {} has use_tls=false — TLS is enforced regardless; update config", exchange_name);
+            bpt::common::log::warn("Adapter {} has use_tls=false — TLS is enforced regardless; update config", exchange_name);
 
         s.adapters.push_back(std::move(ac));
     }
@@ -133,7 +133,7 @@ Settings load(const std::string& path) {
         s.service_heartbeat_interval_ms = static_cast<uint32_t>(*v);
 
     if (auto* l = root["logging"].as_table())
-        s.logging = ygg::logging::from_toml(*l);
+        s.logging = bpt::common::logging::from_toml(*l);
 
     if (auto* m = root["metrics"].as_table()) {
         if (auto v = (*m)["port"].value<int64_t>())

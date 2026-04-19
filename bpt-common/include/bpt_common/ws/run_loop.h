@@ -28,9 +28,9 @@
 //     client because it needs concurrent access to the raw stream, which
 //     doesn't fit the single-owner-stream pattern this class uses.
 
-#include "yggdrasil/logging.h"
-#include "yggdrasil/util/tsc_clock.h"
-#include "yggdrasil/ws/ws_connect.h"
+#include "bpt_common/logging.h"
+#include "bpt_common/util/tsc_clock.h"
+#include "bpt_common/ws/ws_connect.h"
 
 #include <atomic>
 #include <chrono>
@@ -44,7 +44,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 
-namespace ygg::ws {
+namespace bpt::common::ws {
 
 struct PingConfig {
     std::chrono::milliseconds interval;
@@ -180,7 +180,7 @@ inline void RunLoop::run(AnyWsStream ws,
             }
             if (ec) throw beast::system_error(ec);
 
-            const uint64_t recv_ns = ygg::util::WallClock::now_ns();
+            const uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
             std::string_view payload(
                 static_cast<const char*>(buf.data().data()),
                 buf.data().size());
@@ -205,4 +205,4 @@ inline bool RunLoop::send(const std::string& msg) {
     return true;
 }
 
-}  // namespace ygg::ws
+}  // namespace bpt::common::ws

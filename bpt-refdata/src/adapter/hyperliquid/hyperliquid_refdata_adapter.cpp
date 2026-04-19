@@ -3,14 +3,14 @@
 #include <messages/DeltaUpdateType.h>
 
 #include <nlohmann/json.hpp>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::refdata::adapter {
 
 namespace {
 
 uint64_t now_ns() {
-    return ygg::util::TscClock::now_epoch_ns();
+    return bpt::common::util::TscClock::now_epoch_ns();
 }
 
 }  // namespace
@@ -26,7 +26,7 @@ HyperliquidRefDataAdapter::HyperliquidRefDataAdapter(const config::AdapterConfig
       parser_(mapping) {}
 
 void HyperliquidRefDataAdapter::fetchSnapshot() {
-    ygg::log::info("[HyperliquidRefData] Starting snapshot fetch...");
+    bpt::common::log::info("[HyperliquidRefData] Starting snapshot fetch...");
     const uint64_t ts = now_ns();
 
     // 1. Meta — instrument listing (all perps)
@@ -35,7 +35,7 @@ void HyperliquidRefDataAdapter::fetchSnapshot() {
         for (auto& inst : parser_.parse_meta(body, ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
-        ygg::log::error("[HyperliquidRefData] Failed to fetch meta: {}", e.what());
+        bpt::common::log::error("[HyperliquidRefData] Failed to fetch meta: {}", e.what());
         throw;
     }
 
@@ -48,18 +48,18 @@ void HyperliquidRefDataAdapter::fetchSnapshot() {
                 if (on_fee_schedule)
                     on_fee_schedule(fs);
         } catch (const std::exception& e) {
-            ygg::log::warn("[HyperliquidRefData] Failed to fetch userFees: {}", e.what());
+            bpt::common::log::warn("[HyperliquidRefData] Failed to fetch userFees: {}", e.what());
         }
     } else {
-        ygg::log::warn("[HyperliquidRefData] No wallet address configured — skipping userFees");
+        bpt::common::log::warn("[HyperliquidRefData] No wallet address configured — skipping userFees");
     }
 
     ready_.store(true, std::memory_order_release);
-    ygg::log::info("[HyperliquidRefData] Snapshot complete. Registry has {} instruments.", registry_->getAll().size());
+    bpt::common::log::info("[HyperliquidRefData] Snapshot complete. Registry has {} instruments.", registry_->getAll().size());
 }
 
 void HyperliquidRefDataAdapter::fetchInstrumentListing() {
-    ygg::log::info("[HyperliquidRefData] Hourly instrument listing refresh...");
+    bpt::common::log::info("[HyperliquidRefData] Hourly instrument listing refresh...");
     const uint64_t ts = now_ns();
 
     try {
@@ -69,7 +69,7 @@ void HyperliquidRefDataAdapter::fetchInstrumentListing() {
                 on_instrument_delta(inst, bpt::messages::DeltaUpdateType::MODIFY, ts);
         }
     } catch (const std::exception& e) {
-        ygg::log::error("[HyperliquidRefData] Hourly meta refresh failed: {}", e.what());
+        bpt::common::log::error("[HyperliquidRefData] Hourly meta refresh failed: {}", e.what());
     }
 }
 

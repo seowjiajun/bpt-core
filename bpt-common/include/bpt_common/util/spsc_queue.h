@@ -5,7 +5,7 @@
 // Dependencies: none (C++ stdlib only).
 //
 // Usage:
-//   ygg::util::SpscQueue<512, 16384> q;
+//   bpt::common::util::SpscQueue<512, 16384> q;
 //   // producer thread:
 //   q.try_push(recv_ns, payload);
 //   // consumer thread:
@@ -17,7 +17,7 @@
 #include <cstring>
 #include <string_view>
 
-namespace ygg::util {
+namespace bpt::common::util {
 
 // Lock-free single-producer / single-consumer ring buffer for raw byte frames.
 //
@@ -84,4 +84,4 @@ private:
     Slot slots_[CAPACITY];
 };
 
-}  // namespace ygg::util
+}  // namespace bpt::common::util

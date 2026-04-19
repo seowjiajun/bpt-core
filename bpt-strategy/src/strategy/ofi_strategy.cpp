@@ -60,27 +60,27 @@ OFIStrategy::OFIStrategy(uint64_t correlation_id,
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
-    ygg::log::info("[OFI] levels={} window={}ms entry={:.2f} exit={:.2f}",
+    bpt::common::log::info("[OFI] levels={} window={}ms entry={:.2f} exit={:.2f}",
                    book_levels_,
                    ofi_window_ns_ / 1'000'000,
                    entry_threshold_,
                    exit_threshold_);
-    ygg::log::info("[OFI] stop={:.1f}bps target={:.1f}bps max_hold={:.0f}s cooldown={}ticks",
+    bpt::common::log::info("[OFI] stop={:.1f}bps target={:.1f}bps max_hold={:.0f}s cooldown={}ticks",
                    stop_bps_,
                    target_bps_,
                    max_hold_ns_ / 1e9,
                    cooldown_ticks_);
-    ygg::log::info("[OFI] qty_usd={:.0f} max_spread={:.1f}bps depth={}",
+    bpt::common::log::info("[OFI] qty_usd={:.0f} max_spread={:.1f}bps depth={}",
                    qty_usd_,
                    max_spread_bps_,
                    order_book_depth_);
     if (vol_gate_cfg_.max_bps_per_window > 0.0) {
-        ygg::log::info("[OFI] vol_gate max_bps={:.1f} window={}ms halt={}ms",
+        bpt::common::log::info("[OFI] vol_gate max_bps={:.1f} window={}ms halt={}ms",
                        vol_gate_cfg_.max_bps_per_window,
                        vol_gate_cfg_.window_ns / 1'000'000,
                        vol_gate_cfg_.halt_duration_ns / 1'000'000);
     } else {
-        ygg::log::info("[OFI] vol_gate disabled (vol_gate_max_bps=0)");
+        bpt::common::log::info("[OFI] vol_gate disabled (vol_gate_max_bps=0)");
     }
 }
 
@@ -114,7 +114,7 @@ void OFIStrategy::start() {
 
 void OFIStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
     if (!state_.empty()) {
-        ygg::log::debug("[OFI] Ignoring duplicate snapshot ({} instruments)", cache.size());
+        bpt::common::log::debug("[OFI] Ignoring duplicate snapshot ({} instruments)", cache.size());
         return;
     }
 
@@ -144,11 +144,11 @@ void OFIStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
         st.tick_size = inst->tick_size;
         st.lot_size = inst->lot_size;
 
-        ygg::log::info("[OFI] Instrument [{}] {} @ {} tick={} lot={}",
+        bpt::common::log::info("[OFI] Instrument [{}] {} @ {} tick={} lot={}",
                        id, inst->symbol, inst->exchange, inst->tick_size, inst->lot_size);
         state_.emplace(id, std::move(st));
     }
-    ygg::log::info("[OFI] Resolved {} instrument(s)", state_.size());
+    bpt::common::log::info("[OFI] Resolved {} instrument(s)", state_.size());
 
     if (!md_client_)
         return;
@@ -188,12 +188,12 @@ void OFIStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
     const bool was_halted = st.vol_gate.is_halted(st.last_bbo_ns);
     const bool now_halted = st.vol_gate.update_and_check(mid, st.last_bbo_ns);
     if (now_halted && !was_halted) {
-        ygg::log::warn("[OFI] {} VOL HALT tripped last_trip={:.1f}bps — pausing entries for {}ms",
+        bpt::common::log::warn("[OFI] {} VOL HALT tripped last_trip={:.1f}bps — pausing entries for {}ms",
                        st.symbol,
                        st.vol_gate.last_trip_bps(),
                        vol_gate_cfg_.halt_duration_ns / 1'000'000);
     } else if (was_halted && !now_halted) {
-        ygg::log::info("[OFI] {} vol halt cleared — entries re-enabled", st.symbol);
+        bpt::common::log::info("[OFI] {} vol halt cleared — entries re-enabled", st.symbol);
     }
 
     // Walk pending mark-outs with the freshly updated mid.
@@ -203,7 +203,7 @@ void OFIStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
     // max_hold while waiting for the next book update.
     if (st.pos != Position::FLAT && max_hold_ns_ > 0 &&
         st.last_bbo_ns - st.entry_ns > max_hold_ns_) {
-        ygg::log::info("[OFI] {} time_stop ({}s) — exiting {}",
+        bpt::common::log::info("[OFI] {} time_stop ({}s) — exiting {}",
                        st.symbol,
                        (st.last_bbo_ns - st.entry_ns) / 1'000'000'000ULL,
                        st.pos == Position::LONG ? "LONG" : "SHORT");
@@ -280,7 +280,7 @@ void OFIStrategy::try_enter(InstrumentState& st, double ofi_value, uint64_t now_
         return;
 
     if (ofi_value > entry_threshold_) {
-        ygg::log::info("[OFI] {} ENTER LONG ofi={:.3f} mid={:.4f} spread={:.1f}bps",
+        bpt::common::log::info("[OFI] {} ENTER LONG ofi={:.3f} mid={:.4f} spread={:.1f}bps",
                        st.symbol, ofi_value, mid, spread_bps);
         st.active_is_entry = true;
         fire_order(st, OrderSide::BUY, qty_usd_);
@@ -288,7 +288,7 @@ void OFIStrategy::try_enter(InstrumentState& st, double ofi_value, uint64_t now_
         st.entry_price = mid;
         st.entry_ns = now_ns;
     } else if (ofi_value < -entry_threshold_) {
-        ygg::log::info("[OFI] {} ENTER SHORT ofi={:.3f} mid={:.4f} spread={:.1f}bps",
+        bpt::common::log::info("[OFI] {} ENTER SHORT ofi={:.3f} mid={:.4f} spread={:.1f}bps",
                        st.symbol, ofi_value, mid, spread_bps);
         st.active_is_entry = true;
         fire_order(st, OrderSide::SELL, qty_usd_);
@@ -324,7 +324,7 @@ void OFIStrategy::try_exit(InstrumentState& st, double ofi_value, uint64_t now_n
     if (!reason)
         return;
 
-    ygg::log::info("[OFI] {} EXIT {} reason={} pnl={:.1f}bps ofi={:.3f}",
+    bpt::common::log::info("[OFI] {} EXIT {} reason={} pnl={:.1f}bps ofi={:.3f}",
                    st.symbol, is_long ? "LONG" : "SHORT", reason, pnl_bps, ofi_value);
 
     const auto exit_side = is_long ? OrderSide::SELL : OrderSide::BUY;
@@ -340,7 +340,7 @@ void OFIStrategy::fire_order(InstrumentState& st,
                                bpt::messages::OrderSide::Value side,
                                double qty_usd) {
     if (!order_mgr_) {
-        ygg::log::warn("[OFI] {} order_mgr null — dropping order", st.symbol);
+        bpt::common::log::warn("[OFI] {} order_mgr null — dropping order", st.symbol);
         return;
     }
 
@@ -358,7 +358,7 @@ void OFIStrategy::fire_order(InstrumentState& st,
                                                    OrderType::LIMIT, TimeInForce::IOC,
                                                    price, qty);
     if (oid == 0) {
-        ygg::log::warn("[OFI] {} place_order rejected — preflight failed", st.symbol);
+        bpt::common::log::warn("[OFI] {} place_order rejected — preflight failed", st.symbol);
         return;
     }
     st.active_order_id = oid;
@@ -381,7 +381,7 @@ void OFIStrategy::check_markouts(InstrumentState& st, uint64_t now_ns) {
     auto log_markout = [&](const char* label, const MarkOut& mo) {
         const double move = (mid - mo.fill_price) * static_cast<double>(mo.side_sign);
         const double bps = (mo.fill_price > 0.0) ? (move / mo.fill_price * 1e4) : 0.0;
-        ygg::log::info("[OFI markout] {} order_id={} kind={} side={} fill={:.4f} mid={:.4f} {}={:+.2f}bps",
+        bpt::common::log::info("[OFI markout] {} order_id={} kind={} side={} fill={:.4f} mid={:.4f} {}={:+.2f}bps",
                        st.symbol, mo.order_id,
                        mo.is_entry ? "ENTRY" : "EXIT",
                        mo.side_sign > 0 ? "LONG" : "SHORT",
@@ -428,12 +428,12 @@ void OFIStrategy::on_exec_report(const bpt::messages::ExecutionReport& rpt) {
         return;
 
     if (status == ExecStatus::REJECTED) {
-        ygg::log::warn("[OFI] {} order_id={} REJECTED reason={} source={}",
+        bpt::common::log::warn("[OFI] {} order_id={} REJECTED reason={} source={}",
                        st.symbol, order_id,
                        bpt::messages::RejectReason::c_str(rpt.rejectReason()),
                        bpt::messages::RejectSource::c_str(rpt.rejectSource()));
     } else {
-        ygg::log::info("[OFI] {} order_id={} {} filled={:.6f}@{:.4f}",
+        bpt::common::log::info("[OFI] {} order_id={} {} filled={:.6f}@{:.4f}",
                        st.symbol, order_id,
                        bpt::messages::ExecStatus::c_str(status),
                        static_cast<double>(rpt.filledQty()) / kQtyScale,
@@ -469,7 +469,7 @@ void OFIStrategy::on_exec_report(const bpt::messages::ExecutionReport& rpt) {
     // If this was an exit, the position is still on — clear active_order_id
     // so the next tick can retry.
     if (status != ExecStatus::FILLED && order_id == st.active_order_id) {
-        ygg::log::info("[OFI] {} order_id={} did not fill — reverting state", st.symbol, order_id);
+        bpt::common::log::info("[OFI] {} order_id={} did not fill — reverting state", st.symbol, order_id);
         st.pos = Position::FLAT;
         st.cooldown_ticks_remaining = cooldown_ticks_;
     }
@@ -487,7 +487,7 @@ void OFIStrategy::on_shutdown_flatten() {
         if (st.pos == Position::FLAT)
             continue;
         const auto exit_side = (st.pos == Position::LONG) ? OrderSide::SELL : OrderSide::BUY;
-        ygg::log::warn("[OFI] SHUTDOWN FLATTEN {} closing {} via IOC",
+        bpt::common::log::warn("[OFI] SHUTDOWN FLATTEN {} closing {} via IOC",
                        st.symbol, st.pos == Position::LONG ? "LONG" : "SHORT");
         st.active_is_entry = false;
         fire_order(st, exit_side, qty_usd_);
@@ -495,7 +495,7 @@ void OFIStrategy::on_shutdown_flatten() {
         ++flattened;
     }
     if (flattened > 0)
-        ygg::log::warn("[OFI] shutdown flatten fired {} closing order(s)", flattened);
+        bpt::common::log::warn("[OFI] shutdown flatten fired {} closing order(s)", flattened);
 }
 
 }  // namespace bpt::strategy::strategy

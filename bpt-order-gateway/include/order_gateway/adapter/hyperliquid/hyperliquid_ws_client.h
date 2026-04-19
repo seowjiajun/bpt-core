@@ -1,7 +1,7 @@
 #pragma once
 
 // Persistent WebSocket client to the Hyperliquid endpoint. Inherits
-// the connect/read/send/ping scaffolding from ygg::ws::RunLoop and
+// the connect/read/send/ping scaffolding from bpt::common::ws::RunLoop and
 // layers HL-specific request/response plumbing on top:
 //
 //   - Subscribes to `userFills` on handshake so the adapter's exec
@@ -31,11 +31,11 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <yggdrasil/ws/run_loop.h>
+#include <bpt_common/ws/run_loop.h>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
-class HyperliquidWsClient : public ygg::ws::RunLoop {
+class HyperliquidWsClient : public bpt::common::ws::RunLoop {
 public:
     using UserFillsHandler = std::function<void(const boost::json::array& fills,
                                                  uint64_t recv_ns)>;
@@ -64,7 +64,7 @@ public:
 protected:
     void on_handshake_complete() override;
     void on_frame(std::string_view payload, uint64_t recv_ns) override;
-    std::optional<ygg::ws::PingConfig> ping_config() const override;
+    std::optional<bpt::common::ws::PingConfig> ping_config() const override;
 
 private:
     void handle_frame(const std::string& payload, uint64_t recv_ns);

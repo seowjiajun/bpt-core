@@ -5,8 +5,8 @@
 #include <boost/beast/websocket.hpp>
 #include <chrono>
 #include <fmt/format.h>
-#include <yggdrasil/util/tsc_clock.h>
-#include <yggdrasil/ws/ws_connect.h>
+#include <bpt_common/util/tsc_clock.h>
+#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -19,23 +19,23 @@ HyperliquidAdapter::HyperliquidAdapter(const config::AdapterConfig& cfg,
     : AdapterBase(cfg, std::move(md_pub)),
       parser_(subs_) {}
 
-void HyperliquidAdapter::send_instrument_subs(ygg::ws::AnyWsStream& ws, const std::string& coin) {
+void HyperliquidAdapter::send_instrument_subs(bpt::common::ws::AnyWsStream& ws, const std::string& coin) {
     for (const char* type : {"l2Book", "trades", "activeAssetCtx"}) {
         auto sub = fmt::format(R"({{"method":"subscribe","subscription":{{"type":"{}","coin":"{}"}}}})", type, coin);
         ws.write(net::buffer(sub));
     }
 }
 
-std::unique_ptr<ygg::ws::AnyWsStream> HyperliquidAdapter::connect_and_subscribe() {
-    ygg::log::info("HyperliquidAdapter connecting {}:{}{}", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
-    auto tls_ws = ygg::ws::ws_connect(ioc_,
+std::unique_ptr<bpt::common::ws::AnyWsStream> HyperliquidAdapter::connect_and_subscribe() {
+    bpt::common::log::info("HyperliquidAdapter connecting {}:{}{}", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
+    auto tls_ws = bpt::common::ws::ws_connect(ioc_,
                                       ssl_ctx_,
                                       cfg_.ws_host,
                                       cfg_.ws_port,
                                       cfg_.ws_path,
                                       cfg_.so_rcvbuf_bytes,
                                       cfg_.ws_connect_timeout_ms);
-    auto ws = std::make_unique<ygg::ws::AnyWsStream>(std::move(tls_ws));
+    auto ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
 
     // Enable WebSocket-level keep-alive pings. If HL stops responding Beast
     // closes the stream with an error, triggering the reconnect loop.
@@ -46,7 +46,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> HyperliquidAdapter::connect_and_subscribe(
         true                             // send keep-alive ping frames
     });
 
-    ygg::log::info("HyperliquidAdapter connected, subscribing instruments");
+    bpt::common::log::info("HyperliquidAdapter connected, subscribing instruments");
 
     // Drain pending so the read loop does not re-send what we're about to subscribe.
     subs_.take_pending();
@@ -57,7 +57,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> HyperliquidAdapter::connect_and_subscribe(
     return ws;
 }
 
-void HyperliquidAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
+void HyperliquidAdapter::read_loop(bpt::common::ws::AnyWsStream& ws) {
     beast::flat_buffer buf;
     const auto liveness = std::chrono::milliseconds(cfg_.ws_liveness_timeout_ms);
     auto last_recv = std::chrono::steady_clock::now();
@@ -81,9 +81,9 @@ void HyperliquidAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
             try {
                 static const std::string msg = R"({"method":"ping"})";
                 ws.write(net::buffer(msg));
-                ygg::log::info("HyperliquidAdapter: ping sent");
+                bpt::common::log::info("HyperliquidAdapter: ping sent");
             } catch (const std::exception& e) {
-                ygg::log::warn("HyperliquidAdapter: ping write failed: {}", e.what());
+                bpt::common::log::warn("HyperliquidAdapter: ping write failed: {}", e.what());
                 break;
             }
         }
@@ -104,7 +104,7 @@ void HyperliquidAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         // race for now. A future refactor can guard with a write mutex.
         for (const auto& entry : subs_.take_pending()) {
             send_instrument_subs(ws, entry.symbol);
-            ygg::log::info("HyperliquidAdapter: runtime subscribe {}", entry.symbol);
+            bpt::common::log::info("HyperliquidAdapter: runtime subscribe {}", entry.symbol);
         }
 
         beast::error_code ec;
@@ -113,7 +113,7 @@ void HyperliquidAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         if (ec == beast::error::timeout) {
             buf.consume(buf.size());
             if (std::chrono::steady_clock::now() - last_recv >= liveness) {
-                ygg::log::warn("HyperliquidAdapter: no data for {}ms, reconnecting", cfg_.ws_liveness_timeout_ms);
+                bpt::common::log::warn("HyperliquidAdapter: no data for {}ms, reconnecting", cfg_.ws_liveness_timeout_ms);
                 throw std::runtime_error("liveness timeout");
             }
             continue;
@@ -127,7 +127,7 @@ void HyperliquidAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         // receipt. TscClock calibration is per-process and drifts across
         // services, which manifests as uint64 underflow in fenrir's
         // tick→strategy latency histogram.
-        uint64_t recv_ns = ygg::util::WallClock::now_ns();
+        uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
         push_frame(std::string_view(static_cast<const char*>(buf.data().data()), buf.data().size()), recv_ns);
         buf.consume(buf.size());
     }

@@ -11,9 +11,9 @@
 
 #include <cstring>
 #include <x86intrin.h>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::strategy::md {
 
@@ -22,16 +22,16 @@ MdClient::MdClient(std::shared_ptr<aeron::Aeron> aeron,
                    int control_stream,
                    int data_stream,
                    int ack_hb_stream) {
-    ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, channel, control_stream);
-    data_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, data_stream);
-    ack_hb_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, ack_hb_stream);
+    ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, control_stream);
+    data_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, data_stream);
+    ack_hb_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, ack_hb_stream);
 
     data_assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_data_fragment(buf, offset, length, hdr);
         });
 
-    ygg::log::info("MdClient connected: ctrl={} data={} ack_hb={}", control_stream, data_stream, ack_hb_stream);
+    bpt::common::log::info("MdClient connected: ctrl={} data={} ack_hb={}", control_stream, data_stream, ack_hb_stream);
 }
 
 void MdClient::subscribe(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) {
@@ -48,7 +48,7 @@ void MdClient::subscribe(uint64_t correlation_id, const std::vector<InstrumentDe
     MdSubscribeBatch msg;
     msg.wrapAndApplyHeader(buf.data(), 0, buf_size)
         .correlationId(correlation_id)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     auto& g = msg.instrumentsCount(n);
     for (const auto& inst : instruments) {
@@ -64,7 +64,7 @@ void MdClient::subscribe(uint64_t correlation_id, const std::vector<InstrumentDe
     while (ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size)) < 0)
         _mm_pause();
 
-    ygg::log::info("MdClient: subscription sent correlation_id={} instruments={}", correlation_id, n);
+    bpt::common::log::info("MdClient: subscription sent correlation_id={} instruments={}", correlation_id, n);
 }
 
 void MdClient::handle_data_fragment(aeron::AtomicBuffer& buffer,
@@ -81,7 +81,7 @@ void MdClient::handle_data_fragment(aeron::AtomicBuffer& buffer,
 
     static uint64_t frag_count = 0;
     if (++frag_count <= 5) {
-        ygg::log::info("[MdClient] fragment: templateId={} expected_bbo={} length={}",
+        bpt::common::log::info("[MdClient] fragment: templateId={} expected_bbo={} length={}",
                        hdr.templateId(),
                        MdMarketData::sbeTemplateId(),
                        length);
@@ -156,7 +156,7 @@ void MdClient::handle_ack_hb_fragment(aeron::AtomicBuffer& buffer,
                           hdr.blockLength(),
                           hdr.version(),
                           static_cast<std::size_t>(length));
-        ygg::log::info("MdClient: ack instrument_id={} status={}",
+        bpt::common::log::info("MdClient: ack instrument_id={} status={}",
                        msg.instrumentId(),
                        static_cast<int>(msg.ackStatus()));
     }
@@ -173,7 +173,7 @@ int MdClient::poll(int fragment_limit) {
     static uint64_t total_data_frags = 0;
     total_data_frags += data_frags;
     if (++data_poll_count % 100000 == 0) {
-        ygg::log::info("[MdClient] poll stats: polls={} data_frags_total={} connected={}",
+        bpt::common::log::info("[MdClient] poll stats: polls={} data_frags_total={} connected={}",
                        data_poll_count,
                        total_data_frags,
                        data_sub_->isConnected());

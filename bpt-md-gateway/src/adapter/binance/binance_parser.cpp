@@ -2,9 +2,9 @@
 
 #include <messages/TradeSide.h>
 
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/parse_double.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/parse_double.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -13,7 +13,7 @@ void BinanceParser::parse(std::string_view payload,
                           messaging::IMdPublisher& pub,
                           messaging::FundingRateCallback& /*on_funding_rate*/) {
     // Combined stream wrapper: {"stream":"<sym>@<type>","data":{...}}
-    const uint64_t parse_start_ns = ygg::util::TscClock::now_mono_ns();
+    const uint64_t parse_start_ns = bpt::common::util::TscClock::now_mono_ns();
     pad(payload);
 
     simdjson::ondemand::document doc;
@@ -44,19 +44,19 @@ void BinanceParser::parse(std::string_view payload,
         md::MdBbo bbo;
         bbo.timestamp_ns = recv_ns;
         bbo.instrument_id = instrument_id;
-        if (ygg::util::ff_double(data["b"], bbo.bid_price))
+        if (bpt::common::util::ff_double(data["b"], bbo.bid_price))
             return;
-        if (ygg::util::ff_double(data.find_field_unordered("B"), bbo.bid_qty))
+        if (bpt::common::util::ff_double(data.find_field_unordered("B"), bbo.bid_qty))
             return;
-        if (ygg::util::ff_double(data.find_field_unordered("a"), bbo.ask_price))
+        if (bpt::common::util::ff_double(data.find_field_unordered("a"), bbo.ask_price))
             return;
-        if (ygg::util::ff_double(data.find_field_unordered("A"), bbo.ask_qty))
+        if (bpt::common::util::ff_double(data.find_field_unordered("A"), bbo.ask_qty))
             return;
 
-        uint64_t lat_ns = ygg::util::TscClock::now_mono_ns() - parse_start_ns;
+        uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;
         decode_lat_.record(lat_ns);
         if (++tick_count_ <= 20 || tick_count_ % 500 == 0)
-            ygg::log::info("Binance BBO decode: {}ns tick={}", lat_ns, tick_count_);
+            bpt::common::log::info("Binance BBO decode: {}ns tick={}", lat_ns, tick_count_);
         pub.publish(bbo);
 
     } else if (type == "aggTrade") {
@@ -65,9 +65,9 @@ void BinanceParser::parse(std::string_view payload,
         md::MdTrade trade;
         trade.timestamp_ns = recv_ns;
         trade.instrument_id = instrument_id;
-        if (ygg::util::ff_double(data["p"], trade.price))
+        if (bpt::common::util::ff_double(data["p"], trade.price))
             return;
-        if (ygg::util::ff_double(data.find_field_unordered("q"), trade.qty))
+        if (bpt::common::util::ff_double(data.find_field_unordered("q"), trade.qty))
             return;
 
         bool maker_is_buyer = false;

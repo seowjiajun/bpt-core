@@ -20,7 +20,7 @@ cc_library(
     deps = [
         "//bpt-analytics:analytics_core",
         "//messages",
-        "//third_party/yggdrasil",
+        "//bpt-common",
         "@boost.asio",
         "@boost.beast",
         "@boost.system",

@@ -24,7 +24,7 @@ std::unique_ptr<IStrategy> StrategyFactory::create(const config::EngineConfig& c
                                                    vol::VolSurfaceClient* vol_client) {
     const std::string& type = cfg.strategy.type;
 
-    ygg::log::info("[StrategyFactory] Instantiating strategy type: {}", type);
+    bpt::common::log::info("[StrategyFactory] Instantiating strategy type: {}", type);
 
     if (type == "MomentumStrategy") {
         return std::make_unique<MomentumStrategy>(cfg.correlation_id, cfg.strategy, refdata, md, order_mgr);

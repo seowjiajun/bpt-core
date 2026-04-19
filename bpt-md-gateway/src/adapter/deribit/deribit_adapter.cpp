@@ -5,8 +5,8 @@
 #include <boost/beast/websocket.hpp>
 #include <chrono>
 #include <fmt/format.h>
-#include <yggdrasil/util/tsc_clock.h>
-#include <yggdrasil/ws/ws_connect.h>
+#include <bpt_common/util/tsc_clock.h>
+#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -28,7 +28,7 @@ std::chrono::milliseconds DeribitAdapter::reconnect_delay() const {
     return std::chrono::seconds(2);
 }
 
-void DeribitAdapter::send_subscribe_rpc(ygg::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth) {
+void DeribitAdapter::send_subscribe_rpc(bpt::common::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth) {
     const std::string book_channel =
         (depth == 0) ? fmt::format("quote.{}", symbol) : fmt::format("book.{}.100ms", symbol);
 
@@ -39,26 +39,26 @@ void DeribitAdapter::send_subscribe_rpc(ygg::ws::AnyWsStream& ws, const std::str
         book_channel);
     ws.write(net::buffer(req));
 
-    ygg::log::info("DeribitAdapter: subscribed {} depth={}", symbol, depth);
+    bpt::common::log::info("DeribitAdapter: subscribed {} depth={}", symbol, depth);
 }
 
-void DeribitAdapter::send_test_response(ygg::ws::AnyWsStream& ws) {
+void DeribitAdapter::send_test_response(bpt::common::ws::AnyWsStream& ws) {
     auto resp = fmt::format(R"({{"jsonrpc":"2.0","id":{},"method":"public/test","params":{{}}}})",
                             rpc_id_.fetch_add(1, std::memory_order_relaxed));
     ws.write(net::buffer(resp));
-    ygg::log::debug("DeribitAdapter: responded to test_request");
+    bpt::common::log::debug("DeribitAdapter: responded to test_request");
 }
 
-std::unique_ptr<ygg::ws::AnyWsStream> DeribitAdapter::connect_and_subscribe() {
-    ygg::log::info("DeribitAdapter connecting {}:{}{}", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
-    auto tls_ws = ygg::ws::ws_connect(ioc_,
+std::unique_ptr<bpt::common::ws::AnyWsStream> DeribitAdapter::connect_and_subscribe() {
+    bpt::common::log::info("DeribitAdapter connecting {}:{}{}", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
+    auto tls_ws = bpt::common::ws::ws_connect(ioc_,
                                       ssl_ctx_,
                                       cfg_.ws_host,
                                       cfg_.ws_port,
                                       cfg_.ws_path,
                                       cfg_.so_rcvbuf_bytes,
                                       cfg_.ws_connect_timeout_ms);
-    auto ws = std::make_unique<ygg::ws::AnyWsStream>(std::move(tls_ws));
+    auto ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
 
     ws->text(true);
     ws->set_option(websocket::stream_base::timeout{
@@ -67,7 +67,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> DeribitAdapter::connect_and_subscribe() {
         false                            // no Beast keep-alive pings
     });
 
-    ygg::log::info("DeribitAdapter connected");
+    bpt::common::log::info("DeribitAdapter connected");
 
     // Enable Deribit heartbeat — CRITICAL: Deribit disconnects within 30s if
     // test_request is not answered with public/test.
@@ -76,7 +76,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> DeribitAdapter::connect_and_subscribe() {
             fmt::format(R"({{"jsonrpc":"2.0","id":{},"method":"public/set_heartbeat","params":{{"interval":30}}}})",
                         rpc_id_.fetch_add(1, std::memory_order_relaxed));
         ws->write(net::buffer(hb_req));
-        ygg::log::info("DeribitAdapter: heartbeat enabled (interval=30s)");
+        bpt::common::log::info("DeribitAdapter: heartbeat enabled (interval=30s)");
     }
 
     // Clear stale order book gap state before receiving new snapshots.
@@ -91,7 +91,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> DeribitAdapter::connect_and_subscribe() {
     return ws;
 }
 
-void DeribitAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
+void DeribitAdapter::read_loop(bpt::common::ws::AnyWsStream& ws) {
     beast::flat_buffer buf;
     const auto liveness = std::chrono::milliseconds(cfg_.ws_liveness_timeout_ms);
     auto last_recv = std::chrono::steady_clock::now();
@@ -103,7 +103,7 @@ void DeribitAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         ws.expires_after(std::chrono::milliseconds(cfg_.ws_read_timeout_ms));
 
         // Respond to heartbeat test_request if the publisher thread flagged one.
-        // The WS write must happen on the IO thread that owns the ygg::ws::WsStream.
+        // The WS write must happen on the IO thread that owns the bpt::common::ws::WsStream.
         if (needs_test_response_.load(std::memory_order_acquire)) {
             needs_test_response_.store(false, std::memory_order_relaxed);
             send_test_response(ws);
@@ -118,7 +118,7 @@ void DeribitAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         if (ec == beast::error::timeout) {
             buf.consume(buf.size());
             if (std::chrono::steady_clock::now() - last_recv >= liveness) {
-                ygg::log::warn("DeribitAdapter: no data for {}ms, reconnecting", cfg_.ws_liveness_timeout_ms);
+                bpt::common::log::warn("DeribitAdapter: no data for {}ms, reconnecting", cfg_.ws_liveness_timeout_ms);
                 throw std::runtime_error("liveness timeout");
             }
             continue;
@@ -130,7 +130,7 @@ void DeribitAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         // WallClock, not TscClock — this timestamp crosses a process boundary
         // (bpt-md-gateway → fenrir via Aeron SBE) and would suffer from per-process
         // TscClock calibration drift. See HyperliquidAdapter for details.
-        uint64_t recv_ns = ygg::util::WallClock::now_ns();
+        uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
         std::string_view msg(static_cast<const char*>(buf.data().data()), buf.data().size());
         push_frame(msg, recv_ns);
         buf.consume(buf.size());

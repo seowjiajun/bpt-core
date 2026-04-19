@@ -1,7 +1,7 @@
 #include "md_gateway/adapter/common/adapter_base.h"
 
 #include <thread>
-#include <yggdrasil/util/thread_pin.h>
+#include <bpt_common/util/thread_pin.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -60,7 +60,7 @@ void AdapterBase::push_frame(std::string_view payload, uint64_t recv_ns) noexcep
         ++dropped_frames_;
         // Log at most once every 1000 drops to avoid flooding on sustained backpressure.
         if (dropped_frames_ == 1 || dropped_frames_ % 1000 == 0) {
-            ygg::log::warn("{}: frame queue full or oversized — dropped frames: {}", exchange_name(), dropped_frames_);
+            bpt::common::log::warn("{}: frame queue full or oversized — dropped frames: {}", exchange_name(), dropped_frames_);
         }
     }
 }
@@ -79,7 +79,7 @@ void AdapterBase::publish_loop() {
 }
 
 void AdapterBase::run() {
-    ygg::util::pin_thread_to_cpu(cfg_.io_thread_cpu, exchange_name());
+    bpt::common::util::pin_thread_to_cpu(cfg_.io_thread_cpu, exchange_name());
     while (!stop_flag_.load(std::memory_order_relaxed)) {
         try {
             ioc_.restart();
@@ -96,7 +96,7 @@ void AdapterBase::run() {
             if (!stop_flag_.load(std::memory_order_relaxed)) {
                 if (on_disconnect)
                     on_disconnect();
-                ygg::log::error("{} error: {}, reconnecting in {}ms",
+                bpt::common::log::error("{} error: {}, reconnecting in {}ms",
                                 exchange_name(),
                                 e.what(),
                                 reconnect_delay().count());

@@ -2,8 +2,8 @@
 
 #include <messages/TradeSide.h>
 
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -26,7 +26,7 @@ void DeribitParser::parse(std::string_view payload,
                           uint64_t recv_ns,
                           messaging::IMdPublisher& pub,
                           messaging::FundingRateCallback& /*on_funding_rate*/) {
-    const uint64_t parse_start_ns = ygg::util::TscClock::now_mono_ns();
+    const uint64_t parse_start_ns = bpt::common::util::TscClock::now_mono_ns();
     pad(payload);
 
     simdjson::ondemand::document doc;
@@ -101,10 +101,10 @@ void DeribitParser::parse(std::string_view payload,
         if (data.find_field_unordered("best_ask_amount").get_double().get(bbo.ask_qty))
             return;
 
-        uint64_t lat_ns = ygg::util::TscClock::now_mono_ns() - parse_start_ns;
+        uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;
         decode_lat_.record(lat_ns);
         if (++tick_count_ <= 20 || tick_count_ % 500 == 0)
-            ygg::log::info("Deribit BBO decode: {}ns tick={}", lat_ns, tick_count_);
+            bpt::common::log::info("Deribit BBO decode: {}ns tick={}", lat_ns, tick_count_);
         pub.publish(bbo);
         return;
     }
@@ -151,7 +151,7 @@ void DeribitParser::parse(std::string_view payload,
                 std::string sym_key(symbol);
                 auto lcid_it = last_change_id_.find(sym_key);
                 if (lcid_it != last_change_id_.end() && lcid_it->second != prev_change_id) {
-                    ygg::log::warn("DeribitParser: book gap for {} (expected={} got={}), resubscribing",
+                    bpt::common::log::warn("DeribitParser: book gap for {} (expected={} got={}), resubscribing",
                                    sym_key,
                                    lcid_it->second,
                                    prev_change_id);

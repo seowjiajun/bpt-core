@@ -14,7 +14,7 @@
 #include <openssl/hmac.h>
 #include <sstream>
 #include <stdexcept>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 using json = nlohmann::json;
 
@@ -99,7 +99,7 @@ std::vector<refdata::Instrument> OKXParser::parse_instruments(const std::string&
                                                               uint64_t collected_ts) const {
     auto j = json::parse(body);
     if (j.value("code", "") != "0") {
-        ygg::log::error("[OKXParser] instruments API error code={} msg={}", j.value("code", "?"), j.value("msg", "?"));
+        bpt::common::log::error("[OKXParser] instruments API error code={} msg={}", j.value("code", "?"), j.value("msg", "?"));
         return {};
     }
 
@@ -175,7 +175,7 @@ std::vector<refdata::Instrument> OKXParser::parse_instruments(const std::string&
         result.push_back(std::move(inst));
     }
 
-    ygg::log::info("[OKXParser] Parsed {} {} instruments", result.size(), inst_type);
+    bpt::common::log::info("[OKXParser] Parsed {} {} instruments", result.size(), inst_type);
     return result;
 }
 
@@ -183,7 +183,7 @@ std::vector<refdata::FeeScheduleState> OKXParser::parse_trade_fee(const std::str
                                                                   uint64_t collected_ts) const {
     auto j = json::parse(body);
     if (j.value("code", "") != "0") {
-        ygg::log::warn("[OKXParser] trade-fee API error code={}", j.value("code", "?"));
+        bpt::common::log::warn("[OKXParser] trade-fee API error code={}", j.value("code", "?"));
         return {};
     }
 

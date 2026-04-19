@@ -6,7 +6,7 @@
 #include <messages/OrderType.h>
 
 #include <cmath>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 using bpt::messages::OrderSide;
 using bpt::messages::OrderType;
@@ -24,12 +24,12 @@ uint64_t OrderManager::place_order(uint64_t instrument_id,
                                    double quantity) {
     const auto inst = cache_.get(instrument_id);
     if (!inst) {
-        ygg::log::warn("[OrderMgr] Rejected: instrument_id={} not in refdata cache", instrument_id);
+        bpt::common::log::warn("[OrderMgr] Rejected: instrument_id={} not in refdata cache", instrument_id);
         return 0;
     }
 
     if (inst->status != refdata::InstrumentStatus::ACTIVE) {
-        ygg::log::warn("[OrderMgr] Rejected: instrument {} is not ACTIVE", inst->symbol);
+        bpt::common::log::warn("[OrderMgr] Rejected: instrument {} is not ACTIVE", inst->symbol);
         return 0;
     }
 
@@ -51,11 +51,11 @@ uint64_t OrderManager::place_order(uint64_t instrument_id,
     }
 
     if (quantity <= 0.0) {
-        ygg::log::warn("[OrderMgr] Rejected: quantity <= 0 after lot normalisation for {}", inst->symbol);
+        bpt::common::log::warn("[OrderMgr] Rejected: quantity <= 0 after lot normalisation for {}", inst->symbol);
         return 0;
     }
     if (order_type != OrderType::MARKET && price <= 0.0) {
-        ygg::log::warn("[OrderMgr] Rejected: price <= 0 for non-MARKET order on {}", inst->symbol);
+        bpt::common::log::warn("[OrderMgr] Rejected: price <= 0 for non-MARKET order on {}", inst->symbol);
         return 0;
     }
 

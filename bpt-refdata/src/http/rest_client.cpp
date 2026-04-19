@@ -10,7 +10,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <thread>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::http {
 
@@ -80,7 +80,7 @@ std::string with_retry(Fn&& fn, const std::string& desc) {
                 throw;
             if (attempt + 1 == kMaxAttempts)
                 throw;
-            ygg::log::warn("[RestClient] {} failed (attempt {}/{}): {} — retrying in {}s",
+            bpt::common::log::warn("[RestClient] {} failed (attempt {}/{}): {} — retrying in {}s",
                            desc,
                            attempt + 1,
                            kMaxAttempts,

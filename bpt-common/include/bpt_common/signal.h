@@ -3,13 +3,13 @@
 // yggdrasil/signal.h — Unified signal handling for all Strategy services.
 //
 // Usage:
-//   ygg::signal::install();          // call once in main
-//   while (ygg::signal::is_running()) { ... }
+//   bpt::common::signal::install();          // call once in main
+//   while (bpt::common::signal::is_running()) { ... }
 
 #include <csignal>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
-namespace ygg::signal {
+namespace bpt::common::signal {
 
 namespace detail {
 // volatile sig_atomic_t is the only type safe to read/write from a signal
@@ -21,7 +21,7 @@ inline void handler(int signum) {
     detail::g_running = 0;
     // Async logging from a signal handler is not strictly signal-safe,
     // but is acceptable here since we are already shutting down.
-    ygg::log::info("Signal {} received, shutting down...", signum);
+    bpt::common::log::info("Signal {} received, shutting down...", signum);
 }
 
 // Register SIGINT and SIGTERM handlers.  Call once at the top of main.
@@ -42,4 +42,4 @@ inline void stop() noexcept {
     detail::g_running = 0;
 }
 
-}  // namespace ygg::signal
+}  // namespace bpt::common::signal

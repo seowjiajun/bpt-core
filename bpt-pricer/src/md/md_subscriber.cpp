@@ -6,7 +6,7 @@
 
 #include <chrono>
 #include <thread>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::pricer::md {
 
@@ -20,9 +20,9 @@ MdSubscriber::MdSubscriber(std::shared_ptr<aeron::Aeron> aeron, const std::strin
     }
 
     if (!sub_) {
-        ygg::log::error("[MdSubscriber] Failed to find subscription on {} stream {}", channel, stream_id);
+        bpt::common::log::error("[MdSubscriber] Failed to find subscription on {} stream {}", channel, stream_id);
     } else {
-        ygg::log::info("[MdSubscriber] Subscription ready on {} stream {}", channel, stream_id);
+        bpt::common::log::info("[MdSubscriber] Subscription ready on {} stream {}", channel, stream_id);
     }
 }
 

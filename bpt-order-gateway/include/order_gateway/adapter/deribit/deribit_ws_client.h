@@ -3,7 +3,7 @@
 // Persistent WebSocket client for Deribit's JSON-RPC endpoint. Owns
 // one connection session's read loop and thread-safe send.
 //
-// Inherits the connect/read/send scaffolding from ygg::ws::RunLoop;
+// Inherits the connect/read/send scaffolding from bpt::common::ws::RunLoop;
 // this class only implements the Deribit-specific bits:
 //   - build & send the JSON-RPC `public/auth` message on handshake
 //   - forward each inbound frame to the adapter's message_handler
@@ -18,11 +18,11 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <yggdrasil/ws/run_loop.h>
+#include <bpt_common/ws/run_loop.h>
 
 namespace bpt::order_gateway::adapter::deribit {
 
-class DeribitWsClient : public ygg::ws::RunLoop {
+class DeribitWsClient : public bpt::common::ws::RunLoop {
 public:
     using MessageHandler = std::function<void(const std::string& payload, uint64_t recv_ns)>;
     using LoginMsgBuilder = std::function<std::string()>;

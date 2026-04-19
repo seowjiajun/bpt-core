@@ -4,15 +4,15 @@
 #include <messages/MessageHeader.h>
 
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::md_gateway::messaging {
 
 FundingRatePublisher::FundingRatePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                            const std::string& channel,
                                            int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
@@ -39,7 +39,7 @@ void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
             std::this_thread::yield();
     } while (result < 0);
 
-    ygg::log::debug("[MdGateway] FundingRate published exchange={} instrument_id={} rate={}bps",
+    bpt::common::log::debug("[MdGateway] FundingRate published exchange={} instrument_id={} rate={}bps",
                     ExchangeId::c_str(fr.exchange_id),
                     fr.instrument_id,
                     fr.rate_bps);

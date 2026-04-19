@@ -11,7 +11,7 @@
 #include <fstream>
 #include <numeric>
 #include <stdexcept>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace fs = std::filesystem;
 
@@ -206,7 +206,7 @@ void ResultsCollector::write() const {
                              r.realized_pnl,
                              r.equity);
         }
-        ygg::log::info("[ResultsCollector] Wrote {}/trades.csv ({} rows)", output_dir_, trades_.size());
+        bpt::common::log::info("[ResultsCollector] Wrote {}/trades.csv ({} rows)", output_dir_, trades_.size());
     }
 
     // ── pnl_curve.csv ─────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ void ResultsCollector::write() const {
         f << "simulation_ts,equity\n";
         for (const auto& pt : equity_curve_)
             f << std::format("{},{:.10g}\n", pt.simulation_ts, pt.equity);
-        ygg::log::info("[ResultsCollector] Wrote {}/pnl_curve.csv ({} points)", output_dir_, equity_curve_.size());
+        bpt::common::log::info("[ResultsCollector] Wrote {}/pnl_curve.csv ({} points)", output_dir_, equity_curve_.size());
     }
 
     // ── summary.json ──────────────────────────────────────────────────────
@@ -250,8 +250,8 @@ void ResultsCollector::write() const {
         if (!f)
             throw std::runtime_error("Cannot open " + output_dir_ + "/summary.json");
         f << json::serialize(obj) << '\n';
-        ygg::log::info("[ResultsCollector] Wrote {}/summary.json", output_dir_);
-        ygg::log::info(
+        bpt::common::log::info("[ResultsCollector] Wrote {}/summary.json", output_dir_);
+        bpt::common::log::info(
             "[ResultsCollector] Total PnL: {:.2f}  Return: {:.2f}%  "
             "MaxDD: {:.2f}%  Fills: {}  WinRate: {:.1f}%",
             total_pnl,

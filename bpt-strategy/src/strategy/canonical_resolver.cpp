@@ -1,7 +1,7 @@
 #include "strategy/strategy/canonical_resolver.h"
 
 #include <algorithm>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::strategy::strategy {
 
@@ -26,7 +26,7 @@ std::optional<CanonicalResolver::ParsedSymbol> CanonicalResolver::parse(const st
     const auto colon = canonical.find(':');
 
     if (slash == std::string::npos || colon == std::string::npos || colon <= slash) {
-        ygg::log::warn("[CanonicalResolver] Malformed canonical symbol '{}' — expected BASE/QUOTE:TYPE", canonical);
+        bpt::common::log::warn("[CanonicalResolver] Malformed canonical symbol '{}' — expected BASE/QUOTE:TYPE", canonical);
         return std::nullopt;
     }
 

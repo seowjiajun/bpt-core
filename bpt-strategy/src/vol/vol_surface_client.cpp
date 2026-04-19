@@ -5,8 +5,8 @@
 #include <messages/PricerReady.h>
 #include <messages/VolSurface.h>
 
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::strategy::vol {
 
@@ -14,8 +14,8 @@ VolSurfaceClient::VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
                                    const std::string& channel,
                                    int vol_surface_stream,
                                    int pricer_status_stream) {
-    surface_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, vol_surface_stream);
-    status_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, pricer_status_stream);
+    surface_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, vol_surface_stream);
+    status_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, pricer_status_stream);
 
     // FragmentAssembler for surface stream — VolSurface messages can be large
     surface_assembler_ = std::make_unique<aeron::FragmentAssembler>(
@@ -24,7 +24,7 @@ VolSurfaceClient::VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
                aeron::util::index_t length,
                aeron::Header& header) { handle_surface_fragment(buffer, offset, length, header); });
 
-    ygg::log::info("[VolSurfaceClient] Subscriptions ready: surface={} status={}",
+    bpt::common::log::info("[VolSurfaceClient] Subscriptions ready: surface={} status={}",
                    vol_surface_stream,
                    pricer_status_stream);
 }
@@ -105,7 +105,7 @@ void VolSurfaceClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                             hdr.version(),
                             static_cast<uint64_t>(length));
 
-        ygg::log::info("[VolSurfaceClient] PricerReady: exchanges=0x{:02x} underlyings={} points={}",
+        bpt::common::log::info("[VolSurfaceClient] PricerReady: exchanges=0x{:02x} underlyings={} points={}",
                        ready.exchangesLoaded(),
                        ready.underlyingCount(),
                        ready.pointCount());

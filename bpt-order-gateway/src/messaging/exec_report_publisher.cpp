@@ -4,14 +4,14 @@
 #include <messages/MessageHeader.h>
 
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
+#include <bpt_common/aeron/aeron_utils.h>
 
 namespace bpt::order_gateway::messaging {
 
 ExecReportPublisher::ExecReportPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                          const std::string& channel,
                                          int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void ExecReportPublisher::publish(uint64_t order_id,

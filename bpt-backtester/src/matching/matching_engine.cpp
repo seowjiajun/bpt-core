@@ -5,7 +5,7 @@
 
 #include <algorithm>
 #include <format>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::backtester::matching {
 
@@ -59,13 +59,13 @@ OpenOrder MatchingEngine::submit_order(OpenOrder order) {
             if (it != books_.end()) {
                 fill_market(order, it->second, fills);
             } else {
-                ygg::log::warn("[MatchingEngine] No book for {}/{} — market order unfilled",
+                bpt::common::log::warn("[MatchingEngine] No book for {}/{} — market order unfilled",
                                order.exchange,
                                order.symbol);
             }
         } else {
             pending_[key(order.exchange, order.symbol)].push_back(order);
-            ygg::log::debug("[MatchingEngine] Queued LIMIT {} {} {} @ {}",
+            bpt::common::log::debug("[MatchingEngine] Queued LIMIT {} {} {} @ {}",
                             order.symbol,
                             (order.side == OrderSide::BUY ? "BUY" : "SELL"),
                             order.quantity,
@@ -134,7 +134,7 @@ void MatchingEngine::fill_market(OpenOrder& order, const data::OrderBookRecord& 
     }
 
     if (remaining > 1e-12) {
-        ygg::log::warn("[MatchingEngine] Market order {} partially filled: {}/{} — book too thin",
+        bpt::common::log::warn("[MatchingEngine] Market order {} partially filled: {}/{} — book too thin",
                        order.order_id,
                        order.filled_qty,
                        order.quantity);

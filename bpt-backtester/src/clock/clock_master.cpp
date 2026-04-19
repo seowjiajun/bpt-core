@@ -32,11 +32,11 @@ void ClockMaster::run() {
 
     // Handshake: confirm Strategy is up and ready before releasing any ticks.
     if (ctrl_pub_) {
-        ygg::log::info("[ClockMaster] Tick-gating enabled — sending handshake to Strategy");
+        bpt::common::log::info("[ClockMaster] Tick-gating enabled — sending handshake to Strategy");
         ctrl_pub_->send(BacktestCommand::START, 0, 0);
         if (!ack_sub_->wait_for(0, kAckTimeout))
             throw std::runtime_error("[ClockMaster] Handshake ack timed out — is Strategy running?");
-        ygg::log::info("[ClockMaster] Handshake ack received, starting tick loop");
+        bpt::common::log::info("[ClockMaster] Handshake ack received, starting tick loop");
     }
 
     uint64_t seq = 0;
@@ -53,15 +53,15 @@ void ClockMaster::run() {
         }
 
         if (seq % 100'000 == 0)
-            ygg::log::debug("[ClockMaster] {} ticks processed, last_ts={}", seq, event->timestamp_ns);
+            bpt::common::log::debug("[ClockMaster] {} ticks processed, last_ts={}", seq, event->timestamp_ns);
     }
 
     if (ctrl_pub_) {
         ctrl_pub_->send(BacktestCommand::STOP, seq, 0);
-        ygg::log::info("[ClockMaster] Sent STOP to Strategy");
+        bpt::common::log::info("[ClockMaster] Sent STOP to Strategy");
     }
 
-    ygg::log::info("[ClockMaster] Data exhausted after {} ticks.", seq);
+    bpt::common::log::info("[ClockMaster] Data exhausted after {} ticks.", seq);
 }
 
 void ClockMaster::dispatch(const data::MarketEvent& event) {
@@ -76,7 +76,7 @@ void ClockMaster::dispatch(const data::MarketEvent& event) {
         if (okx_server_)
             okx_server_->push(event);
     } else {
-        ygg::log::warn("[ClockMaster] No WS server for exchange '{}' — event dropped", exchange);
+        bpt::common::log::warn("[ClockMaster] No WS server for exchange '{}' — event dropped", exchange);
     }
 
     if (matching_engine_)

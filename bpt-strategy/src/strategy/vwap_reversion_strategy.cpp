@@ -41,7 +41,7 @@ VwapReversionStrategy::VwapReversionStrategy(uint64_t correlation_id,
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
-    ygg::log::info(
+    bpt::common::log::info(
         "[VwapReversion] ema_period={} alpha={:.6f} min_bbo={} entry={:.4f}% exit={:.4f}% "
         "stop={:.4f}% cooldown_ms={}",
         ema_period_,
@@ -51,18 +51,18 @@ VwapReversionStrategy::VwapReversionStrategy(uint64_t correlation_id,
         exit_threshold_ * 100.0,
         stop_threshold_ * 100.0,
         cooldown_ns_ / 1'000'000ULL);
-    ygg::log::info("[VwapReversion] risk: max_position_usd={} max_order_size_usd={}",
+    bpt::common::log::info("[VwapReversion] risk: max_position_usd={} max_order_size_usd={}",
                    cfg.risk.max_position_usd,
                    cfg.risk.max_order_size_usd);
     for (const auto& s : instruments_)
-        ygg::log::info("[VwapReversion] instrument: {}", s);
+        bpt::common::log::info("[VwapReversion] instrument: {}", s);
 }
 
 // ── IStrategy ──────────────────────────────────────────────────────────────
 
 void VwapReversionStrategy::start() {
     for (const auto& ex : md_exchanges_)
-        ygg::log::info("[VwapReversion] MD exchange: {}", ex);
+        bpt::common::log::info("[VwapReversion] MD exchange: {}", ex);
 
     std::vector<refdata::RefdataClient::CanonicalFilter> filters;
     for (const auto& sym : instruments_) {
@@ -95,7 +95,7 @@ void VwapReversionStrategy::start() {
 }
 
 void VwapReversionStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
-    ygg::log::info("[VwapReversion] Snapshot ({} instruments), resolving universe...", cache.size());
+    bpt::common::log::info("[VwapReversion] Snapshot ({} instruments), resolving universe...", cache.size());
     state_.clear();
     order_to_instrument_.clear();
     positions_.clear_all();
@@ -115,10 +115,10 @@ void VwapReversionStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
             ex_id = ExchangeId::HYPERLIQUID;
 
         state_.emplace(id, InstrumentState{.symbol = inst->symbol, .exchange = inst->exchange, .exchange_id = ex_id});
-        ygg::log::info("  [{}] {} @ {}", id, inst->symbol, inst->exchange);
+        bpt::common::log::info("  [{}] {} @ {}", id, inst->symbol, inst->exchange);
     }
 
-    ygg::log::info("[VwapReversion] Trading universe: {} instrument(s)", state_.size());
+    bpt::common::log::info("[VwapReversion] Trading universe: {} instrument(s)", state_.size());
 
     if (!md_client_)
         return;
@@ -128,7 +128,7 @@ void VwapReversionStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
     for (const auto& [id, st] : state_)
         subs.push_back({id, st.exchange, st.symbol});
 
-    ygg::log::info("[VwapReversion] Subscribing MD to {} instrument(s)", subs.size());
+    bpt::common::log::info("[VwapReversion] Subscribing MD to {} instrument(s)", subs.size());
     md_client_->subscribe(correlation_id_, subs);
 }
 
@@ -150,11 +150,11 @@ void VwapReversionStrategy::on_delta(const refdata::Instrument& inst,
 
         state_.emplace(inst.instrument_id,
                        InstrumentState{.symbol = inst.symbol, .exchange = inst.exchange, .exchange_id = ex_id});
-        ygg::log::info("[VwapReversion] Delta ADD {} @ {}", inst.symbol, inst.exchange);
+        bpt::common::log::info("[VwapReversion] Delta ADD {} @ {}", inst.symbol, inst.exchange);
 
     } else if (update_type == bpt::messages::DeltaUpdateType::REMOVE) {
         state_.erase(inst.instrument_id);
-        ygg::log::info("[VwapReversion] Delta REMOVE {} @ {}", inst.symbol, inst.exchange);
+        bpt::common::log::info("[VwapReversion] Delta REMOVE {} @ {}", inst.symbol, inst.exchange);
     }
 }
 
@@ -277,26 +277,26 @@ void VwapReversionStrategy::on_exec_report(const bpt::messages::ExecutionReport&
     InstrumentState& st = state_it->second;
 
     if (status == ExecStatus::ACKED) {
-        ygg::log::debug("[VwapReversion] ExecReport order_id={} {} {} ACKED", order_id, st.symbol, st.exchange);
+        bpt::common::log::debug("[VwapReversion] ExecReport order_id={} {} {} ACKED", order_id, st.symbol, st.exchange);
     } else if (status == ExecStatus::REJECTED) {
         const auto src = rpt.rejectSource();
         const bool gateway_reject = (src == RejectSource::GATEWAY || src == RejectSource::RISK);
         if (gateway_reject)
-            ygg::log::error("[VwapReversion] ExecReport order_id={} {} {} REJECTED reason={} source={}",
+            bpt::common::log::error("[VwapReversion] ExecReport order_id={} {} {} REJECTED reason={} source={}",
                             order_id,
                             st.symbol,
                             st.exchange,
                             bpt::messages::RejectReason::c_str(rpt.rejectReason()),
                             bpt::messages::RejectSource::c_str(src));
         else
-            ygg::log::warn("[VwapReversion] ExecReport order_id={} {} {} REJECTED reason={} source={}",
+            bpt::common::log::warn("[VwapReversion] ExecReport order_id={} {} {} REJECTED reason={} source={}",
                            order_id,
                            st.symbol,
                            st.exchange,
                            bpt::messages::RejectReason::c_str(rpt.rejectReason()),
                            bpt::messages::RejectSource::c_str(src));
     } else {
-        ygg::log::info("[VwapReversion] ExecReport order_id={} {} {} status={} filled={:.6f} price={:.2f}",
+        bpt::common::log::info("[VwapReversion] ExecReport order_id={} {} {} status={} filled={:.6f} price={:.2f}",
                        order_id,
                        st.symbol,
                        st.exchange,
@@ -309,7 +309,7 @@ void VwapReversionStrategy::on_exec_report(const bpt::messages::ExecutionReport&
         positions_.on_fill(canonical_id, st.exchange_id, rpt.side(), rpt.filledQty(), rpt.price());
 
         if (const auto pos = positions_.get(canonical_id, st.exchange_id)) {
-            ygg::log::info("[VwapReversion] Position {} @ {}  net_qty={}  avg_price={:.6f}  rpnl={:.4f}",
+            bpt::common::log::info("[VwapReversion] Position {} @ {}  net_qty={}  avg_price={:.6f}  rpnl={:.4f}",
                            st.symbol,
                            st.exchange,
                            pos->net_qty,
@@ -342,7 +342,7 @@ void VwapReversionStrategy::send_order(uint64_t instrument_id,
                                        const char* reason) {
     const auto vex_it = venue_exec_.find(st.exchange);
     if (vex_it == venue_exec_.end() || !vex_it->second.enabled) {
-        ygg::log::debug("[VwapReversion] Venue {} not enabled — signal suppressed", st.exchange);
+        bpt::common::log::debug("[VwapReversion] Venue {} not enabled — signal suppressed", st.exchange);
         return;
     }
     const auto& vex = vex_it->second;
@@ -357,7 +357,7 @@ void VwapReversionStrategy::send_order(uint64_t instrument_id,
                                                              : mid * 0.999;
 
     if (!order_mgr_) {
-        ygg::log::info("[VwapReversion] {} {} {} @ {} mid={:.6f} vwap={:.6f} (no gateway)",
+        bpt::common::log::info("[VwapReversion] {} {} {} @ {} mid={:.6f} vwap={:.6f} (no gateway)",
                        reason,
                        (side == OrderSide::BUY ? "BUY" : "SELL"),
                        st.symbol,
@@ -367,7 +367,7 @@ void VwapReversionStrategy::send_order(uint64_t instrument_id,
         return;
     }
 
-    ygg::log::debug("[VwapReversion] {} {} {} @ {} mid={:.6f} vwap={:.6f} dev={:+.4f}%",
+    bpt::common::log::debug("[VwapReversion] {} {} {} @ {} mid={:.6f} vwap={:.6f} dev={:+.4f}%",
                     reason,
                     (side == OrderSide::BUY ? "BUY" : "SELL"),
                     st.symbol,
@@ -379,7 +379,7 @@ void VwapReversionStrategy::send_order(uint64_t instrument_id,
     const uint64_t order_id =
         order_mgr_->place_order(instrument_id, st.exchange_id, side, order_type, tif, price_f, quantity);
     if (order_id != 0) {
-        ygg::log::debug("[VwapReversion] order placed → order_id={}", order_id);
+        bpt::common::log::debug("[VwapReversion] order placed → order_id={}", order_id);
         st.open_order_id = order_id;
         st.open_order_side = side;
         st.last_signal_ns = timestamp_ns;

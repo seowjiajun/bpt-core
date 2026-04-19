@@ -5,8 +5,8 @@
 #include <boost/beast/websocket.hpp>
 #include <chrono>
 #include <fmt/format.h>
-#include <yggdrasil/util/tsc_clock.h>
-#include <yggdrasil/ws/ws_connect.h>
+#include <bpt_common/util/tsc_clock.h>
+#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -18,7 +18,7 @@ OkxAdapter::OkxAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messagi
     : AdapterBase(cfg, std::move(md_pub)),
       parser_(subs_) {}
 
-void OkxAdapter::send_instrument_subs(ygg::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth) {
+void OkxAdapter::send_instrument_subs(bpt::common::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth) {
     // Channel selection:
     //   depth 0  → bbo-tbt (tick-by-tick BBO)
     //   depth ≤5 → books5  (top-5 levels)
@@ -40,27 +40,27 @@ void OkxAdapter::send_instrument_subs(ygg::ws::AnyWsStream& ws, const std::strin
     }
 }
 
-std::unique_ptr<ygg::ws::AnyWsStream> OkxAdapter::connect_and_subscribe() {
-    ygg::log::info("OkxAdapter connecting {}:{}{} (tls={})", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path, cfg_.use_tls);
+std::unique_ptr<bpt::common::ws::AnyWsStream> OkxAdapter::connect_and_subscribe() {
+    bpt::common::log::info("OkxAdapter connecting {}:{}{} (tls={})", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path, cfg_.use_tls);
 
-    std::unique_ptr<ygg::ws::AnyWsStream> any;
+    std::unique_ptr<bpt::common::ws::AnyWsStream> any;
     if (cfg_.use_tls) {
-        auto ws = ygg::ws::ws_connect(ioc_,
+        auto ws = bpt::common::ws::ws_connect(ioc_,
                                       ssl_ctx_,
                                       cfg_.ws_host,
                                       cfg_.ws_port,
                                       cfg_.ws_path,
                                       cfg_.so_rcvbuf_bytes,
                                       cfg_.ws_connect_timeout_ms);
-        any = std::make_unique<ygg::ws::AnyWsStream>(std::move(ws));
+        any = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(ws));
     } else {
-        auto ws = ygg::ws::ws_connect_plain(ioc_,
+        auto ws = bpt::common::ws::ws_connect_plain(ioc_,
                                             cfg_.ws_host,
                                             cfg_.ws_port,
                                             cfg_.ws_path,
                                             cfg_.so_rcvbuf_bytes,
                                             cfg_.ws_connect_timeout_ms);
-        any = std::make_unique<ygg::ws::AnyWsStream>(std::move(ws));
+        any = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(ws));
     }
 
     // OKX requires text frames; Beast defaults to binary.
@@ -74,7 +74,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> OkxAdapter::connect_and_subscribe() {
         false                            // no Beast keep-alive pings
     });
 
-    ygg::log::info("OkxAdapter connected, subscribing instruments");
+    bpt::common::log::info("OkxAdapter connected, subscribing instruments");
 
     // Drain pending so the read loop does not re-send what we're about to subscribe.
     subs_.take_pending();
@@ -85,7 +85,7 @@ std::unique_ptr<ygg::ws::AnyWsStream> OkxAdapter::connect_and_subscribe() {
     return any;
 }
 
-void OkxAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
+void OkxAdapter::read_loop(bpt::common::ws::AnyWsStream& ws) {
     const auto ping_interval = std::chrono::milliseconds(cfg_.ws_ping_interval_ms);
     const auto liveness = std::chrono::milliseconds(cfg_.ws_liveness_timeout_ms);
 
@@ -112,14 +112,14 @@ void OkxAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         // If no message (including pong) has arrived within the liveness window,
         // the exchange is no longer responding — reconnect.
         if (now - last_recv >= liveness) {
-            ygg::log::warn("OkxAdapter: no data for {}ms, reconnecting", cfg_.ws_liveness_timeout_ms);
+            bpt::common::log::warn("OkxAdapter: no data for {}ms, reconnecting", cfg_.ws_liveness_timeout_ms);
             throw std::runtime_error("liveness timeout");
         }
 
         // Send subscribe frames for any instruments added since connect.
         for (const auto& entry : subs_.take_pending()) {
             send_instrument_subs(ws, entry.symbol, entry.depth);
-            ygg::log::info("OkxAdapter: runtime subscribe {} depth={}", entry.symbol, entry.depth);
+            bpt::common::log::info("OkxAdapter: runtime subscribe {} depth={}", entry.symbol, entry.depth);
         }
 
         beast::error_code ec;
@@ -136,7 +136,7 @@ void OkxAdapter::read_loop(ygg::ws::AnyWsStream& ws) {
         // See HyperliquidAdapter for the WallClock vs TscClock rationale:
         // this timestamp is serialized into SBE MD messages and compared
         // across process boundaries, so it has to be from CLOCK_REALTIME.
-        uint64_t recv_ns = ygg::util::WallClock::now_ns();
+        uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
         std::string_view msg(static_cast<const char*>(buf.data().data()), buf.data().size());
 
         if (msg == "ping") {

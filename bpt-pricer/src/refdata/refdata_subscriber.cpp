@@ -10,14 +10,14 @@
 #include <messages/RefDataSubscriptionRequest.h>
 
 #include <x86intrin.h>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/util/tsc_clock.h>
 
 #include <chrono>
 #include <cstring>
 #include <string>
 #include <thread>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::pricer::refdata {
 
@@ -49,12 +49,12 @@ RefdataSubscriber::RefdataSubscriber(std::shared_ptr<aeron::Aeron> aeron,
                                      int32_t delta_stream_id,
                                      const std::string& control_channel,
                                      int32_t control_stream_id) {
-    snapshot_sub_ = ygg::aeron::wait_for_subscription(aeron, snapshot_channel, snapshot_stream_id);
-    delta_sub_ = ygg::aeron::wait_for_subscription(aeron, delta_channel, delta_stream_id);
+    snapshot_sub_ = bpt::common::aeron::wait_for_subscription(aeron, snapshot_channel, snapshot_stream_id);
+    delta_sub_ = bpt::common::aeron::wait_for_subscription(aeron, delta_channel, delta_stream_id);
     if (control_stream_id != 0)
-        ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, control_channel, control_stream_id);
+        ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, control_channel, control_stream_id);
 
-    ygg::log::info("[RefdataSubscriber] Snapshot + delta subscriptions ready");
+    bpt::common::log::info("[RefdataSubscriber] Snapshot + delta subscriptions ready");
     snap_assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buffer,
                aeron::util::index_t offset,
@@ -62,12 +62,12 @@ RefdataSubscriber::RefdataSubscriber(std::shared_ptr<aeron::Aeron> aeron,
                aeron::Header& header) { on_snapshot_fragment(buffer, offset, length, header); });
 
     if (ctrl_pub_)
-        ygg::log::info("[RefdataSubscriber] Control publication ready");
+        bpt::common::log::info("[RefdataSubscriber] Control publication ready");
 }
 
 void RefdataSubscriber::send_subscription_request(uint64_t correlation_id) {
     if (!ctrl_pub_) {
-        ygg::log::warn("[RefdataSubscriber] send_subscription_request: no control publication");
+        bpt::common::log::warn("[RefdataSubscriber] send_subscription_request: no control publication");
         return;
     }
 
@@ -83,7 +83,7 @@ void RefdataSubscriber::send_subscription_request(uint64_t correlation_id) {
     RefDataSubscriptionRequest req;
     req.wrapAndApplyHeader(buf.data(), 0, buf_size)
         .correlationId(correlation_id)
-        .timestampNs(ygg::util::TscClock::now_epoch_ns());
+        .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     req.instrumentsCount(0);
     req.canonicalFilterCount(0);
@@ -96,13 +96,13 @@ void RefdataSubscriber::send_subscription_request(uint64_t correlation_id) {
     long result = 0;
     while ((result = ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size))) < 0) {
         if (std::chrono::steady_clock::now() > deadline) {
-            ygg::log::error("[RefdataSubscriber] subscription request offer timed out (last result={})", result);
+            bpt::common::log::error("[RefdataSubscriber] subscription request offer timed out (last result={})", result);
             return;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    ygg::log::info("[RefdataSubscriber] Subscription request sent: correlation_id={}", correlation_id);
+    bpt::common::log::info("[RefdataSubscriber] Subscription request sent: correlation_id={}", correlation_id);
 }
 
 int RefdataSubscriber::poll(int fragment_limit) {
@@ -161,7 +161,7 @@ void RefdataSubscriber::on_snapshot_fragment(const aeron::concurrent::AtomicBuff
                 .exchange = exchange_str,
                 .exchange_id = exchange_from_string(exchange_str),
             };
-            ygg::log::info("[RefdataSubscriber] Perp instrument: {} id={} exchange={}",
+            bpt::common::log::info("[RefdataSubscriber] Perp instrument: {} id={} exchange={}",
                            underlying_str,
                            instruments.instrumentId(),
                            exchange_str);
@@ -171,7 +171,7 @@ void RefdataSubscriber::on_snapshot_fragment(const aeron::concurrent::AtomicBuff
         }
 
         if (instruments.instrumentType() != InstrumentType::OPTION) {
-            ygg::log::info("[RefdataSubscriber] Skipping instrument type={} id={}",
+            bpt::common::log::info("[RefdataSubscriber] Skipping instrument type={} id={}",
                            static_cast<int>(instruments.instrumentType()),
                            instruments.instrumentId());
             continue;
@@ -194,7 +194,7 @@ void RefdataSubscriber::on_snapshot_fragment(const aeron::concurrent::AtomicBuff
         if (on_option_)
             on_option_(oi);
     }
-    ygg::log::info("[RefdataSubscriber] Snapshot: {} total instruments, {} options", total_count, option_count);
+    bpt::common::log::info("[RefdataSubscriber] Snapshot: {} total instruments, {} options", total_count, option_count);
 }
 
 void RefdataSubscriber::on_delta_fragment(const aeron::concurrent::AtomicBuffer& buffer,

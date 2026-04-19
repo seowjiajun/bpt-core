@@ -7,13 +7,13 @@
 #include <messages/ModifyOrder.h>
 #include <messages/NewOrder.h>
 
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::messaging {
 
 OrderSubscriber::OrderSubscriber(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id) {
-    subscription_ = ygg::aeron::wait_for_subscription(aeron, channel, stream_id);
+    subscription_ = bpt::common::aeron::wait_for_subscription(aeron, channel, stream_id);
 
     assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
@@ -86,7 +86,7 @@ void OrderSubscriber::handle_fragment(aeron::AtomicBuffer& buf,
             on_account_snapshot_request(msg);
 
     } else {
-        ygg::log::warn("[OrderGateway] OrderSubscriber: unknown templateId={}", tmpl);
+        bpt::common::log::warn("[OrderGateway] OrderSubscriber: unknown templateId={}", tmpl);
     }
 }
 

@@ -6,14 +6,14 @@
 #include <chrono>
 #include <map>
 #include <string>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/secrets/secrets_client.h>
-#include <yggdrasil/signal.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/secrets/secrets_client.h>
+#include <bpt_common/signal.h>
+#include <bpt_common/util/tsc_clock.h>
 
 int main(int argc, char** argv) {
-    ygg::signal::install();
+    bpt::common::signal::install();
 
     CLI::App app{"bpt-refdata — instrument reference data service"};
     std::string config_path = "config/bpt-refdata.toml";
@@ -26,39 +26,39 @@ int main(int argc, char** argv) {
     try {
         settings = bpt::refdata::config::load(config_path);
     } catch (const std::exception& e) {
-        ygg::logging::init("bpt-refdata");
-        ygg::log::error("Failed to load config: {}", e.what());
+        bpt::common::logging::init("bpt-refdata");
+        bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
 
-    ygg::logging::init("bpt-refdata", settings.logging);
-    ygg::util::TscClock::calibrate();
-    ygg::log::info("Starting Refdata Reference Data Service...");
+    bpt::common::logging::init("bpt-refdata", settings.logging);
+    bpt::common::util::TscClock::calibrate();
+    bpt::common::log::info("Starting Refdata Reference Data Service...");
 
     std::map<std::string, bpt::refdata::adapter::ExchangeCredentials> creds;
     for (const auto& a_cfg : settings.adapters) {
         if (a_cfg.secret_name.empty()) {
-            ygg::log::warn("[Refdata] No secret_name for {} — adapter will have empty credentials", a_cfg.exchange);
+            bpt::common::log::warn("[Refdata] No secret_name for {} — adapter will have empty credentials", a_cfg.exchange);
             creds[a_cfg.exchange] = {};
             continue;
         }
         try {
-            const auto kv = ygg::secrets::fetch(a_cfg.secret_name);
+            const auto kv = bpt::common::secrets::fetch(a_cfg.secret_name);
             creds[a_cfg.exchange] = bpt::refdata::adapter::credentials_from_secret(a_cfg.exchange, kv);
-            ygg::log::info("[Refdata] Loaded credentials for {}", a_cfg.exchange);
+            bpt::common::log::info("[Refdata] Loaded credentials for {}", a_cfg.exchange);
         } catch (const std::exception& e) {
-            ygg::log::error("[Refdata] Failed to load credentials for {}: {}", a_cfg.exchange, e.what());
+            bpt::common::log::error("[Refdata] Failed to load credentials for {}: {}", a_cfg.exchange, e.what());
             return 1;
         }
     }
 
-    auto aeron = ygg::aeron::connect(settings.media_driver_dir);
+    auto aeron = bpt::common::aeron::connect(settings.media_driver_dir);
 
     try {
         bpt::refdata::RefdataApp app(std::move(settings), std::move(aeron), std::move(creds));
         app.run();
     } catch (const std::exception& e) {
-        ygg::log::error("Fatal: {}", e.what());
+        bpt::common::log::error("Fatal: {}", e.what());
         return 1;
     }
 

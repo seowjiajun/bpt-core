@@ -1,8 +1,8 @@
 #include "order_gateway/adapter/common/order_adapter_base.h"
 
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/thread_pin.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/thread_pin.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -39,7 +39,7 @@ std::chrono::milliseconds OrderAdapterBase::reconnect_delay() const {
 }
 
 void OrderAdapterBase::run() {
-    ygg::util::pin_thread_to_cpu(cfg_.io_cpu, exchange_name());
+    bpt::common::util::pin_thread_to_cpu(cfg_.io_cpu, exchange_name());
 
     while (!stop_flag_.load(std::memory_order_relaxed)) {
         try {
@@ -47,7 +47,7 @@ void OrderAdapterBase::run() {
             connect_and_run();
         } catch (const std::exception& e) {
             if (!stop_flag_.load(std::memory_order_relaxed)) {
-                ygg::log::error("[OrderGateway] {} error: {}, reconnecting in {}ms",
+                bpt::common::log::error("[OrderGateway] {} error: {}, reconnecting in {}ms",
                                 exchange_name(),
                                 e.what(),
                                 reconnect_delay().count());
@@ -57,9 +57,9 @@ void OrderAdapterBase::run() {
                 // service stop. Latch check runs before the sleep so the
                 // loud ERROR log lands promptly after the trip.
                 const bool was_tripped = disconnect_breaker_.tripped();
-                disconnect_breaker_.record(ygg::util::TscClock::now_epoch_ns());
+                disconnect_breaker_.record(bpt::common::util::TscClock::now_epoch_ns());
                 if (!was_tripped && disconnect_breaker_.tripped()) {
-                    ygg::log::error(
+                    bpt::common::log::error(
                         "[OrderGateway] {} DISCONNECT BREAKER TRIPPED — {} reconnects "
                         "in last {}s (threshold {}). Halting new orders to this venue. "
                         "Restart service after human review to resume.",

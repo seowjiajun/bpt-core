@@ -7,8 +7,8 @@
 
 #include <boost/json.hpp>
 #include <cmath>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/util/tsc_clock.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
@@ -40,7 +40,7 @@ ExecEvent make_skeleton(const OrderContext& ctx, uint64_t now_ns) {
 
 void push_or_log(util::ExecEventQueue& queue, const ExecEvent& ev, const char* tag) {
     if (!queue.try_push(ev))
-        ygg::log::error("[Hyperliquid] exec_queue full — dropped {} ExecEvent", tag);
+        bpt::common::log::error("[Hyperliquid] exec_queue full — dropped {} ExecEvent", tag);
 }
 
 }  // namespace
@@ -53,10 +53,10 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
         const std::string status =
             rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
 
-        const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+        const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
         if (status != "ok") {
-            ygg::log::warn("[OrderGateway] HL emitter: order rejected, status={}", status);
+            bpt::common::log::warn("[OrderGateway] HL emitter: order rejected, status={}", status);
             ExecEvent ev = make_skeleton(ctx, now_ns);
             ev.status = ES::REJECTED;
             ev.reject_reason = RR::EXCHANGE_ERROR;
@@ -104,14 +104,14 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
             const auto& f = s0.at("filled").as_object();
             const uint64_t exch_oid = f.contains("oid") ? f.at("oid").to_number<uint64_t>() : 0;
             if (exch_oid != 0 && on_acked) on_acked(exch_oid);
-            ygg::log::debug(
+            bpt::common::log::debug(
                 "[OrderGateway] HL emitter: fill-on-placement client_id={} exch_oid={} — waiting for userFills",
                 ctx.client_order_id, exch_oid);
             return true;
         }
 
         if (s0.contains("error")) {
-            ygg::log::warn("[OrderGateway] HL emitter: order error: {}",
+            bpt::common::log::warn("[OrderGateway] HL emitter: order error: {}",
                            std::string(s0.at("error").as_string()));
             ExecEvent ev = make_skeleton(ctx, now_ns);
             ev.status = ES::REJECTED;
@@ -123,7 +123,7 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
 
         return false;
     } catch (const std::exception& e) {
-        ygg::log::warn("[OrderGateway] HL emitter: failed to parse order resp: {} resp={}",
+        bpt::common::log::warn("[OrderGateway] HL emitter: failed to parse order resp: {} resp={}",
                        e.what(), resp);
         emit_rejected(ctx);
         return true;
@@ -165,7 +165,7 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
                             const std::string_view err(s0.at("error").as_string());
                             if (err.find("filled") != std::string_view::npos) {
                                 ambiguous_already_filled = true;
-                                ygg::log::warn(
+                                bpt::common::log::warn(
                                     "[OrderGateway] HL emitter: cancel id={} raced with fill "
                                     "(HL says '{}') — skipping CANCELLED emit, waiting for "
                                     "userFills to deliver the real state",
@@ -183,7 +183,7 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
             return true;
         }
 
-        const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+        const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
         ExecEvent ev{};
         ev.order_id = client_order_id;
@@ -197,13 +197,13 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
         if (on_cancelled) on_cancelled();
         return true;
     } catch (const std::exception& e) {
-        ygg::log::warn("[OrderGateway] HL emitter: failed to parse cancel resp: {}", e.what());
+        bpt::common::log::warn("[OrderGateway] HL emitter: failed to parse cancel resp: {}", e.what());
         return false;
     }
 }
 
 void HyperliquidExecEmitter::emit_rejected(const OrderContext& ctx) {
-    const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+    const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
     ExecEvent ev = make_skeleton(ctx, now_ns);
     ev.status = ES::REJECTED;
     ev.reject_reason = RR::EXCHANGE_ERROR;
@@ -212,7 +212,7 @@ void HyperliquidExecEmitter::emit_rejected(const OrderContext& ctx) {
 }
 
 void HyperliquidExecEmitter::emit_recovered_ack(const OrderContext& ctx, uint64_t exch_oid) {
-    const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+    const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
     ExecEvent ev = make_skeleton(ctx, now_ns);
     ev.status = ES::ACKED;
     ev.reject_reason = RR::NULL_VALUE;
@@ -228,7 +228,7 @@ void HyperliquidExecEmitter::emit_recovered_fill(const OrderContext& ctx,
                                                  int64_t  fill_fee_e8,
                                                  uint64_t fill_qty_e8,
                                                  uint64_t fill_time_ns) {
-    const uint64_t now_ns = ygg::util::TscClock::now_epoch_ns();
+    const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
     ExecEvent ev = make_skeleton(ctx, now_ns);
     // Overwrite price with the actual fill price (may differ from the
     // intended limit price by one tick due to HL's price rounding).

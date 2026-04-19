@@ -6,15 +6,15 @@
 #include <algorithm>
 #include <cstring>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::messaging {
 
 AccountSnapshotPublisher::AccountSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                                    const std::string& channel,
                                                    int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snapshot) {
@@ -71,7 +71,7 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
     while (publication_->offer(ab, 0, encoded_len) < 0)
         std::this_thread::yield();
 
-    ygg::log::info("[OrderGateway] AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
+    bpt::common::log::info("[OrderGateway] AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
                    ExchangeId::c_str(snapshot.exchange_id),
                    static_cast<double>(snapshot.available_balance_e8) / 1e8,
                    n_pos,

@@ -1,7 +1,7 @@
 #include "strategy/app/startup_gate.h"
 
-#include <yggdrasil/logging.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
 
 namespace bpt::strategy::app {
 
@@ -25,7 +25,7 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
                                    bool fee_schedules_loaded,
                                    bool funding_rates_loaded) {
     if (!refdata_ready_) {
-        ygg::log::info(
+        bpt::common::log::info(
             "[Strategy] RefDataReady: exchanges=0x{:02x} (configured=0x{:02x}) "
             "instruments={} fee_schedules={} funding_rates={}",
             exchanges_loaded,
@@ -34,7 +34,7 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
             fee_schedules_loaded,
             funding_rates_loaded);
     } else {
-        ygg::log::debug("[Strategy] RefDataReady (periodic): exchanges=0x{:02x} instruments={}",
+        bpt::common::log::debug("[Strategy] RefDataReady (periodic): exchanges=0x{:02x} instruments={}",
                         exchanges_loaded, instrument_count);
     }
 
@@ -42,11 +42,11 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
     // on_ready fires so a mid-run loss of an exchange also halts.
     if (configured_mask_ != 0 && (exchanges_loaded & configured_mask_) != configured_mask_) {
         const uint8_t missing = configured_mask_ & ~exchanges_loaded;
-        ygg::log::critical(
+        bpt::common::log::critical(
             "[Strategy] HALT — refdata service is missing required exchanges (mask=0x{:02x}). "
             "Cannot trade safely. Shutting down.",
             missing);
-        ygg::signal::stop();
+        bpt::common::signal::stop();
         return;
     }
 
@@ -72,7 +72,7 @@ void StartupGate::on_account_snapshot(ExchangeId::Value exchange) {
 void StartupGate::on_refdata_snapshot_complete() {
     if (phase_ != Phase::WaitMdSnapshot) return;
 
-    ygg::log::info("[Strategy] Snapshot received — starting strategy MD subscriptions");
+    bpt::common::log::info("[Strategy] Snapshot received — starting strategy MD subscriptions");
     strategy_.start();
     metrics_.strategy_active->Set(1.0);
     phase_ = Phase::Active;
@@ -83,19 +83,19 @@ void StartupGate::send_account_snapshot_requests() {
 
     uint64_t corr = correlation_id_;
     if (configured_mask_ & 0x01) {
-        ygg::log::info("[Strategy] Requesting AccountSnapshot for BINANCE");
+        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for BINANCE");
         order_gw_->send_account_snapshot_request(ExchangeId::BINANCE, corr++);
     }
     if (configured_mask_ & 0x02) {
-        ygg::log::info("[Strategy] Requesting AccountSnapshot for OKX");
+        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for OKX");
         order_gw_->send_account_snapshot_request(ExchangeId::OKX, corr++);
     }
     if (configured_mask_ & 0x04) {
-        ygg::log::info("[Strategy] Requesting AccountSnapshot for HYPERLIQUID");
+        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for HYPERLIQUID");
         order_gw_->send_account_snapshot_request(ExchangeId::HYPERLIQUID, corr++);
     }
     if (configured_mask_ & 0x08) {
-        ygg::log::info("[Strategy] Requesting AccountSnapshot for DERIBIT");
+        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for DERIBIT");
         order_gw_->send_account_snapshot_request(ExchangeId::DERIBIT, corr++);
     }
 }
@@ -119,7 +119,7 @@ void StartupGate::tick() {
             if (!accounts_ready) break;
 
             if (!md_subscribe_sent_) {
-                ygg::log::info("[Strategy] RefDataReady + AccountSnapshot received — sending RefDataSubscriptionRequest");
+                bpt::common::log::info("[Strategy] RefDataReady + AccountSnapshot received — sending RefDataSubscriptionRequest");
                 refdata_.subscribe(correlation_id_);
                 md_subscribe_sent_ = true;
             }

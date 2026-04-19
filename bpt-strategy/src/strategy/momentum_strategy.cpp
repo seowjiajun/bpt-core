@@ -32,33 +32,33 @@ MomentumStrategy::MomentumStrategy(uint64_t correlation_id,
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
-    ygg::log::info("[MomentumStrategy] lookback={} entry_threshold={:.4f} cooldown_ms={}",
+    bpt::common::log::info("[MomentumStrategy] lookback={} entry_threshold={:.4f} cooldown_ms={}",
                    lookback_,
                    entry_threshold_,
                    cooldown_ns_ / 1'000'000ULL);
-    ygg::log::info(
+    bpt::common::log::info(
         "[MomentumStrategy] risk: max_position_usd={} max_order_size_usd={} max_open_orders={}",
         cfg.risk.max_position_usd,
         cfg.risk.max_order_size_usd,
         cfg.risk.max_open_orders);
-    ygg::log::info("[MomentumStrategy] schedule: require_refdata_ready={} md_staleness_threshold_ms={}",
+    bpt::common::log::info("[MomentumStrategy] schedule: require_refdata_ready={} md_staleness_threshold_ms={}",
                    cfg.schedule.require_refdata_ready,
                    cfg.schedule.md_staleness_threshold_ms);
 
     if (instruments_.empty()) {
-        ygg::log::info("[MomentumStrategy] instruments: ALL (no canonical filter)");
+        bpt::common::log::info("[MomentumStrategy] instruments: ALL (no canonical filter)");
     } else {
         for (const auto& s : instruments_)
-            ygg::log::info("[MomentumStrategy] instrument: {}", s);
+            bpt::common::log::info("[MomentumStrategy] instrument: {}", s);
     }
 }
 
 void MomentumStrategy::start() {
     if (md_exchanges_.empty()) {
-        ygg::log::info("[MomentumStrategy] MD exchanges: ALL");
+        bpt::common::log::info("[MomentumStrategy] MD exchanges: ALL");
     } else {
         for (const auto& ex : md_exchanges_)
-            ygg::log::info("[MomentumStrategy] MD exchange: {}", ex);
+            bpt::common::log::info("[MomentumStrategy] MD exchange: {}", ex);
     }
 
     std::vector<refdata::RefdataClient::CanonicalFilter> filters;
@@ -92,7 +92,7 @@ void MomentumStrategy::start() {
 }
 
 void MomentumStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
-    ygg::log::info("[MomentumStrategy] Snapshot received ({} total instruments), resolving universe...", cache.size());
+    bpt::common::log::info("[MomentumStrategy] Snapshot received ({} total instruments), resolving universe...", cache.size());
 
     state_.clear();
 
@@ -110,10 +110,10 @@ void MomentumStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
         else if (inst->exchange == "HYPERLIQUID")
             ex_id = ExchangeId::HYPERLIQUID;
         state_.emplace(id, InstrumentState{.symbol = inst->symbol, .exchange = inst->exchange, .exchange_id = ex_id});
-        ygg::log::info("  [{}] {} @ {}", id, inst->symbol, inst->exchange);
+        bpt::common::log::info("  [{}] {} @ {}", id, inst->symbol, inst->exchange);
     }
 
-    ygg::log::info("[MomentumStrategy] Trading universe: {} instrument(s)", state_.size());
+    bpt::common::log::info("[MomentumStrategy] Trading universe: {} instrument(s)", state_.size());
 
     if (!md_client_)
         return;
@@ -123,7 +123,7 @@ void MomentumStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
     for (const auto& [id, st] : state_)
         subs.push_back({id, st.exchange, st.symbol});
 
-    ygg::log::info("[MomentumStrategy] Subscribing MD service to {} instrument(s)", subs.size());
+    bpt::common::log::info("[MomentumStrategy] Subscribing MD service to {} instrument(s)", subs.size());
     md_client_->subscribe(correlation_id_, subs);
 }
 
@@ -136,11 +136,11 @@ void MomentumStrategy::on_delta(const refdata::Instrument& inst,
         if (!wanted)
             return;
         state_.emplace(inst.instrument_id, InstrumentState{.symbol = inst.symbol, .exchange = inst.exchange});
-        ygg::log::info("[MomentumStrategy] Delta ADD {} @ {}", inst.symbol, inst.exchange);
+        bpt::common::log::info("[MomentumStrategy] Delta ADD {} @ {}", inst.symbol, inst.exchange);
 
     } else if (update_type == bpt::messages::DeltaUpdateType::REMOVE) {
         state_.erase(inst.instrument_id);
-        ygg::log::info("[MomentumStrategy] Delta REMOVE {} @ {}", inst.symbol, inst.exchange);
+        bpt::common::log::info("[MomentumStrategy] Delta REMOVE {} @ {}", inst.symbol, inst.exchange);
     }
     // MODIFY: refdata fields (lot size, tick size) don't affect momentum state
 }
@@ -190,7 +190,7 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
     // Look up venue execution config for this exchange.
     const auto it = venue_exec_.find(state.exchange);
     if (it == venue_exec_.end() || !it->second.enabled) {
-        ygg::log::debug("[MomentumStrategy] Venue {} not enabled — signal suppressed", state.exchange);
+        bpt::common::log::debug("[MomentumStrategy] Venue {} not enabled — signal suppressed", state.exchange);
         return;
     }
     const auto& vex = it->second;
@@ -199,7 +199,7 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
     const auto tif = (vex.tif == "IOC") ? TimeInForce::IOC : (vex.tif == "FOK") ? TimeInForce::FOK : TimeInForce::GTC;
 
     if (!order_mgr_) {
-        ygg::log::info("[MomentumStrategy] SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}% (no gateway)",
+        bpt::common::log::info("[MomentumStrategy] SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}% (no gateway)",
                        (side == OrderSide::BUY ? "BUY" : "SELL"),
                        state.symbol,
                        state.exchange,
@@ -216,7 +216,7 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
     // Quantity: 0.001 base currency in natural units (small size for testnet).
     static constexpr double kQty = 0.001;
 
-    ygg::log::info("[MomentumStrategy] SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}%",
+    bpt::common::log::info("[MomentumStrategy] SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}%",
                    (side == OrderSide::BUY ? "BUY" : "SELL"),
                    state.symbol,
                    state.exchange,
@@ -226,7 +226,7 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
     const uint64_t order_id =
         order_mgr_->place_order(instrument_id, state.exchange_id, side, order_type, tif, price_f, kQty);
     if (order_id != 0)
-        ygg::log::info("[MomentumStrategy] order placed → order_id={}", order_id);
+        bpt::common::log::info("[MomentumStrategy] order placed → order_id={}", order_id);
 }
 
 }  // namespace bpt::strategy::strategy

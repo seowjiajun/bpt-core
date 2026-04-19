@@ -7,7 +7,7 @@
 
 #include <cmath>
 #include <nlohmann/json.hpp>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 using json = nlohmann::json;
 
@@ -87,7 +87,7 @@ std::vector<refdata::Instrument> BinanceParser::parse_spot_exchange_info(const s
         result.push_back(std::move(inst));
     }
 
-    ygg::log::info("[BinanceParser] Parsed {} spot instruments from exchangeInfo", result.size());
+    bpt::common::log::info("[BinanceParser] Parsed {} spot instruments from exchangeInfo", result.size());
     return result;
 }
 
@@ -131,7 +131,7 @@ std::vector<refdata::Instrument> BinanceParser::parse_futures_exchange_info(cons
         result.push_back(std::move(inst));
     }
 
-    ygg::log::info("[BinanceParser] Parsed {} futures/perp instruments from fapi exchangeInfo", result.size());
+    bpt::common::log::info("[BinanceParser] Parsed {} futures/perp instruments from fapi exchangeInfo", result.size());
     return result;
 }
 

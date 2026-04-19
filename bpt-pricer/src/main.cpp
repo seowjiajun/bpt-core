@@ -3,12 +3,12 @@
 
 #include <CLI/CLI.hpp>
 #include <string>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
-#include <yggdrasil/signal.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
 
 int main(int argc, char** argv) {
-    ygg::signal::install();
+    bpt::common::signal::install();
 
     CLI::App app{"bpt-pricer — options Greeks + vol surface pricer"};
     std::string config_path = "config/pricer.toml";
@@ -21,32 +21,32 @@ int main(int argc, char** argv) {
     try {
         settings = bpt::pricer::config::load(config_path);
     } catch (const std::exception& e) {
-        ygg::logging::init("bpt-pricer");
-        ygg::log::error("Failed to load config: {}", e.what());
+        bpt::common::logging::init("bpt-pricer");
+        bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
 
-    ygg::logging::LogConfig log_cfg;
+    bpt::common::logging::LogConfig log_cfg;
     log_cfg.log_dir = settings.logging.dir;
     log_cfg.level = settings.logging.level;
-    ygg::logging::init("bpt-pricer", log_cfg);
-    ygg::log::info("Starting Pricer Volatility Surface Service...");
+    bpt::common::logging::init("bpt-pricer", log_cfg);
+    bpt::common::log::info("Starting Pricer Volatility Surface Service...");
 
-    ygg::log::info("[Pricer] publish_interval_ms={} risk_free_rate={:.4f}",
+    bpt::common::log::info("[Pricer] publish_interval_ms={} risk_free_rate={:.4f}",
                    settings.publish_interval_ms,
                    settings.risk_free_rate);
     for (const auto& u : settings.underlyings)
-        ygg::log::info("[Pricer] underlying: {}", u);
+        bpt::common::log::info("[Pricer] underlying: {}", u);
     for (const auto& e : settings.exchanges)
-        ygg::log::info("[Pricer] exchange: {}", e);
+        bpt::common::log::info("[Pricer] exchange: {}", e);
 
-    auto aeron = ygg::aeron::connect(settings.media_driver_dir);
+    auto aeron = bpt::common::aeron::connect(settings.media_driver_dir);
 
     try {
         bpt::pricer::PricerApp app(std::move(settings), std::move(aeron));
         app.run();
     } catch (const std::exception& e) {
-        ygg::log::error("Fatal: {}", e.what());
+        bpt::common::log::error("Fatal: {}", e.what());
         return 1;
     }
 

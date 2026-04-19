@@ -5,7 +5,7 @@
 #include <chrono>
 #include <cstring>
 #include <thread>
-#include <yggdrasil/aeron/aeron_utils.h>
+#include <bpt_common/aeron/aeron_utils.h>
 
 namespace {
 inline uint64_t now_ns() noexcept {
@@ -18,7 +18,7 @@ inline uint64_t now_ns() noexcept {
 namespace bpt::md_gateway::messaging {
 
 AckPublisher::AckPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id) {
-    publication_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void AckPublisher::publish_ack(uint64_t correlation_id,

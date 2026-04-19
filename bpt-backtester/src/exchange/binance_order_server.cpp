@@ -12,7 +12,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -139,7 +139,7 @@ private:
                     return;
                 }
                 self->ws_upgraded_ = true;
-                ygg::log::info("[BinanceOrderServer] User-data WS connected");
+                bpt::common::log::info("[BinanceOrderServer] User-data WS connected");
                 // WS sessions are purely outbound; nothing to read.
             });
             return;
@@ -274,7 +274,7 @@ void BinanceOrderServer::start() {
     acceptor_.set_option(net::socket_base::reuse_address(true));
     acceptor_.bind(ep);
     acceptor_.listen();
-    ygg::log::info("[BinanceOrderServer] Listening on port {}", port_);
+    bpt::common::log::info("[BinanceOrderServer] Listening on port {}", port_);
     do_accept();
     thread_ = std::thread([this] { ioc_.run(); });
 }

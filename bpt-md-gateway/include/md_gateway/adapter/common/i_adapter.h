@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <yggdrasil/util/latency_histogram.h>
+#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -41,7 +41,7 @@ public:
 
     // Returns a reference to the parser's decode latency histogram so the
     // metrics reporter can snapshot it periodically.
-    [[nodiscard]] virtual ygg::util::LatencyHistogram& decode_latency_hist() noexcept = 0;
+    [[nodiscard]] virtual bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept = 0;
 
     // Monotonically increasing count of MD messages that passed validation and
     // were forwarded to the Aeron publisher.

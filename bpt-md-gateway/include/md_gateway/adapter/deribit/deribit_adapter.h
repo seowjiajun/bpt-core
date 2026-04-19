@@ -23,26 +23,26 @@ public:
     void unsubscribe(uint64_t instrument_id) override;
 
     [[nodiscard]] const char* exchange_name() const override { return "DERIBIT"; }
-    [[nodiscard]] ygg::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
+    [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
 
 protected:
     // 2 s back-off — Deribit is slower to recover than CEXs.
     std::chrono::milliseconds reconnect_delay() const override;
 
-    std::unique_ptr<ygg::ws::AnyWsStream> connect_and_subscribe() override;
-    void read_loop(ygg::ws::AnyWsStream& ws) override;
+    std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() override;
+    void read_loop(bpt::common::ws::AnyWsStream& ws) override;
     void parse_frame(std::string_view payload, uint64_t recv_ns) override;
 
 private:
-    void send_subscribe_rpc(ygg::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth);
-    void send_test_response(ygg::ws::AnyWsStream& ws);
+    void send_subscribe_rpc(bpt::common::ws::AnyWsStream& ws, const std::string& symbol, uint8_t depth);
+    void send_test_response(bpt::common::ws::AnyWsStream& ws);
 
     DeribitParser parser_;
     std::atomic<uint64_t> rpc_id_{1};
 
     // Set by the publisher thread when the parser detects a Deribit test_request
     // heartbeat.  The IO thread reads this flag each iteration and sends the WS
-    // response (which must happen on the thread that owns the ygg::ws::WsStream).
+    // response (which must happen on the thread that owns the bpt::common::ws::WsStream).
     std::atomic<bool> needs_test_response_{false};
 };
 

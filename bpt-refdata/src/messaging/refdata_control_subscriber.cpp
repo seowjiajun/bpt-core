@@ -5,15 +5,15 @@
 #include <messages/MessageHeader.h>
 #include <messages/RefDataSubscriptionRequest.h>
 
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::refdata::messaging {
 
 RefdataControlSubscriber::RefdataControlSubscriber(std::shared_ptr<aeron::Aeron> aeron,
                                                    const std::string& channel,
                                                    int stream_id) {
-    subscription_ = ygg::aeron::wait_for_subscription(aeron, channel, stream_id);
+    subscription_ = bpt::common::aeron::wait_for_subscription(aeron, channel, stream_id);
 
     aeron::fragment_handler_t fragment_handler = [&](aeron::concurrent::AtomicBuffer& ab,
                                                      aeron::util::index_t offset,
@@ -23,7 +23,7 @@ RefdataControlSubscriber::RefdataControlSubscriber(std::shared_ptr<aeron::Aeron>
 
         if (static_cast<std::size_t>(length) <
             MessageHeader::encodedLength() + RefDataSubscriptionRequest::sbeBlockLength()) {
-            ygg::log::warn("Control: short fragment ({} bytes), ignoring", length);
+            bpt::common::log::warn("Control: short fragment ({} bytes), ignoring", length);
             return;
         }
 
@@ -32,7 +32,7 @@ RefdataControlSubscriber::RefdataControlSubscriber(std::shared_ptr<aeron::Aeron>
 
         MessageHeader hdr(data, buf_len);
         if (hdr.templateId() != RefDataSubscriptionRequest::sbeTemplateId()) {
-            ygg::log::warn("Control: unexpected templateId {}, ignoring", hdr.templateId());
+            bpt::common::log::warn("Control: unexpected templateId {}, ignoring", hdr.templateId());
             return;
         }
 

@@ -9,7 +9,7 @@
 
 #include <boost/json.hpp>
 #include <string>
-#include <yggdrasil/logging.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter {
 

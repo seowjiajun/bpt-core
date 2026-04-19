@@ -4,16 +4,16 @@
 #include <messages/VolSurface.h>
 
 #include <cstring>
-#include <yggdrasil/aeron/aeron_utils.h>
-#include <yggdrasil/logging.h>
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::pricer::messaging {
 
 VolSurfacePublisher::VolSurfacePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                          const std::string& channel,
                                          int32_t stream_id) {
-    pub_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
-    ygg::log::info("[VolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
+    pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
+    bpt::common::log::info("[VolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
 }
 
 void VolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t timestamp_ns) {
