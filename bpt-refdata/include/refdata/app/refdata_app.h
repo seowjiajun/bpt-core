@@ -22,15 +22,17 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <bpt_app/app.h>
 
 namespace bpt::refdata {
 
-class RefdataApp {
+class RefdataApp : public bpt::app::IService {
 public:
     RefdataApp(config::Settings settings,
               std::shared_ptr<aeron::Aeron> aeron,
               std::map<std::string, adapter::ExchangeCredentials> creds);
-    void run();
+    void run() override;
+    void stop() override;
 
 private:
     config::Settings settings_;

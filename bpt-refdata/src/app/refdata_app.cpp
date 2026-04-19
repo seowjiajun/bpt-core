@@ -45,7 +45,7 @@ RefdataApp::RefdataApp(config::Settings settings,
                      std::map<std::string, adapter::ExchangeCredentials> creds)
     : settings_(std::move(settings)),
       aeron_(aeron),
-      metrics_(settings_.metrics_port),
+      metrics_(settings_.base.metrics_port),
       instrument_mapping_(std::make_shared<mapping::InstrumentMappingLoader>()),
       registry_(std::make_shared<registry::InstrumentRegistry>()) {
     const auto& im_cfg = settings_.instrument_mapping;
@@ -253,12 +253,15 @@ void RefdataApp::run() {
         if (fragments == 0)
             std::this_thread::sleep_for(idle_sleep);
     }
+}
 
+void RefdataApp::stop() {
+    // Called by bpt::app::run() after the poll loop exits on signal.
+    // Adapter REST/WS threads + Prometheus exposer drained here so
+    // teardown is symmetric with the startup side-effects in run().
     for (auto& adapter : adapters_)
         adapter->stop();
-
     metrics_.shutdown();
-    bpt::common::log::info("[Refdata] Shutdown complete.");
 }
 
 }  // namespace bpt::refdata

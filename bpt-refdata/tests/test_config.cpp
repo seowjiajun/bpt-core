@@ -65,7 +65,7 @@ use_tls = true
 
 TEST_F(ConfigTest, ParsesAeronConfig) {
     auto s = bpt::refdata::config::load("test_config_bpt-refdata.toml");
-    EXPECT_EQ(s.media_driver_dir, "/dev/shm/aeron");
+    EXPECT_EQ(s.base.media_driver_dir, "/dev/shm/aeron");
     EXPECT_EQ(s.snapshot.stream_id, 1001);
     EXPECT_EQ(s.delta.stream_id, 1002);
     EXPECT_EQ(s.control.stream_id, 1003);

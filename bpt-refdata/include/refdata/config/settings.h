@@ -4,8 +4,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::refdata::config {
 
@@ -39,9 +39,11 @@ struct InstrumentMappingConfig {
 };
 
 struct Settings {
-    std::string environment;             // "prod" | "qa" | "dev" — logged at startup, validated against exchange_config
+    // Shared lifecycle config (environment, media_driver_dir, logging,
+    // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
+    bpt::app::BaseSettings base;
+
     std::vector<std::string> exchanges;  // exchanges to activate from exchange_config (e.g. ["OKX", "BINANCE"])
-    std::string media_driver_dir;        // Path to Aeron driver dir
 
     // Instrument refdata (existing streams 1001-1003)
     bpt::common::config::StreamConfig snapshot;
@@ -62,9 +64,6 @@ struct Settings {
     uint32_t instrument_poll_interval_s{3600};
 
     InstrumentMappingConfig instrument_mapping;
-    bpt::common::logging::LogConfig logging;
-
-    uint16_t metrics_port{9101};
 };
 
 Settings load(const std::string& path);
