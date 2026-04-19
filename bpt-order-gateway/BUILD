@@ -27,6 +27,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//messages",
+        "//bpt-app",
         "//bpt-common",
         "@boost.json",
         "@fmt",
@@ -84,6 +85,7 @@ cc_binary(
     ],
     deps = [
         ":order_gateway_core",
+        "//bpt-app",
         "//bpt-common",
         "@boost.asio",
         "@boost.beast",

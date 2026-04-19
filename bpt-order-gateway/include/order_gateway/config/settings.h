@@ -3,13 +3,13 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::config {
 
 struct AeronConfig {
-    std::string media_driver_dir;
+    // media_driver_dir moved to BaseSettings; kept streams-only.
     bpt::common::config::StreamConfig order{"aeron:ipc", 3001};
     bpt::common::config::StreamConfig exec_report{"aeron:ipc", 3002};
     bpt::common::config::StreamConfig heartbeat{"aeron:ipc", 3003};
@@ -93,13 +93,13 @@ struct GatewayConfig {
 };
 
 struct Settings {
-    std::string environment;             // "prod" | "qa" | "dev" — logged at startup, validated against
-                                         // exchange_config
+    // Shared lifecycle config (environment, media_driver_dir, logging,
+    // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
+    bpt::app::BaseSettings base;
+
     std::vector<std::string> exchanges;  // exchanges to activate from exchange_config (e.g. ["OKX", "BINANCE"])
     AeronConfig aeron;
     GatewayConfig gateway;
-    bpt::common::logging::LogConfig logging;
-    uint16_t metrics_port{9103};
 };
 
 Settings load(const std::string& path);

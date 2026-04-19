@@ -26,7 +26,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
                          std::map<std::string, adapter::ExchangeCredentials> creds)
     : cfg_(std::move(cfg)),
       aeron_(aeron),
-      metrics_(cfg_.metrics_port),
+      metrics_(cfg_.base.metrics_port),
       risk_checker_(cfg_.gateway.risk.max_order_size_usd,
                     cfg_.gateway.risk.max_notional_per_order_usd,
                     cfg_.gateway.risk.max_open_orders_per_venue,
@@ -224,12 +224,15 @@ void OrderGatewayApp::run() {
         if (fragments == 0)
             _mm_pause();
     }
+}
 
+void OrderGatewayApp::stop() {
+    // Called by bpt::app::run() after the poll loop exits. Drains
+    // adapter WS/REST threads + Prometheus exposer so teardown is
+    // symmetric with the startup side-effects.
     for (auto& a : adapters_)
         a->stop();
-
     metrics_.shutdown();
-    bpt::common::log::info("[OrderGateway] Shutting down");
 }
 
 }  // namespace bpt::order_gateway

@@ -3,7 +3,8 @@
 #include <fmt/ranges.h>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <bpt_common/logging_toml.h>
+#include <bpt_app/base_settings.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::config {
 
@@ -38,21 +39,20 @@ Settings load(const std::string& path) {
     }
 
     Settings s;
+    bpt::app::load_base_settings(root, s.base);
 
-    if (auto v = root["environment"].value<std::string>())
-        s.environment = *v;
-
-    if (!s.environment.empty() && !exchange_config_path.empty()) {
+    if (!s.base.environment.empty() && !exchange_config_path.empty()) {
         const bool path_has_live = exchange_config_path.find("live") != std::string::npos;
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
-        if ((s.environment == "prod" && path_has_testnet) ||
-            ((s.environment == "qa" || s.environment == "dev") && path_has_live))
+        if ((s.base.environment == "prod" && path_has_testnet) ||
+            ((s.base.environment == "qa" || s.base.environment == "dev") && path_has_live))
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
-                           s.environment,
+                           s.base.environment,
                            exchange_config_path);
     }
 
-    bpt::common::log::info("Environment: {}", s.environment.empty() ? "(not set)" : s.environment);
+    bpt::common::log::info("Environment: {}",
+                           s.base.environment.empty() ? "(not set)" : s.base.environment);
 
     // Read the exchanges filter from the instance config.
     std::unordered_set<std::string> exchange_filter;
@@ -65,8 +65,6 @@ Settings load(const std::string& path) {
     }
 
     if (auto* aeron = root["aeron"].as_table()) {
-        if (auto v = (*aeron)["media_driver_dir"].value<std::string>())
-            s.aeron.media_driver_dir = *v;
         s.aeron.order = load_stream((*aeron)["order"].as_table(), "aeron:ipc", 3001);
         s.aeron.exec_report = load_stream((*aeron)["exec_report"].as_table(), "aeron:ipc", 3002);
         s.aeron.heartbeat = load_stream((*aeron)["heartbeat"].as_table(), "aeron:ipc", 3003);
@@ -143,13 +141,6 @@ Settings load(const std::string& path) {
             ac.exec_queue_capacity = static_cast<uint32_t>(*v);
         s.gateway.adapters.push_back(std::move(ac));
     }
-
-    if (auto* l = root["logging"].as_table())
-        s.logging = bpt::common::logging::from_toml(*l);
-
-    if (auto* m = root["metrics"].as_table())
-        if (auto v = (*m)["port"].value<int64_t>())
-            s.metrics_port = static_cast<uint16_t>(*v);
 
     return s;
 }

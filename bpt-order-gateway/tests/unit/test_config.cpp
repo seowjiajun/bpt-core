@@ -65,11 +65,11 @@ port = 9103
 
     auto s = bpt::order_gateway::config::load(path.string());
 
-    EXPECT_EQ(s.environment, "qa");
+    EXPECT_EQ(s.base.environment, "qa");
     ASSERT_EQ(s.exchanges.size(), 1u);
     EXPECT_EQ(s.exchanges[0], "OKX");
 
-    EXPECT_EQ(s.aeron.media_driver_dir, "/tmp/aeron");
+    EXPECT_EQ(s.base.media_driver_dir, "/tmp/aeron");
     EXPECT_EQ(s.aeron.order.stream_id, 3001);
     EXPECT_EQ(s.aeron.exec_report.stream_id, 3002);
     EXPECT_EQ(s.aeron.heartbeat.stream_id, 3003);
@@ -93,7 +93,7 @@ port = 9103
     EXPECT_EQ(a.ws_path, "/ws/v5/private");
     EXPECT_TRUE(a.use_tls);
 
-    EXPECT_EQ(s.metrics_port, 9103u);
+    EXPECT_EQ(s.base.metrics_port, 9103u);
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ exchange = "OKX"
 
     auto s = bpt::order_gateway::config::load(path.string());
 
-    EXPECT_TRUE(s.environment.empty());
+    EXPECT_TRUE(s.base.environment.empty());
     EXPECT_EQ(s.aeron.order.stream_id, 3001);
     EXPECT_EQ(s.aeron.exec_report.stream_id, 3002);
     EXPECT_EQ(s.aeron.heartbeat.stream_id, 3003);
@@ -119,7 +119,10 @@ exchange = "OKX"
     EXPECT_EQ(s.gateway.stale_order_timeout_ms, 30000u);
     EXPECT_TRUE(s.gateway.risk.trading_enabled);
     EXPECT_DOUBLE_EQ(s.gateway.risk.max_order_size_usd, 1000.0);
-    EXPECT_EQ(s.metrics_port, 9103u);
+    // metrics_port default is now 0 (disabled) in BaseSettings; the old
+    // 9103 was an order-gateway-specific default. Explicitly set via
+    // [metrics].port = N in TOML when an exposer is wanted.
+    EXPECT_EQ(s.base.metrics_port, 0u);
 
     ASSERT_EQ(s.gateway.adapters.size(), 1u);
     EXPECT_FALSE(s.gateway.adapters[0].testnet);

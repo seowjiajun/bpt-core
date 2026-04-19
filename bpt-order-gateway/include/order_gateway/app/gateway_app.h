@@ -17,15 +17,17 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <bpt_app/app.h>
 
 namespace bpt::order_gateway {
 
-class OrderGatewayApp {
+class OrderGatewayApp : public bpt::app::IService {
 public:
     OrderGatewayApp(config::Settings cfg,
                 std::shared_ptr<aeron::Aeron> aeron,
                 std::map<std::string, adapter::ExchangeCredentials> creds);
-    void run();
+    void run() override;
+    void stop() override;
 
 private:
     config::Settings cfg_;
