@@ -11,12 +11,22 @@ AdapterBase::AdapterBase(const config::AdapterConfig& cfg, std::shared_ptr<messa
     : cfg_(cfg),
       md_pub_(std::move(md_pub)),
       validator_(cfg.max_price_deviation_pct),
-      validating_pub_(*md_pub_, validator_),
+      validating_pub_(*md_pub_, validator_, cfg_.exchange.c_str()),
       ssl_ctx_(ssl::context::tls_client) {
     ssl_ctx_.set_default_verify_paths();
     ssl_ctx_.set_verify_mode(ssl::verify_peer);
     // Enforce TLS 1.2 minimum — disable weak protocol versions.
     ssl_ctx_.set_options(ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
+
+    // Apply validation-drop breaker config from the adapter's TOML block.
+    // Default-constructed Config is disabled, so adapters that don't set
+    // the knobs behave identically to before this change.
+    md::ValidationDropBreaker::Config db_cfg;
+    db_cfg.enabled = cfg_.validation_drop_breaker_enabled;
+    db_cfg.threshold_pct = cfg_.validation_drop_threshold_pct;
+    db_cfg.window_ns = static_cast<uint64_t>(cfg_.validation_drop_window_sec) * 1'000'000'000ULL;
+    db_cfg.min_events = cfg_.validation_drop_min_events;
+    validating_pub_.set_drop_breaker_config(db_cfg);
 }
 
 void AdapterBase::subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth) {

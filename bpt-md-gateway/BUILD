@@ -8,6 +8,7 @@ cc_library(
         "src/config/loader.cpp",
         "src/md/md_encoder.cpp",
         "src/md/md_validator.cpp",
+        "src/md/validation_drop_breaker.cpp",
         "src/messaging/md_publisher.cpp",
         "src/messaging/ack_publisher.cpp",
         "src/messaging/funding_rate_publisher.cpp",

@@ -107,6 +107,14 @@ Settings load(const std::string& path) {
             ac.so_rcvbuf_bytes = static_cast<uint32_t>(*v);
         if (auto v = (*a)["max_price_deviation_pct"].value<double>())
             ac.max_price_deviation_pct = *v;
+        if (auto v = (*a)["validation_drop_breaker_enabled"].value<bool>())
+            ac.validation_drop_breaker_enabled = *v;
+        if (auto v = (*a)["validation_drop_threshold_pct"].value<double>())
+            ac.validation_drop_threshold_pct = *v;
+        if (auto v = (*a)["validation_drop_window_sec"].value<int64_t>())
+            ac.validation_drop_window_sec = static_cast<uint32_t>(*v);
+        if (auto v = (*a)["validation_drop_min_events"].value<int64_t>())
+            ac.validation_drop_min_events = static_cast<uint32_t>(*v);
 
         // Validate required connectivity fields — fail fast rather than crash at connect time.
         if (ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty()) {

@@ -53,6 +53,18 @@ struct AdapterConfig {
     // Increase to absorb exchange burst traffic without kernel drops.
     // Check /proc/sys/net/core/rmem_max for the system ceiling.
     uint32_t so_rcvbuf_bytes{0};
+
+    // Validation-drop circuit breaker. Trips when the share of publishes
+    // rejected by MdValidator over the rolling window exceeds the
+    // threshold (and at least min_events have landed). On trip: the
+    // ValidatingPublisher stops forwarding to Aeron for this adapter —
+    // downstream sees no data rather than bad data. Latches; restart
+    // to clear. Disabled by default until drop rates are characterized
+    // per-venue on a live feed (schemas change, symbol listings shift).
+    bool     validation_drop_breaker_enabled{false};
+    double   validation_drop_threshold_pct{30.0};
+    uint32_t validation_drop_window_sec{60};
+    uint32_t validation_drop_min_events{50};
 };
 
 struct Settings {

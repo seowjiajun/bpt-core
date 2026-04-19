@@ -16,6 +16,16 @@ ws_port = "8443"
 ws_path = "/ws/v5/public"
 use_tls = true
 ws_read_timeout_ms = 5000
+# Validation-drop circuit breaker (per-adapter). Halts forwards to
+# Aeron when the drop rate (invalid/crossed/price-deviation) exceeds
+# the threshold over the rolling window. Downstream strategies see no
+# further ticks rather than corrupt ones. Latches; restart to clear.
+# Disabled by default — enable once drop rates have been characterised
+# on a live feed (depths, schema drift, symbol listing churn).
+# validation_drop_breaker_enabled = true
+# validation_drop_threshold_pct   = 30.0
+# validation_drop_window_sec      = 60
+# validation_drop_min_events      = 50
 
 [[adapters]]
 exchange = "HYPERLIQUID"
