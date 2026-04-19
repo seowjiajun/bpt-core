@@ -41,9 +41,7 @@ public:
              const std::string& channel,
              int control_stream,
              int data_stream,
-             int ack_hb_stream,
-             int pub_timeout_ms = 5000,
-             int pub_poll_interval_ms = 10);
+             int ack_hb_stream);
 
     // Send a full-replace subscription batch.
     void subscribe(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments);

@@ -6,8 +6,8 @@
 
 #include <chrono>
 #include <stdexcept>
-#include <thread>
 #include <x86intrin.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 
 using namespace bpt::messages;
@@ -17,28 +17,9 @@ namespace bpt::strategy::backtest {
 BacktestClient::BacktestClient(std::shared_ptr<aeron::Aeron> aeron,
                                const std::string& channel,
                                int32_t control_stream_id,
-                               int32_t ack_stream_id,
-                               int pub_timeout_ms,
-                               int pub_poll_interval_ms) {
-    long ctrl_id = aeron->addSubscription(channel, control_stream_id);
-    long ack_id = aeron->addPublication(channel, ack_stream_id);
-
-    const int max_retries = pub_timeout_ms / std::max(pub_poll_interval_ms, 1);
-    const auto poll_interval = std::chrono::milliseconds(pub_poll_interval_ms);
-
-    int retries = 0;
-    while (!(ctrl_sub_ = aeron->findSubscription(ctrl_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("[BacktestClient] timed out waiting for BacktestControl subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(ack_pub_ = aeron->findPublication(ack_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("[BacktestClient] timed out waiting for BacktestAck publication");
-        std::this_thread::sleep_for(poll_interval);
-    }
-
+                               int32_t ack_stream_id) {
+    ctrl_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, control_stream_id);
+    ack_pub_ = ygg::aeron::wait_for_publication(aeron, channel, ack_stream_id);
     ygg::log::info("[BacktestClient] connected: ctrl_sub={} ack_pub={}", control_stream_id, ack_stream_id);
 }
 

@@ -20,9 +20,7 @@ public:
     BacktestClient(std::shared_ptr<aeron::Aeron> aeron,
                    const std::string& channel,
                    int32_t control_stream_id,  // subscribe to BacktestControl
-                   int32_t ack_stream_id,      // publish  to BacktestAck
-                   int pub_timeout_ms,
-                   int pub_poll_interval_ms);
+                   int32_t ack_stream_id);     // publish  to BacktestAck
 
     // Fired for each BacktestControl fragment decoded.
     std::function<void(bpt::messages::BacktestCommand::Value cmd, uint64_t tick_seq, uint64_t simulation_ts)>

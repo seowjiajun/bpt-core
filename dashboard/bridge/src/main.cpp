@@ -81,37 +81,19 @@ int main(int argc, char** argv) {
     // The bridge relays it as-is to all WS clients.
     std::shared_ptr<aeron::Subscription> snapshot_sub;
     if (settings.portfolio_snapshot.stream_id != 0) {
-        const int64_t reg_id = aeron->addSubscription(
-            settings.portfolio_snapshot.channel, settings.portfolio_snapshot.stream_id);
-        for (int i = 0; i < 500; ++i) {
-            snapshot_sub = aeron->findSubscription(reg_id);
-            if (snapshot_sub) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        if (snapshot_sub) {
-            ygg::log::info("[bridge] portfolio snapshot subscription ready on stream {}",
-                           settings.portfolio_snapshot.stream_id);
-        } else {
-            ygg::log::warn("[bridge] portfolio snapshot subscription unavailable");
-        }
+        snapshot_sub = ygg::aeron::wait_for_subscription(
+            aeron, settings.portfolio_snapshot.channel, settings.portfolio_snapshot.stream_id);
+        ygg::log::info("[bridge] portfolio snapshot subscription ready on stream {}",
+                       settings.portfolio_snapshot.stream_id);
     }
 
     // ── Analytics toxicity subscription (optional) ──────────────────────────────────
     std::shared_ptr<aeron::Subscription> tyr_sub;
     if (settings.toxicity.stream_id != 0) {
-        const int64_t reg_id = aeron->addSubscription(
-            settings.toxicity.channel, settings.toxicity.stream_id);
-        for (int i = 0; i < 500; ++i) {
-            tyr_sub = aeron->findSubscription(reg_id);
-            if (tyr_sub) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        if (tyr_sub) {
-            ygg::log::info("[bridge] tyr toxicity subscription ready on stream {}",
-                           settings.toxicity.stream_id);
-        } else {
-            ygg::log::warn("[bridge] tyr toxicity subscription unavailable");
-        }
+        tyr_sub = ygg::aeron::wait_for_subscription(
+            aeron, settings.toxicity.channel, settings.toxicity.stream_id);
+        ygg::log::info("[bridge] tyr toxicity subscription ready on stream {}",
+                       settings.toxicity.stream_id);
     }
 
     // ── Control publication (bridge → Strategy) ────────────────────────────────
@@ -119,19 +101,10 @@ int main(int argc, char** argv) {
     // lightweight control path, not a high-throughput data stream.
     std::shared_ptr<aeron::Publication> ctrl_pub;
     if (settings.control_command.stream_id != 0) {
-        const int64_t reg_id = aeron->addPublication(
-            settings.control_command.channel, settings.control_command.stream_id);
-        for (int i = 0; i < 500; ++i) {
-            ctrl_pub = aeron->findPublication(reg_id);
-            if (ctrl_pub) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        if (ctrl_pub) {
-            ygg::log::info("[bridge] control publication ready on stream {}",
-                           settings.control_command.stream_id);
-        } else {
-            ygg::log::warn("[bridge] control publication unavailable — halt/resume disabled");
-        }
+        ctrl_pub = ygg::aeron::wait_for_publication(
+            aeron, settings.control_command.channel, settings.control_command.stream_id);
+        ygg::log::info("[bridge] control publication ready on stream {}",
+                       settings.control_command.stream_id);
     }
 
     // ── WebSocket server ─────────────────────────────────────────────────────

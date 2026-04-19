@@ -5,9 +5,7 @@
 #include <messages/PricerReady.h>
 #include <messages/VolSurface.h>
 
-#include <chrono>
-#include <stdexcept>
-#include <thread>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 
 namespace bpt::strategy::vol {
@@ -15,29 +13,9 @@ namespace bpt::strategy::vol {
 VolSurfaceClient::VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
                                    const std::string& channel,
                                    int vol_surface_stream,
-                                   int pricer_status_stream,
-                                   int pub_timeout_ms,
-                                   int pub_poll_interval_ms) {
-    long surface_id = aeron->addSubscription(channel, vol_surface_stream);
-    long status_id = aeron->addSubscription(channel, pricer_status_stream);
-
-    const int max_retries = pub_timeout_ms / std::max(pub_poll_interval_ms, 1);
-    const auto poll_interval = std::chrono::milliseconds(pub_poll_interval_ms);
-
-    for (int i = 0; i < max_retries; ++i) {
-        if (!surface_sub_)
-            surface_sub_ = aeron->findSubscription(surface_id);
-        if (!status_sub_)
-            status_sub_ = aeron->findSubscription(status_id);
-        if (surface_sub_ && status_sub_)
-            break;
-        std::this_thread::sleep_for(poll_interval);
-    }
-
-    if (!surface_sub_)
-        throw std::runtime_error("Timed out waiting for VolSurface subscription");
-    if (!status_sub_)
-        throw std::runtime_error("Timed out waiting for Pricer status subscription");
+                                   int pricer_status_stream) {
+    surface_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, vol_surface_stream);
+    status_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, pricer_status_stream);
 
     // FragmentAssembler for surface stream — VolSurface messages can be large
     surface_assembler_ = std::make_unique<aeron::FragmentAssembler>(

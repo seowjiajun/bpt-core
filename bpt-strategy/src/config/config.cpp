@@ -59,10 +59,6 @@ AppConfig AppConfig::load(const std::string& path) {
     app_cfg.aeron.backtest_ack = load_stream((*a)["backtest_ack"].as_table(), "aeron:ipc", 9001);
     app_cfg.aeron.dashboard_control = load_stream((*a)["dashboard_control"].as_table(), "aeron:ipc", 9003);
     app_cfg.aeron.dashboard_snapshot = load_stream((*a)["dashboard_snapshot"].as_table(), "aeron:ipc", 9004);
-    if (auto v = (*a)["pub_timeout_ms"].value<int64_t>())
-        app_cfg.aeron.pub_timeout_ms = static_cast<int>(*v);
-    if (auto v = (*a)["pub_poll_interval_ms"].value<int64_t>())
-        app_cfg.aeron.pub_poll_interval_ms = static_cast<int>(*v);
 
     const auto* f = cfg["fenrir"].as_table();
     if (!f)

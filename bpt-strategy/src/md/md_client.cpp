@@ -9,11 +9,9 @@
 #include <messages/MdTrade.h>
 #include <messages/MessageHeader.h>
 
-#include <chrono>
 #include <cstring>
-#include <stdexcept>
-#include <thread>
 #include <x86intrin.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 #include <yggdrasil/util/tsc_clock.h>
 
@@ -23,34 +21,10 @@ MdClient::MdClient(std::shared_ptr<aeron::Aeron> aeron,
                    const std::string& channel,
                    int control_stream,
                    int data_stream,
-                   int ack_hb_stream,
-                   int pub_timeout_ms,
-                   int pub_poll_interval_ms) {
-    long ctrl_id = aeron->addPublication(channel, control_stream);
-    long data_id = aeron->addSubscription(channel, data_stream);
-    long ack_hb_id = aeron->addSubscription(channel, ack_hb_stream);
-
-    const int max_retries = pub_timeout_ms / std::max(pub_poll_interval_ms, 1);
-    const auto poll_interval = std::chrono::milliseconds(pub_poll_interval_ms);
-    int retries = 0;
-
-    while (!(ctrl_pub_ = aeron->findPublication(ctrl_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for MD control publication");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(data_sub_ = aeron->findSubscription(data_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for MD data subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(ack_hb_sub_ = aeron->findSubscription(ack_hb_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for MD ack/hb subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
+                   int ack_hb_stream) {
+    ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, channel, control_stream);
+    data_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, data_stream);
+    ack_hb_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, ack_hb_stream);
 
     data_assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {

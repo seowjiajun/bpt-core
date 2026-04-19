@@ -44,10 +44,6 @@ struct AeronConfig {
     ygg::config::StreamConfig dashboard_control{"aeron:ipc", 9003};
     // Portfolio snapshot (optional — Strategy → bridge; published every ~100ms)
     ygg::config::StreamConfig dashboard_snapshot{"aeron:ipc", 9004};
-    // Max time (ms) to wait for Aeron pub/sub registration before throwing.
-    int pub_timeout_ms{5000};
-    // Poll interval (ms) when waiting for Aeron pub/sub registration.
-    int pub_poll_interval_ms{10};
 };
 
 // Per-venue execution parameters.

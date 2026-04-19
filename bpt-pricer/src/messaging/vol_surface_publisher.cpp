@@ -3,35 +3,17 @@
 #include <messages/MessageHeader.h>
 #include <messages/VolSurface.h>
 
-#include <algorithm>
-#include <chrono>
 #include <cstring>
-#include <thread>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 
 namespace bpt::pricer::messaging {
 
 VolSurfacePublisher::VolSurfacePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                          const std::string& channel,
-                                         int32_t stream_id,
-                                         int pub_timeout_ms,
-                                         int pub_poll_interval_ms) {
-    const int64_t reg_id = aeron->addPublication(channel, stream_id);
-    const int max_retries = pub_timeout_ms / std::max(pub_poll_interval_ms, 1);
-    const auto poll_interval = std::chrono::milliseconds(pub_poll_interval_ms);
-
-    for (int i = 0; i < max_retries; ++i) {
-        pub_ = aeron->findPublication(reg_id);
-        if (pub_)
-            break;
-        std::this_thread::sleep_for(poll_interval);
-    }
-
-    if (!pub_) {
-        ygg::log::error("[VolSurfacePublisher] Failed to find publication on {} stream {}", channel, stream_id);
-    } else {
-        ygg::log::info("[VolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
-    }
+                                         int32_t stream_id) {
+    pub_ = ygg::aeron::wait_for_publication(aeron, channel, stream_id);
+    ygg::log::info("[VolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
 }
 
 void VolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t timestamp_ns) {

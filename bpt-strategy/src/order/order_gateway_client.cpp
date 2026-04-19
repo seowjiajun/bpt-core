@@ -10,10 +10,8 @@
 #include <messages/NewOrder.h>
 #include <messages/OrderGatewayHeartbeat.h>
 
-#include <chrono>
-#include <stdexcept>
-#include <thread>
 #include <x86intrin.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 #include <yggdrasil/util/tsc_clock.h>
 
@@ -24,45 +22,14 @@ OrderGatewayClient::OrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
                                        int order_stream,
                                        int exec_report_stream,
                                        int heartbeat_stream,
-                                       int account_snapshot_stream,
-                                       int pub_timeout_ms,
-                                       int pub_poll_interval_ms) {
-    long pub_id = aeron->addPublication(channel, order_stream);
-    long exec_id = aeron->addSubscription(channel, exec_report_stream);
-    long hb_id = aeron->addSubscription(channel, heartbeat_stream);
-
-    const int max_retries = pub_timeout_ms / std::max(pub_poll_interval_ms, 1);
-    const auto poll_interval = std::chrono::milliseconds(pub_poll_interval_ms);
-    int retries = 0;
-
-    while (!(order_pub_ = aeron->findPublication(pub_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for order gateway order publication");
-        std::this_thread::sleep_for(poll_interval);
-    }
-
-    retries = 0;
-    while (!(exec_report_sub_ = aeron->findSubscription(exec_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for order gateway exec report subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-
-    retries = 0;
-    while (!(heartbeat_sub_ = aeron->findSubscription(hb_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for order gateway heartbeat subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
+                                       int account_snapshot_stream) {
+    order_pub_ = ygg::aeron::wait_for_publication(aeron, channel, order_stream);
+    exec_report_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, exec_report_stream);
+    heartbeat_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, heartbeat_stream);
 
     if (account_snapshot_stream != 0) {
-        long acct_id = aeron->addSubscription(channel, account_snapshot_stream);
-        retries = 0;
-        while (!(account_snapshot_sub_ = aeron->findSubscription(acct_id))) {
-            if (++retries > max_retries)
-                throw std::runtime_error("Timed out waiting for order gateway account snapshot subscription");
-            std::this_thread::sleep_for(poll_interval);
-        }
+        account_snapshot_sub_ =
+            ygg::aeron::wait_for_subscription(aeron, channel, account_snapshot_stream);
         account_snapshot_assembler_ = std::make_unique<aeron::FragmentAssembler>(
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,

@@ -45,10 +45,6 @@ struct Settings {
     uint32_t newton_max_iterations{100};
     double newton_tolerance{1e-8};
 
-    // Aeron pub registration
-    int pub_timeout_ms{5000};
-    int pub_poll_interval_ms{10};
-
     LoggingConfig logging;
     uint16_t metrics_port{9103};
 };

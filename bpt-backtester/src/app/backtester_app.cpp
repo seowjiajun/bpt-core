@@ -25,13 +25,10 @@ BacktesterApp::BacktesterApp(config::Settings settings) : settings_(std::move(se
 
     const auto& ac = settings_.aeron;
 
-    // max_retries = timeout_ms / 10ms per retry
-    const int retries = ac.pub_timeout_ms / ac.pub_poll_interval_ms;
-
     auto ctrl_pub =
-        ygg::aeron::wait_for_publication(aeron_, ac.backtest_control.channel, ac.backtest_control.stream_id, retries);
+        ygg::aeron::wait_for_publication(aeron_, ac.backtest_control.channel, ac.backtest_control.stream_id);
     auto ack_sub =
-        ygg::aeron::wait_for_subscription(aeron_, ac.backtest_ack.channel, ac.backtest_ack.stream_id, retries);
+        ygg::aeron::wait_for_subscription(aeron_, ac.backtest_ack.channel, ac.backtest_ack.stream_id);
 
     ctrl_pub_ = std::make_unique<messaging::BacktestControlPublisher>(std::move(ctrl_pub));
     ack_sub_ = std::make_unique<messaging::BacktestAckSubscriber>(std::move(ack_sub));

@@ -43,9 +43,7 @@ public:
                   int funding_rate_stream,  // 1005 — funding rate updates
                   int status_stream,        // 1006 — ready + error signals
                   FeeCache& fee_cache,
-                  FundingRateCache& funding_rate_cache,
-                  int pub_timeout_ms = 5000,
-                  int pub_poll_interval_ms = 10);
+                  FundingRateCache& funding_rate_cache);
 
     // Send a subscription request with canonical filters so the server pre-filters the snapshot.
     // An empty filters vector means subscribe-all (receive the full universe).

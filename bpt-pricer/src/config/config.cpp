@@ -55,10 +55,6 @@ Settings load(const std::string& path) {
         s.newton_max_iterations = static_cast<uint32_t>(*v);
     if (auto v = root["newton_tolerance"].value<double>())
         s.newton_tolerance = *v;
-    if (auto v = root["pub_timeout_ms"].value<int64_t>())
-        s.pub_timeout_ms = static_cast<int>(*v);
-    if (auto v = root["pub_poll_interval_ms"].value<int64_t>())
-        s.pub_poll_interval_ms = static_cast<int>(*v);
     if (auto* l = root["logging"].as_table()) {
         if (auto v = (*l)["level"].value<std::string>())
             s.logging.level = *v;

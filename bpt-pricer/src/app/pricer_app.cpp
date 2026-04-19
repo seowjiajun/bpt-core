@@ -29,14 +29,10 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
       builder_(settings_.risk_free_rate, settings_.newton_max_iterations, settings_.newton_tolerance) {
     vol_pub_ = std::make_unique<messaging::VolSurfacePublisher>(aeron,
                                                                 settings_.vol_surface.channel,
-                                                                settings_.vol_surface.stream_id,
-                                                                settings_.pub_timeout_ms,
-                                                                settings_.pub_poll_interval_ms);
+                                                                settings_.vol_surface.stream_id);
     status_pub_ = std::make_unique<messaging::StatusPublisher>(aeron,
                                                                settings_.status.channel,
-                                                               settings_.status.stream_id,
-                                                               settings_.pub_timeout_ms,
-                                                               settings_.pub_poll_interval_ms);
+                                                               settings_.status.stream_id);
     md_sub_ = std::make_unique<md::MdSubscriber>(aeron, settings_.md_input.channel, settings_.md_input.stream_id);
     refdata_sub_ = std::make_unique<refdata::RefdataSubscriber>(aeron,
                                                                 settings_.refdata_snapshot.channel,

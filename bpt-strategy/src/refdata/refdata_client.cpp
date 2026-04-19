@@ -9,11 +9,9 @@
 #include <messages/RefDataSnapshot.h>
 #include <messages/RefDataSubscriptionRequest.h>
 
-#include <chrono>
 #include <cstring>
-#include <stdexcept>
-#include <thread>
 #include <x86intrin.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/logging.h>
 #include <yggdrasil/util/tsc_clock.h>
 
@@ -28,57 +26,15 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
                              int funding_rate_stream,
                              int status_stream,
                              FeeCache& fee_cache,
-                             FundingRateCache& funding_rate_cache,
-                             int pub_timeout_ms,
-                             int pub_poll_interval_ms)
+                             FundingRateCache& funding_rate_cache)
     : fee_cache_(fee_cache),
       funding_rate_cache_(funding_rate_cache) {
-    long ctrl_id = aeron->addPublication(channel, control_stream);
-    long snap_id = aeron->addSubscription(channel, snapshot_stream);
-    long delta_id = aeron->addSubscription(channel, delta_stream);
-    long fee_id = aeron->addSubscription(channel, fee_schedule_stream);
-    long funding_id = aeron->addSubscription(channel, funding_rate_stream);
-    long status_id = aeron->addSubscription(channel, status_stream);
-
-    const int max_retries = pub_timeout_ms / std::max(pub_poll_interval_ms, 1);
-    const auto poll_interval = std::chrono::milliseconds(pub_poll_interval_ms);
-    int retries = 0;
-
-    while (!(ctrl_pub_ = aeron->findPublication(ctrl_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for refdata control publication");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(snap_sub_ = aeron->findSubscription(snap_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for refdata snapshot subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(delta_sub_ = aeron->findSubscription(delta_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for refdata delta subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(fee_sub_ = aeron->findSubscription(fee_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for fee schedule subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(funding_sub_ = aeron->findSubscription(funding_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for funding rate subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
-    retries = 0;
-    while (!(status_sub_ = aeron->findSubscription(status_id))) {
-        if (++retries > max_retries)
-            throw std::runtime_error("Timed out waiting for refdata status subscription");
-        std::this_thread::sleep_for(poll_interval);
-    }
+    ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, channel, control_stream);
+    snap_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, snapshot_stream);
+    delta_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, delta_stream);
+    fee_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, fee_schedule_stream);
+    funding_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, funding_rate_stream);
+    status_sub_ = ygg::aeron::wait_for_subscription(aeron, channel, status_stream);
 
     snap_assembler_ = std::make_unique<aeron::FragmentAssembler>(
         [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {

@@ -12,9 +12,7 @@ class StatusPublisher {
 public:
     StatusPublisher(std::shared_ptr<aeron::Aeron> aeron,
                     const std::string& channel,
-                    int32_t stream_id,
-                    int pub_timeout_ms = 5000,
-                    int pub_poll_interval_ms = 10);
+                    int32_t stream_id);
 
     void publish_heartbeat(uint64_t timestamp_ns, uint64_t seq_num);
     void publish_ready(uint64_t timestamp_ns,

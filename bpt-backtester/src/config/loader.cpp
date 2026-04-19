@@ -82,10 +82,6 @@ Settings load(const std::string& path) {
     if (auto* a = root["aeron"].as_table()) {
         if (auto v = (*a)["media_driver_dir"].value<std::string>())
             s.aeron.media_driver_dir = *v;
-        if (auto v = (*a)["pub_timeout_ms"].value<int64_t>())
-            s.aeron.pub_timeout_ms = static_cast<int>(*v);
-        if (auto v = (*a)["pub_poll_interval_ms"].value<int64_t>())
-            s.aeron.pub_poll_interval_ms = static_cast<int>(*v);
         if (auto* t = (*a)["backtest_control"].as_table()) {
             if (auto v = (*t)["channel"].value<std::string>())
                 s.aeron.backtest_control.channel = *v;

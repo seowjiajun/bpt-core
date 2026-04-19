@@ -33,9 +33,7 @@ public:
                        int order_stream,
                        int exec_report_stream,
                        int heartbeat_stream,
-                       int account_snapshot_stream,
-                       int pub_timeout_ms = 5000,
-                       int pub_poll_interval_ms = 10);
+                       int account_snapshot_stream);
 
     // Send a new order to the order gateway.
     // exchange_symbol must be the exchange-native symbol (e.g. "BTCUSDT" for Binance,

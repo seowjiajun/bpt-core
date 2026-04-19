@@ -22,9 +22,7 @@ public:
     VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
                      const std::string& channel,
                      int vol_surface_stream,
-                     int pricer_status_stream,
-                     int pub_timeout_ms = 5000,
-                     int pub_poll_interval_ms = 10);
+                     int pricer_status_stream);
 
     int poll(int fragment_limit = 10);
 

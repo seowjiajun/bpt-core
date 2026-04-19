@@ -10,6 +10,7 @@
 #include <messages/RefDataSubscriptionRequest.h>
 
 #include <x86intrin.h>
+#include <yggdrasil/aeron/aeron_utils.h>
 #include <yggdrasil/util/tsc_clock.h>
 
 #include <chrono>
@@ -48,39 +49,17 @@ RefdataSubscriber::RefdataSubscriber(std::shared_ptr<aeron::Aeron> aeron,
                                      int32_t delta_stream_id,
                                      const std::string& control_channel,
                                      int32_t control_stream_id) {
-    const int64_t snap_id = aeron->addSubscription(snapshot_channel, snapshot_stream_id);
-    const int64_t delta_id = aeron->addSubscription(delta_channel, delta_stream_id);
-    const int64_t ctrl_id = (control_stream_id != 0)
-                                ? aeron->addPublication(control_channel, control_stream_id)
-                                : -1;
+    snapshot_sub_ = ygg::aeron::wait_for_subscription(aeron, snapshot_channel, snapshot_stream_id);
+    delta_sub_ = ygg::aeron::wait_for_subscription(aeron, delta_channel, delta_stream_id);
+    if (control_stream_id != 0)
+        ctrl_pub_ = ygg::aeron::wait_for_publication(aeron, control_channel, control_stream_id);
 
-    for (int i = 0; i < 500; ++i) {
-        if (!snapshot_sub_)
-            snapshot_sub_ = aeron->findSubscription(snap_id);
-        if (!delta_sub_)
-            delta_sub_ = aeron->findSubscription(delta_id);
-        if (ctrl_id != -1 && !ctrl_pub_)
-            ctrl_pub_ = aeron->findPublication(ctrl_id);
-        if (snapshot_sub_ && delta_sub_ && (ctrl_id == -1 || ctrl_pub_))
-            break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-
-    if (snapshot_sub_) {
-        ygg::log::info("[RefdataSubscriber] Snapshot subscription ready");
-        snap_assembler_ = std::make_unique<aeron::FragmentAssembler>(
-            [this](aeron::AtomicBuffer& buffer,
-                   aeron::util::index_t offset,
-                   aeron::util::index_t length,
-                   aeron::Header& header) { on_snapshot_fragment(buffer, offset, length, header); });
-    } else {
-        ygg::log::error("[RefdataSubscriber] Failed to create snapshot subscription");
-    }
-
-    if (delta_sub_)
-        ygg::log::info("[RefdataSubscriber] Delta subscription ready");
-    else
-        ygg::log::error("[RefdataSubscriber] Failed to create delta subscription");
+    ygg::log::info("[RefdataSubscriber] Snapshot + delta subscriptions ready");
+    snap_assembler_ = std::make_unique<aeron::FragmentAssembler>(
+        [this](aeron::AtomicBuffer& buffer,
+               aeron::util::index_t offset,
+               aeron::util::index_t length,
+               aeron::Header& header) { on_snapshot_fragment(buffer, offset, length, header); });
 
     if (ctrl_pub_)
         ygg::log::info("[RefdataSubscriber] Control publication ready");

@@ -59,8 +59,6 @@ struct AeronConfig {
     std::string media_driver_dir;
     ygg::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // pub: Backtester → Strategy
     ygg::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // sub: Strategy → Backtester
-    int pub_timeout_ms{5000};
-    int pub_poll_interval_ms{10};
 };
 
 struct Settings {

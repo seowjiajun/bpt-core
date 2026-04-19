@@ -41,18 +41,14 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
                                                         ac.funding_rate.stream_id,
                                                         ac.refdata_status.stream_id,
                                                         fee_cache_,
-                                                        funding_rate_cache_,
-                                                        ac.pub_timeout_ms,
-                                                        ac.pub_poll_interval_ms);
+                                                        funding_rate_cache_);
 
     if (ac.md_control.stream_id != 0) {
         md_client_ = std::make_unique<md::MdClient>(aeron,
                                                     ac.md_control.channel,
                                                     ac.md_control.stream_id,
                                                     ac.md_data.stream_id,
-                                                    ac.md_ack_hb.stream_id,
-                                                    ac.pub_timeout_ms,
-                                                    ac.pub_poll_interval_ms);
+                                                    ac.md_ack_hb.stream_id);
     }
 
     if (ac.order.stream_id != 0) {
@@ -61,18 +57,14 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
                                                                 ac.order.stream_id,
                                                                 ac.exec_report.stream_id,
                                                                 ac.heartbeat.stream_id,
-                                                                ac.account_snapshot.stream_id,
-                                                                ac.pub_timeout_ms,
-                                                                ac.pub_poll_interval_ms);
+                                                                ac.account_snapshot.stream_id);
     }
 
     if (ac.vol_surface.stream_id != 0) {
         vol_client_ = std::make_unique<vol::VolSurfaceClient>(aeron,
                                                               ac.vol_surface.channel,
                                                               ac.vol_surface.stream_id,
-                                                              ac.pricer_status.stream_id,
-                                                              ac.pub_timeout_ms,
-                                                              ac.pub_poll_interval_ms);
+                                                              ac.pricer_status.stream_id);
         ygg::log::info("[Strategy] VolSurfaceClient ready: surface={} status={}",
                        ac.vol_surface.stream_id,
                        ac.pricer_status.stream_id);
@@ -107,9 +99,7 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
             std::make_unique<backtest::BacktestClient>(aeron,
                                                        ac.backtest_control.channel,
                                                        ac.backtest_control.stream_id,  // sub: Backtester → Strategy
-                                                       ac.backtest_ack.stream_id,      // pub: Strategy → Backtester
-                                                       ac.pub_timeout_ms,
-                                                       ac.pub_poll_interval_ms);
+                                                       ac.backtest_ack.stream_id);     // pub: Strategy → Backtester
         ygg::log::info("[Strategy] Backtest mode enabled: ctrl_sub={} ack_pub={}",
                        ac.backtest_control.stream_id,
                        ac.backtest_ack.stream_id);
