@@ -101,9 +101,21 @@ void DeribitAdapter::on_tick() {
             bpt::common::log::debug("DeribitAdapter: responded to test_request");
     }
 
+    // Fallback drain — primary subscribe path is the subscribe() override below.
     for (const auto& entry : subs_.take_pending())
         RunLoop::send(deribit::build_subscribe_rpc(
             rpc_id_.fetch_add(1, std::memory_order_relaxed), entry.symbol, entry.depth));
+}
+
+void DeribitAdapter::subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth) {
+    AdapterBase::subscribe(instrument_id, symbol, depth);
+    // Push to the wire immediately when connected. See OkxAdapter::subscribe
+    // for the underlying rationale.
+    if (RunLoop::send(deribit::build_subscribe_rpc(
+            rpc_id_.fetch_add(1, std::memory_order_relaxed), symbol, depth))) {
+        bpt::common::log::info("DeribitAdapter: runtime subscribe {} depth={}", symbol, depth);
+        subs_.take_pending();
+    }
 }
 
 void DeribitAdapter::parse_frame(std::string_view payload, uint64_t recv_ns) {

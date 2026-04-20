@@ -67,10 +67,28 @@ void HyperliquidAdapter::on_frame(std::string_view payload, uint64_t recv_ns) {
 }
 
 void HyperliquidAdapter::on_tick() {
+    // Fallback for subs added between connect_and_subscribe's take_pending
+    // and the first read iteration. Primary path is subscribe() below.
     for (const auto& entry : subs_.take_pending()) {
         for (const char* type : {"l2Book", "trades", "activeAssetCtx"})
             RunLoop::send(hyperliquid::build_subscribe_payload(type, entry.symbol));
-        bpt::common::log::info("HyperliquidAdapter: runtime subscribe {}", entry.symbol);
+        bpt::common::log::info("HyperliquidAdapter: on_tick subscribe {}", entry.symbol);
+    }
+}
+
+void HyperliquidAdapter::subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth) {
+    AdapterBase::subscribe(instrument_id, symbol, depth);
+    // Push to the wire immediately when connected. See OkxAdapter::subscribe
+    // for the underlying rationale — sync ws.read doesn't time out here, so
+    // on_tick is unreliable for runtime subs.
+    bool sent = false;
+    for (const char* type : {"l2Book", "trades", "activeAssetCtx"}) {
+        if (RunLoop::send(hyperliquid::build_subscribe_payload(type, symbol)))
+            sent = true;
+    }
+    if (sent) {
+        bpt::common::log::info("HyperliquidAdapter: runtime subscribe {}", symbol);
+        subs_.take_pending();  // don't double-send in on_tick
     }
 }
 

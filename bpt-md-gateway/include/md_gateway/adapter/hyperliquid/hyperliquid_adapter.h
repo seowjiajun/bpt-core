@@ -23,6 +23,12 @@ public:
     [[nodiscard]] const char* exchange_name() const override { return "HYPERLIQUID"; }
     [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
 
+    // Push subscribe frames to the WS immediately when connected —
+    // on_tick can't be relied upon because RunLoop's sync ws.read()
+    // doesn't honour expires_after in this Beast version (see OKX
+    // adapter commit for the investigation). Same pattern.
+    void subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth = 0) override;
+
 protected:
     std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() override;
     void read_loop(bpt::common::ws::AnyWsStream& ws) override;

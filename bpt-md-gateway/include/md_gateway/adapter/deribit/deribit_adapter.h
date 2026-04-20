@@ -26,6 +26,11 @@ public:
     // Also clears gap-detection state for the instrument in the parser.
     void unsubscribe(uint64_t instrument_id) override;
 
+    // Push subscribe frames immediately when connected — on_tick can't
+    // be relied upon because RunLoop's sync ws.read() doesn't honour
+    // expires_after in this Beast version (see OkxAdapter commit).
+    void subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth = 0) override;
+
     [[nodiscard]] const char* exchange_name() const override { return "DERIBIT"; }
     [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }
 
