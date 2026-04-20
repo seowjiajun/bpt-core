@@ -1,6 +1,8 @@
 #include "refdata/config/settings.h"
 
+#include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
 #include <bpt_app/base_settings.h>
@@ -46,8 +48,11 @@ Settings load(const std::string& path) {
     if (!settings.base.environment.empty() && !exchange_config_path.empty()) {
         const bool path_has_live = exchange_config_path.find("live") != std::string::npos;
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
-        if ((settings.base.environment == "prod" && path_has_testnet) ||
-            ((settings.base.environment == "qa" || settings.base.environment == "dev") && path_has_live))
+        if (settings.base.environment == "prod" && path_has_testnet)
+            throw std::runtime_error(fmt::format(
+                "environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
+                "refusing to start", exchange_config_path));
+        if ((settings.base.environment == "qa" || settings.base.environment == "dev") && path_has_live)
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
                            settings.base.environment,
                            exchange_config_path);
@@ -117,6 +122,17 @@ Settings load(const std::string& path) {
             adapter.ws_port = *v;
         if (auto v = (*a)["use_tls"].value<bool>())
             adapter.use_tls = *v;
+
+        // Only validate connectivity for adapters that are actually
+        // going to run. `enabled = false` is a legal way to declare an
+        // adapter in TOML without wiring it up (e.g. while rolling out
+        // a new venue); skip the required-field check in that case.
+        if (adapter.enabled) {
+            if (adapter.rest_host.empty() || adapter.ws_host.empty() || adapter.ws_port.empty())
+                throw std::runtime_error(fmt::format(
+                    "Adapter {} missing required rest_host/ws_host/ws_port", exchange_name));
+        }
+
         settings.adapters.push_back(std::move(adapter));
     }
 

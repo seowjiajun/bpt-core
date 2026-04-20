@@ -1,6 +1,8 @@
 #include "md_gateway/config/settings.h"
 
+#include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
 #include <bpt_app/base_settings.h>
@@ -44,8 +46,15 @@ Settings load(const std::string& path) {
     if (!s.base.environment.empty() && !exchange_config_path.empty()) {
         const bool path_has_live = exchange_config_path.find("live") != std::string::npos;
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
-        if ((s.base.environment == "prod" && path_has_testnet) ||
-            ((s.base.environment == "qa" || s.base.environment == "dev") && path_has_live))
+        // prod environment paired with a testnet exchange_config is the
+        // catastrophic misdeploy — fail boot so the mistake is impossible
+        // to miss. The inverse (qa/dev with live) is usually intentional
+        // during staging; keep that as a warning.
+        if (s.base.environment == "prod" && path_has_testnet)
+            throw std::runtime_error(fmt::format(
+                "environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
+                "refusing to start (prevents prod → testnet misdeploy)", exchange_config_path));
+        if ((s.base.environment == "qa" || s.base.environment == "dev") && path_has_live)
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
                            s.base.environment,
                            exchange_config_path);
@@ -113,11 +122,14 @@ Settings load(const std::string& path) {
         if (auto v = (*a)["validation_drop_min_events"].value<int64_t>())
             ac.validation_drop_min_events = static_cast<uint32_t>(*v);
 
-        // Validate required connectivity fields — fail fast rather than crash at connect time.
-        if (ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty()) {
-            bpt::common::log::error("Adapter {} missing required ws_host/ws_port/ws_path — skipping", exchange_name);
-            continue;
-        }
+        // Validate required connectivity fields — throw at boot so the
+        // operator sees the bad TOML immediately rather than discovering
+        // it via a silently-missing MD feed at runtime. Previously we
+        // skipped the adapter and logged an error; that left the service
+        // running in a half-configured state.
+        if (ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty())
+            throw std::runtime_error(fmt::format(
+                "Adapter {} missing required ws_host/ws_port/ws_path", exchange_name));
         if (!ac.use_tls)
             bpt::common::log::warn("Adapter {} has use_tls=false — TLS is enforced regardless; update config", exchange_name);
 

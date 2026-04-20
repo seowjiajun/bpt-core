@@ -52,12 +52,13 @@ max_open_orders_per_venue  = 20
 max_orders_per_second      = 5
 
 [[adapters]]
-exchange = "OKX"
-testnet  = true
-ws_host  = "wseeapap.okx.com"
-ws_port  = "8443"
-ws_path  = "/ws/v5/private"
-use_tls  = true
+exchange  = "OKX"
+testnet   = true
+rest_host = "wseeapap.okx.com"
+ws_host   = "wseeapap.okx.com"
+ws_port   = "8443"
+ws_path   = "/ws/v5/private"
+use_tls   = true
 
 [metrics]
 port = 9103
@@ -99,12 +100,19 @@ port = 9103
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 TEST(GatewayConfigTest, DefaultsAppliedWhenFieldsOmitted) {
-    // Minimal config — just enough for the loader not to throw.
+    // Minimal config — just enough for the loader not to throw. The
+    // adapter connectivity fields (rest_host/ws_host/ws_port/ws_path)
+    // are now required by the loader's validation; include the bare
+    // minimum so defaults kick in for everything else.
     auto path = write_toml(R"(
 exchanges = ["OKX"]
 
 [[adapters]]
-exchange = "OKX"
+exchange  = "OKX"
+rest_host = "x"
+ws_host   = "x"
+ws_port   = "443"
+ws_path   = "/ws"
 )");
 
     auto s = bpt::order_gateway::config::load(path.string());
@@ -138,9 +146,14 @@ TEST(GatewayConfigTest, ExchangeFilterExcludesUnlistedAdapters) {
 exchanges = ["OKX"]
 
 [[adapters]]
-exchange = "OKX"
-ws_host  = "wseeapap.okx.com"
+exchange  = "OKX"
+rest_host = "wseeapap.okx.com"
+ws_host   = "wseeapap.okx.com"
+ws_port   = "443"
+ws_path   = "/ws/v5/private"
 
+# BINANCE is filtered out before validation, so it's allowed to be
+# minimally specified here.
 [[adapters]]
 exchange = "BINANCE"
 ws_host  = "stream.binance.com"
@@ -157,11 +170,20 @@ TEST(GatewayConfigTest, MultipleExchangesLoaded) {
 exchanges = ["OKX", "BINANCE"]
 
 [[adapters]]
-exchange = "OKX"
+exchange  = "OKX"
+rest_host = "x"
+ws_host   = "x"
+ws_port   = "443"
+ws_path   = "/ws"
 
 [[adapters]]
-exchange = "BINANCE"
+exchange  = "BINANCE"
+rest_host = "x"
+ws_host   = "x"
+ws_port   = "443"
+ws_path   = "/ws"
 
+# HYPERLIQUID is filtered out.
 [[adapters]]
 exchange = "HYPERLIQUID"
 )");
@@ -200,6 +222,7 @@ rest_host = "api.binance.com"
 rest_port = "443"
 ws_host   = "stream.binance.com"
 ws_port   = "9443"
+ws_path   = "/ws"
 use_tls   = true
 )");
 

@@ -1,6 +1,8 @@
 #include "order_gateway/config/settings.h"
 
+#include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
 #include <bpt_app/base_settings.h>
@@ -44,8 +46,15 @@ Settings load(const std::string& path) {
     if (!s.base.environment.empty() && !exchange_config_path.empty()) {
         const bool path_has_live = exchange_config_path.find("live") != std::string::npos;
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
-        if ((s.base.environment == "prod" && path_has_testnet) ||
-            ((s.base.environment == "qa" || s.base.environment == "dev") && path_has_live))
+        // Fatal: prod environment with a testnet exchange_config. Any
+        // live trades would hit the testnet venue (or vice versa — the
+        // order-gateway is the worst place to be uncertain about where
+        // orders go).
+        if (s.base.environment == "prod" && path_has_testnet)
+            throw std::runtime_error(fmt::format(
+                "environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
+                "refusing to start", exchange_config_path));
+        if ((s.base.environment == "qa" || s.base.environment == "dev") && path_has_live)
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
                            s.base.environment,
                            exchange_config_path);
@@ -139,6 +148,24 @@ Settings load(const std::string& path) {
             ac.use_tls = *v;
         if (auto v = (*a)["exec_queue_capacity"].value<int64_t>())
             ac.exec_queue_capacity = static_cast<uint32_t>(*v);
+
+        // Adapter connectivity must be fully specified; silently-empty
+        // fields would surface as a cryptic connect-time crash later.
+        // rest_host is required because every adapter also does REST
+        // (snapshot fetch at minimum). Hyperliquid's action codec uses
+        // ws_path, OKX/Binance/Deribit also do.
+        if (ac.rest_host.empty() || ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty())
+            throw std::runtime_error(fmt::format(
+                "Adapter {} missing required rest_host/ws_host/ws_port/ws_path", exchange_name));
+
+        // Fatal: prod environment with testnet adapters. Order-gateway
+        // is the worst place for a flag mismatch — testnet=true in prod
+        // means live trades go to the testnet venue.
+        if (s.base.environment == "prod" && ac.testnet)
+            throw std::runtime_error(fmt::format(
+                "environment = \"prod\" but adapter {} has testnet = true — refusing to start",
+                exchange_name));
+
         s.gateway.adapters.push_back(std::move(ac));
     }
 
