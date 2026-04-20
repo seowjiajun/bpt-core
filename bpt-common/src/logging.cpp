@@ -29,6 +29,11 @@ quill::LogLevel g_default_level = quill::LogLevel::Info;
 constexpr const char* kDefaultPattern =
     "%(time) [%(log_level_short_code)] [%(logger)] %(message)";
 
+// Linux TASK_COMM_LEN is 16 bytes incl. null terminator → 15 usable chars.
+// Kept as a constant here rather than including <linux/sched.h> to keep
+// bpt-common portable at build time.
+constexpr std::size_t kMaxThreadNameChars = 15;
+
 quill::LogLevel level_from_string(const std::string& s) {
     if (s == "trace")
         return quill::LogLevel::TraceL1;
@@ -53,9 +58,21 @@ quill::Logger* get_default_logger() {
     return g_logger;
 }
 
+std::string backend_thread_name_for(const std::string& service_name) {
+    std::string name = service_name;
+    if (name.rfind("bpt-", 0) == 0)
+        name.erase(0, 4);
+    for (std::string::size_type pos = 0; (pos = name.find("-gateway", pos)) != std::string::npos; pos += 3)
+        name.replace(pos, 8, "-gw");
+    name += "-log";
+    if (name.size() > kMaxThreadNameChars)
+        name.resize(kMaxThreadNameChars);
+    return name;
+}
+
 void init(const std::string& service_name, const LogConfig& cfg) {
     quill::BackendOptions backend_opts;
-    backend_opts.thread_name = "quill-backend";
+    backend_opts.thread_name = backend_thread_name_for(service_name);
     if (cfg.flush_interval_ms > 0)
         backend_opts.sleep_duration = std::chrono::milliseconds(cfg.flush_interval_ms);
     quill::Backend::start(backend_opts);

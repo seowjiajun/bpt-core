@@ -60,6 +60,14 @@ quill::Logger* get_default_logger();
 // static — Quill's create_or_get_logger is idempotent by name.
 quill::Logger* get_logger(const std::string& name);
 
+// Derive the OS thread name for Quill's backend I/O thread from the
+// service name. Rule: strip leading "bpt-", collapse any "-gateway" →
+// "-gw", append "-log", truncate to 15 chars (Linux TASK_COMM_LEN - 1).
+// Exposed so services running multiple instances on one host can tell
+// quill backend threads apart in `top -H` / `ps -L` / perf samples.
+// Pure function — exposed for unit testing.
+std::string backend_thread_name_for(const std::string& service_name);
+
 void init(const std::string& service_name, const LogConfig& cfg = {});
 
 }  // namespace bpt::common::logging
