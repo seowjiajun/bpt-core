@@ -23,14 +23,16 @@ namespace bpt::order_gateway {
 
 OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
                          std::shared_ptr<aeron::Aeron> aeron,
-                         std::map<std::string, adapter::ExchangeCredentials> creds)
+                         std::map<std::string, adapter::ExchangeCredentials> creds,
+                         const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),
       aeron_(aeron),
       metrics_(cfg_.base.metrics_port),
       risk_checker_(cfg_.gateway.risk.max_order_size_usd,
                     cfg_.gateway.risk.max_notional_per_order_usd,
                     cfg_.gateway.risk.max_open_orders_per_venue,
-                    cfg_.gateway.risk.max_orders_per_second) {
+                    cfg_.gateway.risk.max_orders_per_second),
+      topology_(topology) {
     risk_checker_.set_trading_enabled(cfg_.gateway.risk.trading_enabled);
 
     exec_pub_ = std::make_shared<messaging::ExecReportPublisher>(aeron,
@@ -80,6 +82,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
         }
 
         adapter->set_disconnect_breaker_config(disc_cfg);
+        adapter->set_topology(topology_);
         adapter->start();
         adapters_.push_back(std::move(adapter));
         bpt::common::log::info("Started adapter: {}", a_cfg.exchange);
@@ -149,7 +152,10 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
 
 void OrderGatewayApp::run() {
     bpt::common::util::TscClock::calibrate();
-    bpt::common::util::pin_thread_to_cpu(cfg_.gateway.poll_cpu, "poll");
+    // Pin the main poll loop. Prefer topology role "ogw.poll"; fall
+    // back to legacy cfg_.gateway.poll_cpu knob when no role is set.
+    if (!bpt::common::util::pin_thread_by_role(topology_, "ogw.poll", "poll"))
+        bpt::common::util::pin_thread_to_cpu(cfg_.gateway.poll_cpu, "poll");
 
     const uint64_t hb_interval_ns = static_cast<uint64_t>(cfg_.gateway.heartbeat_interval_ms) * 1'000'000ULL;
     const uint64_t stale_timeout_ns = static_cast<uint64_t>(cfg_.gateway.stale_order_timeout_ms) * 1'000'000ULL;

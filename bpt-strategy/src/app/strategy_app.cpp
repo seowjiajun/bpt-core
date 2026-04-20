@@ -17,6 +17,7 @@
 #include <thread>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/signal.h>
+#include <bpt_common/util/thread_pin.h>
 
 using namespace std::chrono_literals;
 using bpt::messages::ExchangeId;
@@ -26,12 +27,15 @@ using bpt::messages::RejectReason;
 
 namespace bpt::strategy {
 
-StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> aeron)
+StrategyApp::StrategyApp(config::AppConfig cfg,
+                         std::shared_ptr<aeron::Aeron> aeron,
+                         const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),
       aeron_(aeron),
       metrics_(cfg_.base.metrics_port),
       fee_cache_(cfg_.strat.strategy.schedule.max_refdata_staleness_ns),
-      funding_rate_cache_(cfg_.strat.strategy.schedule.max_refdata_staleness_ns) {
+      funding_rate_cache_(cfg_.strat.strategy.schedule.max_refdata_staleness_ns),
+      topology_(topology) {
     const auto& ac = cfg_.aeron;
     const auto& fc = cfg_.strat;
 
@@ -339,6 +343,11 @@ void StrategyApp::wire_order_callbacks() {
 }
 
 void StrategyApp::run() {
+    // Pin the main poll loop to the topology's "strategy.main" role.
+    // Strategy has no legacy io_cpu TOML knob, so unassigned → unpinned
+    // (the helper logs at INFO, matching other services).
+    bpt::common::util::pin_thread_by_role(topology_, "strategy.main", "strategy.main");
+
     bpt::common::log::info("Polling... waiting for RefDataReady before subscribing (Ctrl+C to exit)");
 
     while (bpt::common::signal::is_running()) {

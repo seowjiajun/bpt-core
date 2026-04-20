@@ -50,6 +50,8 @@ public:
         disconnect_breaker_.reset(cfg);
     }
 
+    void set_topology(const bpt::common::util::Topology& topology) override { topology_ = &topology; }
+
 protected:
     config::AdapterConfig cfg_;
     boost::asio::io_context ioc_;
@@ -57,6 +59,9 @@ protected:
     std::atomic<bool> stop_flag_{false};
     std::atomic<bool> connected_{false};
     risk::DisconnectRateBreaker disconnect_breaker_{{}};  // disabled by default
+    // Optional CPU-affinity topology. nullptr = fall back to legacy
+    // cfg_.io_cpu TOML knob; both unset = unpinned.
+    const bpt::common::util::Topology* topology_{nullptr};
 
     // Adapter IO thread pushes events here; main thread pops via drain_exec_events().
     // Capacity is config-driven (AdapterConfig.exec_queue_capacity) and must

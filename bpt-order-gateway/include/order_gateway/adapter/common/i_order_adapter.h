@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <bpt_common/util/topology.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -67,6 +68,12 @@ public:
     // Set disconnect-breaker config before start(). Default no-op for
     // adapters that don't implement it; OrderAdapterBase overrides.
     virtual void set_disconnect_breaker_config(risk::DisconnectRateBreaker::Config) {}
+
+    // Bind the central CPU-affinity topology. Must be called before
+    // start() — the IO thread reads its role assignment at launch.
+    // Default no-op for adapters that don't implement it; OrderAdapterBase
+    // overrides.
+    virtual void set_topology(const bpt::common::util::Topology&) {}
 
     // Drain all pending exec events from the adapter's IO thread into the
     // caller's thread.  Call this from the main poll loop on every iteration.

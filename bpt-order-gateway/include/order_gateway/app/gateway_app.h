@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <bpt_app/app.h>
+#include <bpt_common/util/topology.h>
 
 namespace bpt::order_gateway {
 
@@ -25,7 +26,8 @@ class OrderGatewayApp : public bpt::app::IService {
 public:
     OrderGatewayApp(config::Settings cfg,
                 std::shared_ptr<aeron::Aeron> aeron,
-                std::map<std::string, adapter::ExchangeCredentials> creds);
+                std::map<std::string, adapter::ExchangeCredentials> creds,
+                const bpt::common::util::Topology& topology);
     void run() override;
     void stop() override;
 
@@ -42,6 +44,7 @@ private:
     order::OrderStateManager state_mgr_;
     std::vector<std::shared_ptr<adapter::IOrderAdapter>> adapters_;
     std::unique_ptr<order::OrderProcessor> processor_;
+    const bpt::common::util::Topology& topology_;
 };
 
 }  // namespace bpt::order_gateway

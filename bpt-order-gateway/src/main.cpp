@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
             [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 auto creds = load_credentials(settings.gateway.adapters, settings.base.environment);
                 return std::make_unique<bpt::order_gateway::OrderGatewayApp>(
-                    std::move(settings), ctx.aeron, std::move(creds));
+                    std::move(settings), ctx.aeron, std::move(creds), ctx.topology);
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

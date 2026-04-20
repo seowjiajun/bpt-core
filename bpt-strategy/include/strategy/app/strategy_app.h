@@ -25,13 +25,16 @@ class PaperOrderGatewayClient;  // fwd decl — full include in strategy_app.cpp
 #include <memory>
 #include <bpt_app/app.h>
 #include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/topology.h>
 #include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::strategy {
 
 class StrategyApp : public bpt::app::IService {
 public:
-    StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> aeron);
+    StrategyApp(config::AppConfig cfg,
+                std::shared_ptr<aeron::Aeron> aeron,
+                const bpt::common::util::Topology& topology);
     void run() override;
     void stop() override;
 
@@ -92,6 +95,8 @@ private:
     bpt::common::util::LatencyHistogram order_lat_hist_;
     uint64_t curr_tick_ts_ns_{0};     // T0 of the tick currently being processed
     uint64_t last_lat_report_ns_{0};  // TSC ns of the last latency report
+
+    const bpt::common::util::Topology& topology_;
 };
 
 }  // namespace bpt::strategy

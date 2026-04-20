@@ -1,5 +1,8 @@
 #include "order_gateway/adapter/common/order_adapter_base.h"
 
+#include <algorithm>
+#include <cctype>
+#include <string>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/thread_pin.h>
 #include <bpt_common/util/tsc_clock.h>
@@ -7,6 +10,20 @@
 namespace bpt::order_gateway::adapter {
 
 namespace ssl = boost::asio::ssl;
+
+namespace {
+
+// Topology role name for the order-gw IO thread per adapter.
+// Convention: "ogw.<venue-lower>.io". Matches the service_name shape
+// (bpt-ogw-<venue>) so operators see a consistent vocabulary.
+std::string io_role(const char* exchange) {
+    std::string venue = exchange;
+    std::transform(venue.begin(), venue.end(), venue.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return "ogw." + venue + ".io";
+}
+
+}  // namespace
 
 OrderAdapterBase::OrderAdapterBase(const config::AdapterConfig& cfg)
     : cfg_(cfg),
@@ -39,7 +56,14 @@ std::chrono::milliseconds OrderAdapterBase::reconnect_delay() const {
 }
 
 void OrderAdapterBase::run() {
-    bpt::common::util::pin_thread_to_cpu(cfg_.io_cpu, exchange_name());
+    // Pin policy: prefer topology role when set, fall back to legacy
+    // cfg_.io_cpu knob. Mirrors md-gw adapter pinning.
+    bool pinned_via_topology = false;
+    if (topology_)
+        pinned_via_topology = bpt::common::util::pin_thread_by_role(
+            *topology_, io_role(exchange_name()), exchange_name());
+    if (!pinned_via_topology)
+        bpt::common::util::pin_thread_to_cpu(cfg_.io_cpu, exchange_name());
 
     while (!stop_flag_.load(std::memory_order_relaxed)) {
         try {
