@@ -5,11 +5,13 @@
 #include <CLI/CLI.hpp>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <bpt_app/app.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/secrets/secrets_client.h>
+#include <fmt/format.h>
 
 namespace {
 
@@ -19,11 +21,24 @@ namespace {
 std::map<std::string, bpt::refdata::adapter::ExchangeCredentials>
 load_credentials(const std::vector<bpt::refdata::config::AdapterConfig>& adapters,
                  bpt::common::Env env) {
+    const bool strict = (env == bpt::common::Env::QA || env == bpt::common::Env::PROD);
     std::map<std::string, bpt::refdata::adapter::ExchangeCredentials> creds;
     for (const auto& a_cfg : adapters) {
+        // Disabled adapters won't run, so don't try to load their credentials —
+        // keeps a half-configured disabled entry from blowing up startup.
+        if (!a_cfg.enabled)
+            continue;
+
         if (a_cfg.secret_name.empty()) {
+            // Most refdata pulls are public endpoints, but in qa/prod a missing
+            // secret_name for an enabled adapter is more likely a typo than
+            // intentional — refuse to start so it surfaces at deploy time.
+            if (strict)
+                throw std::runtime_error(fmt::format(
+                    "env={} but adapter {} has empty secret_name — refusing to start",
+                    bpt::common::to_string(env), a_cfg.exchange));
             bpt::common::log::warn(
-                "No secret_name for {} — adapter will have empty credentials",
+                "No secret_name for {} — adapter will have empty credentials (dev only)",
                 a_cfg.exchange);
             creds[a_cfg.exchange] = {};
             continue;

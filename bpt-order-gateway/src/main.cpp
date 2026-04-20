@@ -7,11 +7,13 @@
 #include <CLI/CLI.hpp>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <sys/prctl.h>
 #include <bpt_app/app.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/secrets/secrets_client.h>
+#include <fmt/format.h>
 
 namespace {
 
@@ -21,11 +23,19 @@ namespace {
 std::map<std::string, bpt::order_gateway::adapter::ExchangeCredentials>
 load_credentials(const std::vector<bpt::order_gateway::config::AdapterConfig>& adapters,
                  bpt::common::Env env) {
+    const bool strict = (env == bpt::common::Env::QA || env == bpt::common::Env::PROD);
     std::map<std::string, bpt::order_gateway::adapter::ExchangeCredentials> creds;
     for (const auto& a_cfg : adapters) {
         if (a_cfg.secret_name.empty()) {
+            // An order-gateway adapter without credentials would fail on the
+            // first authed request anyway; in qa/prod this is a deployment
+            // bug, refuse to start so it's caught before any live trading.
+            if (strict)
+                throw std::runtime_error(fmt::format(
+                    "env={} but adapter {} has empty secret_name — refusing to start",
+                    bpt::common::to_string(env), a_cfg.exchange));
             bpt::common::log::warn(
-                "No secret_name for {} — adapter will have empty credentials",
+                "No secret_name for {} — adapter will have empty credentials (dev only)",
                 a_cfg.exchange);
             creds[a_cfg.exchange] = {};
             continue;
