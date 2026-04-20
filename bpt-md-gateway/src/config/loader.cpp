@@ -121,6 +121,11 @@ Settings load(const std::string& path) {
             ac.validation_drop_window_sec = static_cast<uint32_t>(*v);
         if (auto v = (*a)["validation_drop_min_events"].value<int64_t>())
             ac.validation_drop_min_events = static_cast<uint32_t>(*v);
+        if (auto* arr = (*a)["pinned_tls_sha256"].as_array()) {
+            for (auto& elem : *arr)
+                if (auto v = elem.value<std::string>())
+                    ac.pinned_tls_sha256.push_back(*v);
+        }
 
         // Validate required connectivity fields — throw at boot so the
         // operator sees the bad TOML immediately rather than discovering

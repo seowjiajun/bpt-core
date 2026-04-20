@@ -15,13 +15,15 @@ HyperliquidWsClient::HyperliquidWsClient(boost::asio::io_context& ioc,
                                          std::string host,
                                          std::string port,
                                          std::string path,
-                                         std::string wallet_address)
+                                         std::string wallet_address,
+                                         std::vector<std::string> pinned_tls_sha256)
     : ioc_(ioc),
       ssl_ctx_(ssl_ctx),
       host_(std::move(host)),
       port_(std::move(port)),
       path_(std::move(path)),
-      wallet_address_(std::move(wallet_address)) {}
+      wallet_address_(std::move(wallet_address)),
+      pinned_tls_sha256_(std::move(pinned_tls_sha256)) {}
 
 void HyperliquidWsClient::set_user_fills_handler(UserFillsHandler h) {
     user_fills_handler_ = std::move(h);
@@ -240,7 +242,8 @@ void HyperliquidWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& c
     auto ws_ptr = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, host_, port_, path_,
                                       /*so_rcvbuf_bytes=*/0,
                                       /*connect_timeout_ms=*/30000,
-                                      /*user_agent=*/"bpt-order-gateway/0.1");
+                                      /*user_agent=*/"bpt-order-gateway/0.1",
+                                      pinned_tls_sha256_);
 
     // Fail any in-flight posts on exit, whether clean or exceptional.
     // RunLoop's own SendGuard clears its internal stream pointer so

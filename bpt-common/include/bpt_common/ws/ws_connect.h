@@ -18,11 +18,16 @@
 #include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/websocket/ssl.hpp>
+#include <openssl/evp.h>
+#include <openssl/x509.h>
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace bpt::common::ws {
 
@@ -88,6 +93,25 @@ public:
     }
 };
 
+// Lowercase-hex SHA-256 of the leaf cert's DER encoding. Used by the
+// TLS-pinning path in ws_connect — matches the output of
+//   openssl x509 -fingerprint -sha256 -noout | tr -d :aF-F | tr A-F a-f
+// (i.e. 64 hex chars, no colons, lowercase).
+inline std::string cert_sha256_hex(X509* cert) {
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int len = 0;
+    if (!X509_digest(cert, EVP_sha256(), md, &len))
+        return "";
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string hex;
+    hex.reserve(static_cast<std::size_t>(len) * 2);
+    for (unsigned int i = 0; i < len; ++i) {
+        hex.push_back(digits[md[i] >> 4]);
+        hex.push_back(digits[md[i] & 0xf]);
+    }
+    return hex;
+}
+
 // ── ws_connect (TLS) ──────────────────────────────────────────────────────────
 //
 // Resolve host:port, perform TCP connect, TLS handshake, and WebSocket upgrade.
@@ -97,6 +121,12 @@ public:
 // connect_timeout_ms: hard deadline for the entire connect sequence.
 //                     Cleared with expires_never() before returning.
 // user_agent:         value sent in the HTTP Upgrade User-Agent header.
+// pinned_cert_sha256: optional allowlist of leaf-cert SHA-256 fingerprints
+//                     (lowercase hex, no colons, 64 chars each). Empty = no
+//                     pinning (CA + hostname verification only, as before).
+//                     Non-empty = connection rejected unless the leaf cert's
+//                     hash matches one of the pins. Operator must rotate
+//                     pins when the exchange rotates its TLS cert.
 inline std::unique_ptr<WsStream> ws_connect(boost::asio::io_context& ioc,
                                             boost::asio::ssl::context& ssl_ctx,
                                             const std::string& host,
@@ -104,7 +134,8 @@ inline std::unique_ptr<WsStream> ws_connect(boost::asio::io_context& ioc,
                                             const std::string& path,
                                             uint32_t so_rcvbuf_bytes = 0,
                                             uint32_t connect_timeout_ms = 30000,
-                                            const std::string& user_agent = "bpt-client/0.1") {
+                                            const std::string& user_agent = "bpt-client/0.1",
+                                            const std::vector<std::string>& pinned_cert_sha256 = {}) {
     boost::asio::ip::tcp::resolver resolver(ioc);
     auto ws = std::make_unique<WsStream>(ioc, ssl_ctx);
 
@@ -123,7 +154,37 @@ inline std::unique_ptr<WsStream> ws_connect(boost::asio::io_context& ioc,
     if (!SSL_set_tlsext_host_name(ws->next_layer().native_handle(), host.c_str()))
         throw std::runtime_error("SSL_set_tlsext_host_name failed");
 
-    ws->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(host));
+    // Compose host-name verification with optional cert pinning. Pin
+    // check only runs at the leaf depth (get_error_depth() == 0) so we
+    // don't reject on intermediate/root CAs. Missing cert or hash
+    // computation failure → rejected.
+    if (pinned_cert_sha256.empty()) {
+        ws->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(host));
+    } else {
+        ws->next_layer().set_verify_callback(
+            [host, pins = pinned_cert_sha256](bool preverified, boost::asio::ssl::verify_context& ctx) {
+                boost::asio::ssl::host_name_verification hnv(host);
+                if (!hnv(preverified, ctx))
+                    return false;
+                auto* store_ctx = ctx.native_handle();
+                if (X509_STORE_CTX_get_error_depth(store_ctx) != 0)
+                    return true;  // only pin the leaf
+                X509* cert = X509_STORE_CTX_get_current_cert(store_ctx);
+                if (!cert) return false;
+                const std::string got = cert_sha256_hex(cert);
+                if (got.empty()) return false;
+                for (const auto& pin : pins) {
+                    if (pin.size() != got.size()) continue;
+                    bool match = std::equal(pin.begin(), pin.end(), got.begin(),
+                                            [](char a, char b) {
+                                                return std::tolower(static_cast<unsigned char>(a)) ==
+                                                       std::tolower(static_cast<unsigned char>(b));
+                                            });
+                    if (match) return true;
+                }
+                return false;
+            });
+    }
     ws->next_layer().handshake(boost::asio::ssl::stream_base::client);
 
     ws->set_option(

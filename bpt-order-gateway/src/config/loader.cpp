@@ -148,6 +148,11 @@ Settings load(const std::string& path) {
             ac.use_tls = *v;
         if (auto v = (*a)["exec_queue_capacity"].value<int64_t>())
             ac.exec_queue_capacity = static_cast<uint32_t>(*v);
+        if (auto* arr = (*a)["pinned_tls_sha256"].as_array()) {
+            for (auto& elem : *arr)
+                if (auto v = elem.value<std::string>())
+                    ac.pinned_tls_sha256.push_back(*v);
+        }
 
         // Adapter connectivity must be fully specified; silently-empty
         // fields would surface as a cryptic connect-time crash later.

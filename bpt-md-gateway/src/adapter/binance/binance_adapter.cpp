@@ -66,7 +66,9 @@ std::unique_ptr<bpt::common::ws::AnyWsStream> BinanceAdapter::connect_and_subscr
                                       cfg_.ws_port,
                                       path,
                                       cfg_.so_rcvbuf_bytes,
-                                      cfg_.ws_connect_timeout_ms);
+                                      cfg_.ws_connect_timeout_ms,
+                                      "bpt-client/0.1",
+                                      cfg_.pinned_tls_sha256);
     auto ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
 
     // Enable WebSocket-level keep-alive pings. If Binance stops responding
@@ -129,7 +131,9 @@ void BinanceAdapter::run_funding_rate_loop() {
     while (!stop_flag_.load(std::memory_order_relaxed)) {
         try {
             fr_ioc_.restart();
-            auto ws = bpt::common::ws::ws_connect(fr_ioc_, fr_ssl_ctx_, fr_host, fr_port, fr_path, cfg_.so_rcvbuf_bytes);
+            auto ws = bpt::common::ws::ws_connect(fr_ioc_, fr_ssl_ctx_, fr_host, fr_port, fr_path,
+                                                  cfg_.so_rcvbuf_bytes, /*connect_timeout_ms=*/30000,
+                                                  "bpt-client/0.1", cfg_.pinned_tls_sha256);
             bpt::common::log::info("BinanceAdapter funding-rate stream connected");
 
             beast::flat_buffer buf;

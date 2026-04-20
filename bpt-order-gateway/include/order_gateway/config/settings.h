@@ -82,6 +82,11 @@ struct AdapterConfig {
     // burst — a full book snapshot on a cold reconnect is ~tens of
     // events — but a high-churn strategy on a busy venue may want 1024+.
     uint32_t exec_queue_capacity{256};
+
+    // Optional TLS-pinning allowlist for the WS connection (see
+    // bpt::common::ws::ws_connect). Lowercase hex SHA-256 leaf-cert
+    // fingerprints, 64 chars each. Empty = no pinning.
+    std::vector<std::string> pinned_tls_sha256;
 };
 
 struct GatewayConfig {

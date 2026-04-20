@@ -54,6 +54,15 @@ struct AdapterConfig {
     // Check /proc/sys/net/core/rmem_max for the system ceiling.
     uint32_t so_rcvbuf_bytes{0};
 
+    // Optional TLS-pinning allowlist. When non-empty, the TLS handshake
+    // rejects any leaf cert whose SHA-256 fingerprint is not in this
+    // list, on top of the standard CA + hostname verification. Values
+    // are lowercase hex, 64 chars each, no colons — matches
+    //   openssl x509 -fingerprint -sha256 -noout | tr -d : | tr A-F a-f
+    // Empty (default) = no pinning. Operator must rotate pins when the
+    // exchange rotates its TLS cert (typically every 1-3 years).
+    std::vector<std::string> pinned_tls_sha256;
+
     // Validation-drop circuit breaker. Trips when the share of publishes
     // rejected by MdValidator over the rolling window exceeds the
     // threshold (and at least min_events have landed). On trip: the

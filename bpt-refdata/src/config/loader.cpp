@@ -122,6 +122,11 @@ Settings load(const std::string& path) {
             adapter.ws_port = *v;
         if (auto v = (*a)["use_tls"].value<bool>())
             adapter.use_tls = *v;
+        if (auto* arr = (*a)["pinned_tls_sha256"].as_array()) {
+            for (auto& elem : *arr)
+                if (auto v = elem.value<std::string>())
+                    adapter.pinned_tls_sha256.push_back(*v);
+        }
 
         // Only validate connectivity for adapters that are actually
         // going to run. `enabled = false` is a legal way to declare an

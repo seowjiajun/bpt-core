@@ -21,6 +21,11 @@ struct AdapterConfig {
     std::string ws_host;
     std::string ws_port{"443"};
     bool use_tls{true};
+
+    // Optional TLS-pinning allowlist for REST + WS connections (see
+    // bpt::common::ws::ws_connect). Lowercase hex SHA-256 leaf-cert
+    // fingerprints, 64 chars each. Empty = no pinning.
+    std::vector<std::string> pinned_tls_sha256;
 };
 
 struct InstrumentMappingConfig {

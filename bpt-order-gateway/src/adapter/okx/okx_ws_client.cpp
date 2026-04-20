@@ -70,7 +70,8 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
     auto ws_ptr = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
                                       /*so_rcvbuf_bytes=*/0,
                                       /*connect_timeout_ms=*/30000,
-                                      /*user_agent=*/"bpt-order-gateway/0.1");
+                                      /*user_agent=*/"bpt-order-gateway/0.1",
+                                      cfg_.pinned_tls_sha256);
     // Handshake-phase timeout (15s) is unused now that connection is
     // already established, but setting idle=none here would clobber
     // RunLoop's per-read timeout. Leave stream_base::timeout unset on

@@ -29,6 +29,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 #include <string_view>
 #include <unordered_map>
 #include <bpt_common/ws/run_loop.h>
@@ -45,7 +46,8 @@ public:
                         std::string host,
                         std::string port,
                         std::string path,
-                        std::string wallet_address);
+                        std::string wallet_address,
+                        std::vector<std::string> pinned_tls_sha256 = {});
 
     void set_user_fills_handler(UserFillsHandler h);
 
@@ -76,6 +78,7 @@ private:
     const std::string port_;
     const std::string path_;
     const std::string wallet_address_;
+    const std::vector<std::string> pinned_tls_sha256_;
 
     std::atomic<uint64_t> next_post_id_{1};
     std::mutex pending_posts_mutex_;
