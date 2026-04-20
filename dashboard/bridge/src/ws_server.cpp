@@ -6,6 +6,7 @@
 #include <deque>
 #include <nlohmann/json.hpp>
 #include <bpt_common/logging.h>
+#include <bpt_common/util/thread_name.h>
 
 namespace bridge {
 
@@ -137,6 +138,9 @@ void WsServer::start() {
     do_accept();
 
     io_thread_ = std::thread([this] {
+        // WsServer doesn't carry venue; process comm already does
+        // (bpt-bridge-<venue>). The thread name just marks its role.
+        bpt::common::util::set_thread_name("bridge-ws");
         try {
             io_ctx_.run();
         } catch (const std::exception& e) {

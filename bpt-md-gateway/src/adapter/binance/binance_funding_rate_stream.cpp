@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <bpt_common/logging.h>
+#include <bpt_common/util/thread_name.h>
 #include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
@@ -41,6 +42,10 @@ void BinanceFundingRateStream::stop() {
 }
 
 void BinanceFundingRateStream::run() {
+    // Second WS dedicated to Binance mark-price/funding-rate stream
+    // (different endpoint from the main MD stream). Named so perf /
+    // top can separate FR traffic from the primary MD IO thread.
+    bpt::common::util::set_thread_name("mdgw-binance-fr");
     const std::string fr_host = "fstream.binance.com";
     const std::string fr_port = "443";
     const std::string fr_path = "/stream?streams=!markPrice@arr@1s";
