@@ -122,6 +122,13 @@ private:
         // Non-zero while an unwind order is live (waiting for terminal status).
         uint64_t unwind_order_id{0};
 
+        // Remaining retry attempts if a shutdown-path unwind IOC is
+        // rejected or partial-fills + cancels leaving residual position.
+        // Non-zero only between on_shutdown_flatten() and drain
+        // completion. Zero during normal operation so non-shutdown
+        // unwinds (inventory-cap breaches) don't auto-retry.
+        uint32_t unwind_retries_left{0};
+
         // Prices of the currently live (or most recently placed) orders.
         // Used to detect whether the quote has drifted beyond requote_threshold_.
         double last_bid_price{0.0};
@@ -240,6 +247,22 @@ private:
     // (our_qty + queue_ahead)) drops below this floor. 0 disables.
     double queue_suppress_fill_prob_min_;
 
+    // Shutdown-unwind aggression, expressed in basis points through
+    // mid. Used by send_unwind_order() to price the IOC that flattens
+    // residual inventory at shutdown. Default 20 bps is enough to cross
+    // major-pair spreads in normal regimes; raise for thinner venues or
+    // volatile markets where 20 bps no-fills and positions leak past
+    // the drain budget. Retry logic re-reads this value on each attempt.
+    double shutdown_cross_bps_;
+
+    // Max retry attempts per instrument if the initial shutdown unwind
+    // IOC is rejected or leaves residual position (partial fill then
+    // IOC remainder cancels). Each retry refetches st.last_mid so the
+    // IOC is priced against a current BBO. Total attempts per
+    // instrument = 1 initial + shutdown_max_unwind_retries_. Default 3
+    // gives ~4 attempts against the 5s post-drain budget.
+    uint32_t shutdown_max_unwind_retries_;
+
     // Regime detector config — applied per-instrument at snapshot time.
     RegimeDetector::Config regime_cfg_;
 
@@ -256,6 +279,29 @@ private:
     std::unordered_map<uint64_t, InstrumentState> state_;         // keyed by instrument_id
     std::unordered_map<uint64_t, uint64_t> order_to_instrument_;  // order_id → instrument_id
     PositionTracker positions_;
+
+    // Exchange-authoritative position cache, keyed by (exchange_id,
+    // exchange_symbol). Populated on every on_account_snapshot() arrival.
+    // Preferred over PositionTracker at shutdown flatten time because
+    // the strategy-side tracker can race a fill-reporting lag at
+    // shutdown (gateway drops, exec-report queue drains slowly),
+    // whereas AccountSnapshot reflects whatever the exchange booked
+    // before we tore down the connection.
+    struct SnapshotKey {
+        bpt::messages::ExchangeId::Value exchange_id;
+        std::string symbol;
+        bool operator==(const SnapshotKey& o) const noexcept {
+            return exchange_id == o.exchange_id && symbol == o.symbol;
+        }
+    };
+    struct SnapshotKeyHash {
+        std::size_t operator()(const SnapshotKey& k) const noexcept {
+            return std::hash<std::string>{}(k.symbol) ^
+                   (static_cast<std::size_t>(k.exchange_id) * 0x9E3779B97F4A7C15ULL);
+        }
+    };
+    std::unordered_map<SnapshotKey, int64_t, SnapshotKeyHash> last_snapshot_qty_e8_;
+    uint64_t last_snapshot_ns_{0};
 };
 
 }  // namespace bpt::strategy::strategy

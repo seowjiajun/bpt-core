@@ -6,17 +6,10 @@
 
 namespace bpt::strategy::strategy {
 
-std::vector<Divergence> reconcile(
-    const PositionTracker& tracker,
-    bpt::messages::AccountSnapshot& snap,
-    const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
-    int64_t threshold_e8) {
-
-    std::vector<Divergence> out;
-
-    // Build exchangeSymbol → net_qty_e8 from the snapshot. One pass over
-    // the SBE repeating group (non-const — the group carries a read
-    // cursor, same pattern as OrderBookState / OFIStrategy).
+std::unordered_map<std::string, int64_t> extract_exchange_positions(
+    bpt::messages::AccountSnapshot& snap) {
+    // One pass over the SBE repeating group (non-const — the group
+    // carries a read cursor, same pattern as OrderBookState / OFIStrategy).
     std::unordered_map<std::string, int64_t> exchange_by_symbol;
     auto& positions = snap.positions();
     const std::size_t n = positions.count();
@@ -25,8 +18,17 @@ std::vector<Divergence> reconcile(
         positions.next();
         exchange_by_symbol[positions.getExchangeSymbolAsString()] = positions.netQtyE8();
     }
+    return exchange_by_symbol;
+}
 
-    const auto exchange_id = snap.exchangeId();
+std::vector<Divergence> reconcile(
+    const PositionTracker& tracker,
+    const std::unordered_map<std::string, int64_t>& exchange_by_symbol,
+    bpt::messages::ExchangeId::Value exchange_id,
+    const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
+    int64_t threshold_e8) {
+
+    std::vector<Divergence> out;
 
     for (const auto& [instrument_id, symbol] : instrument_id_to_symbol) {
         const int64_t our_qty = tracker.net_qty(instrument_id, exchange_id);
@@ -46,6 +48,17 @@ std::vector<Divergence> reconcile(
         });
     }
     return out;
+}
+
+std::vector<Divergence> reconcile(
+    const PositionTracker& tracker,
+    bpt::messages::AccountSnapshot& snap,
+    const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
+    int64_t threshold_e8) {
+    // Backwards-compat wrapper: callers that don't need the raw
+    // positions map drop into the 2-step helpers.
+    const auto exchange_by_symbol = extract_exchange_positions(snap);
+    return reconcile(tracker, exchange_by_symbol, snap.exchangeId(), instrument_id_to_symbol, threshold_e8);
 }
 
 }  // namespace bpt::strategy::strategy

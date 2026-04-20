@@ -60,4 +60,23 @@ std::vector<Divergence> reconcile(
     const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
     int64_t threshold_e8);
 
+// Drain the AccountSnapshot positions group into an
+// exchange_symbol → net_qty_e8 map. Exposed so callers that want to
+// both reconcile AND cache snapshot positions (e.g. for shutdown
+// flatten's exchange-authoritative path) can iterate the SBE cursor
+// exactly once rather than twice. Also useful in unit tests that want
+// to inspect the snapshot contents without going through reconcile.
+std::unordered_map<std::string, int64_t> extract_exchange_positions(
+    bpt::messages::AccountSnapshot& snap);
+
+// reconcile() overload operating on an already-extracted map. Used
+// together with extract_exchange_positions() when a caller needs both
+// the divergence list and the raw snapshot positions.
+std::vector<Divergence> reconcile(
+    const PositionTracker& tracker,
+    const std::unordered_map<std::string, int64_t>& exchange_by_symbol,
+    bpt::messages::ExchangeId::Value exchange_id,
+    const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
+    int64_t threshold_e8);
+
 }  // namespace bpt::strategy::strategy

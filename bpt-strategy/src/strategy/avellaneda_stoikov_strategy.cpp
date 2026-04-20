@@ -67,6 +67,9 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       drift_suppress_bps_(cfg.params["drift_suppress_bps"].value<double>().value_or(0.0)),
       tyr_suppress_threshold_(cfg.params["tyr_suppress_threshold"].value<double>().value_or(0.0)),
       queue_suppress_fill_prob_min_(cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0)),
+      shutdown_cross_bps_(cfg.params["shutdown_cross_bps"].value<double>().value_or(20.0)),
+      shutdown_max_unwind_retries_(static_cast<uint32_t>(
+          cfg.params["shutdown_max_unwind_retries"].value<int64_t>().value_or(3))),
       regime_cfg_{
           cfg.params["regime_mean_revert_h"].value<double>().value_or(0.45),
           cfg.params["regime_trend_h"].value<double>().value_or(0.55),
@@ -476,6 +479,7 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
     }
 
     // Terminal statuses: clear order slot and cancel-pending flags.
+    bool was_unwind_terminal = false;
     if (status == ExecStatus::FILLED || status == ExecStatus::CANCELLED || status == ExecStatus::REJECTED) {
         st.queue.on_cancel(order_id);
         if (st.bid_order_id == order_id) {
@@ -486,11 +490,41 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
             st.ask_cancel_pending = false;
         } else if (st.unwind_order_id == order_id) {
             st.unwind_order_id = 0;
+            was_unwind_terminal = true;
         }
         order_to_instrument_.erase(order_id);
     }
     // PARTIAL: order still live — keep order_id and pending flags unchanged.
     // ACKED:   acknowledged but not yet filled — keep order_id.
+
+    // Shutdown retry: if this terminal was an unwind and residual
+    // position remains (reject with no fill, or partial+IOC-cancel),
+    // re-fire against a fresh mid while the retry budget is non-zero.
+    // Budget is armed only by on_shutdown_flatten(); normal-path
+    // inventory unwinds don't enter this branch.
+    if (was_unwind_terminal && st.unwind_retries_left > 0) {
+        const int64_t net_qty_e8 = positions_.net_qty(canonical_id, st.exchange_id);
+        if (net_qty_e8 != 0 && st.last_mid > 0.0) {
+            const double residual = static_cast<double>(std::abs(net_qty_e8)) / 1e8;
+            const auto retry_side = (net_qty_e8 > 0) ? OrderSide::SELL : OrderSide::BUY;
+            --st.unwind_retries_left;
+            bpt::common::log::warn(kLog(),
+                "SHUTDOWN RETRY {} {} residual_qty={:.8f} retries_left={}",
+                st.symbol, st.exchange, residual, st.unwind_retries_left);
+            send_unwind_order(canonical_id, st, retry_side, st.last_mid, residual);
+        } else {
+            // Flat — clear budget so has_pending_flatten() settles.
+            st.unwind_retries_left = 0;
+        }
+    } else if (was_unwind_terminal && st.unwind_retries_left == 0) {
+        const int64_t net_qty_e8 = positions_.net_qty(canonical_id, st.exchange_id);
+        if (net_qty_e8 != 0) {
+            bpt::common::log::error(kLog(),
+                "SHUTDOWN RETRIES EXHAUSTED {} {} residual_qty={:.8f} — position leaking past drain",
+                st.symbol, st.exchange,
+                static_cast<double>(std::abs(net_qty_e8)) / 1e8);
+        }
+    }
 
     // Exchange-error backoff: consecutive EXCHANGE-sourced rejections trigger
     // increasing cooldowns so we don't flood a broken/unfunded account.
@@ -867,10 +901,14 @@ uint64_t AvellanedaStoikovStrategy::send_unwind_order(uint64_t instrument_id,
         return 0;
     }
 
-    // Cross the spread aggressively — 20bps through mid — to ensure immediate fill.
+    // Cross the spread aggressively — shutdown_cross_bps through mid — to
+    // ensure immediate fill. Default 20 bps fits major pairs in normal
+    // regimes; raise for thin venues or volatile shutdowns (see the
+    // shutdown_cross_bps knob in [strategy.params]).
     // Use LIMIT IOC rather than MARKET to avoid OKX SPOT market-buy qty quirks
     // (OKX interprets SPOT market BUY sz as quote currency, not base).
-    const double price = (side == OrderSide::BUY) ? mid * 1.002 : mid * 0.998;
+    const double cross_factor = 1.0 + (shutdown_cross_bps_ / 10000.0);
+    const double price = (side == OrderSide::BUY) ? mid * cross_factor : mid / cross_factor;
 
     const uint64_t order_id =
         order_mgr_->place_order(instrument_id, st.exchange_id, side, OrderType::LIMIT, TimeInForce::IOC, price, qty);
@@ -1092,14 +1130,49 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
         }
 
         // Unwind any net inventory with an aggressive IOC cross.
-        const double net_qty =
-            static_cast<double>(positions_.net_qty(instrument_id, st.exchange_id)) / 1e8;
+        //
+        // Position source priority: exchange's most-recent AccountSnapshot
+        // if fresh (< 10 s old), else the strategy-side PositionTracker.
+        // AccountSnapshot is exchange-authoritative so it absorbs any
+        // fill-reporting lag / queue-drain race in the strategy-side
+        // tracker at shutdown. Fallback to PositionTracker covers the
+        // case where no snapshot has arrived yet (early session,
+        // account-snapshot stream down).
+        constexpr uint64_t kSnapshotFreshnessNs = 10ULL * 1'000'000'000ULL;
+        const uint64_t now_wall_ns = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
+        const bool snapshot_fresh =
+            last_snapshot_ns_ > 0 && (now_wall_ns - last_snapshot_ns_) <= kSnapshotFreshnessNs;
+
+        int64_t net_qty_e8 = 0;
+        const char* qty_source = "tracker";
+        if (snapshot_fresh) {
+            const auto it = last_snapshot_qty_e8_.find({st.exchange_id, st.symbol});
+            if (it != last_snapshot_qty_e8_.end()) {
+                net_qty_e8 = it->second;
+                qty_source = "snapshot";
+            } else {
+                net_qty_e8 = positions_.net_qty(instrument_id, st.exchange_id);
+            }
+        } else {
+            net_qty_e8 = positions_.net_qty(instrument_id, st.exchange_id);
+        }
+        const double net_qty = static_cast<double>(net_qty_e8) / 1e8;
         if (net_qty == 0.0 || st.last_mid <= 0.0)
             continue;
+
+        bpt::common::log::info(kLog(), "SHUTDOWN FLATTEN {} position_source={}",
+                       st.symbol, qty_source);
 
         const auto side = (net_qty > 0.0) ? OrderSide::SELL : OrderSide::BUY;
         bpt::common::log::warn(kLog(), "SHUTDOWN FLATTEN {} unwinding net_qty={:.8f} via IOC",
                        st.symbol, net_qty);
+        // Arm retry budget — consumed in on_exec_report on terminal
+        // status of this unwind (rejected or partial+cancelled). Resets
+        // to 0 once residual is flat or the budget is exhausted.
+        st.unwind_retries_left = shutdown_max_unwind_retries_;
         send_unwind_order(instrument_id, st, side, st.last_mid, std::abs(net_qty));
         ++unwinds;
     }
@@ -1110,18 +1183,25 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
 }
 
 void AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::AccountSnapshot& snap) {
-    // Reconcile: build an instrument_id → exchangeSymbol map restricted
-    // to instruments this strategy actually trades on the snap's
-    // exchange (state_ already has both, keyed by instrument_id). The
-    // reconciler compares our PositionTracker against the snap's
-    // positions[] and reports anything diverging by more than the
-    // threshold.
+    // Step 1: drain the SBE positions group exactly once into a map.
+    // Cached for shutdown flatten (exchange-authoritative position
+    // source) AND re-used for the reconcile pass below — SBE group
+    // cursors can only be walked once per message.
+    const auto exchange_id = snap.exchangeId();
+    const auto exchange_by_symbol = extract_exchange_positions(snap);
+    for (const auto& [symbol, qty_e8] : exchange_by_symbol) {
+        last_snapshot_qty_e8_[{exchange_id, symbol}] = qty_e8;
+    }
+    last_snapshot_ns_ = snap.timestampNs();
+
+    // Step 2: reconcile the strategy-side PositionTracker against the
+    // just-cached map. Divergences log-only; they're an "our fill
+    // accounting drifted" signal, not a control-plane trigger.
     //
     // Threshold: 1e4 in 1e8 scale = 0.0001 of a base unit (~$10 at
     // BTC prices, ~$0.40 at ETH prices). Smaller than the smallest
     // order_qty we place (0.0001 BTC); bigger than floating-point
     // rounding noise. Tune per-venue later if needed.
-    const auto exchange_id = snap.exchangeId();
     std::unordered_map<uint64_t, std::string> symbol_map;
     symbol_map.reserve(state_.size());
     for (const auto& [id, st] : state_) {
@@ -1131,7 +1211,8 @@ void AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::AccountSnapsh
 
     constexpr int64_t kDivergenceThresholdE8 = 10000;  // 0.0001 base units
 
-    const auto divergences = reconcile(positions_, snap, symbol_map, kDivergenceThresholdE8);
+    const auto divergences = reconcile(positions_, exchange_by_symbol, exchange_id,
+                                       symbol_map, kDivergenceThresholdE8);
     for (const auto& d : divergences) {
         bpt::common::log::warn(kLog(),
             "RECONCILIATION DIVERGENCE instrument_id={} symbol='{}' "
