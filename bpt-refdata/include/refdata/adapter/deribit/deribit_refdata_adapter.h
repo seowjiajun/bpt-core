@@ -2,6 +2,7 @@
 
 #include "refdata/adapter/common/i_exchange_refdata_adapter.h"
 #include "refdata/adapter/credentials.h"
+#include "refdata/adapter/deribit/deribit_parser.h"
 #include "refdata/config/settings.h"
 #include "refdata/http/rest_client.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
@@ -44,7 +45,6 @@ public:
 private:
     config::AdapterConfig cfg_;
     std::shared_ptr<registry::InstrumentRegistry> registry_;
-    std::shared_ptr<mapping::InstrumentMappingLoader> mapping_;
     std::atomic<bool> ready_{false};
 
     std::string client_id_;
@@ -55,11 +55,15 @@ private:
     // honour the cfg_.rest_host empty-fallback.
     std::unique_ptr<bpt::refdata::http::RestClient> rest_client_;
 
-    // Build JSON-RPC 2.0 envelope and POST to /api/v2. Returns raw body.
-    std::string post_jsonrpc(const std::string& method, const std::string& params_json) const;
+    DeribitRefdataParser parser_;
 
-    void parse_instruments(const std::string& body, uint64_t collected_ts);
-    std::vector<std::string> get_perp_instrument_names() const;
+    // Fetch + ingest one (currency, kind) pair. Used by both the
+    // startup snapshot and the hourly listing refresh — the difference
+    // between those paths is only whether we notify on delta changes.
+    void ingest_instruments(const std::string& currency,
+                            const std::string& kind,
+                            uint64_t collected_ts,
+                            bool notify_deltas);
 };
 
 }  // namespace bpt::refdata::adapter

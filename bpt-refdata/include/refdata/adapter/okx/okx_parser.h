@@ -1,6 +1,5 @@
 #pragma once
 
-#include "refdata/http/rest_client.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 #include "refdata/refdata/funding_rate.h"
 #include "refdata/refdata/instrument.h"
@@ -28,14 +27,5 @@ public:
 private:
     std::shared_ptr<mapping::InstrumentMappingLoader> mapping_;
 };
-
-// Computes the OKX request-signing headers for a private endpoint.
-// method should be "GET" or "POST".
-http::RestClient::Headers okx_auth_headers(const std::string& api_key,
-                                           const std::string& secret_key,
-                                           const std::string& passphrase,
-                                           const std::string& method,
-                                           const std::string& target,
-                                           bool simulated = false);
 
 }  // namespace bpt::refdata::adapter

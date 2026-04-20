@@ -1,5 +1,7 @@
 #include "refdata/adapter/okx/okx_refdata_adapter.h"
 
+#include "refdata/adapter/okx/okx_refdata_auth.h"
+
 #include <messages/DeltaUpdateType.h>
 
 #include <bpt_common/logging.h>
