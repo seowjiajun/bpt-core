@@ -27,6 +27,11 @@ void load_base_settings(const toml::table& root, BaseSettings& base) {
         if (auto v = (*m)["port"].value<int64_t>())
             base.metrics_port = static_cast<uint16_t>(*v);
     }
+
+    if (const auto* t = root["topology"].as_table()) {
+        if (auto v = (*t)["path"].value<std::string>())
+            base.topology_path = *v;
+    }
 }
 
 }  // namespace bpt::app

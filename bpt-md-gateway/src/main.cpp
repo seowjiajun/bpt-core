@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
         return bpt::app::run(service_name, std::move(cfg),
             [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 return std::make_unique<bpt::md_gateway::MdGatewayApp>(
-                    std::move(settings), ctx.aeron);
+                    std::move(settings), ctx.aeron, ctx.topology);
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

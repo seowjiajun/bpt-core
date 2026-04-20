@@ -39,6 +39,7 @@
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/signal.h>
+#include <bpt_common/util/topology.h>
 #include <bpt_common/util/tsc_clock.h>
 
 #include <execinfo.h>
@@ -56,6 +57,7 @@ namespace bpt::app {
 // sockets) can construct them inside their own code using ctx.aeron.
 struct AppContext {
     std::shared_ptr<::aeron::Aeron> aeron;
+    bpt::common::util::Topology     topology;  // empty when base.topology_path is unset
 };
 
 // Service contract. run() is expected to block on its own poll loop,
@@ -130,7 +132,14 @@ int run(const std::string& service_name, Settings settings, BuildFn build_fn) {
     auto aeron = bpt::common::aeron::connect(base.media_driver_dir, aeron_error_handler);
     bpt::common::log::info("Connected to Aeron MediaDriver");
 
-    AppContext ctx{std::move(aeron)};
+    auto topology = bpt::common::util::Topology::load(base.topology_path);
+    if (topology.empty())
+        bpt::common::log::info("CPU topology: empty (no pinning)");
+    else
+        bpt::common::log::info("CPU topology: loaded {} assignments from '{}'",
+                               topology.assignment_count(), base.topology_path);
+
+    AppContext ctx{std::move(aeron), std::move(topology)};
 
     std::unique_ptr<IService> service = build_fn(settings, ctx);
     if (!service) {

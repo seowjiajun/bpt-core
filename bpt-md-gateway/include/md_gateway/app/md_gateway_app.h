@@ -16,12 +16,15 @@
 #include <vector>
 #include <bpt_app/app.h>
 #include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/topology.h>
 
 namespace bpt::md_gateway {
 
 class MdGatewayApp : public bpt::app::IService {
 public:
-    MdGatewayApp(config::Settings cfg, std::shared_ptr<aeron::Aeron> aeron);
+    MdGatewayApp(config::Settings cfg,
+                 std::shared_ptr<aeron::Aeron> aeron,
+                 const bpt::common::util::Topology& topology);
     void run() override;
     void stop() override;
 

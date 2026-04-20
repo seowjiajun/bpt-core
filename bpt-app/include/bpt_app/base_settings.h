@@ -51,6 +51,14 @@ struct BaseSettings {
     // bpt::common::util::TscClock::now_epoch_ns() on the hot path. Disable
     // only for services with no latency-sensitive timestamps (e.g. backtester).
     bool calibrate_tsc{true};
+
+    // Path to the host CPU-affinity topology TOML. Empty = no pinning
+    // (dev-laptop default). Each service looks up its own role names
+    // against this topology at thread construction; unmatched roles
+    // fall through as unpinned. See bpt-common/util/topology.h for the
+    // file format. Typical deploy: one topology per host class (laptop,
+    // prod-host-a, prod-host-b) under deploy/topology/, chosen via env.
+    std::string topology_path;
 };
 
 // Populate the shared keys of BaseSettings from a TOML root table. Reads:

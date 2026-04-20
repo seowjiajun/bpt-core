@@ -1,9 +1,26 @@
 #include "md_gateway/adapter/common/adapter_base.h"
 
+#include <algorithm>
+#include <cctype>
+#include <string>
 #include <thread>
 #include <bpt_common/util/thread_pin.h>
 
 namespace bpt::md_gateway::adapter {
+
+namespace {
+
+// Compose the topology role name used by md-gateway IO threads:
+// "mdgw.<venue-lower>.io". Keeps the role vocabulary in sync with
+// the service_name abbreviation used elsewhere (bpt-mdgw-<venue>).
+std::string io_role(const char* exchange) {
+    std::string venue = exchange;
+    std::transform(venue.begin(), venue.end(), venue.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return "mdgw." + venue + ".io";
+}
+
+}  // namespace
 
 namespace ssl = boost::asio::ssl;
 
@@ -79,7 +96,15 @@ void AdapterBase::publish_loop() {
 }
 
 void AdapterBase::run() {
-    bpt::common::util::pin_thread_to_cpu(cfg_.io_thread_cpu, exchange_name());
+    // Pin policy: prefer central Topology role assignment when set;
+    // fall back to the legacy per-adapter cfg_.io_thread_cpu knob for
+    // configs that haven't migrated. Both unset = unpinned.
+    bool pinned_via_topology = false;
+    if (topology_)
+        pinned_via_topology = bpt::common::util::pin_thread_by_role(
+            *topology_, io_role(exchange_name()), exchange_name());
+    if (!pinned_via_topology)
+        bpt::common::util::pin_thread_to_cpu(cfg_.io_thread_cpu, exchange_name());
     while (!stop_flag_.load(std::memory_order_relaxed)) {
         try {
             ioc_.restart();

@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/topology.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -35,6 +36,12 @@ public:
 
     // Signal the adapter thread to stop, wait for it to join.
     virtual void stop() = 0;
+
+    // Bind the central CPU-affinity topology. Must be called before
+    // start() — the IO thread reads its role assignment the moment it
+    // launches. A topology that doesn't carry the adapter's role falls
+    // through as unpinned with an INFO log (dev-laptop default).
+    virtual void set_topology(const bpt::common::util::Topology& topology) = 0;
 
     // Human-readable exchange name for logging (e.g. "BINANCE").
     [[nodiscard]] virtual const char* exchange_name() const = 0;

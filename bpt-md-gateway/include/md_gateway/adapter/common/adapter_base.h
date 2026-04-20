@@ -49,6 +49,7 @@ public:
     void unsubscribe(uint64_t instrument_id) override;
     void start() override;
     void stop() override;
+    void set_topology(const bpt::common::util::Topology& topology) override { topology_ = &topology; }
 
     [[nodiscard]] uint64_t md_published_count() const noexcept override { return validating_pub_.published(); }
     [[nodiscard]] uint64_t validation_drop_count() const noexcept override { return validating_pub_.drops(); }
@@ -76,6 +77,11 @@ protected:
 
     config::AdapterConfig cfg_;
     std::shared_ptr<messaging::IMdPublisher> md_pub_;
+    // Optional CPU-affinity topology. Pointer (not reference) because
+    // the base can be constructed before topology is known; set via
+    // set_topology() before start(). nullptr = fall back to the legacy
+    // cfg_.io_thread_cpu TOML knob.
+    const bpt::common::util::Topology* topology_{nullptr};
     // validator_ must be declared before validating_pub_ (initializer-list order).
     md::MdValidator validator_;
     md::ValidatingPublisher validating_pub_;

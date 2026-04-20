@@ -10,6 +10,7 @@ cc_library(
         "src/env.cpp",
         "src/logging.cpp",
         "src/secrets/secrets_client.cpp",
+        "src/util/topology.cpp",
         "src/util/tsc_clock.cpp",
     ],
     hdrs = glob(["include/bpt_common/**/*.h"]),

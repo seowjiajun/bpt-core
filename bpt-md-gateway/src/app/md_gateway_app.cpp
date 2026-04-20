@@ -19,7 +19,9 @@ using namespace std::chrono_literals;
 
 namespace bpt::md_gateway {
 
-MdGatewayApp::MdGatewayApp(config::Settings cfg, std::shared_ptr<aeron::Aeron> aeron)
+MdGatewayApp::MdGatewayApp(config::Settings cfg,
+                           std::shared_ptr<aeron::Aeron> aeron,
+                           const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),
       aeron_(aeron),
       metrics_(cfg_.metrics_host, cfg_.base.metrics_port),
@@ -66,6 +68,9 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg, std::shared_ptr<aeron::Aeron> a
 
         lat_reporters_.emplace_back(a_cfg.exchange, &adapter->decode_latency_hist());
         md_stat_reporters_.emplace_back(a_cfg.exchange, adapter.get());
+        // Set topology before start() — run() reads it on first line and
+        // late-binding a pin after thread launch is racy.
+        adapter->set_topology(topology);
         adapter->start();
         sub_mgr_.add_adapter(std::move(adapter));
     }

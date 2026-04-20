@@ -1,0 +1,48 @@
+# Production single-venue topology — example for an OKX-only host.
+#
+# Assumes a 16-core host (single socket, no SMT or SMT disabled at boot).
+# Core layout:
+#   0        housekeeping / interrupts / scheduler tick
+#   1-3      Aeron MediaDriver (conductor / sender / receiver)
+#   4        md-gateway OKX WS read loop
+#   5        order-gateway OKX IO thread
+#   6        order-gateway main poll loop
+#   7        strategy main loop
+#   8-15     reserved for isolcpus expansion (kept out of the scheduler)
+#
+# Host must boot with matching kernel cmdline to keep the scheduler off
+# the isolated cores:
+#   isolcpus=1-15 nohz_full=1-15 rcu_nocbs=1-15
+# and IRQ affinity pinned to core 0. See deploy/topology/README.md.
+
+[host]
+total_cores = 16
+smt_enabled = false
+
+[[assignment]]
+role = "aeron.conductor"
+core = 1
+
+[[assignment]]
+role = "aeron.sender"
+core = 2
+
+[[assignment]]
+role = "aeron.receiver"
+core = 3
+
+[[assignment]]
+role = "mdgw.okx.io"
+core = 4
+
+[[assignment]]
+role = "ogw.okx.io"
+core = 5
+
+[[assignment]]
+role = "ogw.poll"
+core = 6
+
+[[assignment]]
+role = "strategy.main"
+core = 7

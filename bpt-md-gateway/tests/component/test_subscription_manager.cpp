@@ -36,6 +36,7 @@ public:
     MOCK_METHOD(void, unsubscribe, (uint64_t), (override));
     MOCK_METHOD(void, start, (), (override));
     MOCK_METHOD(void, stop, (), (override));
+    void set_topology(const bpt::common::util::Topology&) override {}
 
     [[nodiscard]] uint64_t md_published_count() const noexcept override { return 0; }
     [[nodiscard]] uint64_t validation_drop_count() const noexcept override { return 0; }

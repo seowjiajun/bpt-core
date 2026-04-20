@@ -1,0 +1,12 @@
+# Dev-laptop topology — no pinning.
+#
+# Intentionally empty: on a laptop, SMT + hypervisor + browsers fight for
+# cores, so static pins would hurt more than they help. Services find no
+# assignments and log "role=X not in topology — running unpinned".
+#
+# Use this as the BPT_TOPOLOGY target during local dev to preserve the
+# same startup code path as prod without actually pinning anything.
+
+[host]
+total_cores = 24    # sysconf(_SC_NPROCESSORS_ONLN) on this laptop
+smt_enabled = true  # informational only — not acted on in Phase 1
