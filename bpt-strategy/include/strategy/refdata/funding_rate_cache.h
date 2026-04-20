@@ -37,6 +37,11 @@ public:
                 uint64_t next_funding_ts,
                 uint64_t collected_ts);
 
+    // Drop the entry for instrument_id, if any. Called by RefdataClient
+    // on a REMOVE delta so the map doesn't accumulate entries for
+    // delisted instruments across long-running sessions.
+    void remove(uint64_t instrument_id);
+
     // Lookup the current funding rate for an instrument.
     // Returns nullopt if no entry exists or the entry is stale relative to now_ns.
     [[nodiscard]] std::optional<FundingRateEntry> get(uint64_t instrument_id, uint64_t now_ns) const;

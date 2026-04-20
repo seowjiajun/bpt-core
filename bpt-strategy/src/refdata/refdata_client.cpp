@@ -186,6 +186,15 @@ void RefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
         return;
     }
 
+    // On REMOVE, also prune the fee + funding rate caches for this
+    // instrument — they're keyed by instrument_id and have no other
+    // eviction path, so stale entries would accumulate across delists
+    // over a long-running session.
+    if (update_type == bpt::messages::DeltaUpdateType::REMOVE) {
+        fee_cache_.remove(msg.instrumentId());
+        funding_rate_cache_.remove(msg.instrumentId());
+    }
+
     if (on_delta) {
         if (auto inst = cache_.get(msg.instrumentId()))
             on_delta(*inst, update_type);

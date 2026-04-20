@@ -50,6 +50,13 @@ public:
                 int16_t taker_bps,
                 uint64_t updated_ts);
 
+    // Drop the per-instrument entry for instrument_id, if any. Called
+    // by RefdataClient on a REMOVE delta so the map doesn't accumulate
+    // entries for delisted instruments across long-running sessions.
+    // No-op on exchange-wide slots (those are keyed by ExchangeId, not
+    // instrument_id, and there's one per exchange so they're bounded).
+    void remove(uint64_t instrument_id);
+
     // Lookup fees for a specific instrument.
     // Falls back to the exchange-wide slot if no per-instrument entry exists.
     // Returns nullopt if no entry found or the entry is stale relative to now_ns.

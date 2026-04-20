@@ -82,6 +82,14 @@ void PnlTracker::on_fill(bpt::messages::ExchangeId::Value exchange,
         }
         pos.net_qty_e8 -= static_cast<int64_t>(filled_qty_e8);
     }
+
+    // Prune flat positions. Realised P&L has already been accumulated
+    // into daily_pnl_usd_ / session_pnl_usd_; the entry holds no further
+    // state once net_qty_e8 == 0. net_qty_e8() returns 0 for unknown
+    // keys, so downstream queries are unchanged — this just stops the
+    // map from growing unboundedly as instruments are traded to flat.
+    if (pos.net_qty_e8 == 0)
+        positions_.erase(make_key(exchange, instrument_id));
 }
 
 double PnlTracker::daily_realized_pnl_usd(uint64_t now_ns) {

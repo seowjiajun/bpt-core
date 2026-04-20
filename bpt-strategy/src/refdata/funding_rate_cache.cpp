@@ -14,6 +14,11 @@ void FundingRateCache::update(bpt::messages::ExchangeId::Value exchange_id,
     rates_[instrument_id] = {exchange_id, instrument_id, rate_bps, next_funding_ts, collected_ts};
 }
 
+void FundingRateCache::remove(uint64_t instrument_id) {
+    std::unique_lock lock(mutex_);
+    rates_.erase(instrument_id);
+}
+
 std::optional<FundingRateEntry> FundingRateCache::get(uint64_t instrument_id, uint64_t now_ns) const {
     std::shared_lock lock(mutex_);
     auto it = rates_.find(instrument_id);

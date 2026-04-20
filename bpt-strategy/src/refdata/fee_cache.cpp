@@ -24,6 +24,12 @@ void FeeCache::update(bpt::messages::ExchangeId::Value exchange_id,
     }
 }
 
+void FeeCache::remove(uint64_t instrument_id) {
+    if (instrument_id == 0) return;  // exchange-wide slot isn't in the map
+    std::unique_lock lock(mutex_);
+    per_instrument_.erase(instrument_id);
+}
+
 std::optional<FeeScheduleEntry> FeeCache::get(bpt::messages::ExchangeId::Value exchange_id,
                                               uint64_t instrument_id,
                                               uint64_t now_ns) const {
