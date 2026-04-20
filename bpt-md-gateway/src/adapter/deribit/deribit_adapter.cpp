@@ -58,7 +58,7 @@ std::unique_ptr<bpt::common::ws::AnyWsStream> DeribitAdapter::connect_and_subscr
                                       cfg_.ws_path,
                                       cfg_.so_rcvbuf_bytes,
                                       cfg_.ws_connect_timeout_ms,
-                                      "bpt-client/0.1",
+                                      "bpt-md-gateway/0.1",
                                       cfg_.pinned_tls_sha256);
     auto ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
 
