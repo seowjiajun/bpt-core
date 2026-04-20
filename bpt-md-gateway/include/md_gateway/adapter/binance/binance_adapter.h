@@ -1,15 +1,10 @@
 #pragma once
 
+#include "md_gateway/adapter/binance/binance_funding_rate_stream.h"
 #include "md_gateway/adapter/binance/binance_parser.h"
 #include "md_gateway/adapter/common/adapter_base.h"
 
 #include <atomic>
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/ssl/context.hpp>
-#include <simdjson.h>
-#include <string>
-#include <thread>
-#include <vector>
 #include <bpt_common/ws/run_loop.h>
 
 namespace bpt::md_gateway::adapter {
@@ -20,8 +15,8 @@ namespace bpt::md_gateway::adapter {
 //   Subscriptions are baked into the URL — runtime subscribe/unsubscribe take
 //   effect on the next reconnect.
 //
-// Funding rate WS (separate thread): fstream.binance.com/stream?streams=!markPrice@arr@1s
-//   Publishes FundingRateUpdate for all subscribed instruments found in the stream.
+// Funding rate WS runs on its own thread inside BinanceFundingRateStream
+// (fstream.binance.com/stream?streams=!markPrice@arr@1s).
 //
 // Binance uses Beast's WS-level control-frame pings (set in connect_and_subscribe),
 // so ping_config is left at the default nullopt — no application ping thread.
@@ -32,10 +27,10 @@ public:
     // Lowercases the symbol before registering — Binance stream names are lowercase.
     void subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth = 0) override;
 
-    // Also starts the funding-rate thread.
+    // Also starts the funding-rate stream.
     void start() override;
 
-    // Also stops the funding-rate thread.
+    // Also stops the funding-rate stream.
     void stop() override;
 
     [[nodiscard]] const char* exchange_name() const override { return "BINANCE"; }
@@ -50,20 +45,9 @@ protected:
     void on_frame(std::string_view payload, uint64_t recv_ns) override;
 
 private:
-    void run_funding_rate_loop();
-
     BinanceParser parser_;
     std::atomic<bool> rl_connected_{false};
-
-    // Funding-rate thread state — separate from the main IO thread.
-    boost::asio::io_context fr_ioc_;
-    boost::asio::ssl::context fr_ssl_ctx_;
-    std::thread fr_thread_;
-
-    // Reused simdjson parser + padded buffer for the funding-rate thread.
-    simdjson::ondemand::parser fr_json_parser_;
-    std::vector<char> fr_padded_buf_;
-    std::string lower_sym_;  // scratch buffer for symbol lowercase conversion
+    BinanceFundingRateStream fr_stream_;
 };
 
 }  // namespace bpt::md_gateway::adapter

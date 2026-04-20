@@ -16,6 +16,7 @@ cc_library(
         "src/adapter/common/adapter_base.cpp",
         "src/adapter/binance/binance_md_encoder.cpp",
         "src/adapter/binance/binance_parser.cpp",
+        "src/adapter/binance/binance_funding_rate_stream.cpp",
         "src/adapter/binance/binance_adapter.cpp",
         "src/adapter/okx/okx_md_encoder.cpp",
         "src/adapter/okx/okx_parser.cpp",
