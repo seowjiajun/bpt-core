@@ -50,7 +50,7 @@ FundingArbStrategy::FundingArbStrategy(uint64_t correlation_id,
                                        const config::StrategyConfig& cfg,
                                        refdata::RefdataClient& refdata,
                                        md::MdClient* md,
-                                       order::OrderGatewayClient* order_gw)
+                                       order::IOrderGatewayClient* order_gw)
     : min_funding_rate_bps_(static_cast<int32_t>(cfg.params["min_funding_rate_bps"].value<int64_t>().value_or(5))),
       exit_funding_rate_bps_(static_cast<int32_t>(cfg.params["exit_funding_rate_bps"].value<int64_t>().value_or(2))),
       min_stable_periods_(static_cast<int>(cfg.params["min_stable_periods"].value<int64_t>().value_or(3))),

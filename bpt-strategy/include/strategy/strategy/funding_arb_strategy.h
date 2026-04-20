@@ -2,7 +2,7 @@
 
 #include "strategy/config/config.h"
 #include "strategy/md/md_client.h"
-#include "strategy/order/order_gateway_client.h"
+#include "strategy/order/i_order_gateway_client.h"
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
@@ -41,7 +41,7 @@ public:
                        const config::StrategyConfig& cfg,
                        refdata::RefdataClient& refdata,
                        md::MdClient* md,
-                       order::OrderGatewayClient* order_gw);
+                       order::IOrderGatewayClient* order_gw);
 
     void start() override;
     void on_snapshot(const refdata::InstrumentCache& cache) override;
@@ -139,7 +139,7 @@ private:
 
     refdata::RefdataClient& refdata_;
     md::MdClient* md_client_;
-    order::OrderGatewayClient* order_gw_;
+    order::IOrderGatewayClient* order_gw_;
 
     std::atomic<uint64_t> next_order_id_{1};
     std::unordered_map<std::string, ArbPair> pairs_;                // keyed by base asset

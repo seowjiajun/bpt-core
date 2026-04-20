@@ -1,5 +1,6 @@
 #include "strategy/app/strategy_app.h"
 
+#include "strategy/order/aeron_order_gateway_client.h"
 #include "strategy/strategy/strategy_factory.h"
 
 #include <analytics/messaging/toxicity_update.h>
@@ -53,7 +54,7 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
     }
 
     if (ac.order.stream_id != 0) {
-        order_gw_ = std::make_unique<order::OrderGatewayClient>(aeron,
+        order_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
                                                                 ac.order.channel,
                                                                 ac.order.stream_id,
                                                                 ac.exec_report.stream_id,

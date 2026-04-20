@@ -1,6 +1,6 @@
 #pragma once
 
-#include "strategy/order/order_gateway_client.h"
+#include "strategy/order/i_order_gateway_client.h"
 #include "strategy/refdata/instrument_cache.h"
 
 #include <messages/ExchangeId.h>
@@ -23,7 +23,7 @@ namespace bpt::strategy::order {
 //   - Quantity normalisation: rounded down to lot_size, clamped to minimum one lot.
 //   - Exchange symbol resolution: fetched from the refdata cache — strategies never
 //     need to carry the exchange-native symbol themselves.
-//   - Final gate to OrderGatewayClient::send_new_order().
+//   - Final gate to IOrderGatewayClient::send_new_order().
 //
 // Usage:
 //   uint64_t order_id = order_mgr_.place_order(instrument_id, exchange_id,
@@ -38,7 +38,7 @@ namespace bpt::strategy::order {
 // Threading: single-threaded — must be called from the Aeron poll thread only.
 class OrderManager {
 public:
-    OrderManager(OrderGatewayClient& gw, const refdata::InstrumentCache& cache);
+    OrderManager(IOrderGatewayClient& gw, const refdata::InstrumentCache& cache);
 
     // Place a new order.  Returns the assigned order_id (> 0) on success, or 0
     // if any pre-flight check fails (instrument unknown/inactive, zero quantity,
@@ -57,10 +57,10 @@ public:
 
     // Direct access to the underlying gateway — use sparingly (prefer the methods above).
     // Provided for legacy strategies not yet migrated to OrderManager.
-    OrderGatewayClient& gw() { return gw_; }
+    IOrderGatewayClient& gw() { return gw_; }
 
     // Thin delegations to the underlying gateway — strategies should use these
-    // rather than holding a raw OrderGatewayClient pointer.
+    // rather than holding a raw IOrderGatewayClient pointer.
     void cancel_order(uint64_t order_id, bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id);
 
     void cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id);
@@ -74,7 +74,7 @@ public:
                       uint64_t new_quantity);
 
 private:
-    OrderGatewayClient& gw_;
+    IOrderGatewayClient& gw_;
     const refdata::InstrumentCache& cache_;
     // High 32 bits = Unix timestamp at construction (seconds), low 32 bits = counter.
     // Guarantees uniqueness across process restarts without any persistent state.

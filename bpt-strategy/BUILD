@@ -71,7 +71,7 @@ cc_binary(
         "src/strategy/strategy_factory.cpp",
         "src/md/md_client.cpp",
         "src/vol/vol_surface_client.cpp",
-        "src/order/order_gateway_client.cpp",
+        "src/order/aeron_order_gateway_client.cpp",
         "src/order/order_manager.cpp",
     ],
     deps = [

@@ -8,7 +8,7 @@ namespace bpt::strategy::app {
 using bpt::messages::ExchangeId;
 
 StartupGate::StartupGate(refdata::RefdataClient& refdata,
-                         order::OrderGatewayClient* order_gw,
+                         order::IOrderGatewayClient* order_gw,
                          strategy::IStrategy& strategy,
                          metrics::StrategyMetrics& metrics,
                          uint8_t configured_exchanges_mask,

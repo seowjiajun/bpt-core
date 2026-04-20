@@ -13,7 +13,7 @@ using bpt::messages::OrderType;
 
 namespace bpt::strategy::order {
 
-OrderManager::OrderManager(OrderGatewayClient& gw, const refdata::InstrumentCache& cache) : gw_(gw), cache_(cache) {}
+OrderManager::OrderManager(IOrderGatewayClient& gw, const refdata::InstrumentCache& cache) : gw_(gw), cache_(cache) {}
 
 uint64_t OrderManager::place_order(uint64_t instrument_id,
                                    bpt::messages::ExchangeId::Value exchange_id,

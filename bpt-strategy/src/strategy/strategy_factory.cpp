@@ -1,7 +1,7 @@
 #include "strategy/strategy/strategy_factory.h"
 
 #include "strategy/md/md_client.h"
-#include "strategy/order/order_gateway_client.h"
+#include "strategy/order/i_order_gateway_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/strategy/avellaneda_stoikov_strategy.h"
 #include "strategy/strategy/funding_arb_strategy.h"
@@ -43,7 +43,7 @@ std::unique_ptr<IStrategy> StrategyFactory::create(const config::EngineConfig& c
     }
 
     if (type == "FundingArbStrategy") {
-        order::OrderGatewayClient* gw = order_mgr ? &order_mgr->gw() : nullptr;
+        order::IOrderGatewayClient* gw = order_mgr ? &order_mgr->gw() : nullptr;
         return std::make_unique<FundingArbStrategy>(cfg.correlation_id, cfg.strategy, refdata, md, gw);
     }
 

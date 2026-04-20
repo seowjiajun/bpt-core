@@ -6,7 +6,7 @@
 #include "strategy/dashboard/portfolio_snapshot_publisher.h"
 #include "strategy/md/md_client.h"
 #include "strategy/metrics/metrics.h"
-#include "strategy/order/order_gateway_client.h"
+#include "strategy/order/i_order_gateway_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/fee_cache.h"
 #include "strategy/refdata/funding_rate_cache.h"
@@ -48,7 +48,7 @@ private:
     refdata::FundingRateCache funding_rate_cache_;
     std::unique_ptr<refdata::RefdataClient> refdata_;
     std::unique_ptr<md::MdClient> md_client_;
-    std::unique_ptr<order::OrderGatewayClient> order_gw_;
+    std::unique_ptr<order::IOrderGatewayClient> order_gw_;
     std::unique_ptr<vol::VolSurfaceClient> vol_client_;
     std::unique_ptr<order::OrderManager> order_mgr_;
     std::unique_ptr<strategy::IStrategy> strategy_;

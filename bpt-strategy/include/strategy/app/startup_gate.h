@@ -1,7 +1,7 @@
 #pragma once
 
 #include "strategy/metrics/metrics.h"
-#include "strategy/order/order_gateway_client.h"
+#include "strategy/order/i_order_gateway_client.h"
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/i_strategy.h"
 
@@ -43,7 +43,7 @@ public:
     // order_gw may be null in refdata-only / dry-run modes; in that case the
     // account-snapshot phase is skipped entirely.
     StartupGate(refdata::RefdataClient& refdata,
-                order::OrderGatewayClient* order_gw,
+                order::IOrderGatewayClient* order_gw,
                 strategy::IStrategy& strategy,
                 metrics::StrategyMetrics& metrics,
                 uint8_t configured_exchanges_mask,
@@ -59,7 +59,7 @@ public:
                           bool fee_schedules_loaded,
                           bool funding_rates_loaded);
 
-    // Called from OrderGatewayClient::on_account_snapshot for each exchange.
+    // Called from IOrderGatewayClient::on_account_snapshot for each exchange.
     void on_account_snapshot(bpt::messages::ExchangeId::Value exchange);
 
     // Called from RefdataClient::on_snapshot_complete after the strategy
@@ -83,7 +83,7 @@ private:
     void send_account_snapshot_requests();
 
     refdata::RefdataClient& refdata_;
-    order::OrderGatewayClient* order_gw_;  // nullable
+    order::IOrderGatewayClient* order_gw_;  // nullable
     strategy::IStrategy& strategy_;
     metrics::StrategyMetrics& metrics_;
 
