@@ -1,6 +1,7 @@
 #include "strategy/app/strategy_app.h"
 
 #include "strategy/order/aeron_order_gateway_client.h"
+#include "strategy/order/paper_order_gateway_client.h"
 #include "strategy/strategy/strategy_factory.h"
 
 #include <analytics/messaging/toxicity_update.h>
@@ -54,12 +55,23 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
     }
 
     if (ac.order.stream_id != 0) {
-        order_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
-                                                                ac.order.channel,
-                                                                ac.order.stream_id,
-                                                                ac.exec_report.stream_id,
-                                                                ac.heartbeat.stream_id,
-                                                                ac.account_snapshot.stream_id);
+        if (cfg_.strat.strategy.paper_mode) {
+            // Canary / shadow run: swallow orders locally, synthesise
+            // fills from the MD stream. Exchange never sees anything.
+            auto paper = std::make_unique<order::PaperOrderGatewayClient>();
+            paper_gw_ = paper.get();
+            order_gw_ = std::move(paper);
+            bpt::common::log::warn("================================================");
+            bpt::common::log::warn(" PAPER MODE  —  orders will NOT reach the exchange ");
+            bpt::common::log::warn("================================================");
+        } else {
+            order_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
+                                                                    ac.order.channel,
+                                                                    ac.order.stream_id,
+                                                                    ac.exec_report.stream_id,
+                                                                    ac.heartbeat.stream_id,
+                                                                    ac.account_snapshot.stream_id);
+        }
     }
 
     if (ac.vol_surface.stream_id != 0) {
@@ -197,6 +209,19 @@ void StrategyApp::wire_md_callbacks() {
         // silently underflow the delta when strategy calibration is behind
         // bpt-md-gateway's.
         curr_tick_ts_ns_ = tick.timestampNs();
+
+        // Paper mode: feed the fill engine BEFORE the strategy so
+        // any IOC submit in the strategy callback sees a fresh BBO
+        // and any fills triggered by this tick arrive on the next
+        // order_gw_ poll — mirrors the exchange match-then-publish
+        // ordering real trading observes downstream.
+        if (paper_gw_) {
+            paper_gw_->feed_bbo(tick.instrumentId(),
+                                tick.bidPrice(),
+                                tick.askPrice(),
+                                tick.timestampNs());
+        }
+
         strategy_->on_bbo(tick);
         const uint64_t t3 = bpt::common::util::WallClock::now_ns();
         if (t3 > curr_tick_ts_ns_) {
@@ -213,6 +238,14 @@ void StrategyApp::wire_md_callbacks() {
         if (trading_paused_ || trading_halted_) return;
 
         curr_tick_ts_ns_ = tick.timestampNs();
+
+        if (paper_gw_) {
+            paper_gw_->feed_trade(tick.instrumentId(),
+                                  tick.price(),
+                                  tick.qty(),
+                                  tick.timestampNs());
+        }
+
         strategy_->on_trade(tick);
         const uint64_t t3 = bpt::common::util::WallClock::now_ns();
         if (t3 > curr_tick_ts_ns_) {

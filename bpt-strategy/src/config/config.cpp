@@ -89,6 +89,7 @@ AppConfig AppConfig::load(const std::string& path) {
     auto& sc = app_cfg.strat.strategy;
     sc.type = (*s)["type"].value<std::string>().value_or("");
     sc.enabled = (*s)["enabled"].value<bool>().value_or(true);
+    sc.paper_mode = (*s)["paper_mode"].value<bool>().value_or(false);
 
     if (auto* arr = (*s)["instruments"].as_array())
         for (auto& elem : *arr)

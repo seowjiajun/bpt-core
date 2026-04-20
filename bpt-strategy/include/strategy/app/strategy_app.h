@@ -7,6 +7,10 @@
 #include "strategy/md/md_client.h"
 #include "strategy/metrics/metrics.h"
 #include "strategy/order/i_order_gateway_client.h"
+
+namespace bpt::strategy::order {
+class PaperOrderGatewayClient;  // fwd decl — full include in strategy_app.cpp
+}  // namespace bpt::strategy::order
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/fee_cache.h"
 #include "strategy/refdata/funding_rate_cache.h"
@@ -49,6 +53,12 @@ private:
     std::unique_ptr<refdata::RefdataClient> refdata_;
     std::unique_ptr<md::MdClient> md_client_;
     std::unique_ptr<order::IOrderGatewayClient> order_gw_;
+
+    // Non-owning alias to the order_gw_ above when paper_mode is set —
+    // gives wire_md_callbacks a typed handle so it can feed BBO / trade
+    // ticks into the fill engine without downcasting the interface.
+    // Null otherwise.
+    order::PaperOrderGatewayClient* paper_gw_{nullptr};
     std::unique_ptr<vol::VolSurfaceClient> vol_client_;
     std::unique_ptr<order::OrderManager> order_mgr_;
     std::unique_ptr<strategy::IStrategy> strategy_;

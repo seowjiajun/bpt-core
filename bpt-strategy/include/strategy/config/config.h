@@ -112,6 +112,14 @@ struct StrategyConfig {
     std::string type;
     bool enabled{true};
 
+    // Canary / shadow mode: when true, orders are routed to an
+    // in-process PaperOrderGatewayClient instead of bpt-order-gateway.
+    // Fills are synthesised from the MD stream by PaperFillEngine, so
+    // the strategy's lifecycle runs unchanged without touching the
+    // exchange. Use for regression-testing a new strategy variant
+    // alongside live before flipping it in.
+    bool paper_mode{false};
+
     // Canonical instrument universe.  Format: BASE/QUOTE:TYPE  (e.g. BTC/USDT:SPOT).
     // Resolved against the Sindri snapshot at startup.
     // Empty = all instruments across md_exchanges (subscribe-all fallback).
