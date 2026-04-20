@@ -18,13 +18,17 @@ namespace {
 // fits inside the 15-char comm cap; unknown types fall back to the
 // first 5 chars of the type string.
 std::string derive_service_name(const std::string& strategy_type) {
+    // Strategy `type` strings are PascalCase per config convention
+    // (e.g. AvellanedaStoikovStrategy, OFIStrategy). Map to short
+    // codes that fit the 15-char comm budget.
     std::string variant;
-    if (strategy_type == "avellaneda_stoikov") variant = "as";
-    else if (strategy_type == "regime_switch")  variant = "rs";
-    else if (strategy_type == "ofi")            variant = "ofi";
-    else if (strategy_type == "hmm")            variant = "hmm";
-    else if (strategy_type == "momentum")       variant = "mom";
-    else                                         variant = strategy_type.substr(0, 5);
+    if (strategy_type == "AvellanedaStoikovStrategy") variant = "as";
+    else if (strategy_type == "RegimeSwitchStrategy") variant = "rs";
+    else if (strategy_type == "OFIStrategy")          variant = "ofi";
+    else if (strategy_type == "HmmStrategy")          variant = "hmm";
+    else if (strategy_type == "MomentumStrategy")     variant = "mom";
+    else if (strategy_type == "FundingArbStrategy")   variant = "farb";
+    else                                              variant = strategy_type.substr(0, 5);
     return "bpt-strat-" + variant;
 }
 
