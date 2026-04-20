@@ -22,6 +22,12 @@ dependencies {
     implementation 'io.prometheus:prometheus-metrics-core:1.3.3'
     implementation 'io.prometheus:prometheus-metrics-instrumentation-jvm:1.3.3'
     implementation 'io.prometheus:prometheus-metrics-exporter-httpserver:1.3.3'
+    // OpenHFT Affinity — JNI wrapper around sched_setaffinity; used by
+    // AffinityThreadFactory to pin the Aeron MediaDriver's conductor/
+    // sender/receiver threads to specific cores per the topology config.
+    // Matches the pinning story in bpt-core/bpt-common (pthread-based)
+    // on the C++ side — both ends of the IPC speak the same topology.
+    implementation 'net.openhft:affinity:3.23.3'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
     testImplementation 'org.mockito:mockito-core:5.5.0'
 }

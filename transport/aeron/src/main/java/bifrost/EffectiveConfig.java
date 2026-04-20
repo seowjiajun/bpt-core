@@ -18,7 +18,10 @@ public record EffectiveConfig(
     Integer termBufferLength,
     Integer mtuLength,
     long heartbeatIntervalSec,
-    int metricsPort) {
+    int metricsPort,
+    int conductorCore,
+    int senderCore,
+    int receiverCore) {
 
   /** Merges file-based {@link Config} with CLI override flags into an immutable snapshot. */
   public static EffectiveConfig from(
@@ -38,6 +41,9 @@ public record EffectiveConfig(
         c.termBufferLength,
         c.mtuLength,
         c.heartbeatIntervalSec,
-        c.metricsPort);
+        c.metricsPort,
+        c.conductorCore,
+        c.senderCore,
+        c.receiverCore);
   }
 }

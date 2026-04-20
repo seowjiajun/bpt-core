@@ -44,6 +44,15 @@ public class Config {
 
   public final int metricsPort;
 
+  // CPU affinity assignments for the three Aeron MediaDriver agent
+  // threads when DEDICATED threading mode is active. -1 means unpinned.
+  // Role vocabulary matches bpt-core's topology.toml: aeron.conductor,
+  // aeron.sender, aeron.receiver. Operator keeps these in sync with the
+  // C++ services' topology.toml so both ends of the IPC agree.
+  public final int conductorCore;
+  public final int senderCore;
+  public final int receiverCore;
+
   @SuppressWarnings("unchecked") // YAML parser returns raw Map; inner keys are always String
   private Config(Map<String, Object> data) {
     Object aeronRaw = data != null ? data.get("aeron") : null;
@@ -76,6 +85,18 @@ public class Config {
         metricsRaw instanceof Map ? (Map<String, Object>) metricsRaw : null;
     Integer metricsPort = getInteger(metrics, "port");
     this.metricsPort = metricsPort != null ? metricsPort : 9100;
+
+    // topology: { conductor_core, sender_core, receiver_core }
+    // Missing = -1 = unpinned (dev-laptop default).
+    Object topologyRaw = data != null ? data.get("topology") : null;
+    Map<String, Object> topology =
+        topologyRaw instanceof Map ? (Map<String, Object>) topologyRaw : null;
+    Integer cc = getInteger(topology, "conductor_core");
+    Integer sc = getInteger(topology, "sender_core");
+    Integer rc = getInteger(topology, "receiver_core");
+    this.conductorCore = cc != null ? cc : -1;
+    this.senderCore = sc != null ? sc : -1;
+    this.receiverCore = rc != null ? rc : -1;
   }
 
   public static Config load(String path) {

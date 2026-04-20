@@ -49,6 +49,33 @@ public class ConfigTest {
   }
 
   @Test
+  public void testLoadTopologyAssignments() throws Exception {
+    File configFile =
+        createTempConfig(
+            "aeron:\n"
+                + "  directory: '/dev/shm/t'\n"
+                + "topology:\n"
+                + "  conductor_core: 1\n"
+                + "  sender_core: 2\n"
+                + "  receiver_core: 3\n");
+
+    Config config = Config.load(configFile.getAbsolutePath());
+    assertEquals(1, config.conductorCore);
+    assertEquals(2, config.senderCore);
+    assertEquals(3, config.receiverCore);
+  }
+
+  @Test
+  public void testTopologyDefaultsToUnpinned() throws Exception {
+    // Absent topology block → all roles -1 (dev-laptop default).
+    File configFile = createTempConfig("aeron:\n  directory: '/dev/shm/t'\n");
+    Config config = Config.load(configFile.getAbsolutePath());
+    assertEquals(-1, config.conductorCore);
+    assertEquals(-1, config.senderCore);
+    assertEquals(-1, config.receiverCore);
+  }
+
+  @Test
   public void testDefaultsWhenEmptyFile() throws Exception {
     File configFile = createTempConfig("");
     Config config = Config.load(configFile.getAbsolutePath());

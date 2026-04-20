@@ -20,3 +20,15 @@ logger:
 
 metrics:
   port: 9100
+
+# CPU affinity for the DEDICATED-mode agent threads. -1 = unpinned (laptop
+# default). On a real trading host, keep these core numbers coherent with
+# bpt-core/deploy/topology/*.toml — the mdgw/ogw/strategy roles on that
+# side and these aeron.{conductor,sender,receiver} roles together form the
+# full-stack topology. Collisions (two bpt-core roles on the same core
+# that's also listed here) aren't detected cross-process; the operator
+# holds the full picture.
+#topology:
+#  conductor_core: 1
+#  sender_core: 2
+#  receiver_core: 3

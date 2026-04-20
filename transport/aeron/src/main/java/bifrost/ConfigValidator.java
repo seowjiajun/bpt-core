@@ -57,7 +57,51 @@ public final class ConfigValidator {
       }
     }
 
+    // Topology core IDs: -1 means unpinned (valid); otherwise must be a
+    // non-negative core index within the online CPU count. Duplicate
+    // cores across roles are rejected so a mis-edited YAML doesn't
+    // silently co-schedule two hot threads.
+    int nproc = Runtime.getRuntime().availableProcessors();
+    validateTopologyCore("conductor_core", c.conductorCore(), nproc, errors);
+    validateTopologyCore("sender_core", c.senderCore(), nproc, errors);
+    validateTopologyCore("receiver_core", c.receiverCore(), nproc, errors);
+    checkCoreCollision("conductor_core", c.conductorCore(), "sender_core", c.senderCore(), errors);
+    checkCoreCollision(
+        "conductor_core", c.conductorCore(), "receiver_core", c.receiverCore(), errors);
+    checkCoreCollision("sender_core", c.senderCore(), "receiver_core", c.receiverCore(), errors);
+
     return errors;
+  }
+
+  private static void validateTopologyCore(
+      String fieldName, int coreId, int nproc, List<String> errors) {
+    if (coreId < -1) {
+      errors.add(
+          "Invalid " + fieldName + "=" + coreId + ": must be -1 (unpinned) or a core index >= 0");
+    } else if (coreId >= nproc) {
+      errors.add(
+          "Invalid "
+              + fieldName
+              + "="
+              + coreId
+              + ": exceeds online CPU count ("
+              + nproc
+              + "). Wrong topology file for this host?");
+    }
+  }
+
+  private static void checkCoreCollision(
+      String fieldA, int coreA, String fieldB, int coreB, List<String> errors) {
+    if (coreA >= 0 && coreA == coreB) {
+      errors.add(
+          "Core "
+              + coreA
+              + " assigned to both "
+              + fieldA
+              + " and "
+              + fieldB
+              + " — each hot thread needs its own core");
+    }
   }
 
   private static void validateIdleStrategy(

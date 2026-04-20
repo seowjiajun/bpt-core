@@ -187,6 +187,15 @@ public class MediaDriverRunner {
     if (config.termBufferLength() != null) ctx.ipcTermBufferLength(config.termBufferLength());
     if (config.mtuLength() != null) ctx.mtuLength(config.mtuLength());
 
+    // Per-thread CPU affinity for the three DEDICATED-mode agent threads.
+    // Aeron Context exposes per-role ThreadFactory hooks; AffinityThreadFactory
+    // sets the OS thread name and pins via net.openhft.affinity on each new
+    // thread's run(). coreId == -1 means unpinned (dev-laptop default).
+    ctx.conductorThreadFactory(
+        new AffinityThreadFactory("aeron-conductor", config.conductorCore()));
+    ctx.senderThreadFactory(new AffinityThreadFactory("aeron-sender", config.senderCore()));
+    ctx.receiverThreadFactory(new AffinityThreadFactory("aeron-receiver", config.receiverCore()));
+
     return ctx;
   }
 }

@@ -74,7 +74,10 @@ public class MediaDriverRunnerTest {
             null,
             null,
             30L,
-            0);
+            0,
+            -1,
+            -1,
+            -1);
     MediaDriver.Context ctx = MediaDriverRunner.buildContext(config);
 
     assertNotNull(ctx);
@@ -104,7 +107,10 @@ public class MediaDriverRunnerTest {
             null,
             null,
             30L,
-            0);
+            0,
+            -1,
+            -1,
+            -1);
     MediaDriver.Context ctx = MediaDriverRunner.buildContext(config);
 
     assertNotNull(ctx);
@@ -132,7 +138,10 @@ public class MediaDriverRunnerTest {
             65536,
             1408,
             30L,
-            0);
+            0,
+            -1,
+            -1,
+            -1);
     MediaDriver.Context ctx = MediaDriverRunner.buildContext(config);
 
     assertEquals(5000L, ctx.driverTimeoutMs());
@@ -159,7 +168,10 @@ public class MediaDriverRunnerTest {
             null,
             null,
             30L,
-            0);
+            0,
+            -1,
+            -1,
+            -1);
     // Should not throw; Aeron will use its own defaults
     MediaDriver.Context ctx = MediaDriverRunner.buildContext(config);
     assertNotNull(ctx);
@@ -183,6 +195,9 @@ public class MediaDriverRunnerTest {
         null,
         null,
         30L,
-        0);
+        0,
+        -1,
+        -1,
+        -1);
   }
 }

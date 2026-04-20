@@ -68,6 +68,64 @@ public class ConfigValidatorTest {
     assertEquals(3, errors.size(), "Should have errors for dir, threading, and idle strategy");
   }
 
+  @Test
+  public void testTopologyCoreOutOfRange() {
+    int nproc = Runtime.getRuntime().availableProcessors();
+    EffectiveConfig config = withTopology(nproc + 10, -1, -1);
+    List<String> errors = ConfigValidator.validate(config, "DEV", false);
+    assertTrue(
+        errors.stream().anyMatch(s -> s.contains("conductor_core") && s.contains("exceeds")),
+        "Out-of-range core should be flagged; got: " + errors);
+  }
+
+  @Test
+  public void testTopologyDuplicateCoresRejected() {
+    EffectiveConfig config = withTopology(2, 2, -1);
+    List<String> errors = ConfigValidator.validate(config, "DEV", false);
+    assertTrue(
+        errors.stream().anyMatch(s -> s.contains("assigned to both")),
+        "Duplicate core assignment should be flagged; got: " + errors);
+  }
+
+  @Test
+  public void testTopologyAllUnpinnedIsValid() {
+    EffectiveConfig config = withTopology(-1, -1, -1);
+    List<String> errors = ConfigValidator.validate(config, "DEV", false);
+    assertTrue(errors.isEmpty(), "Fully-unpinned topology should pass validation");
+  }
+
+  @Test
+  public void testTopologyDistinctCoresIsValid() {
+    // Use low cores that exist on any reasonable host
+    EffectiveConfig config = withTopology(0, 1, 2);
+    List<String> errors = ConfigValidator.validate(config, "DEV", false);
+    assertTrue(
+        errors.isEmpty(),
+        "Topology with three distinct in-range cores should pass; got: " + errors);
+  }
+
+  private static EffectiveConfig withTopology(int conductor, int sender, int receiver) {
+    return new EffectiveConfig(
+        "/dev/shm/test",
+        "DEDICATED",
+        "BUSY_SPIN",
+        null,
+        null,
+        null,
+        false,
+        true,
+        null,
+        null,
+        null,
+        null,
+        null,
+        30L,
+        0,
+        conductor,
+        sender,
+        receiver);
+  }
+
   private static EffectiveConfig makeConfig(
       String dir, String threading, String idle, boolean deleteOnStart) {
     return new EffectiveConfig(
@@ -85,6 +143,9 @@ public class ConfigValidatorTest {
         null,
         null,
         30L,
-        0);
+        0,
+        -1,
+        -1,
+        -1);
   }
 }
