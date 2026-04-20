@@ -1,0 +1,43 @@
+# prometheus-process-exporter config for the bpt-core stack.
+#
+# Matches all bpt-* processes (including the topology-qualified forms
+# we set via prctl: bpt-mdgw-<venue>, bpt-ogw-<venue>, bpt-rfd-<venue>,
+# bpt-strat-<variant>, bpt-bridge-<venue>, bpt-pricer, bpt-analytics).
+# Each matching process becomes one `groupname` — the default template
+# uses the process `comm`, which is already what we want after the #17
+# role-qualified naming work.
+#
+# Matches Java transport separately so its JVM threads show up
+# attributable to "bpt-transport" rather than just "java".
+#
+# Note: process-exporter needs read access to /proc/<pid>/* for all
+# matched processes. Runs fine as the same user that owns the bpt-*
+# processes (systemd-user units, which run as jseow).
+#
+# Exposed on :9256 (process-exporter's default listen port).
+
+process_names:
+
+  # Match any process whose cmdline contains a bpt-core binary path.
+  # The regex pattern covers every service binary under bazel-bin/, and
+  # name: "{{.Comm}}" tells process-exporter to label each group by the
+  # kernel comm field (which our prctl work set to the role-qualified
+  # form like bpt-mdgw-okx / bpt-ogw-okx / bpt-strat-as). Default
+  # template would've used {{.ExeBase}} = binary filename, which loses
+  # the venue/variant qualifier — exactly what we want to preserve.
+  - cmdline:
+      - 'bazel-bin/(bpt-|dashboard/bridge/).*'
+    name: "{{.Comm}}"
+
+  # Java process for transport. Matches by cmdline since the JVM's comm
+  # is just "java" and wouldn't distinguish from other JVMs.
+  - name: "bpt-transport"
+    cmdline:
+      - "bifrost-fabric-.*\\.jar"
+
+  # Java process for transport. Matches by cmdline since the JVM's
+  # comm is just "java" and can't be reliably distinguished from
+  # other JVMs on the host by comm alone.
+  - name: "bpt-transport"
+    cmdline:
+      - "bifrost-fabric-.*\\.jar"

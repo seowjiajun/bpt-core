@@ -19,7 +19,12 @@ logger:
   level: "info"
 
 metrics:
-  port: 9100
+  # 9100 is the conventional prometheus-node-exporter port and every
+  # distro install binds it at boot. bpt-transport lost that race
+  # pre-2026-04-21 and silently ran without a metrics server ("Address
+  # already in use" in startup log). Move to 9110 — above the block
+  # 9100-9106 reserved for bpt-* services.
+  port: 9110
 
 # CPU affinity for the DEDICATED-mode agent threads. -1 = unpinned (laptop
 # default). On a real trading host, keep these core numbers coherent with

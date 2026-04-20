@@ -39,11 +39,30 @@ scrape_configs:
       - targets: ['alertmanager:9093']
 
   - job_name: bpt-transport
-    # bifrost-fabric Aeron MediaDriver; metrics exposer on 9100.
+    # bifrost-fabric Aeron MediaDriver. Moved off 9100 (collides with
+    # prometheus-node-exporter) to 9110 on 2026-04-21.
+    static_configs:
+      - targets: ['host.docker.internal:9110']
+        labels:
+          service: transport
+
+  - job_name: node-exporter
+    # Host-level metrics (CPU / memory / disk / network / loadavg /
+    # filesystem) from prometheus-node-exporter. Installed via apt,
+    # runs as a system service on :9100.
     static_configs:
       - targets: ['host.docker.internal:9100']
         labels:
-          service: transport
+          service: host
+
+  - job_name: process-exporter
+    # Per-process metrics (RSS / VSZ / CPU seconds / open FDs / thread
+    # count) from prometheus-process-exporter. Matches bpt-* processes
+    # by comm name — see monitoring/process-exporter.yml.
+    static_configs:
+      - targets: ['host.docker.internal:9256']
+        labels:
+          service: processes
 
   - job_name: bpt-md-gateway
     static_configs:
