@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <vector>
 
 namespace bpt::strategy::strategy {
 
@@ -75,6 +76,27 @@ public:
     [[nodiscard]] std::size_t tick_count() const { return tick_count_; }
 
     static const char* name(Regime r);
+
+    // Opaque snapshot of internal state — consumed by the strategy's
+    // warm-start serialisation. Intentionally plain data (no deque /
+    // no nlohmann::json dependency) so the serializer owns the wire
+    // format and the detector stays small.
+    struct StateSnapshot {
+        Regime regime{Regime::WARMING_UP};
+        double hurst{0.5};
+        double last_mid{0.0};
+        std::vector<double> returns;
+        std::size_t tick_count{0};
+    };
+
+    [[nodiscard]] StateSnapshot snapshot_state() const;
+
+    // Restore from a prior snapshot. The Config is NOT overwritten —
+    // callers should already have constructed the detector with the
+    // intended config; this only repopulates the runtime state.
+    // Silently clamps `returns` to cfg_.hurst_window if oversized
+    // (handles config shrinking between runs).
+    void restore_state(const StateSnapshot& snap);
 
 private:
     Regime classify(double hurst) const;

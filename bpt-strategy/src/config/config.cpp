@@ -151,6 +151,11 @@ AppConfig AppConfig::load(const std::string& path) {
         sc.schedule.configured_exchanges_mask = mask;
     }
 
+    if (auto* ws = (*s)["warm_start"].as_table()) {
+        sc.warm_start.state_dir = (*ws)["state_dir"].value<std::string>().value_or("");
+        sc.warm_start.max_age_s = static_cast<uint64_t>((*ws)["max_age_s"].value<int64_t>().value_or(600));
+    }
+
     if (auto* p = (*s)["params"].as_table())
         sc.params = *p;
 

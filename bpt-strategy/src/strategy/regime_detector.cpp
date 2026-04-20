@@ -79,4 +79,30 @@ const char* RegimeDetector::name(Regime r) {
     return "UNKNOWN";
 }
 
+RegimeDetector::StateSnapshot RegimeDetector::snapshot_state() const {
+    StateSnapshot s;
+    s.regime = regime_;
+    s.hurst = hurst_;
+    s.last_mid = last_mid_;
+    s.returns.assign(returns_.begin(), returns_.end());
+    s.tick_count = tick_count_;
+    return s;
+}
+
+void RegimeDetector::restore_state(const StateSnapshot& snap) {
+    regime_ = snap.regime;
+    hurst_ = snap.hurst;
+    last_mid_ = snap.last_mid;
+    tick_count_ = snap.tick_count;
+
+    // Clamp to the (possibly smaller) configured window — keep the
+    // most recent samples since older samples have already aged out
+    // of the Hurst estimator's consideration anyway.
+    returns_.clear();
+    const std::size_t start =
+        snap.returns.size() > cfg_.hurst_window ? snap.returns.size() - cfg_.hurst_window : 0;
+    for (std::size_t i = start; i < snap.returns.size(); ++i)
+        returns_.push_back(snap.returns[i]);
+}
+
 }  // namespace bpt::strategy::strategy

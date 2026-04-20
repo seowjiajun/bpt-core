@@ -135,6 +135,25 @@ public:
     // budget. A strategy that doesn't override it returns false —
     // appropriate for stateless / non-inventory strategies.
     [[nodiscard]] virtual bool has_pending_flatten() const { return false; }
+
+    // Persist warm-start state (EWMA estimators, regime detector, etc.)
+    // to `path`. StrategyApp calls this on graceful shutdown AFTER the
+    // flatten drain completes, so positions are flat and state is
+    // stable. Default no-op — strategies with no expensive warmup don't
+    // need to persist anything.
+    //
+    // Implementations should write atomically (e.g. tmp + rename) to
+    // avoid leaving a half-written file behind on crash; returning
+    // normally signals "saved OK" and any error should be logged
+    // internally rather than thrown.
+    virtual void save_state(const std::string& /*path*/) {}
+
+    // Load warm-start state from `path` if it exists and is no older
+    // than `max_age_s` seconds. Called once, AFTER on_snapshot() has
+    // resolved the instrument universe (so instrument_id → state
+    // entries can be matched). Missing / corrupt / stale file is not
+    // an error — strategies fall back to cold start silently.
+    virtual void load_state(const std::string& /*path*/, uint64_t /*max_age_s*/) {}
 };
 
 }  // namespace bpt::strategy::strategy

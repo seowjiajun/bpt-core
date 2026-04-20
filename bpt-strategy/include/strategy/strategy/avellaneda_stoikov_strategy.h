@@ -80,6 +80,11 @@ public:
     void on_shutdown_flatten() override;
     [[nodiscard]] bool has_pending_flatten() const override;
 
+    // Persist per-instrument EWMA + regime state so a restart within
+    // max_age_s doesn't eat the full vol/drift/kappa warmup.
+    void save_state(const std::string& path) override;
+    void load_state(const std::string& path, uint64_t max_age_s) override;
+
 private:
     struct InstrumentState {
         // EWMA volatility state.

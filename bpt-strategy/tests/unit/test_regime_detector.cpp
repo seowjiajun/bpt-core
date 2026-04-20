@@ -208,4 +208,75 @@ TEST(RegimeDetectorTest, EvalIntervalThrottles) {
     EXPECT_TRUE(det.is_warm());
 }
 
+// ---------------------------------------------------------------------------
+// Snapshot / restore — warm-start persistence round-trip
+// ---------------------------------------------------------------------------
+
+TEST(RegimeDetectorSnapshot, RoundTripsAllFields) {
+    RegimeDetector src({.hurst_window = 50, .warmup_samples = 30, .eval_interval = 10});
+
+    // Drive enough samples to warm + set non-default internal state.
+    double price = 100.0;
+    std::mt19937 rng(42);
+    std::normal_distribution<double> noise(0.0, 0.005);
+    for (int i = 0; i < 200; ++i) {
+        price *= std::exp(noise(rng));
+        src.update(price);
+    }
+    ASSERT_TRUE(src.is_warm());
+
+    const auto snap = src.snapshot_state();
+
+    RegimeDetector dst({.hurst_window = 50, .warmup_samples = 30, .eval_interval = 10});
+    dst.restore_state(snap);
+
+    // Public-observable state should match exactly.
+    EXPECT_EQ(dst.regime(), src.regime());
+    EXPECT_DOUBLE_EQ(dst.hurst(), src.hurst());
+    EXPECT_EQ(dst.tick_count(), src.tick_count());
+    // is_warm() follows from regime, so this confirms the deque survived.
+    EXPECT_EQ(dst.is_warm(), src.is_warm());
+
+    // And the next update should produce identical trajectories from here.
+    src.update(price * 1.001);
+    dst.update(price * 1.001);
+    EXPECT_DOUBLE_EQ(dst.hurst(), src.hurst());
+    EXPECT_EQ(dst.regime(), src.regime());
+}
+
+TEST(RegimeDetectorSnapshot, RestoreIntoSmallerWindowKeepsRecentSamples) {
+    // Source was run with a 200-sample window; destination is configured
+    // with only 50. Expect restore to retain the 50 most recent returns.
+    RegimeDetector src({.hurst_window = 200, .warmup_samples = 50, .eval_interval = 10});
+    double price = 100.0;
+    for (int i = 0; i < 300; ++i) {
+        price *= 1.0 + 0.0001 * ((i % 2) ? 1 : -1);  // mean-reverting
+        src.update(price);
+    }
+    const auto snap = src.snapshot_state();
+    EXPECT_EQ(snap.returns.size(), 200u);
+
+    RegimeDetector dst({.hurst_window = 50, .warmup_samples = 30, .eval_interval = 10});
+    dst.restore_state(snap);
+
+    // Can't peek returns_ directly, but feeding another update+eval
+    // should not crash and should respect the new window.
+    dst.update(price * 1.0001);
+    // tick_count continues from where it left off.
+    EXPECT_EQ(dst.tick_count(), snap.tick_count + 1);
+}
+
+TEST(RegimeDetectorSnapshot, RestoreFromEmptyDeckYieldsWarmingUp) {
+    // Default-constructed source (no updates) → snapshot → restore into
+    // fresh detector. Restored detector should still be in warmup.
+    RegimeDetector src;
+    const auto snap = src.snapshot_state();
+
+    RegimeDetector dst;
+    dst.restore_state(snap);
+    EXPECT_EQ(dst.regime(), Regime::WARMING_UP);
+    EXPECT_FALSE(dst.is_warm());
+    EXPECT_EQ(dst.tick_count(), 0u);
+}
+
 }  // namespace

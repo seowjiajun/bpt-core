@@ -17,7 +17,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <nlohmann/json.hpp>
+#include <system_error>
 
 using bpt::messages::ExchangeId;
 using bpt::messages::ExecStatus;
@@ -1150,6 +1153,162 @@ bool AvellanedaStoikovStrategy::has_pending_flatten() const {
             return true;
     }
     return false;
+}
+
+// ── Warm-start state ────────────────────────────────────────────────────────
+//
+// Schema version: bump on breaking format changes. Loader rejects files
+// whose version doesn't match and falls back to cold start.
+static constexpr int kWarmStartSchemaVersion = 1;
+
+void AvellanedaStoikovStrategy::save_state(const std::string& path) {
+    if (path.empty())
+        return;
+
+    try {
+        nlohmann::json root;
+        root["version"] = kWarmStartSchemaVersion;
+        root["saved_at_ns"] = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+
+        nlohmann::json instruments = nlohmann::json::array();
+        for (const auto& [instrument_id, st] : state_) {
+            nlohmann::json j;
+            j["instrument_id"] = instrument_id;
+            j["symbol"] = st.symbol;
+            j["exchange"] = st.exchange;
+            j["ewma_var"] = st.ewma_var;
+            j["ewma_ticks"] = st.ewma_ticks;
+            j["last_mid"] = st.last_mid;
+            j["last_tick_ns"] = st.last_tick_ns;
+            j["ewma_drift"] = st.ewma_drift;
+            j["ewma_kappa"] = st.ewma_kappa;
+            j["kappa_ticks"] = st.kappa_ticks;
+            j["last_trade_ns"] = st.last_trade_ns;
+
+            const auto rs = st.regime.snapshot_state();
+            nlohmann::json r;
+            r["regime"] = static_cast<int>(rs.regime);
+            r["hurst"] = rs.hurst;
+            r["last_mid"] = rs.last_mid;
+            r["returns"] = rs.returns;
+            r["tick_count"] = rs.tick_count;
+            j["regime"] = std::move(r);
+
+            instruments.push_back(std::move(j));
+        }
+        root["instruments"] = std::move(instruments);
+
+        // Atomic write: tmp + rename so a crash mid-serialise doesn't
+        // leave a half-written file that the next boot would load.
+        std::filesystem::path p(path);
+        std::filesystem::create_directories(p.parent_path());
+        const std::filesystem::path tmp = p.string() + ".tmp";
+        {
+            std::ofstream ofs(tmp);
+            if (!ofs) {
+                bpt::common::log::error(kLog(), "warm-start save: cannot open {} for write", tmp.string());
+                return;
+            }
+            ofs << root.dump(2);
+        }
+        std::filesystem::rename(tmp, p);
+        bpt::common::log::info(kLog(), "warm-start saved {} instrument(s) to {}",
+                               state_.size(), p.string());
+    } catch (const std::exception& e) {
+        bpt::common::log::error(kLog(), "warm-start save failed: {}", e.what());
+    }
+}
+
+void AvellanedaStoikovStrategy::load_state(const std::string& path, uint64_t max_age_s) {
+    if (path.empty())
+        return;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec)) {
+        bpt::common::log::info(kLog(), "warm-start: no prior state at {} — cold start", path);
+        return;
+    }
+
+    try {
+        std::ifstream ifs(path);
+        nlohmann::json root = nlohmann::json::parse(ifs);
+
+        const int version = root.value("version", 0);
+        if (version != kWarmStartSchemaVersion) {
+            bpt::common::log::warn(kLog(),
+                "warm-start: schema mismatch (file={} expected={}) — cold start",
+                version, kWarmStartSchemaVersion);
+            return;
+        }
+
+        const uint64_t saved_at_ns = root.value<uint64_t>("saved_at_ns", 0);
+        const uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    std::chrono::system_clock::now().time_since_epoch())
+                                    .count();
+        const uint64_t age_ns = (now_ns > saved_at_ns) ? (now_ns - saved_at_ns) : 0;
+        const uint64_t max_age_ns = max_age_s * 1'000'000'000ULL;
+        if (age_ns > max_age_ns) {
+            bpt::common::log::warn(kLog(),
+                "warm-start: saved state is {}s old (max {}s) — cold start",
+                age_ns / 1'000'000'000ULL, max_age_s);
+            return;
+        }
+
+        int restored = 0;
+        int skipped = 0;
+        for (const auto& j : root.value("instruments", nlohmann::json::array())) {
+            const uint64_t instrument_id = j.value<uint64_t>("instrument_id", 0);
+            auto it = state_.find(instrument_id);
+            if (it == state_.end()) {
+                ++skipped;  // instrument not in current universe
+                continue;
+            }
+            auto& st = it->second;
+
+            // Sanity: symbol + exchange must still match so a refdata
+            // reshuffle doesn't silently graft OKX state onto a Binance
+            // instrument that happens to have inherited the same id.
+            const std::string saved_sym = j.value("symbol", "");
+            const std::string saved_ex = j.value("exchange", "");
+            if (saved_sym != st.symbol || saved_ex != st.exchange) {
+                bpt::common::log::warn(kLog(),
+                    "warm-start: instrument_id={} symbol/exchange mismatch "
+                    "(saved '{}'/'{}' vs current '{}'/'{}') — skipping",
+                    instrument_id, saved_sym, saved_ex, st.symbol, st.exchange);
+                ++skipped;
+                continue;
+            }
+
+            st.ewma_var = j.value("ewma_var", 0.0);
+            st.ewma_ticks = j.value<std::size_t>("ewma_ticks", 0);
+            st.last_mid = j.value("last_mid", 0.0);
+            st.last_tick_ns = j.value<uint64_t>("last_tick_ns", 0);
+            st.ewma_drift = j.value("ewma_drift", 0.0);
+            st.ewma_kappa = j.value("ewma_kappa", 0.0);
+            st.kappa_ticks = j.value<std::size_t>("kappa_ticks", 0);
+            st.last_trade_ns = j.value<uint64_t>("last_trade_ns", 0);
+
+            if (auto r = j.find("regime"); r != j.end()) {
+                RegimeDetector::StateSnapshot snap;
+                snap.regime = static_cast<RegimeDetector::Regime>(r->value("regime", 0));
+                snap.hurst = r->value("hurst", 0.5);
+                snap.last_mid = r->value("last_mid", 0.0);
+                snap.tick_count = r->value<std::size_t>("tick_count", 0);
+                snap.returns = r->value("returns", std::vector<double>{});
+                st.regime.restore_state(snap);
+            }
+
+            ++restored;
+        }
+        bpt::common::log::info(kLog(),
+            "warm-start: restored {} instrument(s) from {} (skipped {}, age {}s)",
+            restored, path, skipped, age_ns / 1'000'000'000ULL);
+    } catch (const std::exception& e) {
+        bpt::common::log::error(kLog(),
+            "warm-start load failed: {} — falling back to cold start", e.what());
+    }
 }
 
 }  // namespace bpt::strategy::strategy

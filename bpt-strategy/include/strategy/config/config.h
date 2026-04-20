@@ -91,6 +91,23 @@ struct ScheduleConfig {
     std::vector<std::string> configured_exchanges;
 };
 
+// Warm-start / state persistence. Saves per-instrument EWMA + regime
+// state to disk on graceful shutdown; reloads on startup subject to a
+// TTL. Cuts the ~2 min vol/drift/kappa warmup gap on restarts.
+struct WarmStartConfig {
+    // Directory that holds <correlation_id>.json state files. Empty
+    // string disables the feature — save/load become no-ops, and a
+    // cold start rebuilds all EWMA state from scratch.
+    std::string state_dir;
+
+    // Discard saved state if (now - saved_at) exceeds this. EWMA
+    // vol_halflife defaults to 60 s, so anything past ~5 half-lives
+    // (~5 min) has decayed to ~3% of its original weight and is less
+    // useful than a fresh warmup. 600 s = 10 min is a conservative
+    // default; tune if your vol_halflife differs materially.
+    uint64_t max_age_s{600};
+};
+
 struct StrategyConfig {
     std::string type;
     bool enabled{true};
@@ -107,6 +124,7 @@ struct StrategyConfig {
     std::unordered_map<std::string, VenueExecConfig> venue_exec;  // keyed by exchange name
     RiskConfig risk;
     ScheduleConfig schedule;
+    WarmStartConfig warm_start;
 
     // Strategy-specific signal parameters (lookback windows, thresholds, etc.).
     // Parsed by the concrete strategy class.

@@ -11,6 +11,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <filesystem>
 #include <thread>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/signal.h>
@@ -151,6 +152,17 @@ void StrategyApp::wire_refdata_callbacks() {
 
     refdata_->on_snapshot_complete = [this](const refdata::InstrumentCache& cache) {
         strategy_->on_snapshot(cache);
+
+        // Warm-start load: instruments are resolved and state_ entries
+        // exist, so saved EWMA / regime state has somewhere to land.
+        // Empty state_dir disables the feature (default).
+        const auto& ws = cfg_.strat.strategy.warm_start;
+        if (!ws.state_dir.empty()) {
+            const auto path = std::filesystem::path(ws.state_dir) /
+                              (std::to_string(cfg_.strat.correlation_id) + ".json");
+            strategy_->load_state(path.string(), ws.max_age_s);
+        }
+
         startup_gate_->on_refdata_snapshot_complete();
     };
 
@@ -473,6 +485,21 @@ void StrategyApp::shutdown_flatten() {
             const int frags = order_gw_->poll();
             if (frags == 0)
                 __builtin_ia32_pause();
+        }
+    }
+
+    // Warm-start save: EWMA / regime state depends only on market data
+    // (not our positions), so saving is safe even when the drain didn't
+    // complete cleanly. The TTL on load is the real safety net against
+    // a stale restart.
+    const auto& ws = cfg_.strat.strategy.warm_start;
+    if (!ws.state_dir.empty()) {
+        const auto path = std::filesystem::path(ws.state_dir) /
+                          (std::to_string(cfg_.strat.correlation_id) + ".json");
+        try {
+            strategy_->save_state(path.string());
+        } catch (const std::exception& e) {
+            bpt::common::log::error("save_state threw: {}", e.what());
         }
     }
 
