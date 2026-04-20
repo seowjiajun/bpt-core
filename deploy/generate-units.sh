@@ -229,6 +229,12 @@ EOF
 # Alertmanager: loads the Discord webhook URL via LoadCredentialEncrypted
 # (systemd-creds).  The creds file should already exist at
 # ~/.config/systemd/creds/bpt-discord-webhook.cred — see monitoring README.
+#
+# Binary path: Debian/Ubuntu ships the Alertmanager binary as
+# /usr/bin/prometheus-alertmanager (namespaced to avoid conflicts with
+# other "alertmanager"-named tools).  If you installed via the upstream
+# tarball, it's likely /usr/local/bin/alertmanager instead — edit
+# ExecStart to match.
 cat > "$UNIT_DIR/bpt-alertmanager.service" <<EOF
 [Unit]
 Description=BPT Alertmanager (Discord webhook dispatch)
@@ -240,7 +246,7 @@ Type=simple
 # Discord webhook URL — decrypted into \$CREDENTIALS_DIRECTORY at start.
 # The alertmanager.yml references webhook_url_file pointing to this path.
 LoadCredentialEncrypted=bpt-discord-webhook:$CRED_DIR/bpt-discord-webhook.cred
-ExecStart=/usr/bin/alertmanager \\
+ExecStart=/usr/bin/prometheus-alertmanager \\
   --config.file=$BPT_ROOT/deploy/monitoring/alertmanager/alertmanager.yml \\
   --storage.path=%h/.local/share/alertmanager \\
   --web.listen-address=127.0.0.1:9093
@@ -300,7 +306,7 @@ echo "  systemctl --user start bpt-stack.target               # bring the stack 
 echo
 echo "Monitoring setup (see deploy/monitoring/README.md):"
 echo "  sudo apt install prometheus prometheus-alertmanager"
-echo "  sudo systemctl disable --now prometheus alertmanager  # we run as user units"
+echo "  sudo systemctl disable --now prometheus prometheus-alertmanager  # we run as user units"
 echo "  echo -n 'https://discord.com/api/webhooks/...' | \\"
 echo "    systemd-creds encrypt - $CRED_DIR/bpt-discord-webhook.cred"
 echo "  echo 'HC_URL=https://hc-ping.com/YOUR-UUID' | sudo tee /etc/bpt/healthchecks.env"
