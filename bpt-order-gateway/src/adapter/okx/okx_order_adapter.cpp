@@ -223,18 +223,22 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
         auto bal_resp = https_client_.get_signed("/api/v5/account/balance");
         auto bal_j = json::parse(bal_resp);
         if (!bal_j.is_object()) {
-            bpt::common::log::warn("OKXOrderAdapter: balance response is not an object: {}",
-                           bal_resp.substr(0, 400));
+            // Non-JSON response (WAF interstitial, gateway error page). Log
+            // size only — a byte count is enough to distinguish HTML blob
+            // from empty body without echoing whatever the origin returned.
+            bpt::common::log::warn("OKXOrderAdapter: balance response is not a JSON object (bytes={})",
+                           bal_resp.size());
         } else {
             const auto& root = bal_j.as_object();
             // OKX wraps errors in {code, msg, data:[]}. Surface any non-zero
             // code prominently so we don't silently swallow auth / clock
-            // failures like 50112.
+            // failures like 50112. The structured code+msg pair is the
+            // entire diagnostic surface; dropping the raw body avoids
+            // echoing signed-request metadata or upstream error envelopes.
             if (root.contains("code") && std::string(root.at("code").as_string()) != "0") {
-                bpt::common::log::warn("OKXOrderAdapter: /account/balance error code={} msg={} body={}",
+                bpt::common::log::warn("OKXOrderAdapter: /account/balance error code={} msg={}",
                                std::string(root.at("code").as_string()),
-                               root.contains("msg") ? std::string(root.at("msg").as_string()) : "",
-                               bal_resp.substr(0, 400));
+                               root.contains("msg") ? std::string(root.at("msg").as_string()) : "");
             } else if (root.contains("data") && root.at("data").is_array() &&
                        !root.at("data").as_array().empty() && root.at("data").as_array()[0].is_object()) {
                 const auto& d = root.at("data").as_array()[0].as_object();

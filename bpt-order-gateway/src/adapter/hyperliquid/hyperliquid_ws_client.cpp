@@ -109,15 +109,22 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
     if (channel == "error") {
         // Protocol-level error, no id — fail ALL in-flight senders
         // with the error text so they unblock immediately instead of
-        // waiting for the 5 s timeout.
+        // waiting for the 5 s timeout. HL error-channel payloads may
+        // echo the failing request's signed action body (which embeds
+        // the wallet nonce and action shape). Cap to a short prefix so
+        // neither the log nor the propagated exception text carries the
+        // full envelope downstream.
         std::string err;
         if (data_it->value().is_string()) {
             err = std::string(data_it->value().as_string());
         } else {
             err = json::serialize(data_it->value());
         }
-        bpt::common::log::warn("HyperliquidWsClient: HL WS channel=error: {}",
-                       err.substr(0, 200));
+        const std::size_t full_len = err.size();
+        constexpr std::size_t kMaxErrChars = 80;
+        if (err.size() > kMaxErrChars) err.resize(kMaxErrChars);
+        bpt::common::log::warn("HyperliquidWsClient: HL WS channel=error (bytes={}) prefix={}",
+                       full_len, err);
         fail_pending_posts("HL WS error: " + err);
         return;
     }

@@ -79,7 +79,10 @@ void BinanceOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
 
     try {
         const std::string resp = https_client_.request("POST", "/api/v3/order?" + signed_params, "", true);
-        bpt::common::log::debug("BinanceOrderAdapter: new order resp={}", resp);
+        // Raw body intentionally not logged — parser below surfaces the
+        // structured fields (orderId/status/executedQty) via exec events.
+        // Byte count is enough for a "did we get a response?" trace.
+        bpt::common::log::debug("BinanceOrderAdapter: new order resp (bytes={})", resp.size());
 
         const uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
         auto root = json::parse(resp);
@@ -99,7 +102,7 @@ void BinanceOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel, 
 
     try {
         const std::string resp = https_client_.request("DELETE", "/api/v3/order?" + signed_params, "", true);
-        bpt::common::log::debug("BinanceOrderAdapter: cancel resp={}", resp);
+        bpt::common::log::debug("BinanceOrderAdapter: cancel resp (bytes={})", resp.size());
     } catch (const std::exception& e) {
         bpt::common::log::error("BinanceOrderAdapter: send_cancel failed: {}", e.what());
     }
