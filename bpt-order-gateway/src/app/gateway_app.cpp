@@ -55,7 +55,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
 
     for (const auto& a_cfg : cfg_.gateway.adapters) {
         if (a_cfg.testnet)
-            bpt::common::log::warn("[OrderGateway] *** TESTNET MODE *** adapter={} host={}",
+            bpt::common::log::warn("*** TESTNET MODE *** adapter={} host={}",
                            a_cfg.exchange,
                            a_cfg.rest_host.empty() ? a_cfg.ws_host : a_cfg.rest_host);
 
@@ -75,14 +75,14 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
         } else if (a_cfg.exchange == "HYPERLIQUID") {
             adapter = std::make_shared<adapter::HyperliquidOrderAdapter>(a_cfg, exchange_creds);
         } else {
-            bpt::common::log::warn("[OrderGateway] Unknown exchange in config: {}", a_cfg.exchange);
+            bpt::common::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
             continue;
         }
 
         adapter->set_disconnect_breaker_config(disc_cfg);
         adapter->start();
         adapters_.push_back(std::move(adapter));
-        bpt::common::log::info("[OrderGateway] Started adapter: {}", a_cfg.exchange);
+        bpt::common::log::info("Started adapter: {}", a_cfg.exchange);
     }
 
     risk::RejectRateBreaker::Config breaker_cfg;
@@ -125,7 +125,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
                     auto snap = adapter->fetch_account_snapshot(correlation_id);
                     account_snap_pub_->publish(snap);
                 } catch (const std::exception& e) {
-                    bpt::common::log::error("[OrderGateway] AccountSnapshot fetch failed for exchange={}: {}",
+                    bpt::common::log::error("AccountSnapshot fetch failed for exchange={}: {}",
                                     bpt::messages::ExchangeId::c_str(exchange_id),
                                     e.what());
                     // Publish empty snapshot so Strategy's gate doesn't hang.
@@ -140,11 +140,11 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
             }).detach();
             return;
         }
-        bpt::common::log::warn("[OrderGateway] AccountSnapshotRequest for unconfigured exchange={}",
+        bpt::common::log::warn("AccountSnapshotRequest for unconfigured exchange={}",
                        bpt::messages::ExchangeId::c_str(exchange_id));
     };
 
-    bpt::common::log::info("[OrderGateway] Ready — polling order stream {}", cfg_.aeron.order.stream_id);
+    bpt::common::log::info("Ready — polling order stream {}", cfg_.aeron.order.stream_id);
 }
 
 void OrderGatewayApp::run() {
@@ -213,7 +213,7 @@ void OrderGatewayApp::run() {
                         auto snap = a->fetch_account_snapshot(/*correlation_id=*/0);
                         account_snap_pub_->publish(snap);
                     } catch (const std::exception& e) {
-                        bpt::common::log::warn("[OrderGateway] Periodic AccountSnapshot fetch failed for {}: {}",
+                        bpt::common::log::warn("Periodic AccountSnapshot fetch failed for {}: {}",
                                        bpt::messages::ExchangeId::c_str(a->exchange_id()),
                                        e.what());
                     }

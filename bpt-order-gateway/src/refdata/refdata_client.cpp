@@ -32,7 +32,7 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
             handle_delta_fragment(buf, offset, length, hdr);
         });
 
-    bpt::common::log::info("[OrderGateway] RefdataClient connected: ctrl={} snap={} delta={}",
+    bpt::common::log::info("RefdataClient connected: ctrl={} snap={} delta={}",
                    control_stream,
                    snapshot_stream,
                    delta_stream);
@@ -75,7 +75,7 @@ void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilt
     }
 
     bpt::common::log::info(
-        "[OrderGateway] Refdata subscription request sent: correlation_id={} "
+        "Refdata subscription request sent: correlation_id={} "
         "canonical_filters={}",
         correlation_id,
         nf);
@@ -107,7 +107,7 @@ void RefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
         return;
 
     cache_.apply_snapshot(msg);
-    bpt::common::log::info("[OrderGateway] Refdata snapshot received: {} instruments", cache_.size());
+    bpt::common::log::info("Refdata snapshot received: {} instruments", cache_.size());
 
     if (on_snapshot_complete)
         on_snapshot_complete(cache_);
@@ -149,7 +149,7 @@ void RefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
     bool ok = cache_.apply_delta(msg);
     if (!ok) {
         bpt::common::log::warn(
-            "[OrderGateway] Delta sequence gap detected (last={} received={}), "
+            "Delta sequence gap detected (last={} received={}), "
             "resetting cache",
             cache_.last_delta_seq(),
             msg.deltaSeqNum());

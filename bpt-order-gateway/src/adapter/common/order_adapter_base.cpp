@@ -47,7 +47,7 @@ void OrderAdapterBase::run() {
             connect_and_run();
         } catch (const std::exception& e) {
             if (!stop_flag_.load(std::memory_order_relaxed)) {
-                bpt::common::log::error("[OrderGateway] {} error: {}, reconnecting in {}ms",
+                bpt::common::log::error("{} error: {}, reconnecting in {}ms",
                                 exchange_name(),
                                 e.what(),
                                 reconnect_delay().count());
@@ -60,7 +60,7 @@ void OrderAdapterBase::run() {
                 disconnect_breaker_.record(bpt::common::util::TscClock::now_epoch_ns());
                 if (!was_tripped && disconnect_breaker_.tripped()) {
                     bpt::common::log::error(
-                        "[OrderGateway] {} DISCONNECT BREAKER TRIPPED — {} reconnects "
+                        "{} DISCONNECT BREAKER TRIPPED — {} reconnects "
                         "in last {}s (threshold {}). Halting new orders to this venue. "
                         "Restart service after human review to resume.",
                         exchange_name(),

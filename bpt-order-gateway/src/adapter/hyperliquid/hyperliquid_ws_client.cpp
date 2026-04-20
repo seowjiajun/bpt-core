@@ -31,7 +31,7 @@ void HyperliquidWsClient::set_user_fills_handler(UserFillsHandler h) {
 
 void HyperliquidWsClient::on_handshake_complete() {
     if (wallet_address_.empty()) {
-        bpt::common::log::warn("[OrderGateway] HyperliquidWsClient: wallet_address empty — "
+        bpt::common::log::warn("HyperliquidWsClient: wallet_address empty — "
                        "skipping userFills subscribe. WS will idle-close.");
         return;
     }
@@ -47,11 +47,11 @@ void HyperliquidWsClient::on_handshake_complete() {
         return a.size() > 10 ? a.substr(0, 6) + "…" + a.substr(a.size() - 4) : std::string{"<short>"};
     };
     if (!send(json::serialize(sub_msg))) {
-        bpt::common::log::warn("[OrderGateway] HyperliquidWsClient: userFills subscribe send failed "
+        bpt::common::log::warn("HyperliquidWsClient: userFills subscribe send failed "
                        "(not connected). WS will idle-close.");
         return;
     }
-    bpt::common::log::info("[OrderGateway] HyperliquidWsClient: subscribed userFills for {}",
+    bpt::common::log::info("HyperliquidWsClient: subscribed userFills for {}",
                    truncate(wallet_address_));
 }
 
@@ -68,7 +68,7 @@ std::optional<bpt::common::ws::PingConfig> HyperliquidWsClient::ping_config() co
     return bpt::common::ws::PingConfig{
         std::chrono::seconds(20),
         [] {
-            bpt::common::log::info("[OrderGateway] HyperliquidWsClient: ping sent");
+            bpt::common::log::info("HyperliquidWsClient: ping sent");
             return std::string{R"({"method":"ping"})"};
         },
     };
@@ -116,7 +116,7 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
         } else {
             err = json::serialize(data_it->value());
         }
-        bpt::common::log::warn("[OrderGateway] HyperliquidWsClient: HL WS channel=error: {}",
+        bpt::common::log::warn("HyperliquidWsClient: HL WS channel=error: {}",
                        err.substr(0, 200));
         fail_pending_posts("HL WS error: " + err);
         return;
@@ -236,7 +236,7 @@ void HyperliquidWsClient::fail_pending_posts(const std::string& reason) {
 }
 
 void HyperliquidWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
-    bpt::common::log::info("[OrderGateway] HyperliquidWsClient connecting WS {}:{}{}",
+    bpt::common::log::info("HyperliquidWsClient connecting WS {}:{}{}",
                    host_, port_, path_);
 
     auto ws_ptr = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, host_, port_, path_,
@@ -255,7 +255,7 @@ void HyperliquidWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& c
         ~PendingGuard() { self->fail_pending_posts("HL WS disconnected"); }
     } pending_guard{this};
 
-    bpt::common::log::info("[OrderGateway] HyperliquidWsClient connected");
+    bpt::common::log::info("HyperliquidWsClient connected");
     RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
 }
 

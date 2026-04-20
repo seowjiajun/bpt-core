@@ -71,7 +71,7 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
     while (publication_->offer(ab, 0, encoded_len) < 0)
         std::this_thread::yield();
 
-    bpt::common::log::info("[OrderGateway] AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
+    bpt::common::log::info("AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
                    ExchangeId::c_str(snapshot.exchange_id),
                    static_cast<double>(snapshot.available_balance_e8) / 1e8,
                    n_pos,

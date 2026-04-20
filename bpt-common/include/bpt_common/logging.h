@@ -51,6 +51,15 @@ struct LogConfig {
 // Returns the Quill logger created by init().  Nullptr until init() is called.
 quill::Logger* get_default_logger();
 
+// Create or fetch a named sub-module logger. Shares sinks + pattern with
+// the default logger — output is auto-prefixed with the given name via
+// the %(logger) placeholder in the pattern, so modules don't have to
+// hand-prefix every log line. Returns nullptr if called before init().
+//
+// Safe to call once per module and cache the pointer as a file-scope
+// static — Quill's create_or_get_logger is idempotent by name.
+quill::Logger* get_logger(const std::string& name);
+
 void init(const std::string& service_name, const LogConfig& cfg = {});
 
 }  // namespace bpt::common::logging
@@ -112,6 +121,62 @@ inline void error(fmt::format_string<Args...> fmt, Args&&... args) {
 template <typename... Args>
 inline void critical(fmt::format_string<Args...> fmt, Args&&... args) {
     auto* l = bpt::common::logging::get_default_logger();
+    if (l) {
+        auto msg = fmt::format(fmt, std::forward<Args>(args)...);
+        LOG_CRITICAL(l, "{}", msg);
+    }
+}
+
+// ── Per-logger API ───────────────────────────────────────────────────────────
+//
+// For modules that want their own prefix (e.g. strategy sub-components
+// [AS]/[OFI]/[Reconciler]) separate from the service-level default.
+// Obtain a logger via bpt::common::logging::get_logger(name), cache it
+// as a file-scope static, then call these helpers. Pattern auto-includes
+// the logger name, so the message body should NOT hand-prefix anymore.
+
+template <typename... Args>
+inline void trace(quill::Logger* l, fmt::format_string<Args...> fmt, Args&&... args) {
+    if (l) {
+        auto msg = fmt::format(fmt, std::forward<Args>(args)...);
+        LOG_TRACE_L1(l, "{}", msg);
+    }
+}
+
+template <typename... Args>
+inline void debug(quill::Logger* l, fmt::format_string<Args...> fmt, Args&&... args) {
+    if (l) {
+        auto msg = fmt::format(fmt, std::forward<Args>(args)...);
+        LOG_DEBUG(l, "{}", msg);
+    }
+}
+
+template <typename... Args>
+inline void info(quill::Logger* l, fmt::format_string<Args...> fmt, Args&&... args) {
+    if (l) {
+        auto msg = fmt::format(fmt, std::forward<Args>(args)...);
+        LOG_INFO(l, "{}", msg);
+    }
+}
+
+template <typename... Args>
+inline void warn(quill::Logger* l, fmt::format_string<Args...> fmt, Args&&... args) {
+    if (l) {
+        auto msg = fmt::format(fmt, std::forward<Args>(args)...);
+        LOG_WARNING(l, "{}", msg);
+    }
+}
+
+template <typename... Args>
+inline void error(quill::Logger* l, fmt::format_string<Args...> fmt, Args&&... args) {
+    if (l) {
+        auto msg = fmt::format(fmt, std::forward<Args>(args)...);
+        LOG_ERROR(l, "{}", msg);
+    }
+}
+
+template <typename... Args>
+inline void critical(quill::Logger* l, fmt::format_string<Args...> fmt, Args&&... args) {
     if (l) {
         auto msg = fmt::format(fmt, std::forward<Args>(args)...);
         LOG_CRITICAL(l, "{}", msg);

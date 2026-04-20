@@ -51,7 +51,7 @@ void BinanceExecParser::handle_execution_report(const json::object& obj, uint64_
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::warn("[OrderGateway] BinanceExecParser: unknown cloid={}", cloid);
+        bpt::common::log::warn("BinanceExecParser: unknown cloid={}", cloid);
         return;
     }
 
@@ -128,7 +128,7 @@ void BinanceExecParser::handle_order_response(const json::object& obj,
         auto msg_it = obj.find("msg");
         std::string msg = (msg_it != obj.end()) ? std::string(msg_it->value().as_string()) : "?";
         bpt::common::log::error(
-            "[OrderGateway] BinanceExecParser: exchange rejected order={} code={} msg={}",
+            "BinanceExecParser: exchange rejected order={} code={} msg={}",
             order_id,
             code_it->value().as_int64(),
             msg);

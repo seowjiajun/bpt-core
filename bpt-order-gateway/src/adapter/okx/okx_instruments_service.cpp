@@ -53,10 +53,10 @@ void OKXInstrumentsService::fetch() {
                 contract_sizes_[inst_id] = ctval;
             }
         } catch (const std::exception& e) {
-            bpt::common::log::warn("[OrderGateway] OKXInstrumentsService: fetch({}) failed: {}", inst_type, e.what());
+            bpt::common::log::warn("OKXInstrumentsService: fetch({}) failed: {}", inst_type, e.what());
         }
     }
-    bpt::common::log::info("[OrderGateway] OKXInstrumentsService: loaded {} instIdCodes, {} contract sizes from REST",
+    bpt::common::log::info("OKXInstrumentsService: loaded {} instIdCodes, {} contract sizes from REST",
                    inst_id_codes_.size(),
                    contract_sizes_.size());
 }

@@ -40,7 +40,7 @@ void RefdataStatusPublisher::publish_ready(uint8_t exchanges_loaded,
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "refdata_ready");
 
-    bpt::common::log::info("[Refdata] RefDataReady published exchanges_loaded=0x{:02x} instruments={} fee_schedules={}",
+    bpt::common::log::info("RefDataReady published exchanges_loaded=0x{:02x} instruments={} fee_schedules={}",
                    exchanges_loaded,
                    instrument_count,
                    fee_schedules_loaded);
@@ -67,7 +67,7 @@ void RefdataStatusPublisher::publish_error(bpt::messages::RefDataErrorType::Valu
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "refdata_error");
 
-    bpt::common::log::error("[Refdata] RefDataError published error_type={} exchange={} instrument_id={}",
+    bpt::common::log::error("RefDataError published error_type={} exchange={} instrument_id={}",
                     RefDataErrorType::c_str(error_type),
                     ExchangeId::c_str(exchange_id),
                     instrument_id);

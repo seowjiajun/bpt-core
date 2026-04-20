@@ -24,14 +24,14 @@ load_credentials(const std::vector<bpt::order_gateway::config::AdapterConfig>& a
     for (const auto& a_cfg : adapters) {
         if (a_cfg.secret_name.empty()) {
             bpt::common::log::warn(
-                "[OrderGateway] No secret_name for {} — adapter will have empty credentials",
+                "No secret_name for {} — adapter will have empty credentials",
                 a_cfg.exchange);
             creds[a_cfg.exchange] = {};
             continue;
         }
         const auto kv = bpt::common::secrets::fetch(a_cfg.secret_name);
         creds[a_cfg.exchange] = bpt::order_gateway::adapter::credentials_from_secret(a_cfg.exchange, kv);
-        bpt::common::log::info("[OrderGateway] Loaded credentials for {}", a_cfg.exchange);
+        bpt::common::log::info("Loaded credentials for {}", a_cfg.exchange);
     }
     return creds;
 }
@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
         cfg = bpt::order_gateway::config::load(config_path);
     } catch (const std::exception& e) {
         bpt::common::logging::init("order-gateway");
-        bpt::common::log::error("[OrderGateway] Failed to load config: {}", e.what());
+        bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
 
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
                     std::move(settings), ctx.aeron, std::move(creds));
             });
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] Fatal: {}", e.what());
+        bpt::common::log::error("Fatal: {}", e.what());
         return 1;
     }
 }

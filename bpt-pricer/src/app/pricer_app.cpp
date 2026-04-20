@@ -53,7 +53,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
 
     refdata_sub_->set_on_option([this](const surface::OptionInstrument& inst) {
         builder_.add_instrument(inst);
-        bpt::common::log::info("[Pricer] Option instrument: id={} {} {} K={} exp={}",
+        bpt::common::log::info("Option instrument: id={} {} {} K={} exp={}",
                        inst.instrument_id,
                        inst.underlying,
                        inst.exchange,
@@ -63,7 +63,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
 
     refdata_sub_->set_on_perp([this](const refdata::PerpInstrument& inst) {
         perp_map_[inst.instrument_id] = {inst.underlying, inst.exchange_id};
-        bpt::common::log::info("[Pricer] Perp instrument registered: id={} {} {}",
+        bpt::common::log::info("Perp instrument registered: id={} {} {}",
                        inst.instrument_id,
                        inst.underlying,
                        inst.exchange);
@@ -71,13 +71,13 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
 
     refdata_sub_->set_on_remove([this](uint64_t instrument_id) { builder_.remove_instrument(instrument_id); });
 
-    bpt::common::log::info("[Pricer] publish_interval_ms={} risk_free_rate={:.4f}",
+    bpt::common::log::info("publish_interval_ms={} risk_free_rate={:.4f}",
                            settings_.publish_interval_ms, settings_.risk_free_rate);
     for (const auto& u : settings_.underlyings)
-        bpt::common::log::info("[Pricer] underlying: {}", u);
+        bpt::common::log::info("underlying: {}", u);
     for (const auto& e : settings_.exchanges)
-        bpt::common::log::info("[Pricer] exchange: {}", e);
-    bpt::common::log::info("[Pricer] Ready — entering main loop");
+        bpt::common::log::info("exchange: {}", e);
+    bpt::common::log::info("Ready — entering main loop");
 }
 
 void PricerApp::run() {
@@ -106,7 +106,7 @@ void PricerApp::run() {
 
             for (const auto& grid : grids) {
                 vol_pub_->publish(grid, now_ns());
-                bpt::common::log::debug("[Pricer] Published surface: {} {} points={}",
+                bpt::common::log::debug("Published surface: {} {} points={}",
                                 grid.underlying,
                                 static_cast<int>(grid.exchange_id),
                                 grid.points.size());

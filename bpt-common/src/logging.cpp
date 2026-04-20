@@ -15,6 +15,20 @@ namespace {
 
 quill::Logger* g_logger = nullptr;
 
+// Captured at init() time and reused for every get_logger() call so
+// sub-module loggers share the same sinks + pattern as the default.
+std::vector<std::shared_ptr<quill::Sink>> g_sinks;
+quill::PatternFormatterOptions g_fmt_opts;
+quill::LogLevel g_default_level = quill::LogLevel::Info;
+
+// Default pattern — includes the logger name in brackets so modules that
+// create their own named logger are auto-prefixed, matching the manual
+// [Service] prefix operators used to write in every log call. Services
+// should let the pattern do the prefixing and drop the redundant manual
+// bracket from message bodies.
+constexpr const char* kDefaultPattern =
+    "%(time) [%(log_level_short_code)] [%(logger)] %(message)";
+
 quill::LogLevel level_from_string(const std::string& s) {
     if (s == "trace")
         return quill::LogLevel::TraceL1;
@@ -65,13 +79,26 @@ void init(const std::string& service_name, const LogConfig& cfg) {
     }
 
     quill::PatternFormatterOptions fmt_opts;
-    if (!cfg.pattern.empty())
-        fmt_opts.format_pattern = cfg.pattern;
+    fmt_opts.format_pattern = cfg.pattern.empty() ? kDefaultPattern : cfg.pattern;
+
+    // Cache for get_logger() so sub-module loggers share sinks + pattern.
+    g_sinks = sinks;
+    g_fmt_opts = fmt_opts;
+    g_default_level = level_from_string(cfg.level);
 
     quill::Logger* logger = quill::Frontend::create_or_get_logger(service_name, std::move(sinks), fmt_opts);
-    logger->set_log_level(level_from_string(cfg.level));
+    logger->set_log_level(g_default_level);
 
     g_logger = logger;
+}
+
+quill::Logger* get_logger(const std::string& name) {
+    if (g_logger == nullptr)
+        return nullptr;  // init() not yet called
+    auto sinks = g_sinks;  // create_or_get_logger takes ownership; keep cache intact
+    quill::Logger* logger = quill::Frontend::create_or_get_logger(name, std::move(sinks), g_fmt_opts);
+    logger->set_log_level(g_default_level);
+    return logger;
 }
 
 }  // namespace bpt::common::logging

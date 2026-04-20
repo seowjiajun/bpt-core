@@ -86,7 +86,7 @@ void OrderSubscriber::handle_fragment(aeron::AtomicBuffer& buf,
             on_account_snapshot_request(msg);
 
     } else {
-        bpt::common::log::warn("[OrderGateway] OrderSubscriber: unknown templateId={}", tmpl);
+        bpt::common::log::warn("OrderSubscriber: unknown templateId={}", tmpl);
     }
 }
 

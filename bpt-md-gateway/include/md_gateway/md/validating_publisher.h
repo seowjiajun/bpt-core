@@ -70,7 +70,7 @@ private:
         breaker_.record(is_drop, now_ns);
         if (!was_tripped && breaker_.tripped()) {
             bpt::common::log::error(
-                "[MdGateway] {} VALIDATION-DROP BREAKER TRIPPED — {}/{} publishes "
+                "{} VALIDATION-DROP BREAKER TRIPPED — {}/{} publishes "
                 "dropped in last {}s (threshold {:.1f}%). Publishing suppressed. "
                 "Restart service after human review to resume.",
                 adapter_name_,

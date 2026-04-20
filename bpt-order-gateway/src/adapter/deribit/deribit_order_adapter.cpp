@@ -101,7 +101,7 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
             code = cit->value().to_number<int64_t>();
         if (auto mit = err.find("message"); mit != err.end())
             errmsg = std::string(mit->value().as_string());
-        bpt::common::log::error("[OrderGateway] DeribitOrderAdapter: JSON-RPC error code={} msg={}", code, errmsg);
+        bpt::common::log::error("DeribitOrderAdapter: JSON-RPC error code={} msg={}", code, errmsg);
         return;
     }
 
@@ -112,7 +112,7 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
 
     // Auth response
     if (res.find("access_token") != res.end()) {
-        bpt::common::log::info("[OrderGateway] DeribitOrderAdapter: authenticated successfully");
+        bpt::common::log::info("DeribitOrderAdapter: authenticated successfully");
         logged_in_.store(true, std::memory_order_release);
 
         const auto next_id = [this] { return jsonrpc_id_.fetch_add(1, std::memory_order_relaxed); };
@@ -138,7 +138,7 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
             try {
                 if (!ws_client_.send(pending_sends_.front())) break;
             } catch (const std::exception& e) {
-                bpt::common::log::error("[OrderGateway] DeribitOrderAdapter: mid-drain send threw ({}) — "
+                bpt::common::log::error("DeribitOrderAdapter: mid-drain send threw ({}) — "
                                 "dropping frame, {} remaining queued",
                                 e.what(), pending_sends_.size() - 1);
                 pending_sends_.erase(pending_sends_.begin());
@@ -195,7 +195,7 @@ void DeribitOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
 
     if (!logged_in_.load(std::memory_order_acquire)) {
         bpt::common::log::info(
-            "[OrderGateway] DeribitOrderAdapter: queuing order {} (not yet "
+            "DeribitOrderAdapter: queuing order {} (not yet "
             "authenticated)",
             order.orderId());
         std::lock_guard<std::mutex> lk(pending_mu_);
@@ -206,13 +206,13 @@ void DeribitOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     try {
         if (!ws_client_.send(frame)) {
             bpt::common::log::warn(
-                "[OrderGateway] DeribitOrderAdapter: send_new_order: WS not "
+                "DeribitOrderAdapter: send_new_order: WS not "
                 "connected, rejecting order={}",
                 order.orderId());
             emit_rejection();
         }
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] DeribitOrderAdapter: send_new_order failed: {}", e.what());
+        bpt::common::log::error("DeribitOrderAdapter: send_new_order failed: {}", e.what());
         emit_rejection();
     }
 }
@@ -223,7 +223,7 @@ void DeribitOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
     const std::string exch_oid = parser_.get_exchange_order_id(cancel.orderId());
     if (exch_oid.empty()) {
         bpt::common::log::warn(
-            "[OrderGateway] DeribitOrderAdapter: send_cancel: no exchange "
+            "DeribitOrderAdapter: send_cancel: no exchange "
             "order_id for order={}",
             cancel.orderId());
         return;
@@ -234,13 +234,13 @@ void DeribitOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
     try {
         ws_client_.send(frame);
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] DeribitOrderAdapter: send_cancel failed: {}", e.what());
+        bpt::common::log::error("DeribitOrderAdapter: send_cancel failed: {}", e.what());
     }
 }
 
 void DeribitOrderAdapter::send_cancel_all(uint64_t instrument_id) {
     bpt::common::log::warn(
-        "[OrderGateway] DeribitOrderAdapter: send_cancel_all called "
+        "DeribitOrderAdapter: send_cancel_all called "
         "instrument_id={} — not supported without instrument name",
         instrument_id);
 }
@@ -250,7 +250,7 @@ void DeribitOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
     const std::string exch_oid = parser_.get_exchange_order_id(modify.orderId());
     if (exch_oid.empty()) {
         bpt::common::log::warn(
-            "[OrderGateway] DeribitOrderAdapter: send_modify: no exchange "
+            "DeribitOrderAdapter: send_modify: no exchange "
             "order_id for order={}",
             modify.orderId());
         return;
@@ -261,13 +261,13 @@ void DeribitOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
     try {
         ws_client_.send(frame);
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] DeribitOrderAdapter: send_modify failed: {}", e.what());
+        bpt::common::log::error("DeribitOrderAdapter: send_modify failed: {}", e.what());
     }
 }
 
 AccountSnapshotData DeribitOrderAdapter::fetch_account_snapshot(uint64_t correlation_id) {
     bpt::common::log::warn(
-        "[OrderGateway] DeribitOrderAdapter: fetch_account_snapshot not implemented — returning empty "
+        "DeribitOrderAdapter: fetch_account_snapshot not implemented — returning empty "
         "snapshot");
     AccountSnapshotData snap;
     snap.exchange_id = bpt::messages::ExchangeId::DERIBIT;

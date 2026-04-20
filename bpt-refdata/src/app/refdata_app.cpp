@@ -56,7 +56,7 @@ RefdataApp::RefdataApp(config::Settings settings,
     if (!im_cfg.sources.paths.empty()) {
         mapping_merger_.emplace(mapping::InstrumentMappingMerger::Config{im_cfg.sources.paths});
         if (!mapping_merger_->merge(im_cfg.local_path))
-            bpt::common::log::warn("[Refdata] Merge failed — attempting to load cached local file");
+            bpt::common::log::warn("Merge failed — attempting to load cached local file");
     }
 
     instrument_mapping_->load(im_cfg.local_path);
@@ -98,7 +98,7 @@ RefdataApp::RefdataApp(config::Settings settings,
             adapter =
                 std::make_unique<adapter::DeribitRefDataAdapter>(cfg, exchange_creds, registry_, instrument_mapping_);
         } else {
-            bpt::common::log::error("[Refdata] Unknown exchange '{}' in config — skipping", cfg.exchange);
+            bpt::common::log::error("Unknown exchange '{}' in config — skipping", cfg.exchange);
             continue;
         }
 
@@ -118,9 +118,9 @@ RefdataApp::RefdataApp(config::Settings settings,
     }
 
     if (adapters_.empty())
-        throw std::runtime_error("[Refdata] No adapters configured — nothing to serve.");
+        throw std::runtime_error("No adapters configured — nothing to serve.");
 
-    bpt::common::log::info("[Refdata] Ready — listening on {} stream {}",
+    bpt::common::log::info("Ready — listening on {} stream {}",
                    settings_.control.channel,
                    settings_.control.stream_id);
 }
@@ -135,7 +135,7 @@ void RefdataApp::run() {
         std::vector<std::future<void>> futures;
         futures.reserve(adapters_.size());
         for (auto& adapter : adapters_) {
-            bpt::common::log::info("[Refdata] Fetching snapshot for {}...", adapter->exchange_name());
+            bpt::common::log::info("Fetching snapshot for {}...", adapter->exchange_name());
             futures.push_back(std::async(std::launch::async, [&adapter]() { adapter->fetchSnapshot(); }));
         }
         for (std::size_t i = 0; i < adapters_.size(); ++i) {
@@ -144,9 +144,9 @@ void RefdataApp::run() {
                 exchanges_loaded |= exchange_id_to_bit(adapters_[i]->exchange_id());
                 fee_schedules_loaded = true;
                 metrics_.exchange_ready(adapters_[i]->exchange_name()).Set(1.0);
-                bpt::common::log::info("[Refdata] Snapshot complete for {}", adapters_[i]->exchange_name());
+                bpt::common::log::info("Snapshot complete for {}", adapters_[i]->exchange_name());
             } catch (const std::exception& e) {
-                bpt::common::log::error("[Refdata] Snapshot failed for {}: {}", adapters_[i]->exchange_name(), e.what());
+                bpt::common::log::error("Snapshot failed for {}: {}", adapters_[i]->exchange_name(), e.what());
                 status_pub_->publish_error(bpt::messages::RefDataErrorType::SNAPSHOT_FAILED,
                                            adapters_[i]->exchange_id());
                 metrics_.snapshot_failure(adapters_[i]->exchange_name()).Increment();
@@ -157,7 +157,7 @@ void RefdataApp::run() {
     for (auto& adapter : adapters_) {
         if (adapter->isReady()) {
             adapter->subscribeDeltas();
-            bpt::common::log::info("[Refdata] Delta subscriptions started for {}", adapter->exchange_name());
+            bpt::common::log::info("Delta subscriptions started for {}", adapter->exchange_name());
         }
     }
 
@@ -181,7 +181,7 @@ void RefdataApp::run() {
 
     while (bpt::common::signal::is_running()) {
         int fragments = control_sub_->poll([this](const messaging::RefdataRequest& request) {
-            bpt::common::log::info("[Refdata] Request correlation_id={} filters={}",
+            bpt::common::log::info("Request correlation_id={} filters={}",
                            request.correlation_id,
                            request.instruments.size());
             sub_manager_.upsert(request);
@@ -210,7 +210,7 @@ void RefdataApp::run() {
         if (now - last_snapshot_republish >= snapshot_republish_interval) {
             messaging::RefdataRequest empty_req{};
             snapshot_pub_->publish(*registry_, empty_req, delta_pub_->current_sequence());
-            bpt::common::log::info("[Refdata] Periodic snapshot republish: {} instruments", registry_->count());
+            bpt::common::log::info("Periodic snapshot republish: {} instruments", registry_->count());
             last_snapshot_republish = now;
         }
 
@@ -224,9 +224,9 @@ void RefdataApp::run() {
                         delta_pub_->publish_delta(bpt::messages::DeltaUpdateType::MODIFY, inst);
                         ++delta_count;
                     });
-                    bpt::common::log::info("[Refdata] Republished {} instrument deltas after mapping refresh", delta_count);
+                    bpt::common::log::info("Republished {} instrument deltas after mapping refresh", delta_count);
                 } catch (const std::exception& e) {
-                    bpt::common::log::error("[Refdata] Mapping reload failed after refresh: {}", e.what());
+                    bpt::common::log::error("Mapping reload failed after refresh: {}", e.what());
                 }
             }
             last_mapping_refresh = now;
@@ -240,7 +240,7 @@ void RefdataApp::run() {
                     adapter->fetchInstrumentListing();
                     metrics_.listing_refresh(adapter->exchange_name()).Increment();
                 } catch (const std::exception& e) {
-                    bpt::common::log::error("[Refdata] Instrument listing refresh failed for {}: {}",
+                    bpt::common::log::error("Instrument listing refresh failed for {}: {}",
                                     adapter->exchange_name(),
                                     e.what());
                     status_pub_->publish_error(bpt::messages::RefDataErrorType::SNAPSHOT_FAILED,

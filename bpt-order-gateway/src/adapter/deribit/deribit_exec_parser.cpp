@@ -61,7 +61,7 @@ void DeribitExecParser::handle_subscription_event(const json::object& d, uint64_
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::debug("[OrderGateway] DeribitExecParser: subscription unknown label={}", label);
+        bpt::common::log::debug("DeribitExecParser: subscription unknown label={}", label);
         return;
     }
 
@@ -146,13 +146,13 @@ void DeribitExecParser::handle_subscription_event(const json::object& d, uint64_
     if (ev.status == ES::ACKED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!acked_orders_.insert(ev.order_id).second) {
-            bpt::common::log::debug("[OrderGateway] DeribitExecParser: suppressed duplicate ACKED order_id={}", ev.order_id);
+            bpt::common::log::debug("DeribitExecParser: suppressed duplicate ACKED order_id={}", ev.order_id);
             return;
         }
     } else if (ev.status == ES::CANCELLED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!cancelled_orders_.insert(ev.order_id).second) {
-            bpt::common::log::debug("[OrderGateway] DeribitExecParser: suppressed duplicate CANCELLED order_id={}", ev.order_id);
+            bpt::common::log::debug("DeribitExecParser: suppressed duplicate CANCELLED order_id={}", ev.order_id);
             return;
         }
         acked_orders_.erase(ev.order_id);
@@ -183,7 +183,7 @@ void DeribitExecParser::handle_order_response(const json::object& order_obj, uin
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::warn("[OrderGateway] DeribitExecParser: order response unknown label={}", label);
+        bpt::common::log::warn("DeribitExecParser: order response unknown label={}", label);
         return;
     }
 
@@ -200,7 +200,7 @@ void DeribitExecParser::handle_order_response(const json::object& order_obj, uin
     if (auto sit = order_obj.find("order_state"); sit != order_obj.end() && sit->value().is_string())
         order_state = std::string(sit->value().as_string());
 
-    bpt::common::log::info("[OrderGateway] DeribitExecParser: order response label={} exchange_oid={} state={}",
+    bpt::common::log::info("DeribitExecParser: order response label={} exchange_oid={} state={}",
                    label,
                    exch_oid,
                    order_state);

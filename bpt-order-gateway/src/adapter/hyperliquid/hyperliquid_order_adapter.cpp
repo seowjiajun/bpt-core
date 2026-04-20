@@ -46,16 +46,16 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
 
     if (creds.private_key.empty()) {
         enabled_ = false;
-        bpt::common::log::warn("[OrderGateway] HyperliquidOrderAdapter: disabled — private_key not set");
+        bpt::common::log::warn("HyperliquidOrderAdapter: disabled — private_key not set");
         return;
     }
     try {
         signer_ = std::make_unique<HyperliquidSigner>(creds.private_key, !cfg.testnet);
         enabled_ = true;
-        bpt::common::log::info("[OrderGateway] HyperliquidOrderAdapter: signer loaded");
+        bpt::common::log::info("HyperliquidOrderAdapter: signer loaded");
     } catch (const std::exception& e) {
         enabled_ = false;
-        bpt::common::log::warn("[OrderGateway] HyperliquidOrderAdapter: disabled — {}", e.what());
+        bpt::common::log::warn("HyperliquidOrderAdapter: disabled — {}", e.what());
     }
 
     // Phantom-fill reconciler. Poller wraps the existing HTTPS client —
@@ -73,7 +73,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
                     https_client_->post("/info", json::serialize(json::value(req_open))));
                 if (open_resp.is_array()) out.first = open_resp.as_array();
             } catch (const std::exception& e) {
-                bpt::common::log::warn("[OrderGateway] reconciler: openOrders poll failed: {}", e.what());
+                bpt::common::log::warn("reconciler: openOrders poll failed: {}", e.what());
             }
             try {
                 json::object req_fills;
@@ -83,7 +83,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
                     https_client_->post("/info", json::serialize(json::value(req_fills))));
                 if (fills_resp.is_array()) out.second = fills_resp.as_array();
             } catch (const std::exception& e) {
-                bpt::common::log::warn("[OrderGateway] reconciler: userFills poll failed: {}", e.what());
+                bpt::common::log::warn("reconciler: userFills poll failed: {}", e.what());
             }
             return out;
         },
@@ -101,7 +101,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
 
 void HyperliquidOrderAdapter::connect_and_run() {
     if (!enabled_) {
-        bpt::common::log::warn("[OrderGateway] HyperliquidOrderAdapter: running in disabled mode");
+        bpt::common::log::warn("HyperliquidOrderAdapter: running in disabled mode");
         while (!stop_flag_.load(std::memory_order_relaxed))
             std::this_thread::sleep_for(std::chrono::seconds(1));
         return;
@@ -111,7 +111,7 @@ void HyperliquidOrderAdapter::connect_and_run() {
 
 void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     if (!enabled_ || !signer_) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: disabled, cannot send order");
+        bpt::common::log::error("HyperliquidOrderAdapter: disabled, cannot send order");
         return;
     }
 
@@ -153,7 +153,7 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
         // payload shape is identical to the REST body, so downstream
         // parsing below is unchanged.
         const std::string resp = ws_client_->post_action(action, nonce, tx);
-        bpt::common::log::info("[OrderGateway] HyperliquidOrderAdapter: new order id={} side={} tif={} px={} sz={} resp={}",
+        bpt::common::log::info("HyperliquidOrderAdapter: new order id={} side={} tif={} px={} sz={} resp={}",
                        order.orderId(),
                        is_buy ? "BUY" : "SELL",
                        hlcodec::tif_to_string(hl_tif),
@@ -189,7 +189,7 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
         // diverge, defer to the reconciler — it waits 3 s then REST-
         // polls /info openOrders + /info userFills to find the truth.
         bpt::common::log::warn(
-            "[OrderGateway] HyperliquidOrderAdapter: send_new_order id={} threw "
+            "HyperliquidOrderAdapter: send_new_order id={} threw "
             "({}) — deferring to reconciler",
             order.orderId(), e.what());
         reconciler_->reconcile_async(hyperliquid::HyperliquidReconciler::Candidate{
@@ -222,7 +222,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
     // already populated the mapping, skip the duplicate emit.
     if (client_to_exch_oid_.find(c.client_order_id) != client_to_exch_oid_.end()) {
         bpt::common::log::info(
-            "[OrderGateway] HL reconciler: client_id={} already has exch_oid={} — "
+            "HL reconciler: client_id={} already has exch_oid={} — "
             "late response beat us; skipping recovery emit",
             c.client_order_id, client_to_exch_oid_[c.client_order_id]);
         return;
@@ -237,7 +237,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
     switch (r.kind) {
         case MK::OpenOrder:
             bpt::common::log::warn(
-                "[OrderGateway] HL reconciler: RECOVERED ACK client_id={} exch_oid={} "
+                "HL reconciler: RECOVERED ACK client_id={} exch_oid={} "
                 "(order rested on HL despite lost response)",
                 c.client_order_id, r.exch_oid);
             client_to_exch_oid_[c.client_order_id] = r.exch_oid;
@@ -247,7 +247,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
             return;
         case MK::UserFill:
             bpt::common::log::warn(
-                "[OrderGateway] HL reconciler: RECOVERED FILL client_id={} exch_oid={} "
+                "HL reconciler: RECOVERED FILL client_id={} exch_oid={} "
                 "qty_e8={} px_e8={} (phantom fill — order matched on HL despite lost response)",
                 c.client_order_id, r.exch_oid, r.fill_qty_e8, r.fill_price_e8);
             client_to_exch_oid_[c.client_order_id] = r.exch_oid;
@@ -275,7 +275,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
 void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
                                           const std::string& native_symbol) {
     if (!enabled_ || !signer_) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: disabled, cannot cancel order");
+        bpt::common::log::error("HyperliquidOrderAdapter: disabled, cannot cancel order");
         return;
     }
 
@@ -284,7 +284,7 @@ void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& canc
     // send_new_order populated when it received the ACK.
     auto it = client_to_exch_oid_.find(cancel.orderId());
     if (it == client_to_exch_oid_.end()) {
-        bpt::common::log::warn("[OrderGateway] HyperliquidOrderAdapter: cancel id={}: no exch_oid mapping — order never ACKed or already terminal",
+        bpt::common::log::warn("HyperliquidOrderAdapter: cancel id={}: no exch_oid mapping — order never ACKed or already terminal",
                        cancel.orderId());
         return;
     }
@@ -297,7 +297,7 @@ void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& canc
         auto tx = signer_->sign_l1_action(action, nonce);
 
         const std::string resp = ws_client_->post_action(action, nonce, tx);
-        bpt::common::log::info("[OrderGateway] HyperliquidOrderAdapter: cancel id={} resp={}",
+        bpt::common::log::info("HyperliquidOrderAdapter: cancel id={} resp={}",
                        cancel.orderId(), resp);
 
         exec_emitter_.emit_cancel_response(
@@ -307,7 +307,7 @@ void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& canc
                 exch_oid_to_client_.erase(exch_oid);
             });
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: send_cancel failed: {}", e.what());
+        bpt::common::log::error("HyperliquidOrderAdapter: send_cancel failed: {}", e.what());
     }
 }
 
@@ -320,11 +320,11 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
     // This matches the Python scripts/flatten_hl_positions.py flow and
     // works regardless of scheduleCancel volume gating.
     if (!enabled_ || !signer_) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: disabled, cannot cancel_all");
+        bpt::common::log::error("HyperliquidOrderAdapter: disabled, cannot cancel_all");
         return;
     }
 
-    bpt::common::log::warn("[OrderGateway] HyperliquidOrderAdapter: send_cancel_all(instrument_id={}) "
+    bpt::common::log::warn("HyperliquidOrderAdapter: send_cancel_all(instrument_id={}) "
                    "— cancelling ALL open orders on wallet (HL bulk cancel is not per-instrument)",
                    instrument_id);
 
@@ -337,12 +337,12 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
 
         auto parsed = json::parse(info_resp);
         if (!parsed.is_array()) {
-            bpt::common::log::warn("[OrderGateway] cancel_all: unexpected openOrders response: {}", info_resp);
+            bpt::common::log::warn("cancel_all: unexpected openOrders response: {}", info_resp);
             return;
         }
         const auto& orders = parsed.as_array();
         if (orders.empty()) {
-            bpt::common::log::info("[OrderGateway] cancel_all: no open orders to cancel");
+            bpt::common::log::info("cancel_all: no open orders to cancel");
             return;
         }
 
@@ -363,7 +363,7 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
             cancels.push_back(std::move(c));
         }
         if (cancels.empty()) {
-            bpt::common::log::info("[OrderGateway] cancel_all: no cancellable orders after parse");
+            bpt::common::log::info("cancel_all: no cancellable orders after parse");
             return;
         }
 
@@ -386,17 +386,17 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
 
         const std::string cancel_resp =
             https_client_->post("/exchange", json::serialize(req));
-        bpt::common::log::info("[OrderGateway] cancel_all: submitted batch cancel for {} order(s), resp={}",
+        bpt::common::log::info("cancel_all: submitted batch cancel for {} order(s), resp={}",
                        orders.size(), cancel_resp);
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] send_cancel_all failed: {}", e.what());
+        bpt::common::log::error("send_cancel_all failed: {}", e.what());
     }
 }
 
 void HyperliquidOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
                                           const std::string& native_symbol) {
     if (!enabled_ || !signer_) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: disabled, cannot modify order");
+        bpt::common::log::error("HyperliquidOrderAdapter: disabled, cannot modify order");
         return;
     }
 
@@ -424,9 +424,9 @@ void HyperliquidOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modi
         req["signature"] = std::move(signature);
 
         const std::string resp = https_client_->post("/exchange", json::serialize(req));
-        bpt::common::log::debug("[OrderGateway] HyperliquidOrderAdapter: modify resp={}", resp);
+        bpt::common::log::debug("HyperliquidOrderAdapter: modify resp={}", resp);
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: send_modify failed: {}", e.what());
+        bpt::common::log::error("HyperliquidOrderAdapter: send_modify failed: {}", e.what());
     }
 }
 
@@ -441,14 +441,14 @@ AccountSnapshotData HyperliquidOrderAdapter::fetch_account_snapshot(uint64_t cor
     snap.timestamp_ns = ts_ns;
 
     if (!enabled_) {
-        bpt::common::log::warn("[OrderGateway] HyperliquidOrderAdapter: disabled — returning empty snapshot");
+        bpt::common::log::warn("HyperliquidOrderAdapter: disabled — returning empty snapshot");
         return snap;
     }
 
     // Wallet address required for clearinghouseState query.
     if (wallet_address_.empty()) {
         bpt::common::log::warn(
-            "[OrderGateway] HyperliquidOrderAdapter: wallet_address not set — "
+            "HyperliquidOrderAdapter: wallet_address not set — "
             "returning empty account snapshot");
         return snap;
     }
@@ -503,11 +503,11 @@ AccountSnapshotData HyperliquidOrderAdapter::fetch_account_snapshot(uint64_t cor
             }
         }
     } catch (const std::exception& e) {
-        bpt::common::log::error("[OrderGateway] HyperliquidOrderAdapter: failed to parse account snapshot: {}", e.what());
+        bpt::common::log::error("HyperliquidOrderAdapter: failed to parse account snapshot: {}", e.what());
     }
 
     bpt::common::log::info(
-        "[OrderGateway] HyperliquidOrderAdapter: account snapshot fetched — balance={:.2f} "
+        "HyperliquidOrderAdapter: account snapshot fetched — balance={:.2f} "
         "positions={}",
         static_cast<double>(snap.available_balance_e8) / 1e8,
         snap.positions.size());

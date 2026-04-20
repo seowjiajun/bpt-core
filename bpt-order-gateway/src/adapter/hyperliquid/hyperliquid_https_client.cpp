@@ -41,7 +41,7 @@ void HyperliquidHttpsClient::connect() {
     beast::get_lowest_layer(*stream_).connect(results);
     stream_->handshake(ssl::stream_base::client);
 
-    bpt::common::log::info("[OrderGateway] HyperliquidHttpsClient: TLS connected to {}:{}", host_, port_);
+    bpt::common::log::info("HyperliquidHttpsClient: TLS connected to {}:{}", host_, port_);
 }
 
 void HyperliquidHttpsClient::close() noexcept {
@@ -88,7 +88,7 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
             // for block inclusion on HL's L1 (~500 ms blocks). TLS pooling
             // eliminates connect cost but HL's commit latency is upstream of
             // us. `/info` queries don't hit the chain so they're always fast.
-            bpt::common::log::debug("[OrderGateway] HyperliquidHttpsClient: post {} "
+            bpt::common::log::debug("HyperliquidHttpsClient: post {} "
                             "total={:.1f}ms connect={:.1f}ms write={:.2f}ms server+read={:.1f}ms reused={}",
                             path,
                             (t_read - t0) / 1e6,
@@ -99,7 +99,7 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
 
             return res.body();
         } catch (const std::exception& e) {
-            bpt::common::log::warn("[OrderGateway] HyperliquidHttpsClient: post attempt {} failed: {}",
+            bpt::common::log::warn("HyperliquidHttpsClient: post attempt {} failed: {}",
                            attempt, e.what());
             close();
             if (attempt == 1) throw;

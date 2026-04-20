@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
         settings = bpt::backtester::config::load(config_path);
     } catch (const std::exception& e) {
         bpt::common::logging::init("bpt-backtester");
-        bpt::common::log::error("[Backtester] Failed to load config: {}", e.what());
+        bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
 
@@ -37,13 +37,13 @@ int main(int argc, char* argv[]) {
     try {
         return bpt::app::run("bpt-backtester", std::move(settings),
             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-                bpt::common::log::info("[Backtester] starting_capital=${:.2f}",
+                bpt::common::log::info("starting_capital=${:.2f}",
                                        cfg.results.starting_capital);
                 return std::make_unique<bpt::backtester::BacktesterApp>(
                     std::move(cfg), ctx.aeron);
             });
     } catch (const std::exception& e) {
-        bpt::common::log::error("[Backtester] Fatal: {}", e.what());
+        bpt::common::log::error("Fatal: {}", e.what());
         return 1;
     }
 }

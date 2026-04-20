@@ -39,7 +39,7 @@ void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
             std::this_thread::yield();
     } while (result < 0);
 
-    bpt::common::log::debug("[MdGateway] FundingRate published exchange={} instrument_id={} rate={}bps",
+    bpt::common::log::debug("FundingRate published exchange={} instrument_id={} rate={}bps",
                     ExchangeId::c_str(fr.exchange_id),
                     fr.instrument_id,
                     fr.rate_bps);

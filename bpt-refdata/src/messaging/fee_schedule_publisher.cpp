@@ -35,7 +35,7 @@ void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "fee_schedule");
 
-    bpt::common::log::debug("[Refdata] FeeSchedule published exchange={} instrument_id={} maker={}bps taker={}bps",
+    bpt::common::log::debug("FeeSchedule published exchange={} instrument_id={} maker={}bps taker={}bps",
                     ExchangeId::c_str(fs.exchange_id),
                     fs.instrument_id,
                     fs.maker_fee_bps,

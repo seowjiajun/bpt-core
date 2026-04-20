@@ -225,7 +225,7 @@ void RefdataClient::handle_fee_schedule_fragment(aeron::AtomicBuffer& buffer,
 
     fee_cache_.update(msg.exchangeId(), msg.instrumentId(), msg.makerFeeBps(), msg.takerFeeBps(), msg.updatedTs());
 
-    bpt::common::log::debug("[Strategy] FeeSchedule: exchange={} instrument={} maker={}bps taker={}bps",
+    bpt::common::log::debug("FeeSchedule: exchange={} instrument={} maker={}bps taker={}bps",
                     ExchangeId::c_str(msg.exchangeId()),
                     msg.instrumentId(),
                     msg.makerFeeBps(),
@@ -260,7 +260,7 @@ void RefdataClient::handle_funding_rate_fragment(aeron::AtomicBuffer& buffer,
                                msg.nextFundingTs(),
                                msg.collectedTs());
 
-    bpt::common::log::debug("[Strategy] FundingRate: exchange={} instrument={} rate={}bps",
+    bpt::common::log::debug("FundingRate: exchange={} instrument={} rate={}bps",
                     ExchangeId::c_str(msg.exchangeId()),
                     msg.instrumentId(),
                     msg.rateBps());
@@ -286,7 +286,7 @@ void RefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                           hdr.version(),
                           static_cast<std::size_t>(length));
 
-        bpt::common::log::debug("[Strategy] RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
+        bpt::common::log::debug("RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
                         msg.exchangesLoaded(),
                         msg.instrumentCount(),
                         msg.feeSchedulesLoaded(),
@@ -306,7 +306,7 @@ void RefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                           hdr.version(),
                           static_cast<std::size_t>(length));
 
-        bpt::common::log::error("[Strategy] RefDataError: type={} exchange={} instrument={}",
+        bpt::common::log::error("RefDataError: type={} exchange={} instrument={}",
                         RefDataErrorType::c_str(msg.errorType()),
                         ExchangeId::c_str(msg.exchangeId()),
                         msg.instrumentId());

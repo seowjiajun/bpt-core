@@ -22,14 +22,14 @@ load_credentials(const std::vector<bpt::refdata::config::AdapterConfig>& adapter
     for (const auto& a_cfg : adapters) {
         if (a_cfg.secret_name.empty()) {
             bpt::common::log::warn(
-                "[Refdata] No secret_name for {} — adapter will have empty credentials",
+                "No secret_name for {} — adapter will have empty credentials",
                 a_cfg.exchange);
             creds[a_cfg.exchange] = {};
             continue;
         }
         const auto kv = bpt::common::secrets::fetch(a_cfg.secret_name);
         creds[a_cfg.exchange] = bpt::refdata::adapter::credentials_from_secret(a_cfg.exchange, kv);
-        bpt::common::log::info("[Refdata] Loaded credentials for {}", a_cfg.exchange);
+        bpt::common::log::info("Loaded credentials for {}", a_cfg.exchange);
     }
     return creds;
 }

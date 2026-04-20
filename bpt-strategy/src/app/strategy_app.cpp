@@ -65,14 +65,14 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
                                                               ac.vol_surface.channel,
                                                               ac.vol_surface.stream_id,
                                                               ac.pricer_status.stream_id);
-        bpt::common::log::info("[Strategy] VolSurfaceClient ready: surface={} status={}",
+        bpt::common::log::info("VolSurfaceClient ready: surface={} status={}",
                        ac.vol_surface.stream_id,
                        ac.pricer_status.stream_id);
     }
 
     if (ac.toxicity.stream_id != 0) {
         tyr_sub_ = bpt::common::aeron::wait_for_subscription(aeron, ac.toxicity.channel, ac.toxicity.stream_id);
-        bpt::common::log::info("[Strategy] Analytics toxicity subscription ready: {} stream {}",
+        bpt::common::log::info("Analytics toxicity subscription ready: {} stream {}",
                        ac.toxicity.channel, ac.toxicity.stream_id);
     }
 
@@ -100,7 +100,7 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
                                                        ac.backtest_control.channel,
                                                        ac.backtest_control.stream_id,  // sub: Backtester → Strategy
                                                        ac.backtest_ack.stream_id);     // pub: Strategy → Backtester
-        bpt::common::log::info("[Strategy] Backtest mode enabled: ctrl_sub={} ack_pub={}",
+        bpt::common::log::info("Backtest mode enabled: ctrl_sub={} ack_pub={}",
                        ac.backtest_control.stream_id,
                        ac.backtest_ack.stream_id);
     }
@@ -117,10 +117,10 @@ StrategyApp::StrategyApp(config::AppConfig cfg, std::shared_ptr<aeron::Aeron> ae
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         if (dashboard_ctrl_sub_) {
-            bpt::common::log::info("[Strategy] Dashboard control subscription ready on stream {}",
+            bpt::common::log::info("Dashboard control subscription ready on stream {}",
                            ac.dashboard_control.stream_id);
         } else {
-            bpt::common::log::warn("[Strategy] Dashboard control subscription unavailable");
+            bpt::common::log::warn("Dashboard control subscription unavailable");
         }
     }
 
@@ -143,7 +143,7 @@ void StrategyApp::wire_refdata_callbacks() {
     };
 
     refdata_->on_error = [](RefDataErrorType::Value error_type, ExchangeId::Value exchange_id, uint64_t instrument_id) {
-        bpt::common::log::error("[Strategy] RefDataError: type={} exchange={} instrument={}",
+        bpt::common::log::error("RefDataError: type={} exchange={} instrument={}",
                         RefDataErrorType::c_str(error_type),
                         ExchangeId::c_str(exchange_id),
                         instrument_id);
@@ -172,7 +172,7 @@ void StrategyApp::wire_md_callbacks() {
     md_client_->on_bbo = [this](const bpt::messages::MdMarketData& tick) {
         static uint64_t bbo_count = 0;
         if (++bbo_count <= 10 || bbo_count % 1000 == 0) {
-            bpt::common::log::info("[Strategy] BBO tick #{}: id={} bid={:.4f} ask={:.4f}",
+            bpt::common::log::info("BBO tick #{}: id={} bid={:.4f} ask={:.4f}",
                            bbo_count, tick.instrumentId(), tick.bidPrice(), tick.askPrice());
         }
         metrics_.md_ticks_total->Increment();
@@ -227,14 +227,14 @@ void StrategyApp::wire_vol_callbacks() {
     if (!vol_client_) return;
 
     vol_client_->on_vol_surface = [this](bpt::messages::VolSurface& surface) {
-        bpt::common::log::info("[Strategy] VolSurface received: exchange={} underlying={}",
+        bpt::common::log::info("VolSurface received: exchange={} underlying={}",
                        ExchangeId::c_str(surface.exchangeId()),
                        surface.getUnderlyingAsString());
         strategy_->on_vol_surface(surface);
     };
 
     vol_client_->on_ready = [this](uint8_t exchanges_loaded, uint16_t underlying_count, uint32_t point_count) {
-        bpt::common::log::info("[Strategy] PricerReady: exchanges=0x{:02x} underlyings={} points={}",
+        bpt::common::log::info("PricerReady: exchanges=0x{:02x} underlyings={} points={}",
                        exchanges_loaded, underlying_count, point_count);
         pricer_ready_ = true;
     };
@@ -259,13 +259,13 @@ void StrategyApp::wire_order_callbacks() {
         const auto status = rpt.status();
         const double price_d = static_cast<double>(rpt.price()) / 1e8;
         if (status == ExecStatus::ACKED) {
-            bpt::common::log::debug("[Strategy] ExecReport order_id={} ACKED price={:.2f}",
+            bpt::common::log::debug("ExecReport order_id={} ACKED price={:.2f}",
                             rpt.orderId(), price_d);
         } else if (status == ExecStatus::REJECTED) {
-            bpt::common::log::info("[Strategy] ExecReport order_id={} REJECTED reason={} price={:.2f}",
+            bpt::common::log::info("ExecReport order_id={} REJECTED reason={} price={:.2f}",
                            rpt.orderId(), RejectReason::c_str(rpt.rejectReason()), price_d);
         } else {
-            bpt::common::log::info("[Strategy] ExecReport order_id={} status={} filled_qty={:.6f} price={:.2f}",
+            bpt::common::log::info("ExecReport order_id={} status={} filled_qty={:.6f} price={:.2f}",
                            rpt.orderId(), ExecStatus::c_str(status),
                            static_cast<double>(rpt.filledQty()) / 1e8, price_d);
         }
@@ -282,7 +282,7 @@ void StrategyApp::wire_order_callbacks() {
     order_gw_->on_account_snapshot = [this](bpt::messages::AccountSnapshot& snap) {
         const auto exchange_id = snap.exchangeId();
         bpt::common::log::info(
-            "[Strategy] AccountSnapshot received: exchange={} balance={:.2f} positions={}",
+            "AccountSnapshot received: exchange={} balance={:.2f} positions={}",
             ExchangeId::c_str(exchange_id),
             static_cast<double>(snap.availableBalanceE8()) / 1e8,
             snap.positions().count());
@@ -329,10 +329,10 @@ void StrategyApp::run() {
                     const uint8_t cmd = *reinterpret_cast<const uint8_t*>(buffer.buffer() + offset);
                     if (cmd == 0x00 && !trading_halted_) {
                         trading_halted_ = true;
-                        bpt::common::log::warn("[Strategy] TRADING HALTED via dashboard kill-switch");
+                        bpt::common::log::warn("TRADING HALTED via dashboard kill-switch");
                     } else if (cmd == 0x01 && trading_halted_) {
                         trading_halted_ = false;
-                        bpt::common::log::info("[Strategy] Trading RESUMED via dashboard");
+                        bpt::common::log::info("Trading RESUMED via dashboard");
                     }
                 },
                 1);
@@ -390,7 +390,7 @@ void StrategyApp::shutdown_flatten() {
     if (!strategy_) {
         return;
     }
-    bpt::common::log::warn("[Strategy] Shutdown flatten starting — cancelling resting orders and closing open positions");
+    bpt::common::log::warn("Shutdown flatten starting — cancelling resting orders and closing open positions");
 
     // Pre-drain: process any exec reports already queued on the gateway
     // BEFORE we ask the strategy to flatten. If a fill happened in the
@@ -413,7 +413,7 @@ void StrategyApp::shutdown_flatten() {
     try {
         strategy_->on_shutdown_flatten();
     } catch (const std::exception& e) {
-        bpt::common::log::error("[Strategy] on_shutdown_flatten threw: {}", e.what());
+        bpt::common::log::error("on_shutdown_flatten threw: {}", e.what());
     }
 
     // Post-drain: loop until the strategy says all its
@@ -433,7 +433,7 @@ void StrategyApp::shutdown_flatten() {
             if (elapsed >= kDrainBudgetNs) {
                 if (strategy_->has_pending_flatten()) {
                     bpt::common::log::error(
-                        "[Strategy] shutdown drain budget ({} ms) expired with pending "
+                        "shutdown drain budget ({} ms) expired with pending "
                         "orders still in flight — process exiting with live exchange-side "
                         "state. Investigate via order-gateway logs and exchange console.",
                         kDrainBudgetNs / 1'000'000ULL);
@@ -442,7 +442,7 @@ void StrategyApp::shutdown_flatten() {
                 break;
             }
             if (!strategy_->has_pending_flatten()) {
-                bpt::common::log::info("[Strategy] shutdown drain completed cleanly in {} ms",
+                bpt::common::log::info("shutdown drain completed cleanly in {} ms",
                                elapsed / 1'000'000ULL);
                 break;
             }
@@ -460,7 +460,7 @@ void StrategyApp::shutdown_flatten() {
         try {
             startup_gate_->refresh_account_snapshots();
         } catch (const std::exception& e) {
-            bpt::common::log::error("[Strategy] refresh_account_snapshots threw: {}", e.what());
+            bpt::common::log::error("refresh_account_snapshots threw: {}", e.what());
         }
     }
 
@@ -476,7 +476,7 @@ void StrategyApp::shutdown_flatten() {
         }
     }
 
-    bpt::common::log::warn("[Strategy] Shutdown flatten complete");
+    bpt::common::log::warn("Shutdown flatten complete");
 }
 
 void StrategyApp::check_service_liveness() {
@@ -495,7 +495,7 @@ void StrategyApp::check_service_liveness() {
     if (md_client_ && last_md_hb_recv_ns_ != 0) {
         const uint64_t age_ns = now_ns - last_md_hb_recv_ns_;
         if (age_ns > threshold_ns) {
-            bpt::common::log::warn("[Strategy] MD Gateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
+            bpt::common::log::warn("MD Gateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
                            age_ns / 1e9,
                            threshold_ns / 1e9);
             stale = true;
@@ -505,7 +505,7 @@ void StrategyApp::check_service_liveness() {
     if (order_gw_ && last_gw_hb_recv_ns_ != 0) {
         const uint64_t age_ns = now_ns - last_gw_hb_recv_ns_;
         if (age_ns > threshold_ns) {
-            bpt::common::log::warn("[Strategy] OrderGateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
+            bpt::common::log::warn("OrderGateway heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing trading",
                            age_ns / 1e9,
                            threshold_ns / 1e9);
             stale = true;
@@ -515,11 +515,11 @@ void StrategyApp::check_service_liveness() {
     if (stale && !trading_paused_) {
         trading_paused_ = true;
         metrics_.trading_paused->Set(1.0);
-        bpt::common::log::warn("[Strategy] Trading PAUSED — service heartbeat(s) stale");
+        bpt::common::log::warn("Trading PAUSED — service heartbeat(s) stale");
     } else if (!stale && trading_paused_) {
         trading_paused_ = false;
         metrics_.trading_paused->Set(0.0);
-        bpt::common::log::info("[Strategy] Trading RESUMED — all service heartbeats healthy");
+        bpt::common::log::info("Trading RESUMED — all service heartbeats healthy");
     }
 }
 
@@ -569,7 +569,7 @@ void StrategyApp::report_latency_stats() {
 }
 
 void StrategyApp::run_backtest_loop() {
-    bpt::common::log::info("[Strategy] Backtest: strategy ready — entering tick-gating loop");
+    bpt::common::log::info("Backtest: strategy ready — entering tick-gating loop");
 
     bool stop_received = false;
 
@@ -580,7 +580,7 @@ void StrategyApp::run_backtest_loop() {
             if (cmd == BacktestCommand::START) {
                 if (seq == 0) {
                     // Initial handshake — Backtester is ready to start ticking.
-                    bpt::common::log::info("[Strategy] Backtest handshake received, acking");
+                    bpt::common::log::info("Backtest handshake received, acking");
                     backtest_client_->send_ack(0, 0);
                 } else {
                     // Normal tick — drain MD and execution reports for up to 10 ms,
@@ -602,7 +602,7 @@ void StrategyApp::run_backtest_loop() {
                     backtest_client_->send_ack(seq, sim_ts);
                 }
             } else if (cmd == BacktestCommand::STOP) {
-                bpt::common::log::info("[Strategy] Backtest STOP received — halting");
+                bpt::common::log::info("Backtest STOP received — halting");
                 stop_received = true;
             }
         };

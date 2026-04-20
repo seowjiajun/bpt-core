@@ -75,7 +75,7 @@ void StatusPublisher::publish_ready(uint64_t timestamp_ns,
     aeron::concurrent::AtomicBuffer buffer(reinterpret_cast<uint8_t*>(buf), total);
     pub_->offer(buffer, 0, static_cast<int32_t>(total));
 
-    bpt::common::log::info("[Pricer] Published PricerReady: exchanges=0x{:02x} underlyings={} points={}",
+    bpt::common::log::info("Published PricerReady: exchanges=0x{:02x} underlyings={} points={}",
                    exchanges_loaded,
                    underlying_count,
                    point_count);

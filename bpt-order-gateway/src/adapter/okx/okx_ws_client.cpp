@@ -41,14 +41,14 @@ std::optional<bpt::common::ws::PingConfig> OKXWsClient::ping_config() const {
     return bpt::common::ws::PingConfig{
         std::chrono::seconds(10),
         [] {
-            bpt::common::log::info("[OrderGateway] OKXWsClient heartbeat ping sent");
+            bpt::common::log::info("OKXWsClient heartbeat ping sent");
             return std::string("ping");
         },
     };
 }
 
 void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
-    bpt::common::log::info("[OrderGateway] OKXWsClient connecting {}:{}{} (tls={})",
+    bpt::common::log::info("OKXWsClient connecting {}:{}{} (tls={})",
                    cfg_.ws_host, cfg_.ws_port, cfg_.ws_path, cfg_.use_tls);
 
     if (!cfg_.use_tls) {
@@ -61,7 +61,7 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
                                                 /*so_rcvbuf_bytes=*/0,
                                                 /*connect_timeout_ms=*/30000,
                                                 /*user_agent=*/"bpt-order-gateway/0.1");
-        bpt::common::log::info("[OrderGateway] OKXWsClient connected (plain), waiting for login");
+        bpt::common::log::info("OKXWsClient connected (plain), waiting for login");
         RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
         return;
     }
@@ -76,7 +76,7 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
     // already established, but setting idle=none here would clobber
     // RunLoop's per-read timeout. Leave stream_base::timeout unset on
     // the TLS path too — RunLoop drives both timing and heartbeat.
-    bpt::common::log::info("[OrderGateway] OKXWsClient connected (tls), waiting for login");
+    bpt::common::log::info("OKXWsClient connected (tls), waiting for login");
     RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
 }
 

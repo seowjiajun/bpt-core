@@ -26,7 +26,7 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
                                    bool funding_rates_loaded) {
     if (!refdata_ready_) {
         bpt::common::log::info(
-            "[Strategy] RefDataReady: exchanges=0x{:02x} (configured=0x{:02x}) "
+            "RefDataReady: exchanges=0x{:02x} (configured=0x{:02x}) "
             "instruments={} fee_schedules={} funding_rates={}",
             exchanges_loaded,
             configured_mask_,
@@ -34,7 +34,7 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
             fee_schedules_loaded,
             funding_rates_loaded);
     } else {
-        bpt::common::log::debug("[Strategy] RefDataReady (periodic): exchanges=0x{:02x} instruments={}",
+        bpt::common::log::debug("RefDataReady (periodic): exchanges=0x{:02x} instruments={}",
                         exchanges_loaded, instrument_count);
     }
 
@@ -43,7 +43,7 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
     if (configured_mask_ != 0 && (exchanges_loaded & configured_mask_) != configured_mask_) {
         const uint8_t missing = configured_mask_ & ~exchanges_loaded;
         bpt::common::log::critical(
-            "[Strategy] HALT — refdata service is missing required exchanges (mask=0x{:02x}). "
+            "HALT — refdata service is missing required exchanges (mask=0x{:02x}). "
             "Cannot trade safely. Shutting down.",
             missing);
         bpt::common::signal::stop();
@@ -72,7 +72,7 @@ void StartupGate::on_account_snapshot(ExchangeId::Value exchange) {
 void StartupGate::on_refdata_snapshot_complete() {
     if (phase_ != Phase::WaitMdSnapshot) return;
 
-    bpt::common::log::info("[Strategy] Snapshot received — starting strategy MD subscriptions");
+    bpt::common::log::info("Snapshot received — starting strategy MD subscriptions");
     strategy_.start();
     metrics_.strategy_active->Set(1.0);
     phase_ = Phase::Active;
@@ -83,19 +83,19 @@ void StartupGate::send_account_snapshot_requests() {
 
     uint64_t corr = correlation_id_;
     if (configured_mask_ & 0x01) {
-        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for BINANCE");
+        bpt::common::log::info("Requesting AccountSnapshot for BINANCE");
         order_gw_->send_account_snapshot_request(ExchangeId::BINANCE, corr++);
     }
     if (configured_mask_ & 0x02) {
-        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for OKX");
+        bpt::common::log::info("Requesting AccountSnapshot for OKX");
         order_gw_->send_account_snapshot_request(ExchangeId::OKX, corr++);
     }
     if (configured_mask_ & 0x04) {
-        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for HYPERLIQUID");
+        bpt::common::log::info("Requesting AccountSnapshot for HYPERLIQUID");
         order_gw_->send_account_snapshot_request(ExchangeId::HYPERLIQUID, corr++);
     }
     if (configured_mask_ & 0x08) {
-        bpt::common::log::info("[Strategy] Requesting AccountSnapshot for DERIBIT");
+        bpt::common::log::info("Requesting AccountSnapshot for DERIBIT");
         order_gw_->send_account_snapshot_request(ExchangeId::DERIBIT, corr++);
     }
 }
@@ -119,7 +119,7 @@ void StartupGate::tick() {
             if (!accounts_ready) break;
 
             if (!md_subscribe_sent_) {
-                bpt::common::log::info("[Strategy] RefDataReady + AccountSnapshot received — sending RefDataSubscriptionRequest");
+                bpt::common::log::info("RefDataReady + AccountSnapshot received — sending RefDataSubscriptionRequest");
                 refdata_.subscribe(correlation_id_);
                 md_subscribe_sent_ = true;
             }

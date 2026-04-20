@@ -31,7 +31,7 @@ void DeribitWsClient::on_frame(std::string_view payload, uint64_t recv_ns) {
 }
 
 void DeribitWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
-    bpt::common::log::info("[OrderGateway] DeribitWsClient connecting {}:{}{}",
+    bpt::common::log::info("DeribitWsClient connecting {}:{}{}",
                    cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
 
     auto ws_ptr = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, cfg_.ws_host, cfg_.ws_port, cfg_.ws_path,
@@ -49,7 +49,7 @@ void DeribitWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& conne
         false,                           // no Beast keep-alive pings
     });
 
-    bpt::common::log::info("[OrderGateway] DeribitWsClient connected, waiting for auth");
+    bpt::common::log::info("DeribitWsClient connected, waiting for auth");
     RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
 }
 

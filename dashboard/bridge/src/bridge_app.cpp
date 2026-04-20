@@ -23,10 +23,10 @@ namespace bridge {
 void BridgeApp::run() {
     bpt::common::log::info("bridge starting — ws :{}  aeron {}",
                            settings_.ws_port, settings_.base.media_driver_dir);
-    bpt::common::log::info("[bridge] md_data stream={}  exec_report stream={}  control stream={}",
+    bpt::common::log::info("md_data stream={}  exec_report stream={}  control stream={}",
                            settings_.md_data.stream_id, settings_.exec_report.stream_id,
                            settings_.control_command.stream_id);
-    bpt::common::log::info("[bridge] mode={} strategy={} symbol={}@{} instrument_filter={}",
+    bpt::common::log::info("mode={} strategy={} symbol={}@{} instrument_filter={}",
                            settings_.mode, settings_.strategy, settings_.symbol, settings_.exchange,
                            settings_.instrument_id == 0 ? "(none)" : std::to_string(settings_.instrument_id));
 
@@ -38,7 +38,7 @@ void BridgeApp::run() {
     if (settings_.portfolio_snapshot.stream_id != 0) {
         snapshot_sub = bpt::common::aeron::wait_for_subscription(
             aeron_, settings_.portfolio_snapshot.channel, settings_.portfolio_snapshot.stream_id);
-        bpt::common::log::info("[bridge] portfolio snapshot subscription ready on stream {}",
+        bpt::common::log::info("portfolio snapshot subscription ready on stream {}",
                                settings_.portfolio_snapshot.stream_id);
     }
 
@@ -46,7 +46,7 @@ void BridgeApp::run() {
     if (settings_.toxicity.stream_id != 0) {
         tyr_sub = bpt::common::aeron::wait_for_subscription(
             aeron_, settings_.toxicity.channel, settings_.toxicity.stream_id);
-        bpt::common::log::info("[bridge] tyr toxicity subscription ready on stream {}",
+        bpt::common::log::info("tyr toxicity subscription ready on stream {}",
                                settings_.toxicity.stream_id);
     }
 
@@ -55,7 +55,7 @@ void BridgeApp::run() {
     if (settings_.control_command.stream_id != 0) {
         ctrl_pub = bpt::common::aeron::wait_for_publication(
             aeron_, settings_.control_command.channel, settings_.control_command.stream_id);
-        bpt::common::log::info("[bridge] control publication ready on stream {}",
+        bpt::common::log::info("control publication ready on stream {}",
                                settings_.control_command.stream_id);
     }
 
@@ -71,7 +71,7 @@ void BridgeApp::run() {
             ctrl_byte = 0x01;
             status_str = "live";
         } else {
-            bpt::common::log::warn("[bridge] unknown command: {}", cmd);
+            bpt::common::log::warn("unknown command: {}", cmd);
             return;
         }
 
@@ -79,12 +79,12 @@ void BridgeApp::run() {
             aeron::AtomicBuffer buf(reinterpret_cast<uint8_t*>(&ctrl_byte), 1);
             auto result = ctrl_pub->offer(buf, 0, 1);
             if (result < 0) {
-                bpt::common::log::warn("[bridge] control offer failed: {}", result);
+                bpt::common::log::warn("control offer failed: {}", result);
             }
         }
 
         ws.publish(MsgKind::Status, encode::status(status_str));
-        bpt::common::log::info("[bridge] command '{}' → status '{}'", cmd, status_str);
+        bpt::common::log::info("command '{}' → status '{}'", cmd, status_str);
     };
 
     ws.start();

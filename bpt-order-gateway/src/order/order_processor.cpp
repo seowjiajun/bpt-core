@@ -69,7 +69,7 @@ void OrderProcessor::on_exec_event(const adapter::ExecEvent& ev) {
     if (!breaker_was_tripped && reject_rate_breaker_.tripped()) {
         risk_checker_.set_trading_enabled(false);
         bpt::common::log::error(
-            "[OrderGateway] EXEC REJECT-RATE BREAKER TRIPPED — {}/{} exec events "
+            "EXEC REJECT-RATE BREAKER TRIPPED — {}/{} exec events "
             "rejected in last {}s (threshold {:.1f}%). Trading halted. Restart "
             "service after human review to resume.",
             reject_rate_breaker_.rejects_in_window(),
@@ -93,7 +93,7 @@ void OrderProcessor::on_exec_event(const adapter::ExecEvent& ev) {
                 daily_loss_latched_ = true;
                 risk_checker_.set_trading_enabled(false);
                 bpt::common::log::error(
-                    "[OrderGateway] DAILY LOSS KILL SWITCH — realized P&L "
+                    "DAILY LOSS KILL SWITCH — realized P&L "
                     "{:.2f} USD < limit {:.2f} USD. Trading halted. "
                     "Restart service after human review to resume.",
                     daily, -max_daily_loss_usd_);
@@ -144,7 +144,7 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
     using RR = bpt::messages::RejectReason;
     using FC = bpt::messages::FeeCurrency;
 
-    bpt::common::log::debug("[OrderGateway] NewOrder: id={} exchange={} instrument_id={} qty={}",
+    bpt::common::log::debug("NewOrder: id={} exchange={} instrument_id={} qty={}",
                     order.orderId(),
                     static_cast<int>(order.exchangeId()),
                     order.instrumentId(),
@@ -174,7 +174,7 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
                           FC::USDT,
                           ts,
                           ts);
-        bpt::common::log::warn("[OrderGateway] Order {} rejected by risk: reason={}",
+        bpt::common::log::warn("Order {} rejected by risk: reason={}",
                        order.orderId(),
                        static_cast<int>(result.error()));
         metrics_.risk_reject(exch).Increment();
@@ -203,7 +203,7 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
             exec_pub_.publish(order.orderId(), 0, order.exchangeId(), order.instrumentId(),
                               ES::REJECTED, order.side(), order.orderType(), order.price(),
                               0, order.quantity(), RR::RISK_REJECTED, 0, FC::USDT, ts, ts);
-            bpt::common::log::warn("[OrderGateway] Order {} rejected by position cap: "
+            bpt::common::log::warn("Order {} rejected by position cap: "
                            "projected=${:.2f} > limit=${:.2f}",
                            order.orderId(), projected_usd, max_position_usd_);
             metrics_.risk_reject(exch).Increment();
@@ -237,10 +237,10 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
                           ts,
                           ts);
         if (adapter && adapter->is_halted()) {
-            bpt::common::log::warn("[OrderGateway] Order {} rejected: {} halted by disconnect breaker",
+            bpt::common::log::warn("Order {} rejected: {} halted by disconnect breaker",
                            order.orderId(), adapter->exchange_name());
         } else {
-            bpt::common::log::warn("[OrderGateway] Order {} rejected: adapter not connected", order.orderId());
+            bpt::common::log::warn("Order {} rejected: adapter not connected", order.orderId());
         }
         // Risk check already incremented the open-order counter — undo it so
         // the counter doesn't accumulate while the adapter is down.
@@ -269,7 +269,7 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
 }
 
 void OrderProcessor::on_cancel(const bpt::messages::CancelOrder& cancel) {
-    bpt::common::log::debug("[OrderGateway] CancelOrder: id={} exchange={}",
+    bpt::common::log::debug("CancelOrder: id={} exchange={}",
                     cancel.orderId(),
                     static_cast<int>(cancel.exchangeId()));
 
@@ -281,7 +281,7 @@ void OrderProcessor::on_cancel(const bpt::messages::CancelOrder& cancel) {
     // cancel request; it was stored at NewOrder time.
     const auto* st = state_mgr_.get(cancel.orderId());
     if (!st) {
-        bpt::common::log::warn("[OrderGateway] CancelOrder {}: order not found in state", cancel.orderId());
+        bpt::common::log::warn("CancelOrder {}: order not found in state", cancel.orderId());
         return;
     }
 
@@ -291,7 +291,7 @@ void OrderProcessor::on_cancel(const bpt::messages::CancelOrder& cancel) {
 void OrderProcessor::on_cancel_all(const bpt::messages::CancelAll& msg) {
     using EX = bpt::messages::ExchangeId;
 
-    bpt::common::log::debug("[OrderGateway] CancelAll: exchange={} instrument_id={}",
+    bpt::common::log::debug("CancelAll: exchange={} instrument_id={}",
                     static_cast<int>(msg.exchangeId()),
                     msg.instrumentId());
 
@@ -299,7 +299,7 @@ void OrderProcessor::on_cancel_all(const bpt::messages::CancelAll& msg) {
         // Kill switch path — atomically disables trading so no new orders can
         // pass the risk check, then drains every open order across all venues.
         risk_checker_.set_trading_enabled(false);
-        bpt::common::log::warn("[OrderGateway] Kill switch activated — cancelling all open orders");
+        bpt::common::log::warn("Kill switch activated — cancelling all open orders");
         state_mgr_.for_each_open([&](OrderState& st) {
             auto* adapter = find_adapter(st.exchange_id);
             if (adapter)
@@ -313,7 +313,7 @@ void OrderProcessor::on_cancel_all(const bpt::messages::CancelAll& msg) {
 }
 
 void OrderProcessor::on_modify(const bpt::messages::ModifyOrder& modify) {
-    bpt::common::log::debug("[OrderGateway] ModifyOrder: id={} exchange={}",
+    bpt::common::log::debug("ModifyOrder: id={} exchange={}",
                     modify.orderId(),
                     static_cast<int>(modify.exchangeId()));
 
@@ -323,7 +323,7 @@ void OrderProcessor::on_modify(const bpt::messages::ModifyOrder& modify) {
 
     const auto* st = state_mgr_.get(modify.orderId());
     if (!st) {
-        bpt::common::log::warn("[OrderGateway] ModifyOrder {}: order not found in state", modify.orderId());
+        bpt::common::log::warn("ModifyOrder {}: order not found in state", modify.orderId());
         return;
     }
 
@@ -337,7 +337,7 @@ void OrderProcessor::check_stale_orders(uint64_t stale_timeout_ns) {
     // iterating over it in check_stale.
     stale_ids_scratch_.clear();
     state_mgr_.check_stale(cur_ns, stale_timeout_ns, [&](const OrderState& st) {
-        bpt::common::log::warn("[OrderGateway] Stale order detected: id={} exchange={} age_ms={}",
+        bpt::common::log::warn("Stale order detected: id={} exchange={} age_ms={}",
                        st.order_id,
                        static_cast<int>(st.exchange_id),
                        (cur_ns - st.last_update_ns) / 1'000'000ULL);
