@@ -154,6 +154,14 @@ private:
         std::string exchange;
         bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
 
+        // Set from refdata at on_snapshot(). Drives SPOT-vs-derivative
+        // branching in the reconciler — SPOT holdings land in the
+        // base-currency equity row on AccountSnapshot rather than the
+        // positions[] group, so reconcile compares against a delta
+        // from the session-start balance instead of an absolute.
+        refdata::InstrumentType instrument_type{refdata::InstrumentType::SPOT};
+        std::string base_ccy;  // base currency, e.g. "BTC" for "BTC-USDT"
+
         double tick_size{0.0};  // minimum price increment from refdata (0 = unknown)
         double lot_size{0.0};   // minimum quantity increment from refdata (0 = unknown)
 
@@ -235,12 +243,12 @@ private:
     uint8_t order_book_depth_;        // 0 = BBO only, >0 subscribes to L2 ladder
 
     // Drift (momentum) detection — Cartea-Jaimungal extension of AS.
-    double drift_halflife_s_;         // EWMA half-life for µ estimation (seconds)
-    double drift_suppress_bps_;       // suppress adverse side when |µ| > this (bps/√s)
+    double drift_halflife_s_;    // EWMA half-life for µ estimation (seconds)
+    double drift_suppress_bps_;  // suppress adverse side when |µ| > this (bps/√s)
 
     // Analytics toxicity suppression — suppress side when tyr score < threshold.
     // 0 disables. Typical value: -2.0 (suppress when 5s markout is -2bps or worse).
-    double tyr_suppress_threshold_;   // negative value; 0 disables
+    double tyr_suppress_threshold_;  // negative value; 0 disables
 
     // Queue-position suppression — suppress a side if the projected
     // fill probability at the candidate quote price (our_qty /
@@ -302,6 +310,28 @@ private:
     };
     std::unordered_map<SnapshotKey, int64_t, SnapshotKeyHash> last_snapshot_qty_e8_;
     uint64_t last_snapshot_ns_{0};
+
+    // Session-start currency equity baseline per (exchange_id, ccy).
+    // SPOT reconciliation works by delta: exchange has moved us by
+    // (current_equity - initial_equity), and we compare that to
+    // PositionTracker.net_qty. Captured once on the first
+    // AccountSnapshot that arrives after on_snapshot() (refdata ready),
+    // at which point PositionTracker is guaranteed 0 (see on_snapshot
+    // body). If the operator deposits/withdraws the base ccy mid-session
+    // this baseline goes stale — accepted limitation; manual
+    // intervention already breaks P&L accounting elsewhere.
+    struct CcyKey {
+        bpt::messages::ExchangeId::Value exchange_id;
+        std::string ccy;
+        bool operator==(const CcyKey& o) const noexcept { return exchange_id == o.exchange_id && ccy == o.ccy; }
+    };
+    struct CcyKeyHash {
+        std::size_t operator()(const CcyKey& k) const noexcept {
+            return std::hash<std::string>{}(k.ccy) ^ (static_cast<std::size_t>(k.exchange_id) * 0x9E3779B97F4A7C15ULL);
+        }
+    };
+    std::unordered_map<CcyKey, int64_t, CcyKeyHash> initial_ccy_equity_e8_;
+    bool initial_ccy_equity_captured_{false};
 };
 
 }  // namespace bpt::strategy::strategy

@@ -6,8 +6,7 @@
 
 namespace bpt::strategy::strategy {
 
-std::unordered_map<std::string, int64_t> extract_exchange_positions(
-    bpt::messages::AccountSnapshot& snap) {
+std::unordered_map<std::string, int64_t> extract_exchange_positions(bpt::messages::AccountSnapshot& snap) {
     // One pass over the SBE repeating group (non-const — the group
     // carries a read cursor, same pattern as OrderBookState / OFIStrategy).
     std::unordered_map<std::string, int64_t> exchange_by_symbol;
@@ -21,13 +20,23 @@ std::unordered_map<std::string, int64_t> extract_exchange_positions(
     return exchange_by_symbol;
 }
 
-std::vector<Divergence> reconcile(
-    const PositionTracker& tracker,
-    const std::unordered_map<std::string, int64_t>& exchange_by_symbol,
-    bpt::messages::ExchangeId::Value exchange_id,
-    const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
-    int64_t threshold_e8) {
+std::unordered_map<std::string, int64_t> extract_exchange_currency_balances(bpt::messages::AccountSnapshot& snap) {
+    std::unordered_map<std::string, int64_t> equity_by_ccy;
+    auto& balances = snap.currencyBalances();
+    const std::size_t n = balances.count();
+    equity_by_ccy.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        balances.next();
+        equity_by_ccy[balances.getCcyAsString()] = balances.equityE8();
+    }
+    return equity_by_ccy;
+}
 
+std::vector<Divergence> reconcile(const PositionTracker& tracker,
+                                  const std::unordered_map<std::string, int64_t>& exchange_by_symbol,
+                                  bpt::messages::ExchangeId::Value exchange_id,
+                                  const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
+                                  int64_t threshold_e8) {
     std::vector<Divergence> out;
 
     for (const auto& [instrument_id, symbol] : instrument_id_to_symbol) {
@@ -36,7 +45,8 @@ std::vector<Divergence> reconcile(
         const int64_t exchange_qty = (it == exchange_by_symbol.end()) ? 0 : it->second;
         const int64_t diff = our_qty - exchange_qty;
 
-        if (std::abs(diff) <= threshold_e8) continue;
+        if (std::abs(diff) <= threshold_e8)
+            continue;
 
         out.push_back({
             instrument_id,
@@ -50,11 +60,10 @@ std::vector<Divergence> reconcile(
     return out;
 }
 
-std::vector<Divergence> reconcile(
-    const PositionTracker& tracker,
-    bpt::messages::AccountSnapshot& snap,
-    const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
-    int64_t threshold_e8) {
+std::vector<Divergence> reconcile(const PositionTracker& tracker,
+                                  bpt::messages::AccountSnapshot& snap,
+                                  const std::unordered_map<uint64_t, std::string>& instrument_id_to_symbol,
+                                  int64_t threshold_e8) {
     // Backwards-compat wrapper: callers that don't need the raw
     // positions map drop into the 2-step helpers.
     const auto exchange_by_symbol = extract_exchange_positions(snap);
