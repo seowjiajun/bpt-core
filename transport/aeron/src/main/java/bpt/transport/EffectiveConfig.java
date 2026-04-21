@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 /**
  * Immutable snapshot of the effective configuration after merging file config with CLI overrides.

@@ -37,7 +37,7 @@ service_status() {
 
 do_status() {
     echo "Testnet stack status:"
-    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bpt-transport.pid"
     service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
     service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
     service_status "order-gateway"        "$ORDER_GATEWAY_DIR/.order-gateway.pid"
@@ -49,7 +49,7 @@ do_start() {
     echo "  Strategy config : $STRATEGY_CONFIG"
     echo
 
-    # 1. Bifrost-fabric
+    # 1. bpt-transport
     "$TRANSPORT_DIR/scripts/dev_start.sh"
     echo
 

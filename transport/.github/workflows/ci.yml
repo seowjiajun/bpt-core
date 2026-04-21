@@ -46,11 +46,11 @@ jobs:
     - name: Upload distribution
       uses: actions/upload-artifact@v4
       with:
-        name: bifrost-fabric-dist
+        name: bpt-transport-dist
         path: build/distributions/*.zip
 
     - name: Upload JAR
       uses: actions/upload-artifact@v4
       with:
-        name: bifrost-fabric-jar
+        name: bpt-transport-jar
         path: build/libs/*-all.jar

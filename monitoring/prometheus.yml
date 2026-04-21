@@ -39,7 +39,7 @@ scrape_configs:
       - targets: ['alertmanager:9093']
 
   - job_name: bpt-transport
-    # bifrost-fabric Aeron MediaDriver. Moved off 9100 (collides with
+    # bpt-transport Aeron MediaDriver. Moved off 9100 (collides with
     # prometheus-node-exporter) to 9110 on 2026-04-21.
     static_configs:
       - targets: ['host.docker.internal:9110']

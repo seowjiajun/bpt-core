@@ -43,7 +43,7 @@ service_status() {
 
 do_status() {
     echo "Stack status:"
-    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bpt-transport.pid"
     service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
     service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
     service_status "order-gateway"        "$ORDER_GATEWAY_DIR/.order-gateway.pid"
@@ -58,7 +58,7 @@ do_start() {
     echo "=== Starting Strategy stack ==="
     echo
 
-    # 1. Bifrost-fabric (Aeron media driver)
+    # 1. bpt-transport (Aeron media driver)
     "$TRANSPORT_DIR/scripts/dev_start.sh"
     echo
 
@@ -92,7 +92,7 @@ do_stop() {
     echo "=== Stopping Strategy stack ==="
     echo
 
-    # Reverse order: bpt-strategy first, bifrost last
+    # Reverse order: bpt-strategy first, bpt-transport last
     "$STRATEGY_DIR/scripts/stop.sh"
     "$ORDER_GATEWAY_DIR/scripts/stop.sh"
     "$MD_GATEWAY_DIR/scripts/stop.sh"

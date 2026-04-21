@@ -10,7 +10,7 @@ exchanges = ["HYPERLIQUID"]
 instrument_poll_interval_s = 3600
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.snapshot]
 channel = "aeron:ipc"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # smoke_test.sh — End-to-end dashboard smoke test.
 #
-# Launches the full backtest stack (bifrost + bpt-refdata + huginn + order-gateway +
+# Launches the full backtest stack (bpt-transport + bpt-refdata + huginn + order-gateway +
 # fenrir + jormungandr) via the existing backtest.sh, then starts the bridge
 # on top and prints the command to run the frontend.
 #

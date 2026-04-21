@@ -2,7 +2,7 @@ environment = "qa"
 strategy_config = "strategies/avellaneda_stoikov.hyperliquid.toml"
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.refdata_control]
 channel = "aeron:ipc"

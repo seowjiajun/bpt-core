@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 import io.prometheus.metrics.core.metrics.Gauge;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
@@ -29,8 +29,8 @@ public class MetricsServer implements AutoCloseable {
 
     this.healthyGauge =
         Gauge.builder()
-            .name("bifrost_healthy")
-            .help("1 if bifrost-fabric MediaDriver is running")
+            .name("bpt_transport_healthy")
+            .help("1 if bpt-transport MediaDriver is running")
             .register();
     this.healthyGauge.set(1.0);
 

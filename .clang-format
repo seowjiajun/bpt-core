@@ -26,8 +26,8 @@ IncludeCategories:
   # Aeron headers
   - Regex: '<Aeron.*|<concurrent/.*|<FragmentAssembler'
     Priority: 2
-  # bifrost_protocol SBE headers
-  - Regex: '<bifrost_protocol/.*'
+  # messages SBE headers
+  - Regex: '<messages/.*'
     Priority: 3
   # System / STL
   - Regex: '<.*'

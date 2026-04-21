@@ -26,7 +26,7 @@ binance_order_port = 18110
 okx_order_port     = 18111
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.backtest_control]
 channel   = "aeron:ipc"

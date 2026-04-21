@@ -6,7 +6,7 @@ subscription_heartbeat_interval_ms = 5000
 service_heartbeat_interval_ms = 5000
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.control]
 channel = "aeron:ipc"

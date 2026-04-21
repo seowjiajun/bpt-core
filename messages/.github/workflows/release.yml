@@ -60,10 +60,10 @@ jobs:
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          ARCHIVE="bifrost-protocol-${TAG}.tar.gz"
+          ARCHIVE="bpt-messages-${TAG}.tar.gz"
 
           tar -czf "${ARCHIVE}" \
-            --transform "s|^|bifrost-protocol-${TAG}/|" \
+            --transform "s|^|bpt-messages-${TAG}/|" \
             schema/ \
             generated/cpp/ \
             CMakeLists.txt \
@@ -77,25 +77,25 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           body: |
-            ## bifrost-protocol ${{ steps.version.outputs.tag }}
+            ## bpt-messages ${{ steps.version.outputs.tag }}
 
             ### What's included
             - `schema/` — SBE schema XML
-            - `generated/cpp/` — C++ headers (`bifrost::protocol` namespace)
-            - `CMakeLists.txt` + `cmake/` — INTERFACE library target `bifrost::protocol`
+            - `generated/cpp/` — C++ headers (`bpt::messages` namespace)
+            - `CMakeLists.txt` + `cmake/` — INTERFACE library target `bpt::messages`
 
             ### Consuming via git submodule (recommended)
             ```bash
-            git submodule add git@github.com:bishanparktrading/bifrost-protocol.git
+            git submodule add git@github.com:bishanparktrading/bpt-messages.git
             git submodule update --init
             ```
             Pin to this tag in your consuming repo's `.gitmodules`.
 
             ### Consuming via tarball
-            Download `bifrost-protocol-${{ steps.version.outputs.tag }}.tar.gz`, extract, and point CMake at it:
+            Download `bpt-messages-${{ steps.version.outputs.tag }}.tar.gz`, extract, and point CMake at it:
             ```cmake
-            add_subdirectory(path/to/bifrost-protocol)
-            target_link_libraries(my_target PRIVATE bifrost::protocol)
+            add_subdirectory(path/to/bpt-messages)
+            target_link_libraries(my_target PRIVATE bpt::messages)
             ```
           files: ${{ env.ARCHIVE }}
           fail_on_unmatched_files: true

@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 import java.util.BitSet;
 import java.util.concurrent.ThreadFactory;
@@ -10,14 +10,13 @@ import org.slf4j.LoggerFactory;
  * ThreadFactory that pins each thread it creates to a specific CPU core via OpenHFT's Affinity
  * library (JNI wrapper around {@code sched_setaffinity}).
  *
- * <p>Used by {@link MediaDriverRunner} to pin the three Aeron MediaDriver agent threads
- * (conductor, sender, receiver) when DEDICATED threading mode is active, per the central topology
- * file. Pinning is per-thread, not per-process, so this must run inside the thread's own {@code
- * run()} — Aeron's Agrona AgentRunner creates the thread via the factory and then immediately
- * starts it.
+ * <p>Used by {@link MediaDriverRunner} to pin the three Aeron MediaDriver agent threads (conductor,
+ * sender, receiver) when DEDICATED threading mode is active, per the central topology file. Pinning
+ * is per-thread, not per-process, so this must run inside the thread's own {@code run()} — Aeron's
+ * Agrona AgentRunner creates the thread via the factory and then immediately starts it.
  *
- * <p>A {@code coreId} of -1 disables pinning and yields a factory behaviourally identical to
- * {@code r -> new Thread(r, name)} — useful on dev laptops where the topology is empty.
+ * <p>A {@code coreId} of -1 disables pinning and yields a factory behaviourally identical to {@code
+ * r -> new Thread(r, name)} — useful on dev laptops where the topology is empty.
  */
 public final class AffinityThreadFactory implements ThreadFactory {
 

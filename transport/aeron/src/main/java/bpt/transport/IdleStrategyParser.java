@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 import io.aeron.driver.ThreadingMode;
 import java.util.Locale;

@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
@@ -66,12 +66,12 @@ public class MediaDriverMain implements Callable<Integer> {
         if (is != null) {
           Properties props = new Properties();
           props.load(is);
-          return new String[] {"bifrost-fabric " + props.getProperty("version", "unknown")};
+          return new String[] {"bpt-transport " + props.getProperty("version", "unknown")};
         }
       } catch (Exception ignored) {
         // fall through
       }
-      return new String[] {"bifrost-fabric version unknown"};
+      return new String[] {"bpt-transport version unknown"};
     }
   }
 

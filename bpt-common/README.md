@@ -73,6 +73,6 @@ bpt::common::util::TscClock::calibrate();
 uint64_t t = bpt::common::util::TscClock::now_epoch_ns();
 
 // Aeron
-auto aeron = bpt::common::aeron::connect("/dev/shm/aeron-bifrost");
+auto aeron = bpt::common::aeron::connect("/dev/shm/aeron-bpt");
 auto pub   = bpt::common::aeron::wait_for_publication(aeron, "aeron:ipc", 2001);
 ```

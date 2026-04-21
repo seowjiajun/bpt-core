@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -14,7 +14,7 @@ import org.yaml.snakeyaml.error.YAMLException;
 public class Config {
 
   // ── Default values ──────────────────────────────────────────────
-  static final String DEFAULT_AERON_DIRECTORY = "/dev/shm/aeron-bifrost";
+  static final String DEFAULT_AERON_DIRECTORY = "/dev/shm/aeron-bpt";
   static final String DEFAULT_THREADING_MODE = "SHARED";
   static final String DEFAULT_IDLE_STRATEGY = "BUSY_SPIN";
   static final boolean DEFAULT_DIR_DELETE_ON_START = false;

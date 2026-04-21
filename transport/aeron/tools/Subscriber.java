@@ -20,7 +20,7 @@ public class Subscriber implements Callable<Integer> {
   @Option(names = {"-s", "--stream"}, description = "Stream ID", defaultValue = "1001")
   private int streamId;
 
-  @Option(names = {"-d", "--dir"}, description = "Aeron directory", defaultValue = "/dev/shm/aeron-bifrost")
+  @Option(names = {"-d", "--dir"}, description = "Aeron directory", defaultValue = "/dev/shm/aeron-bpt")
   private String aeronDir;
 
   public static void main(String[] args) {

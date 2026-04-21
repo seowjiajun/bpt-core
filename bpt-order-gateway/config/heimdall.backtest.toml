@@ -6,7 +6,7 @@ exchange_config = "config/exchanges/backtest.toml"
 exchanges      = ["BINANCE", "OKX"]
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.order]
 channel   = "aeron:ipc"

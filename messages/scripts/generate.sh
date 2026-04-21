@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerates C++ SBE encoders/decoders from schema/bifrost-protocol.xml.
+# Regenerates C++ SBE encoders/decoders from schema/bpt-protocol.xml.
 # Prerequisites: JDK 17+, tools/sbe-all-*.jar  (run download-sbe-tool.sh first)
 #
 # Usage:
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCHEMA="${REPO_ROOT}/schema/bifrost-protocol.xml"
+SCHEMA="${REPO_ROOT}/schema/bpt-protocol.xml"
 OUT_DIR="${REPO_ROOT}/generated/cpp"
 TOOLS_DIR="${REPO_ROOT}/tools"
 

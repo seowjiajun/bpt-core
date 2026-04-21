@@ -20,7 +20,7 @@ target_include_directories(backtester_lib PUBLIC
 
 target_link_libraries(backtester_lib PUBLIC
     yggdrasil
-    bifrost::protocol
+    bpt::messages
     aeron_client
     fmt::fmt
     tomlplusplus::tomlplusplus

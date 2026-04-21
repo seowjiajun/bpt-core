@@ -25,21 +25,21 @@ toml::table parse(const char* src) {
 // ── Env enum + string helpers ────────────────────────────────────────────────
 
 TEST(EnvTest, ToStringRoundTrip) {
-    EXPECT_EQ(to_string(Env::DEV),  "dev");
-    EXPECT_EQ(to_string(Env::QA),   "qa");
+    EXPECT_EQ(to_string(Env::DEV), "dev");
+    EXPECT_EQ(to_string(Env::QA), "qa");
     EXPECT_EQ(to_string(Env::PROD), "prod");
 }
 
 TEST(EnvTest, FromStringKnownValues) {
-    EXPECT_EQ(env_from_string("dev"),  Env::DEV);
-    EXPECT_EQ(env_from_string("qa"),   Env::QA);
+    EXPECT_EQ(env_from_string("dev"), Env::DEV);
+    EXPECT_EQ(env_from_string("qa"), Env::QA);
     EXPECT_EQ(env_from_string("prod"), Env::PROD);
 }
 
 TEST(EnvTest, FromStringRejectsTypo) {
     // Catches the "prd"/"prood"/"" class of silent-skip-prod-checks bugs.
-    EXPECT_THROW(env_from_string("prd"),  std::runtime_error);
-    EXPECT_THROW(env_from_string(""),     std::runtime_error);
+    EXPECT_THROW(env_from_string("prd"), std::runtime_error);
+    EXPECT_THROW(env_from_string(""), std::runtime_error);
     EXPECT_THROW(env_from_string("PROD"), std::runtime_error) << "case-sensitive on purpose";
 }
 
@@ -67,10 +67,10 @@ TEST(BaseSettingsLoader, ReadsAeronMediaDriverDir) {
     auto root = parse(R"(
         environment = "dev"
         [aeron]
-        media_driver_dir = "/dev/shm/aeron-bifrost"
+        media_driver_dir = "/dev/shm/aeron-bpt"
     )");
     load_base_settings(root, base);
-    EXPECT_EQ(base.media_driver_dir, "/dev/shm/aeron-bifrost");
+    EXPECT_EQ(base.media_driver_dir, "/dev/shm/aeron-bpt");
 }
 
 TEST(BaseSettingsLoader, ReadsMetricsPort) {

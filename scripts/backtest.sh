@@ -3,7 +3,7 @@
 #
 # Backtester acts as the exchange simulator behind Huginn and Heimdall.
 # Strategy runs in its normal live mode — no backtest-specific code paths.
-# All inter-service communication still flows through Bifrost (Aeron IPC).
+# All inter-service communication still flows through bpt-transport (Aeron IPC).
 #
 # Usage:
 #   ./backtest.sh start [bpt-strategy-config]   Start the backtest stack.
@@ -49,7 +49,7 @@ service_status() {
 
 do_status() {
     echo "Backtest stack status:"
-    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bpt-transport.pid"
     service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
     service_status "bpt-backtester"    "$BACKTESTER_DIR/.bpt-backtester.pid"
     service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
@@ -63,7 +63,7 @@ do_start() {
     echo "  Backtester config : $BACKTESTER_CONFIG"
     echo
 
-    # 1. Bifrost-fabric — Aeron media driver must be up first
+    # 1. bpt-transport — Aeron media driver must be up first
     "$TRANSPORT_DIR/scripts/dev_start.sh"
     echo
 

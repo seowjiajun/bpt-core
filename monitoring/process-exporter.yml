@@ -33,11 +33,11 @@ process_names:
   # is just "java" and wouldn't distinguish from other JVMs.
   - name: "bpt-transport"
     cmdline:
-      - "bifrost-fabric-.*\\.jar"
+      - "bpt-transport-.*\.jar"
 
   # Java process for transport. Matches by cmdline since the JVM's
   # comm is just "java" and can't be reliably distinguished from
   # other JVMs on the host by comm alone.
   - name: "bpt-transport"
     cmdline:
-      - "bifrost-fabric-.*\\.jar"
+      - "bpt-transport-.*\.jar"

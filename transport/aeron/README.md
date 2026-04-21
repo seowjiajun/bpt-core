@@ -1,10 +1,10 @@
 <div align="center">
-  <img src="docs/bifrost-fabric-logo.png" alt="Bifrost Fabric" width="200"/>
-  <h1>Bifrost Fabric</h1>
+  <img src="docs/bpt-transport-logo.png" alt="BPT Transport" width="200"/>
+  <h1>BPT Transport</h1>
   <p><strong>High-performance Aeron Media Driver wrapper for low-latency messaging infrastructure.</strong></p>
 </div>
 
-Bifrost Fabric is a production-grade standalone runner for the [Aeron](https://github.com/real-logic/aeron) Media Driver. It provides YAML-driven configuration, CLI overrides, environment-aware validation, and structured lifecycle management — designed for latency-sensitive systems such as market-data distribution and order routing.
+BPT Transport is a production-grade standalone runner for the [Aeron](https://github.com/real-logic/aeron) Media Driver. It provides YAML-driven configuration, CLI overrides, environment-aware validation, and structured lifecycle management — designed for latency-sensitive systems such as market-data distribution and order routing.
 
 ---
 
@@ -72,7 +72,7 @@ Configuration is loaded from a YAML file specified via the `--config` flag. All 
 
 ```yaml
 aeron:
-  directory: "/dev/shm/aeron-bifrost"     # Aeron shared-memory directory
+  directory: "/dev/shm/aeron-bpt"     # Aeron shared-memory directory
   threading_mode: "SHARED"                # SHARED | SHARED_NETWORK | DEDICATED
   idle_strategy: "BUSY_SPIN"              # Shared idle strategy (see table below)
 
@@ -174,7 +174,7 @@ aeron:
 Confirm the shared-memory directory exists:
 
 ```bash
-ls -ld /dev/shm/aeron-bifrost
+ls -ld /dev/shm/aeron-bpt
 ```
 
 View live driver counters (publications, subscriptions, bytes sent/received):
@@ -182,7 +182,7 @@ View live driver counters (publications, subscriptions, bytes sent/received):
 ```bash
 java --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
      --add-opens java.base/java.nio=ALL-UNNAMED \
-     -Daeron.dir=/dev/shm/aeron-bifrost \
+     -Daeron.dir=/dev/shm/aeron-bpt \
      -cp build/libs/*-all.jar \
      io.aeron.samples.AeronStat
 ```
@@ -192,15 +192,15 @@ java --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
 Once launched, the driver emits a heartbeat log at the configured interval (`heartbeat_interval_sec`, default 30 s):
 
 ```
-MediaDriver alive (uptime=60s, aeronDir=/dev/shm/aeron-bifrost, threading=SHARED, idle=BUSY_SPIN)
+MediaDriver alive (uptime=60s, aeronDir=/dev/shm/aeron-bpt, threading=SHARED, idle=BUSY_SPIN)
 ```
 
 ### Log Files
 
-Logs are written to both stdout and a rolling file in `logs/bifrost.log` (100 MB per file, 30-day history, 1 GB total cap). Override the log directory with:
+Logs are written to both stdout and a rolling file in `logs/bpt-transport.log` (100 MB per file, 30-day history, 1 GB total cap). Override the log directory with:
 
 ```bash
-java -DBIFROST_LOG_DIR=/var/log/bifrost ...
+java -DBPT_TRANSPORT_LOG_DIR=/var/log/bpt-transport ...
 ```
 
 ### Shutdown
@@ -223,7 +223,7 @@ The driver responds to standard OS signals (`SIGINT`, `SIGTERM`). On shutdown:
 
 ## Developer Tools
 
-The `tools/` directory contains lightweight Aeron client utilities for manual testing. They connect to the running MediaDriver (bifrost-fabric) and require no additional setup.
+The `tools/` directory contains lightweight Aeron client utilities for manual testing. They connect to the running MediaDriver (bpt-transport) and require no additional setup.
 
 ### Starting
 
@@ -259,7 +259,7 @@ Connects to a channel and sends a message for each line typed. Exit with `Ctrl+D
 |------|:---:|:---:|---------|
 | `-c`, `--channel` | ✓ | ✓ | `aeron:ipc` |
 | `-s`, `--stream` | ✓ | ✓ | `1001` |
-| `-d`, `--dir` | ✓ | ✓ | `/dev/shm/aeron-bifrost` |
+| `-d`, `--dir` | ✓ | ✓ | `/dev/shm/aeron-bpt` |
 
 ### Example session
 
@@ -268,7 +268,7 @@ Connects to a channel and sends a message for each line typed. Exit with `Ctrl+D
 $ ./tools/run.sh Subscriber
 Subscribing on aeron:ipc stream 1001
 Waiting for messages... (Ctrl+C to stop)
-[recv] hello bifrost
+[recv] hello bpt
 [recv] second message
 ```
 
@@ -277,8 +277,8 @@ Waiting for messages... (Ctrl+C to stop)
 $ ./tools/run.sh Publisher
 Waiting for subscriber... connected.
 Type a message and press Enter to send. Ctrl+D to quit.
-hello bifrost
-[sent] hello bifrost
+hello bpt
+[sent] hello bpt
 second message
 [sent] second message
 ```
@@ -288,7 +288,7 @@ second message
 ## Project Structure
 
 ```
-bifrost-fabric/
+bpt-transport/
 ├── config/
 │   └── config.yaml                  # Default configuration
 ├── scripts/
@@ -303,7 +303,7 @@ bifrost-fabric/
 │   ├── Subscriber.java              # Interactive Aeron subscriber
 │   └── Publisher.java               # Interactive Aeron publisher
 ├── src/
-│   ├── main/java/bifrost/
+│   ├── main/java/bpt/transport/
 │   │   ├── MediaDriverMain.java     # CLI entry point (picocli)
 │   │   ├── MediaDriverRunner.java   # Driver lifecycle management
 │   │   ├── Config.java              # YAML config loader and defaults
@@ -312,7 +312,7 @@ bifrost-fabric/
 │   │   └── IdleStrategyParser.java  # Idle strategy and threading mode parser
 │   ├── main/resources/
 │   │   └── logback.xml              # Logging configuration (console + rolling file)
-│   └── test/java/bifrost/
+│   └── test/java/bpt/transport/
 │       ├── MediaDriverMainTest.java
 │       ├── MediaDriverRunnerTest.java
 │       ├── ConfigTest.java

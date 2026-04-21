@@ -4,7 +4,7 @@
 environment = "qa"
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.md_data]
 channel   = "aeron:ipc"

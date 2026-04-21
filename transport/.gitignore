@@ -30,8 +30,8 @@ out/
 .DS_Store
 Thumbs.db
 
-# Bifrost specific
+# bpt-transport specific
 /dev/shm/
-.bifrost.pid
+.bpt-transport.pid
 *:Zone.Identifier
 logs/

@@ -29,7 +29,7 @@ PartOf=bpt-dev-stack.target
 [Service]
 Type=simple
 WorkingDirectory=$BPT_ROOT/transport
-ExecStart=/usr/bin/java --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -jar $BPT_ROOT/transport/aeron/build/libs/bifrost-fabric-1.0.0-all.jar --config $BPT_ROOT/transport/aeron/config/config-dev.yaml
+ExecStart=/usr/bin/java --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -jar $BPT_ROOT/transport/aeron/build/libs/bpt-transport-1.0.0-all.jar --config $BPT_ROOT/transport/aeron/config/config-dev.yaml
 Restart=no
 TimeoutStopSec=10
 

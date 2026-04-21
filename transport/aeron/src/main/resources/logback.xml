@@ -9,12 +9,12 @@
   <!--
     Rolling file appender: rotates daily and when the file reaches 100 MB.
     Log directory defaults to "logs/" relative to the working directory.
-    Override via system property: -DBIFROST_LOG_DIR=/var/log/bifrost
+    Override via system property: -DBPT_TRANSPORT_LOG_DIR=/var/log/bpt-transport
   -->
   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>${BIFROST_LOG_DIR:-logs}/bifrost.log</file>
+    <file>${BPT_TRANSPORT_LOG_DIR:-logs}/bpt-transport.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-      <fileNamePattern>${BIFROST_LOG_DIR:-logs}/bifrost.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <fileNamePattern>${BPT_TRANSPORT_LOG_DIR:-logs}/bpt-transport.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
       <maxFileSize>100MB</maxFileSize>
       <maxHistory>30</maxHistory>
       <totalSizeCap>1GB</totalSizeCap>

@@ -1,4 +1,4 @@
-package bifrost;
+package bpt.transport;
 
 import io.aeron.driver.MediaDriver;
 import java.io.IOException;
@@ -62,7 +62,7 @@ public class MediaDriverRunner {
     ScheduledExecutorService heartbeatExecutor =
         Executors.newSingleThreadScheduledExecutor(
             r -> {
-              Thread t = new Thread(r, "bifrost-heartbeat");
+              Thread t = new Thread(r, "bpt-transport-hb");
               t.setDaemon(true);
               return t;
             });
@@ -95,7 +95,7 @@ public class MediaDriverRunner {
                     heartbeatExecutor.shutdownNow();
                   }
                 },
-                "bifrost-shutdown-hook"));
+                "bpt-shutdown-hook"));
 
     // ── Launch ───────────────────────────────────────────────────
     try (MediaDriver driver = MediaDriver.launch(ctx)) {

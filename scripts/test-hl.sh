@@ -41,7 +41,7 @@ service_status() {
 
 do_status() {
     echo "TEST-HL stack status:"
-    service_status "transport" "$TRANSPORT_DIR/.bifrost.pid"
+    service_status "transport" "$TRANSPORT_DIR/.bpt-transport.pid"
     service_status "bpt-refdata"         "$REFDATA_DIR/.bpt-refdata.pid"
     service_status "bpt-md-gateway"         "$MD_GATEWAY_DIR/.bpt-md-gateway.pid"
     service_status "order-gateway"       "$ORDER_GATEWAY_DIR/.order-gateway.pid"

@@ -1,4 +1,4 @@
-// Compile-check and round-trip test for all bifrost-protocol generated headers.
+// Compile-check and round-trip test for all bpt-messages generated headers.
 //
 // Verifies:
 //   1. Every generated header compiles cleanly under C++17.
@@ -7,7 +7,7 @@
 //      types (the most common source of silent regression).
 //
 // Run by the CI pipeline on every push to main, and by the CMake CTest target
-// bifrost_protocol_check when building bifrost-protocol standalone.
+// bpt_messages_check when building bpt-messages standalone.
 
 #include "messages/AckStatus.h"
 #include "messages/BacktestAck.h"

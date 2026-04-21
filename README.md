@@ -15,7 +15,7 @@ Monorepo for a low-latency algorithmic trading system. All inter-service communi
 | **bpt-backtester** | C++ | Exchange simulator, reads Parquet market data |
 | **dashboard/bridge** | C++ | Aeron → WebSocket forwarder for the dashboard frontend |
 | **transport/aeron** | Java | Aeron media driver — central messaging backbone |
-| **messages** | C++ | SBE message schemas and generated codecs (legacy alias: `bifrost::protocol`) |
+| **messages** | C++ | SBE message schemas and generated codecs (`bpt::messages`) |
 
 ## Requirements
 
@@ -115,7 +115,7 @@ bpt-core/
   dashboard/
     bridge/             # Aeron → WebSocket forwarder (C++)
     frontend/           # dashboard UI (not covered here)
-  messages/             # SBE schemas + generated C++ codecs (alias: bifrost::protocol)
+  messages/             # SBE schemas + generated C++ codecs (bpt::messages)
   transport/
     aeron/              # Java media driver (Gradle)
   third_party/

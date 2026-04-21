@@ -1,8 +1,8 @@
-# bifrost-protocol
+# bpt-messages
 
 SBE (Simple Binary Encoding) message schemas and generated C++ codecs for all inter-service communication in the trading system. Both sides of each channel include this repo and use the same generated headers — no independent codec implementations, no drift.
 
-Transport layer: [bifrost-fabric](../bifrost-fabric) (Aeron).
+Transport layer: [bpt-transport](../transport/aeron) (Aeron).
 
 ---
 
@@ -70,14 +70,14 @@ Apply deltas with `deltaSeqNum > snapshotSeqNum`. A gap in `deltaSeqNum` means m
 
 ```
 schema/                         SBE schema XML (source of truth)
-generated/cpp/bifrost_protocol/ Generated C++ headers (committed)
+generated/cpp/messages/ Generated C++ headers (committed)
 scripts/
   download-sbe-tool.sh          Fetches sbe-all-1.30.0.jar from Maven Central
   generate.sh                   Regenerates generated/ from schema/
   install-hooks.sh              Installs the pre-commit hook (run once after clone)
 tools/                          sbe-tool JAR lives here (gitignored)
 cmake/                          CMake package config template
-CMakeLists.txt                  INTERFACE library target bifrost::protocol
+CMakeLists.txt                  INTERFACE library target bpt::messages
 ```
 
 ---
@@ -95,7 +95,7 @@ The pre-commit hook automatically regenerates `generated/` when `schema/` is sta
 
 ## Regenerating codecs
 
-Only needed after editing `schema/bifrost-protocol.xml`:
+Only needed after editing `schema/bpt-protocol.xml`:
 
 ```bash
 ./scripts/generate.sh
@@ -109,20 +109,20 @@ git commit
 
 ```cmake
 # As a subdirectory
-add_subdirectory(path/to/bifrost-protocol)
-target_link_libraries(my_target PRIVATE bifrost::protocol)
+add_subdirectory(path/to/bpt-messages)
+target_link_libraries(my_target PRIVATE bpt::messages)
 ```
 
 Then include headers:
 
 ```cpp
-#include "bifrost_protocol/MessageHeader.h"
-#include "bifrost_protocol/RefDataSubscriptionRequest.h"
-#include "bifrost_protocol/RefDataSnapshot.h"
-#include "bifrost_protocol/RefDataDelta.h"
-#include "bifrost_protocol/RefDataReady.h"
-#include "bifrost_protocol/MdSubscribeBatch.h"
-#include "bifrost_protocol/MdMarketData.h"
+#include "messages/MessageHeader.h"
+#include "messages/RefDataSubscriptionRequest.h"
+#include "messages/RefDataSnapshot.h"
+#include "messages/RefDataDelta.h"
+#include "messages/RefDataReady.h"
+#include "messages/MdSubscribeBatch.h"
+#include "messages/MdMarketData.h"
 // ... other messages as needed
 ```
 
@@ -135,9 +135,9 @@ Requires C++17. The library is header-only — no compilation step.
 ### Encoding a subscription request (Fenrir)
 
 ```cpp
-#include "bifrost_protocol/RefDataSubscriptionRequest.h"
+#include "messages/RefDataSubscriptionRequest.h"
 
-using namespace bifrost::protocol;
+using namespace bpt::messages;
 
 // Allocate a buffer (stack or Aeron offer buffer)
 constexpr std::size_t bufLen =
@@ -157,9 +157,9 @@ instruments.next().putSymbol("ETH-USDT-PERP").putExchange("BINANCE");
 ### Decoding a delta (Fenrir)
 
 ```cpp
-#include "bifrost_protocol/RefDataDelta.h"
+#include "messages/RefDataDelta.h"
 
-using namespace bifrost::protocol;
+using namespace bpt::messages;
 
 // buf/offset come from Aeron fragment handler
 MessageHeader hdr(buf, offset, bufLen, 0);
@@ -181,9 +181,9 @@ switch (delta.updateType()) {
 ### Decoding RefDataReady and validating exchanges (Fenrir)
 
 ```cpp
-#include "bifrost_protocol/RefDataReady.h"
+#include "messages/RefDataReady.h"
 
-using namespace bifrost::protocol;
+using namespace bpt::messages;
 
 MessageHeader hdr(buf, offset, bufLen, 0);
 RefDataReady ready;
@@ -205,7 +205,7 @@ if ((ready.exchangesLoaded() & CONFIGURED_MASK) != CONFIGURED_MASK) {
 | Schema ID | 1 |
 | Schema version | 9 (semantic 1.9.0) |
 | Byte order | little-endian |
-| C++ namespace | `bifrost::protocol` |
+| C++ namespace | `bpt::messages` |
 | SBE tool | Real Logic SBE 1.30.0 |
 
 When adding new fields to existing messages, increment `version` in the schema and use `sinceVersion` on the new fields so older decoders skip them safely.

@@ -2,7 +2,7 @@ environment = "qa"
 strategy_config = "strategies/short_vol.deribit.toml"
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.refdata_control]
 channel = "aeron:ipc"

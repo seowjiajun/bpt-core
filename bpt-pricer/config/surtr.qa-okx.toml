@@ -7,7 +7,7 @@ newton_max_iterations = 100
 newton_tolerance = 1.0e-8
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 # Read market data from Huginn (passive — no subscription request needed)
 [md_input]

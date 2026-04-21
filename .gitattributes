@@ -1,2 +1,2 @@
 # Treat Gradle wrapper JAR as binary — never diff or merge as text
-bifrost/fabric/gradle/wrapper/gradle-wrapper.jar binary
+transport/aeron/gradle/wrapper/gradle-wrapper.jar binary

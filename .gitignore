@@ -52,7 +52,7 @@ __pycache__/
 dist/
 *.egg-info/
 
-# Java (bifrost-fabric)
-bifrost/fabric/.gradle/
-bifrost/fabric/build/
-bifrost/protocol/generated/
+# Java (bpt-transport)
+transport/aeron/.gradle/
+transport/aeron/build/
+messages/generated/

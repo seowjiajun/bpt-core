@@ -5,7 +5,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-group = 'com.bifrost'
+group = 'com.bpt'
 version = '1.0.0'
 
 repositories {
@@ -40,7 +40,7 @@ test {
 }
 
 application {
-    mainClass = 'bifrost.MediaDriverMain'
+    mainClass = 'bpt.transport.MediaDriverMain'
     applicationDefaultJvmArgs = [
         '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED',
         '--add-opens', 'java.base/java.nio=ALL-UNNAMED',

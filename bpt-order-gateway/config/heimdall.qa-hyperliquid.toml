@@ -4,7 +4,7 @@ exchange_config = "config/exchanges/testnet.toml"
 exchanges = ["HYPERLIQUID"]
 
 [aeron]
-media_driver_dir = "/dev/shm/aeron-bifrost"
+media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.order]
 channel = "aeron:ipc"

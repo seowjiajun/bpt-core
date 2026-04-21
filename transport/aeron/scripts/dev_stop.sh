@@ -3,11 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PID_FILE="$PROJECT_DIR/.bifrost.pid"
+PID_FILE="$PROJECT_DIR/.bpt-transport.pid"
 
 # ── Check PID file exists ────────────────────────────────────────
 if [ ! -f "$PID_FILE" ]; then
-    echo "No PID file found. Bifrost does not appear to be running."
+    echo "No PID file found. bpt-transport does not appear to be running."
     exit 0
 fi
 
@@ -21,7 +21,7 @@ if ! kill -0 "$DRIVER_PID" 2>/dev/null; then
 fi
 
 # ── Graceful shutdown (SIGTERM) ──────────────────────────────────
-echo "Stopping Bifrost MediaDriver (PID $DRIVER_PID)..."
+echo "Stopping bpt-transport MediaDriver (PID $DRIVER_PID)..."
 kill "$DRIVER_PID"
 
 # ── Wait for exit with timeout ───────────────────────────────────
@@ -38,4 +38,4 @@ while kill -0 "$DRIVER_PID" 2>/dev/null; do
 done
 
 rm -f "$PID_FILE"
-echo "Bifrost MediaDriver stopped."
+echo "bpt-transport MediaDriver stopped."
