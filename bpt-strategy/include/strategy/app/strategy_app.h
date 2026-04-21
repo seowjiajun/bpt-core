@@ -62,6 +62,15 @@ private:
     // ticks into the fill engine without downcasting the interface.
     // Null otherwise.
     order::PaperOrderGatewayClient* paper_gw_{nullptr};
+
+    // Paper-mode shadow: a real aeron-backed client used ONLY for
+    // AccountSnapshotRequest round-trips to the running bpt-order-gateway.
+    // Paper's order/fill path stays in-process (PaperFillEngine), but
+    // balance/position display on the dashboard needs the real exchange
+    // view — testnet account state is fake capital, so there's no reason
+    // to hide it during a paper run. Null unless paper_mode is true and
+    // the stack has a real order-gateway service configured.
+    std::unique_ptr<order::IOrderGatewayClient> snapshot_gw_;
     std::unique_ptr<vol::VolSurfaceClient> vol_client_;
     std::unique_ptr<order::OrderManager> order_mgr_;
     std::unique_ptr<strategy::IStrategy> strategy_;

@@ -74,38 +74,38 @@ HEALTH_THRESHOLDS = [
 # fails, which is how we detect a hard process crash vs a soft unhealthy.
 
 health_panels = [
-    stat("muninn",   'muninn_healthy or on() vector(0)',
+    stat("refdata",   'refdata_healthy or on() vector(0)',
          x=0,  y=0, w=3, thresholds=HEALTH_THRESHOLDS),
-    stat("huginn",   'huginn_healthy or on() vector(0)',
+    stat("md-gw",   'md_gateway_healthy or on() vector(0)',
          x=3,  y=0, w=3, thresholds=HEALTH_THRESHOLDS),
-    stat("heimdall", 'heimdall_healthy or on() vector(0)',
+    stat("order-gw", 'order_gateway_healthy or on() vector(0)',
          x=6,  y=0, w=3, thresholds=HEALTH_THRESHOLDS),
-    stat("fenrir",   'fenrir_healthy or on() vector(0)',
+    stat("strategy",   'strategy_healthy or on() vector(0)',
          x=9,  y=0, w=3, thresholds=HEALTH_THRESHOLDS),
-    stat("strategy active", 'fenrir_strategy_active or on() vector(0)',
+    stat("strategy active", 'strategy_strategy_active or on() vector(0)',
          x=12, y=0, w=3, thresholds=HEALTH_THRESHOLDS),
-    stat("trading paused", 'fenrir_trading_paused or on() vector(0)',
+    stat("trading paused", 'strategy_trading_paused or on() vector(0)',
          x=15, y=0, w=3),
-    stat("open orders", 'heimdall_open_orders',
+    stat("open orders", 'order_gateway_open_orders',
          x=18, y=0, w=3),
-    stat("instruments", 'muninn_instruments_total',
+    stat("instruments", 'refdata_instruments_total',
          x=21, y=0, w=3),
 ]
 
 
 # ── Row 2: Exchange connectivity (y=3) ───────────────────────────────
-# Both heimdall and huginn expose per-exchange connected gauges. Show
+# Both order-gw and md-gw expose per-exchange connected gauges. Show
 # them as a single graph so a drop on either side is visible.
 
 connectivity_panels = [
     graph(
-        "Exchange connectivity — heimdall",
-        [target('heimdall_exchange_connected', '{{exchange}}')],
+        "Exchange connectivity — order-gw",
+        [target('order_gateway_exchange_connected', '{{exchange}}')],
         x=0, y=3, w=12, h=7,
     ),
     graph(
-        "Exchange connectivity — huginn",
-        [target('huginn_exchange_connected', '{{exchange}}')],
+        "Exchange connectivity — md-gw",
+        [target('md_gateway_exchange_connected', '{{exchange}}')],
         x=12, y=3, w=12, h=7,
     ),
 ]
@@ -117,16 +117,16 @@ connectivity_panels = [
 
 activity_panels = [
     graph(
-        "Order rate (heimdall)",
+        "Order rate (order-gw)",
         [
-            target('sum(rate(heimdall_orders_received_total[1m]))', 'new orders'),
-            target('sum(rate(heimdall_exec_reports_total[1m]))',    'exec reports'),
+            target('sum(rate(order_gateway_orders_received_total[1m]))', 'new orders'),
+            target('sum(rate(order_gateway_exec_reports_total[1m]))',    'exec reports'),
         ],
         x=0, y=10, w=12, h=7, unit=OPS_FORMAT,
     ),
     graph(
-        "Market data publish rate (huginn)",
-        [target('sum(rate(huginn_md_messages_published_total[1m])) by (exchange)',
+        "Market data publish rate (md-gw)",
+        [target('sum(rate(md_gateway_md_messages_published_total[1m])) by (exchange)',
                 '{{exchange}}')],
         x=12, y=10, w=12, h=7, unit=OPS_FORMAT,
     ),
@@ -134,37 +134,37 @@ activity_panels = [
 
 
 # ── Row 4: Order ACK latency (y=17) ───────────────────────────────────
-# heimdall_order_ack_rtt_ns is a histogram. Use histogram_quantile with
+# order_gateway_order_ack_rtt_ns is a histogram. Use histogram_quantile with
 # the _bucket suffix to get p50 / p90 / p99. Units stay ns in the query
 # and we divide to microseconds client-side for readability.
 
 latency_panels = [
     graph(
-        "Order ACK RTT (heimdall) — µs",
+        "Order ACK RTT (order-gw) — µs",
         [
-            target('histogram_quantile(0.50, sum(rate(heimdall_order_ack_rtt_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.50, sum(rate(order_gateway_order_ack_rtt_ns_bucket[5m])) by (le)) / 1000',
                    'p50'),
-            target('histogram_quantile(0.90, sum(rate(heimdall_order_ack_rtt_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.90, sum(rate(order_gateway_order_ack_rtt_ns_bucket[5m])) by (le)) / 1000',
                    'p90'),
-            target('histogram_quantile(0.99, sum(rate(heimdall_order_ack_rtt_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.99, sum(rate(order_gateway_order_ack_rtt_ns_bucket[5m])) by (le)) / 1000',
                    'p99'),
         ],
         x=0, y=17, w=12, h=8,
     ),
-    # Fenrir internal latency. Measures T0 = huginn tick publish time →
+    # Strategy internal latency. Measures T0 = md-gw tick publish time →
     # T3 = strategy callback returns (and the order-placed subset). The
-    # heimdall panel above is the EXCHANGE round-trip; this one isolates
+    # order-gw panel above is the EXCHANGE round-trip; this one isolates
     # our own code path, which should be microseconds on a healthy box.
     graph(
-        "Fenrir tick→strategy latency — µs",
+        "Strategy tick→strategy latency — µs",
         [
-            target('histogram_quantile(0.50, sum(rate(fenrir_tick_to_strategy_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.50, sum(rate(strategy_tick_to_strategy_ns_bucket[5m])) by (le)) / 1000',
                    'tick p50'),
-            target('histogram_quantile(0.99, sum(rate(fenrir_tick_to_strategy_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.99, sum(rate(strategy_tick_to_strategy_ns_bucket[5m])) by (le)) / 1000',
                    'tick p99'),
-            target('histogram_quantile(0.50, sum(rate(fenrir_tick_to_order_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.50, sum(rate(strategy_tick_to_order_ns_bucket[5m])) by (le)) / 1000',
                    'order p50'),
-            target('histogram_quantile(0.99, sum(rate(fenrir_tick_to_order_ns_bucket[5m])) by (le)) / 1000',
+            target('histogram_quantile(0.99, sum(rate(strategy_tick_to_order_ns_bucket[5m])) by (le)) / 1000',
                    'order p99'),
         ],
         x=12, y=17, w=12, h=8,
@@ -177,17 +177,17 @@ latency_panels = [
 error_panels = [
     graph(
         "Stale orders",
-        [target('sum(rate(heimdall_stale_orders_total[5m]))', 'rate/s')],
+        [target('sum(rate(order_gateway_stale_orders_total[5m]))', 'rate/s')],
         x=0, y=25, w=8, h=7, unit=OPS_FORMAT,
     ),
     graph(
         "Risk rejects",
-        [target('sum(rate(heimdall_risk_rejects_total[5m])) by (reason)', '{{reason}}')],
+        [target('sum(rate(order_gateway_risk_rejects_total[5m])) by (reason)', '{{reason}}')],
         x=8, y=25, w=8, h=7, unit=OPS_FORMAT,
     ),
     graph(
-        "MD validation drops (huginn)",
-        [target('sum(rate(huginn_md_validation_drops_total[5m])) by (exchange)',
+        "MD validation drops (md-gw)",
+        [target('sum(rate(md_gateway_md_validation_drops_total[5m])) by (exchange)',
                 '{{exchange}}')],
         x=16, y=25, w=8, h=7, unit=OPS_FORMAT,
     ),
@@ -198,7 +198,7 @@ error_panels = [
 
 dashboard = Dashboard(
     title="BPT System Overview",
-    description="Operational health for muninn / huginn / heimdall / fenrir.",
+    description="Operational health for refdata / md-gw / order-gw / strategy.",
     tags=["bpt", "ops"],
     timezone="browser",
     refresh="10s",

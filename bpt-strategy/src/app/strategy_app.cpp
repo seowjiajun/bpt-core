@@ -68,6 +68,18 @@ StrategyApp::StrategyApp(config::AppConfig cfg,
             bpt::common::log::warn("================================================");
             bpt::common::log::warn(" PAPER MODE  —  orders will NOT reach the exchange ");
             bpt::common::log::warn("================================================");
+
+            // Shadow aeron client for AccountSnapshotRequest only. Lets
+            // the dashboard's Holdings panel show the real testnet
+            // account state during a paper run — testnet capital is
+            // fake, and hiding it produced empty UI with no diagnostic
+            // signal. Orders/fills still flow through `paper_gw_`.
+            snapshot_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
+                                                                    ac.order.channel,
+                                                                    ac.order.stream_id,
+                                                                    ac.exec_report.stream_id,
+                                                                    ac.heartbeat.stream_id,
+                                                                    ac.account_snapshot.stream_id);
         } else {
             order_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
                                                                     ac.order.channel,
@@ -100,8 +112,12 @@ StrategyApp::StrategyApp(config::AppConfig cfg,
 
     strategy_ = strategy::StrategyFactory::create(fc, *refdata_, md_client_.get(), order_mgr_.get(), vol_client_.get());
 
+    // In paper mode, route AccountSnapshotRequest to the real aeron-backed
+    // client (snapshot_gw_) so the real order-gateway answers; otherwise
+    // the request would go to PaperOrderGatewayClient's no-op handler.
+    auto* snap_client = snapshot_gw_ ? snapshot_gw_.get() : order_gw_.get();
     startup_gate_ = std::make_unique<app::StartupGate>(*refdata_,
-                                                       order_gw_.get(),
+                                                       snap_client,
                                                        *strategy_,
                                                        metrics_,
                                                        fc.strategy.schedule.configured_exchanges_mask,
@@ -329,7 +345,7 @@ void StrategyApp::wire_order_callbacks() {
                 std::chrono::steady_clock::now().time_since_epoch()).count());
     };
 
-    order_gw_->on_account_snapshot = [this](bpt::messages::AccountSnapshot& snap) {
+    auto on_snap = [this](bpt::messages::AccountSnapshot& snap) {
         const auto exchange_id = snap.exchangeId();
         bpt::common::log::info(
             "AccountSnapshot received: exchange={} balance={:.2f} positions={}",
@@ -357,6 +373,12 @@ void StrategyApp::wire_order_callbacks() {
             metrics_.reconciliation_divergences_total->Increment();
         }
     };
+    order_gw_->on_account_snapshot = on_snap;
+    // In paper mode the real snapshot arrives on snapshot_gw_, not
+    // order_gw_ (which is the PaperOrderGatewayClient no-op path).
+    if (snapshot_gw_) {
+        snapshot_gw_->on_account_snapshot = on_snap;
+    }
 }
 
 void StrategyApp::run() {
@@ -375,6 +397,8 @@ void StrategyApp::run() {
             frags += vol_client_->poll();
         if (order_gw_)
             frags += order_gw_->poll();
+        if (snapshot_gw_)
+            frags += snapshot_gw_->poll();
         if (tyr_sub_) {
             frags += tyr_sub_->poll(
                 [this](const aeron::concurrent::AtomicBuffer& buffer,
@@ -539,12 +563,15 @@ void StrategyApp::shutdown_flatten() {
     }
 
     // Brief secondary drain so the refresh snapshot propagates through the
-    // bus before we exit.
+    // bus before we exit. In paper mode the real snapshot arrives on
+    // snapshot_gw_, not order_gw_, so poll both.
     if (order_gw_) {
         const uint64_t t1 = bpt::common::util::TscClock::now_epoch_ns();
         constexpr uint64_t kSnapDrainBudgetNs = 1'000'000'000ULL;
         while (bpt::common::util::TscClock::now_epoch_ns() - t1 < kSnapDrainBudgetNs) {
-            const int frags = order_gw_->poll();
+            int frags = order_gw_->poll();
+            if (snapshot_gw_)
+                frags += snapshot_gw_->poll();
             if (frags == 0)
                 __builtin_ia32_pause();
         }
