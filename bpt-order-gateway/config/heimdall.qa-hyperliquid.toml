@@ -1,5 +1,5 @@
 # Instance config — QA environment, Hyperliquid testnet.
-environment = "qa"
+environment = "dev"
 exchange_config = "config/exchanges/testnet.toml"
 exchanges = ["HYPERLIQUID"]
 

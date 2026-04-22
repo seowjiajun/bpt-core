@@ -2,7 +2,8 @@
   "forward": {
     "3_BTC": 1001,
     "3_ETH": 1002,
-    "3_SOL": 1003
+    "3_SOL": 1003,
+    "3_XMR": 1004
   },
   "reverse": {
     "1001": {
@@ -28,8 +29,16 @@
       "exchanges": {
         "3": "SOL"
       }
+    },
+    "1004": {
+      "base": "XMR",
+      "quote": "USDT",
+      "type": "PERP",
+      "exchanges": {
+        "3": "XMR"
+      }
     }
   },
   "exported_at": 1776450537661,
-  "instrument_count": 3
+  "instrument_count": 4
 }
