@@ -36,6 +36,14 @@ function ttfClass(v: Num): string {
   return 'stat-value--green'
 }
 
+// Sample threshold below which markout / adverse / score are statistically
+// meaningless — they'd render as 0.0 which is indistinguishable from "flat
+// market" but actually means "we only have N<5 fills, trust nothing." The
+// number matches scorer_min_samples = 5 in bpt-analytics/config/tyr.*.toml.
+// Plumbing the exact threshold through the message would be more correct
+// but the config rarely changes; hardcoding keeps the panel self-contained.
+const MIN_SAMPLES = 5
+
 export function ToxicityPanel() {
   const tox = useStore((s) => s.toxicity)
 
@@ -53,11 +61,25 @@ export function ToxicityPanel() {
     )
   }
 
+  // Per-side warmup gate: when samples are sparse, mask the markout /
+  // adverse / score cells with '—' rather than letting a single-sample
+  // zero read as "flat market." Fill rate + TTF + sample count stay
+  // visible because they converge meaningfully even at n=1.
+  const bidWarmup = tox.bidSamples < MIN_SAMPLES
+  const askWarmup = tox.askSamples < MIN_SAMPLES
+  const mask = (v: Num, warmup: boolean): Num => (warmup ? null : v)
+
+  const bothWarm = !bidWarmup && !askWarmup
+  const badgeText = bothWarm
+    ? `TYR · ${tox.bidSamples + tox.askSamples} fills`
+    : `WARMUP · bid ${tox.bidSamples}/${MIN_SAMPLES} ask ${tox.askSamples}/${MIN_SAMPLES}`
+  const badgeClass = bothWarm ? 'panel-badge' : 'panel-badge panel-badge--warn'
+
   return (
     <div className="panel" style={{ gridArea: 'toxicity' }}>
       <div className="panel-header">
         <span className="panel-title">Flow Toxicity</span>
-        <span className="panel-badge">TYR · {tox.bidSamples + tox.askSamples} fills</span>
+        <span className={badgeClass}>{badgeText}</span>
       </div>
       <table className="blotter-table" style={{ fontSize: 11 }}>
         <thead>
@@ -73,14 +95,14 @@ export function ToxicityPanel() {
         <tbody>
           <tr>
             <td style={{ fontWeight: 600 }}>BID</td>
-            <td className={`num ${scoreClass(tox.bidMarkout5s)}`}>
-              {fmt1(tox.bidMarkout5s)} bps
+            <td className={`num ${scoreClass(mask(tox.bidMarkout5s, bidWarmup))}`}>
+              {fmt1(mask(tox.bidMarkout5s, bidWarmup))} bps
             </td>
-            <td className={`num ${rateClass(tox.bidAdverseRate)}`}>
-              {fmtPct(tox.bidAdverseRate)}
+            <td className={`num ${rateClass(mask(tox.bidAdverseRate, bidWarmup))}`}>
+              {fmtPct(mask(tox.bidAdverseRate, bidWarmup))}
             </td>
-            <td className={`num ${scoreClass(tox.bidToxScore)}`}>
-              {fmtScore(tox.bidToxScore)}
+            <td className={`num ${scoreClass(mask(tox.bidToxScore, bidWarmup))}`}>
+              {fmtScore(mask(tox.bidToxScore, bidWarmup))}
             </td>
             <td className={`num ${fillRateClass(tox.bidFillRate)}`}>
               {fmtPct(tox.bidFillRate)}
@@ -91,14 +113,14 @@ export function ToxicityPanel() {
           </tr>
           <tr>
             <td style={{ fontWeight: 600 }}>ASK</td>
-            <td className={`num ${scoreClass(tox.askMarkout5s)}`}>
-              {fmt1(tox.askMarkout5s)} bps
+            <td className={`num ${scoreClass(mask(tox.askMarkout5s, askWarmup))}`}>
+              {fmt1(mask(tox.askMarkout5s, askWarmup))} bps
             </td>
-            <td className={`num ${rateClass(tox.askAdverseRate)}`}>
-              {fmtPct(tox.askAdverseRate)}
+            <td className={`num ${rateClass(mask(tox.askAdverseRate, askWarmup))}`}>
+              {fmtPct(mask(tox.askAdverseRate, askWarmup))}
             </td>
-            <td className={`num ${scoreClass(tox.askToxScore)}`}>
-              {fmtScore(tox.askToxScore)}
+            <td className={`num ${scoreClass(mask(tox.askToxScore, askWarmup))}`}>
+              {fmtScore(mask(tox.askToxScore, askWarmup))}
             </td>
             <td className={`num ${fillRateClass(tox.askFillRate)}`}>
               {fmtPct(tox.askFillRate)}

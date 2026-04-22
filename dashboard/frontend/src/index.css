@@ -207,6 +207,13 @@ html, body, #root {
   color: var(--text-secondary);
 }
 
+/* Warmup / insufficient-data variant — same shape, attention-grabbing
+ * color. Used by ToxicityPanel while per-side sample count is below the
+ * scorer threshold so users can distinguish "warming up" from "markout=0". */
+.panel-badge--warn {
+  color: var(--amber, #d4a72c);
+}
+
 .panel-body {
   flex: 1;
   padding: 12px;
