@@ -158,12 +158,11 @@ for f in deploy/topology/*.toml; do
 done
 
 echo "--- Copying host-side scripts..."
-cp deploy/generate-units.sh    "$STAGE/scripts/"
-cp deploy/sync-config.sh       "$STAGE/scripts/" 2>/dev/null || true
-cp scripts/cleanup-stale-logs.sh "$STAGE/scripts/" 2>/dev/null || true
-# Deploy + rollback land here once they exist (TODO — follow-up commit).
-cp deploy/deploy.sh            "$STAGE/scripts/" 2>/dev/null || true
-cp deploy/rollback.sh          "$STAGE/scripts/" 2>/dev/null || true
+cp deploy/generate-units.sh      "$STAGE/scripts/"
+cp deploy/sync-config.sh         "$STAGE/scripts/"
+cp scripts/cleanup-stale-logs.sh "$STAGE/scripts/"
+cp deploy/deploy.sh              "$STAGE/scripts/"
+cp deploy/rollback.sh            "$STAGE/scripts/"
 
 echo "$VERSION" > "$STAGE/VERSION"
 date -u +%FT%TZ > "$STAGE/BUILT_AT"
