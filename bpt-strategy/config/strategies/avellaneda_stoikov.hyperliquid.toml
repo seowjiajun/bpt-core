@@ -95,6 +95,35 @@ min_half_spread_bps = 0.1
 drift_halflife_s    = 15.0
 drift_suppress_bps  = 5.0
 
+# ── Slow-drift (trend) suppression ─────────────────────────────────
+# Complements the per-√s drift EWMA above. Same wrong-side logic —
+# suppress the inventory-adverse side in a trending market — but keyed
+# on cumulative return over a rolling anchor window rather than per-√s
+# normalized return. Targets sustained slow bleeds that the fast EWMA
+# misses because their per-second rate is too small to clear
+# drift_suppress_bps.
+#
+# Motivating case (2026-04-22): 2% XMR decline over ~34 min registered
+# as ~0.1 bps/√s on the fast EWMA — well below the 5 bps/√s threshold —
+# so drift_suppress_bids never fired. Meanwhile AS kept quoting bids
+# into every tick down and accumulated ~1.64 XMR short via adverse
+# selection. That same move = ~60 bps over a 5-min window → clearly
+# trips a 20 bps threshold here.
+#
+# Tuning knobs:
+#   slow_drift_window_s    — window length in seconds. Shorter → more
+#                             reactive + noisier; longer → slower but
+#                             more stable. 300s (5min) is a reasonable
+#                             default for asset classes where sustained
+#                             trends last minutes, not seconds.
+#   slow_drift_suppress_bps — threshold on |cum_return| over the window.
+#                             Set 2-3× typical noise-band over the same
+#                             window. 0 disables. For HL XMR where noise
+#                             is ~5-10 bps / 5min, 20 bps gives clean
+#                             separation.
+slow_drift_window_s     = 300.0
+slow_drift_suppress_bps = 20.0
+
 # ── Tyr toxicity feedback (optional) ──────────────────────────────
 # When tyr is running and fenrir subscribes to stream 5001 (set
 # [aeron.toxicity] stream_id = 5001 in the instance config), AS

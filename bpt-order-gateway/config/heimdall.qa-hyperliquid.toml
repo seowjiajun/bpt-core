@@ -33,6 +33,23 @@ max_order_size_usd = 500.0
 max_notional_per_order_usd = 1000.0
 max_open_orders_per_venue = 50
 max_orders_per_second = 10
+# Latched kill switch on realized UTC-day P&L. Below -75 USD the
+# gateway rejects all subsequent NewOrders with RISK_REJECTED and
+# stays latched until restart — see bpt-order-gateway/src/risk/pnl_tracker
+# and backlog item #1. Scaled for HL testnet where starting balance
+# is ~$686 (~-11% before halt). Raise when moving to a larger capital
+# base; don't raise without explicit reason.
+max_daily_loss_usd = 75.0
+# Pre-trade cap on absolute position USD exposure per (exchange,
+# instrument). Projected as (current_net_qty + order_dir × order_qty)
+# × order_price. AS on HL XMR runs with max_inventory = 1.0 XMR
+# ≈ $377 notional at current prices; 750 USD gives the strategy its
+# configured ceiling plus one order of breathing room for timing gaps
+# between an inventory-cap check and the actual fill. This is the
+# belt; AS's own max_inventory is the suspenders. Was missing entirely
+# before 2026-04-22 and allowed position to reach -1.94 XMR (≈$730)
+# in a single session via cumulative divergence.
+max_position_usd = 750.0
 
 [metrics]
 port = 9103

@@ -188,6 +188,17 @@ private:
         double tyr_ask_toxicity{0.0};
         bool tyr_data_received{false};
 
+        // Slow-drift (trend) tracking — cumulative return from a window-
+        // start anchor. Catches multi-minute trends that the per-√s
+        // drift EWMA misses because its per-second rate is too small
+        // to clear the drift_suppress_bps threshold. Updated in on_bbo:
+        // advance the window anchor once per slow_drift_window_s_,
+        // recompute slow_drift_bps as (mid - anchor) / anchor in bps.
+        // See suppression logic in compute_quotes.
+        double slow_drift_window_start_mid{0.0};
+        uint64_t slow_drift_window_start_ns{0};
+        double slow_drift_bps{0.0};  // cached for state JSON + suppression check
+
         // Maintained L2 ladder. Populated from MdOrderBook deltas in
         // on_order_book(); read by the queuing logic in Phase 3+.
         OrderBookState book;
@@ -261,6 +272,23 @@ private:
     // Drift (momentum) detection — Cartea-Jaimungal extension of AS.
     double drift_halflife_s_;    // EWMA half-life for µ estimation (seconds)
     double drift_suppress_bps_;  // suppress adverse side when |µ| > this (bps/√s)
+
+    // Slow-drift (trend) detection — complements the per-√s EWMA drift
+    // above. The fast signal is tuned for flash moves (threshold in
+    // bps/√s, sensitive to sudden spikes). It misses sustained slow
+    // bleeds — a 2% decline over 30 min on XMR registers as ~0.1 bps/√s,
+    // well below drift_suppress_bps_ = 5, so the fast signal's
+    // side-suppression never fires against a directional grind.
+    //
+    // Mechanism: anchor a mid sample at `window_start`, advance the
+    // anchor every slow_drift_window_s_ seconds, compute
+    // `slow_drift_bps = (mid_now - anchor) / anchor * 1e4`. Suppress
+    // the trend-adverse side when |slow_drift_bps| > slow_drift_suppress_bps_.
+    // Window-based (not EWMA) because the cumulative-return framing gives
+    // a predictable threshold in absolute bps; EWMA would require an
+    // adaptive threshold keyed to halflife.
+    double slow_drift_window_s_;      // rolling anchor window (seconds)
+    double slow_drift_suppress_bps_;  // suppress when |cum_return| > this (bps). 0 disables.
 
     // Analytics toxicity suppression — suppress side when tyr score < threshold.
     // 0 disables. Typical value: -2.0 (suppress when 5s markout is -2bps or worse).

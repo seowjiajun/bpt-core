@@ -190,6 +190,13 @@ export interface StrategyStateMsg {
   exchange: string
   drift: number
   driftBps: number
+  // Slow-drift signal: cumulative return (in bps) from a rolling
+  // anchor advanced every slow_drift_window_s. Complements `driftBps`
+  // which is the per-√s EWMA — fast signal vs trend signal. Side
+  // suppression triggers when |slowDriftBps| > slowDriftSuppressBps
+  // (0 = feature disabled in strategy config).
+  slowDriftBps?: number
+  slowDriftSuppressBps?: number
   sigma2: number
   kappa: number
   kappaLive: boolean

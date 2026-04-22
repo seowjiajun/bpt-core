@@ -65,6 +65,8 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       order_book_depth_(static_cast<uint8_t>(cfg.params["order_book_depth"].value<int64_t>().value_or(0))),
       drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
       drift_suppress_bps_(cfg.params["drift_suppress_bps"].value<double>().value_or(0.0)),
+      slow_drift_window_s_(cfg.params["slow_drift_window_s"].value<double>().value_or(300.0)),
+      slow_drift_suppress_bps_(cfg.params["slow_drift_suppress_bps"].value<double>().value_or(0.0)),
       tyr_suppress_threshold_(cfg.params["tyr_suppress_threshold"].value<double>().value_or(0.0)),
       queue_suppress_fill_prob_min_(cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0)),
       shutdown_cross_bps_(cfg.params["shutdown_cross_bps"].value<double>().value_or(20.0)),
@@ -98,7 +100,8 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                            "kappa_halflife={:.1f}s kappa_warmup={} kappa_min={:.4f} "
                            "requote_thr={:.4f}% max_inv={:.4f} qty={:.6f} "
                            "half_spread=[{:.1f},{:.1f}]bps "
-                           "drift_halflife={:.1f}s drift_suppress={:.1f}bps",
+                           "drift_halflife={:.1f}s drift_suppress={:.1f}bps "
+                           "slow_drift_window={:.0f}s slow_drift_suppress={:.1f}bps",
                            gamma_,
                            kappa_,
                            session_duration_s_,
@@ -113,7 +116,9 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                            min_half_spread_bps_,
                            max_half_spread_bps_,
                            drift_halflife_s_,
-                           drift_suppress_bps_);
+                           drift_suppress_bps_,
+                           slow_drift_window_s_,
+                           slow_drift_suppress_bps_);
     bpt::common::log::info(kLog(),
                            "risk: max_position_usd={} max_order_size_usd={}",
                            cfg.risk.max_position_usd,
@@ -359,6 +364,25 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     // st.book unpopulated.
     st.last_market_bid = bid_px;
     st.last_market_ask = ask_px;
+
+    // Slow-drift anchor. Seeded on first tick, advanced once per
+    // window duration. slow_drift_bps expresses cumulative return
+    // from the anchor in bps — see the trend-suppression block in
+    // compute_quotes for how it drives side cutoff.
+    if (st.slow_drift_window_start_ns == 0) {
+        st.slow_drift_window_start_mid = mid;
+        st.slow_drift_window_start_ns = ts_ns;
+    } else {
+        const uint64_t window_ns = static_cast<uint64_t>(slow_drift_window_s_ * 1e9);
+        if (ts_ns - st.slow_drift_window_start_ns > window_ns) {
+            st.slow_drift_window_start_mid = mid;
+            st.slow_drift_window_start_ns = ts_ns;
+        }
+    }
+    if (st.slow_drift_window_start_mid > 0.0) {
+        st.slow_drift_bps =
+            (mid - st.slow_drift_window_start_mid) / st.slow_drift_window_start_mid * 1e4;
+    }
 
     // ── Update EWMA volatility ─────────────────────────────────────────────
     if (st.session_start_ns == 0)
@@ -718,6 +742,21 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
     const bool suppress_asks = drift_suppressing && st.ewma_drift > 0.0;  // uptrend → don't sell
     const bool suppress_bids = drift_suppressing && st.ewma_drift < 0.0;  // downtrend → don't buy
 
+    // ── Slow-drift (trend) side suppression ───────────────────────────────
+    // Complements the fast drift EWMA above — same wrong-side logic, but
+    // keyed on cumulative return over slow_drift_window_s_ rather than
+    // per-√s normalized return. Catches sustained slow bleeds that clear
+    // slow_drift_suppress_bps_ without ever registering on the per-√s
+    // threshold. See the session-forensics note in
+    // project_prod_hardening_backlog.md for the case that motivated this.
+    //
+    // slow_drift_suppress_bps_ = 0 disables.
+    const double slow_drift_bps_abs = std::abs(st.slow_drift_bps);
+    const bool trend_suppressing =
+        slow_drift_suppress_bps_ > 0.0 && slow_drift_bps_abs > slow_drift_suppress_bps_;
+    const bool trend_suppress_asks = trend_suppressing && st.slow_drift_bps > 0.0;  // uptrend → don't sell
+    const bool trend_suppress_bids = trend_suppressing && st.slow_drift_bps < 0.0;  // downtrend → don't buy
+
     // ── Analytics toxicity-based side suppression ──────────────────────────────
     // When tyr reports a toxicity score below the threshold for a side,
     // suppress that side. This is outcome-based (actual fill markouts)
@@ -764,9 +803,21 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
         queue_suppress_asks = fp_ask < queue_suppress_fill_prob_min_;
     }
 
-    // Combine drift, tyr, and queue suppression — any can suppress a side.
-    const bool final_suppress_bids = suppress_bids || tyr_suppress_bids || queue_suppress_bids;
-    const bool final_suppress_asks = suppress_asks || tyr_suppress_asks || queue_suppress_asks;
+    // Combine drift, trend, tyr, and queue suppression — any can suppress a side.
+    const bool final_suppress_bids =
+        suppress_bids || trend_suppress_bids || tyr_suppress_bids || queue_suppress_bids;
+    const bool final_suppress_asks =
+        suppress_asks || trend_suppress_asks || tyr_suppress_asks || queue_suppress_asks;
+
+    if (trend_suppressing) {
+        bpt::common::log::info(kLog(),
+                               "{} trend suppress |Δ|={:.1f}bps > {:.1f}bps over {:.0f}s window — suppressing {}",
+                               st.symbol,
+                               slow_drift_bps_abs,
+                               slow_drift_suppress_bps_,
+                               slow_drift_window_s_,
+                               st.slow_drift_bps > 0 ? "asks" : "bids");
+    }
 
     if (drift_suppressing) {
         bpt::common::log::info(kLog(),
@@ -1070,6 +1121,15 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     const bool drift_suppress_bids = drift_suppressing && st.ewma_drift < 0;
     const bool drift_suppress_asks = drift_suppressing && st.ewma_drift > 0;
 
+    // Slow-drift (trend) suppression state — mirror of the logic in
+    // compute_quotes so the dashboard badge agrees with the actual
+    // decision the strategy will make on the next quote.
+    const double slow_drift_bps_abs_state = std::abs(st.slow_drift_bps);
+    const bool trend_suppressing =
+        slow_drift_suppress_bps_ > 0 && slow_drift_bps_abs_state > slow_drift_suppress_bps_;
+    const bool trend_suppress_bids = trend_suppressing && st.slow_drift_bps < 0;
+    const bool trend_suppress_asks = trend_suppressing && st.slow_drift_bps > 0;
+
     // Analytics suppression state
     const bool tyr_suppress_bids =
         tyr_suppress_threshold_ < 0 && st.tyr_data_received && st.tyr_bid_toxicity < tyr_suppress_threshold_;
@@ -1128,6 +1188,8 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     // Model parameters (live values, not config)
     j["drift"] = st.ewma_drift;
     j["driftBps"] = drift_bps;
+    j["slowDriftBps"] = st.slow_drift_bps;
+    j["slowDriftSuppressBps"] = slow_drift_suppress_bps_;
     j["sigma2"] = st.ewma_var;
     j["kappa"] = (st.kappa_ticks >= kappa_warmup_ticks_) ? std::max(kappa_min_, st.ewma_kappa) : kappa_;
     j["kappaLive"] = st.kappa_ticks >= kappa_warmup_ticks_;
@@ -1152,20 +1214,25 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["inventoryPct"] = max_inventory_ > 0 ? std::abs(net_qty) / max_inventory_ * 100.0 : 0;
 
     // Suppression state per side — order matters for reason priority:
-    // vol_gate → inventory → drift → tyr → queue (most to least severe).
-    j["bidSuppressed"] =
-        drift_suppress_bids || tyr_suppress_bids || inv_suppress_bids || vol_halted || queue_suppress_bids;
+    // vol_gate → inventory → drift → trend → tyr → queue (most to least severe).
+    // "drift" and "trend" both indicate direction-adverse suppression but
+    // on different time horizons: drift = per-√s EWMA (flash moves),
+    // trend = cumulative return over slow_drift_window_s_ (sustained bleeds).
+    j["bidSuppressed"] = drift_suppress_bids || trend_suppress_bids || tyr_suppress_bids
+                         || inv_suppress_bids || vol_halted || queue_suppress_bids;
     j["bidSuppressReason"] = vol_halted            ? "vol_gate"
                              : inv_suppress_bids   ? "inventory"
                              : drift_suppress_bids ? "drift"
+                             : trend_suppress_bids ? "trend"
                              : tyr_suppress_bids   ? "tyr"
                              : queue_suppress_bids ? "queue"
                                                    : "";
-    j["askSuppressed"] =
-        drift_suppress_asks || tyr_suppress_asks || inv_suppress_asks || vol_halted || queue_suppress_asks;
+    j["askSuppressed"] = drift_suppress_asks || trend_suppress_asks || tyr_suppress_asks
+                         || inv_suppress_asks || vol_halted || queue_suppress_asks;
     j["askSuppressReason"] = vol_halted            ? "vol_gate"
                              : inv_suppress_asks   ? "inventory"
                              : drift_suppress_asks ? "drift"
+                             : trend_suppress_asks ? "trend"
                              : tyr_suppress_asks   ? "tyr"
                              : queue_suppress_asks ? "queue"
                                                    : "";

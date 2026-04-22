@@ -13,6 +13,7 @@ function SuppressIndicator({ suppressed, reason }: { suppressed: boolean; reason
   // coherent with the ToxicityPanel badge.
   const labels: Record<string, string> = {
     drift: 'DRIFT',
+    trend: 'TREND',
     tyr: 'TOX',
     inventory: 'INV',
     vol_gate: 'VHALT',
