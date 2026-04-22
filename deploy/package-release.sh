@@ -36,6 +36,9 @@
 # same SHA should produce a functionally identical artifact.
 
 set -euo pipefail
+# Empty globs collapse instead of iterating the literal pattern — otherwise
+# `for f in */.json; do cp "$f" ...` fires set -e on the no-match iteration.
+shopt -s nullglob
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
@@ -66,7 +69,12 @@ trap 'rm -rf "$STAGE_ROOT"' EXIT
 # without needing --transform tricks.
 STAGE="$STAGE_ROOT/bpt-${VERSION}"
 
-mkdir -p "$STAGE"/{bin/transport,share/schema,share/config-templates,share/instruments,scripts}
+mkdir -p "$STAGE"/{bin/transport,share/schema,share/config-templates,share/instruments,share/topology,scripts}
+# Per-service config seeds. Mirrors the source-tree bpt-<svc>/config/ layout
+# so deploy.sh can seed $BPT_DEPLOY_ROOT/<svc>/config/ on first install —
+# that layout is what the generated systemd units expect at runtime
+# (WorkingDirectory=$BPT_ROOT/$svc). See deploy/generate-units.sh.
+mkdir -p "$STAGE"/share/service-configs/{refdata,md-gateway,order-gateway,strategy,analytics,bridge}
 
 echo "--- Copying C++ binaries..."
 # Map: source binary path → destination name under bin/
@@ -110,6 +118,43 @@ done
 # Strategy default / shared parameter templates (reference material for operators).
 for f in bpt-strategy/config/strategies/*.toml; do
     [ -f "$f" ] && cp "$f" "$STAGE/share/config-templates/"
+done
+
+echo "--- Copying per-service config seeds..."
+# Per-service TOMLs + exchange-config subdirs. Layout inside each service
+# seed mirrors exactly what the source-tree bpt-<svc>/config/ contains, so
+# deploy.sh can cp -r share/service-configs/<svc>/. into $BPT_DEPLOY_ROOT/bpt-<svc>/config/.
+# Exclude build artefacts (Bazel BUILD files, etc).
+copy_service_configs() {
+    local svc_src="$1" seed_dst="$2"
+    for f in "$svc_src"/*.toml; do
+        cp "$f" "$seed_dst/"
+    done
+    for d in "$svc_src"/*/; do
+        local name
+        name=$(basename "$d")
+        case "$name" in
+            BUILD|tests|__pycache__) continue ;;  # never ship build/test junk
+        esac
+        mkdir -p "$seed_dst/$name"
+        for f in "$d"/*.toml "$d"/*.json; do
+            cp "$f" "$seed_dst/$name/"
+        done
+    done
+}
+copy_service_configs bpt-refdata/config         "$STAGE/share/service-configs/refdata"
+copy_service_configs bpt-md-gateway/config      "$STAGE/share/service-configs/md-gateway"
+copy_service_configs bpt-order-gateway/config   "$STAGE/share/service-configs/order-gateway"
+copy_service_configs bpt-strategy/config        "$STAGE/share/service-configs/strategy"
+copy_service_configs bpt-analytics/config       "$STAGE/share/service-configs/analytics"
+# Bridge lives under dashboard/bridge/config/
+copy_service_configs dashboard/bridge/config    "$STAGE/share/service-configs/bridge"
+
+echo "--- Copying CPU-affinity topology profiles..."
+# deploy/topology/*.toml — per-host-class pinning profiles. Operator (or
+# deploy.sh) picks one and points the active env at it.
+for f in deploy/topology/*.toml; do
+    [ -f "$f" ] && cp "$f" "$STAGE/share/topology/"
 done
 
 echo "--- Copying host-side scripts..."
