@@ -134,6 +134,14 @@ private:
         double last_bid_price{0.0};
         double last_ask_price{0.0};
 
+        // Most-recent market top-of-book, cached from on_bbo. Only used
+        // by the dashboard state publisher — the strategy math operates
+        // on last_mid. Keeping it separate from st.book so strategies
+        // configured with order_book_depth=0 still have a reference for
+        // the chart overlay.
+        double last_market_bid{0.0};
+        double last_market_ask{0.0};
+
         // Mid price at the time each side was placed — used for directional cancel.
         // Cancel a bid if mid has risen by more than requote_threshold_ since placement
         // (informed flow is pushing against us); same logic inverted for asks.

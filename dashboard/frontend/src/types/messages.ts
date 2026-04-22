@@ -241,6 +241,11 @@ export interface StrategyStateMsg {
   bidProjectedFillProb?: number
   askProjectedFillProb?: number
   queueSuppressMin?: number
+  // Market best bid/ask — for the PriceChart overlay so users can
+  // see our quote placement relative to the touch. 0 when the book
+  // hasn't warmed up.
+  marketBid?: number
+  marketAsk?: number
 }
 
 export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg | OrderMsg | PortfolioMsg | AccountMsg | ToxicityMsg | StrategyStateMsg

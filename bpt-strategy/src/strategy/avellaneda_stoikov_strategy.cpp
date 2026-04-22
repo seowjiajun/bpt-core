@@ -353,6 +353,13 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     const double mid = (bid_px + ask_px) * 0.5;
     const uint64_t ts_ns = tick.timestampNs();
 
+    // Cache market top-of-book for the dashboard overlay. Done here (not
+    // just before publish) so the strategy sees the same values the
+    // dashboard does, and works even when order_book_depth=0 leaves
+    // st.book unpopulated.
+    st.last_market_bid = bid_px;
+    st.last_market_ask = ask_px;
+
     // ── Update EWMA volatility ─────────────────────────────────────────────
     if (st.session_start_ns == 0)
         st.session_start_ns = ts_ns;
@@ -1189,6 +1196,12 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["bidProjectedFillProb"] = projected_fp_bid;
     j["askProjectedFillProb"] = projected_fp_ask;
     j["queueSuppressMin"] = queue_suppress_fill_prob_min_;
+
+    // Market best bid/ask — cached by on_bbo. Preferred over st.book
+    // because this strategy runs with order_book_depth=0 (no L2 ladder
+    // consumption); st.book.ready() would always return false here.
+    j["marketBid"] = st.last_market_bid;
+    j["marketAsk"] = st.last_market_ask;
 
     return j.dump();
 }
