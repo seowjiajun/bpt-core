@@ -20,6 +20,7 @@
 #include <messages/OrderSide.h>
 
 #include <atomic>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -199,6 +200,13 @@ private:
         double slow_drift_window_start_mid{0.0};
         uint64_t slow_drift_window_start_ns{0};
         double slow_drift_bps{0.0};  // cached for state JSON + suppression check
+
+        // Rolling per-fill realized-PnL deltas — fixed-size FIFO,
+        // length capped by gamma_pnl_window_n_. Used by gamma_pnl_mult()
+        // to widen γ after a recent loss streak / tighten after a
+        // recent profit streak. Empty when the feature is disabled
+        // (gamma_pnl_window_n_ == 0) or pre-fill warmup.
+        std::deque<double> recent_rpnl;
 
         // Maintained L2 ladder. Populated from MdOrderBook deltas in
         // on_order_book(); read by the queuing logic in Phase 3+.
@@ -439,6 +447,29 @@ private:
     // on_bbo tick once the vol EWMA has warmed up. 0 disables adaptive
     // part (purely fixed threshold).
     double vol_gate_sigma_mult_;
+
+    // γ feedback from recent realized PnL — closes a feedback loop on
+    // the risk-aversion parameter using observed session performance.
+    // Every FILLED/PARTIAL exec report pushes its rpnl delta into
+    // st.recent_rpnl (FIFO, capped at gamma_pnl_window_n_);
+    // gamma_pnl_mult(st) inspects the rolling sum and returns:
+    //   gamma_pnl_widen_mult_   if sum < loss_threshold_usd  (loss streak → wider quotes)
+    //   gamma_pnl_tighten_mult_ if sum > profit_threshold_usd (profit streak → tighter)
+    //   1.0 otherwise (feature disabled or rpnl in the deadband)
+    // The multiplier is folded into AS's effective γ alongside the
+    // regime detector's gamma_multiplier.
+    //
+    // Defaults: window_n = 0 → feature disabled. This is the highest-
+    // blast-radius adaptive knob on AS — a mis-tuned widen_mult of 5x
+    // could lock the strategy into permanent wide quotes. Conservative
+    // values (widen ≤ 2.0, tighten ≥ 0.7) recommended.
+    std::size_t gamma_pnl_window_n_;
+    double gamma_pnl_loss_threshold_usd_;
+    double gamma_pnl_profit_threshold_usd_;
+    double gamma_pnl_widen_mult_;
+    double gamma_pnl_tighten_mult_;
+
+    [[nodiscard]] double gamma_pnl_mult(const InstrumentState& st) const;
 
     std::vector<std::string> instruments_;
     std::vector<std::string> md_exchanges_;

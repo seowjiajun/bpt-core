@@ -94,6 +94,12 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
           static_cast<uint64_t>(cfg.params["vol_gate_halt_ms"].value<double>().value_or(5000.0) * 1e6),
       },
       vol_gate_sigma_mult_(cfg.params["vol_gate_sigma_mult"].value<double>().value_or(0.0)),
+      gamma_pnl_window_n_(static_cast<std::size_t>(
+          cfg.params["gamma_pnl_window_n"].value<int64_t>().value_or(0))),
+      gamma_pnl_loss_threshold_usd_(cfg.params["gamma_pnl_loss_threshold_usd"].value<double>().value_or(0.0)),
+      gamma_pnl_profit_threshold_usd_(cfg.params["gamma_pnl_profit_threshold_usd"].value<double>().value_or(0.0)),
+      gamma_pnl_widen_mult_(cfg.params["gamma_pnl_widen_mult"].value<double>().value_or(1.0)),
+      gamma_pnl_tighten_mult_(cfg.params["gamma_pnl_tighten_mult"].value<double>().value_or(1.0)),
       instruments_(cfg.instruments),
       md_exchanges_(cfg.md_exchanges),
       venue_exec_(cfg.venue_exec),
@@ -540,6 +546,13 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
     }
 
     if (status == ExecStatus::FILLED || status == ExecStatus::PARTIAL) {
+        // Capture rpnl baseline before the fill so we can derive this
+        // fill's CONTRIBUTION to realized PnL (PositionTracker holds
+        // session-cumulative; γ-feedback wants per-fill delta). When
+        // there's no prior position, baseline = 0.
+        const auto before = positions_.get(canonical_id, st.exchange_id);
+        const double prior_rpnl = before ? before->realized_pnl : 0.0;
+
         positions_.on_fill(canonical_id, st.exchange_id, rpt.side(), rpt.filledQty(), rpt.price());
         st.queue.on_fill(order_id, static_cast<double>(rpt.filledQty()) / 1e8);
 
@@ -551,6 +564,18 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
                                    static_cast<double>(pos->net_qty) / 1e8,
                                    pos->avg_price,
                                    pos->realized_pnl);
+
+            // γ-feedback rolling window — only push when feature enabled
+            // and the fill actually realized PnL (opening fills don't
+            // realize anything; deltas of 0 would dilute the window).
+            if (gamma_pnl_window_n_ > 0) {
+                const double delta = pos->realized_pnl - prior_rpnl;
+                if (delta != 0.0) {
+                    st.recent_rpnl.push_back(delta);
+                    while (st.recent_rpnl.size() > gamma_pnl_window_n_)
+                        st.recent_rpnl.pop_front();
+                }
+            }
         }
     }
 
@@ -653,7 +678,13 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
     // Regime-adjusted gamma: widen spreads in trending regimes, tighten
     // in mean-reverting regimes. The multiplier comes from the Hurst-based
     // regime detector (1.8x in trending, 0.6x in mean-reverting, 1.0x neutral).
-    const double effective_gamma = gamma_ * st.regime.gamma_multiplier();
+    // Effective γ folds in two adaptive factors:
+    //   1. Regime detector multiplier (mean-rev / neutral / trending)
+    //   2. PnL feedback multiplier (widen on recent loss streak)
+    // Both default to 1.0 when their respective features are disabled,
+    // so static γ behavior is unchanged unless operator opts in.
+    const double effective_gamma =
+        gamma_ * st.regime.gamma_multiplier() * gamma_pnl_mult(st);
     const double gamma_sigma_sq_T = effective_gamma * sigma_sq * T_minus_t;
 
     // Drift-adjusted reservation price (Cartea-Jaimungal extension).
@@ -745,6 +776,19 @@ double AvellanedaStoikovStrategy::effective_max_inventory(const InstrumentState&
         return max_inventory_fraction_ * equity_usd / st.last_mid;
     }
     return max_inventory_;
+}
+
+double AvellanedaStoikovStrategy::gamma_pnl_mult(const InstrumentState& st) const {
+    // Disabled if window not configured. Also a no-op until at least
+    // one fill has accrued — empty deque sums to 0, which falls into
+    // the deadband by design (no over-eager widen on session start).
+    if (gamma_pnl_window_n_ == 0 || st.recent_rpnl.empty())
+        return 1.0;
+    double sum = 0.0;
+    for (double r : st.recent_rpnl) sum += r;
+    if (sum < gamma_pnl_loss_threshold_usd_)   return gamma_pnl_widen_mult_;
+    if (sum > gamma_pnl_profit_threshold_usd_) return gamma_pnl_tighten_mult_;
+    return 1.0;
 }
 
 // ── Suppression state — single source of truth for both runtime
@@ -1218,8 +1262,16 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["regime"] = st.regime.regime_name();
     j["hurst"] = st.regime.hurst();
     j["gammaBase"] = gamma_;
-    j["gammaEffective"] = gamma_ * st.regime.gamma_multiplier();
+    const double gpnl_mult = gamma_pnl_mult(st);
+    j["gammaEffective"] = gamma_ * st.regime.gamma_multiplier() * gpnl_mult;
     j["gammaMultiplier"] = st.regime.gamma_multiplier();
+    j["gammaPnlMultiplier"] = gpnl_mult;
+    j["gammaPnlWindow"] = static_cast<int>(gamma_pnl_window_n_);
+    j["gammaPnlRecentSum"] = [&]() {
+        double s = 0.0;
+        for (double r : st.recent_rpnl) s += r;
+        return s;
+    }();
 
     // Quotes
     j["mid"] = st.last_mid;
