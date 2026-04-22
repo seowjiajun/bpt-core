@@ -89,16 +89,13 @@ void StrategyApp::shutdown_flatten() {
         }
     }
 
-    // Brief secondary drain so the refresh snapshot propagates through the
-    // bus before we exit. In paper mode the real snapshot arrives on
-    // snapshot_gw_, not order_gw_, so poll both.
+    // Brief secondary drain so the refresh snapshot propagates through
+    // the bus before we exit.
     if (order_gw_) {
         const uint64_t t1 = bpt::common::util::TscClock::now_epoch_ns();
         constexpr uint64_t kSnapDrainBudgetNs = 1'000'000'000ULL;
         while (bpt::common::util::TscClock::now_epoch_ns() - t1 < kSnapDrainBudgetNs) {
             int frags = order_gw_->poll();
-            if (snapshot_gw_)
-                frags += snapshot_gw_->poll();
             if (frags == 0)
                 __builtin_ia32_pause();
         }

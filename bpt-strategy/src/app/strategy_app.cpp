@@ -1,7 +1,6 @@
 #include "strategy/app/strategy_app.h"
 
 #include "strategy/order/aeron_order_gateway_client.h"
-#include "strategy/order/paper_order_gateway_client.h"
 #include "strategy/strategy/strategy_factory.h"
 
 #include <analytics/messaging/toxicity_update.h>
@@ -60,40 +59,12 @@ StrategyApp::StrategyApp(config::AppConfig cfg,
     }
 
     if (ac.order.stream_id != 0) {
-        if (cfg_.strat.strategy.paper_mode) {
-            // Canary / shadow run: swallow orders locally, synthesise
-            // fills from the MD stream. Exchange never sees anything.
-            // But the paper gateway DOES publish exec reports to the
-            // live exec_report stream so bpt-bridge / dashboard see
-            // paper fills identically to live ones — otherwise the
-            // blotter + chart overlay are permanently empty in paper.
-            auto paper = std::make_unique<order::PaperOrderGatewayClient>(
-                aeron, ac.exec_report.channel, ac.exec_report.stream_id);
-            paper_gw_ = paper.get();
-            order_gw_ = std::move(paper);
-            bpt::common::log::warn("================================================");
-            bpt::common::log::warn(" PAPER MODE  —  orders will NOT reach the exchange ");
-            bpt::common::log::warn("================================================");
-
-            // Shadow aeron client for AccountSnapshotRequest only. Lets
-            // the dashboard's Holdings panel show the real testnet
-            // account state during a paper run — testnet capital is
-            // fake, and hiding it produced empty UI with no diagnostic
-            // signal. Orders/fills still flow through `paper_gw_`.
-            snapshot_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
-                                                                    ac.order.channel,
-                                                                    ac.order.stream_id,
-                                                                    ac.exec_report.stream_id,
-                                                                    ac.heartbeat.stream_id,
-                                                                    ac.account_snapshot.stream_id);
-        } else {
-            order_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
-                                                                    ac.order.channel,
-                                                                    ac.order.stream_id,
-                                                                    ac.exec_report.stream_id,
-                                                                    ac.heartbeat.stream_id,
-                                                                    ac.account_snapshot.stream_id);
-        }
+        order_gw_ = std::make_unique<order::AeronOrderGatewayClient>(aeron,
+                                                                ac.order.channel,
+                                                                ac.order.stream_id,
+                                                                ac.exec_report.stream_id,
+                                                                ac.heartbeat.stream_id,
+                                                                ac.account_snapshot.stream_id);
     }
 
     if (ac.vol_surface.stream_id != 0) {
@@ -118,12 +89,8 @@ StrategyApp::StrategyApp(config::AppConfig cfg,
 
     strategy_ = strategy::StrategyFactory::create(fc, *refdata_, md_client_.get(), order_mgr_.get(), vol_client_.get());
 
-    // In paper mode, route AccountSnapshotRequest to the real aeron-backed
-    // client (snapshot_gw_) so the real order-gateway answers; otherwise
-    // the request would go to PaperOrderGatewayClient's no-op handler.
-    auto* snap_client = snapshot_gw_ ? snapshot_gw_.get() : order_gw_.get();
     startup_gate_ = std::make_unique<app::StartupGate>(*refdata_,
-                                                       snap_client,
+                                                       order_gw_.get(),
                                                        *strategy_,
                                                        metrics_,
                                                        fc.strategy.schedule.configured_exchanges_mask,
@@ -212,8 +179,6 @@ void StrategyApp::run() {
             frags += vol_client_->poll();
         if (order_gw_)
             frags += order_gw_->poll();
-        if (snapshot_gw_)
-            frags += snapshot_gw_->poll();
         if (tyr_sub_) {
             frags += tyr_sub_->poll(
                 [this](const aeron::concurrent::AtomicBuffer& buffer,

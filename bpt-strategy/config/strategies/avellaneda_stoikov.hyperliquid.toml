@@ -10,13 +10,6 @@ enabled = true
 instruments = ["XMR/USD:PERPETUAL"]
 md_exchanges = ["HYPERLIQUID"]
 
-# Tier-2 paper mode: orders route to in-process PaperOrderGatewayClient
-# + PaperFillEngine; HL is never touched. Still gets real HL market
-# data + real refdata + real AccountSnapshot (for reconcile baseline),
-# so signals are live. First test of AS on a market where spread
-# economics actually work.
-paper_mode = true
-
 [fenrir.strategy.venue_exec.HYPERLIQUID]
 enabled = true
 latency_budget_us = 5000

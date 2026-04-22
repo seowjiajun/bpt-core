@@ -1,7 +1,5 @@
 #include "strategy/app/strategy_app.h"
 
-#include "strategy/order/paper_order_gateway_client.h"
-
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
 #include <messages/RejectReason.h>
@@ -87,18 +85,6 @@ void StrategyApp::wire_md_callbacks() {
         // bpt-md-gateway's.
         curr_tick_ts_ns_ = tick.timestampNs();
 
-        // Paper mode: feed the fill engine BEFORE the strategy so
-        // any IOC submit in the strategy callback sees a fresh BBO
-        // and any fills triggered by this tick arrive on the next
-        // order_gw_ poll — mirrors the exchange match-then-publish
-        // ordering real trading observes downstream.
-        if (paper_gw_) {
-            paper_gw_->feed_bbo(tick.instrumentId(),
-                                tick.bidPrice(),
-                                tick.askPrice(),
-                                tick.timestampNs());
-        }
-
         strategy_->on_bbo(tick);
         const uint64_t t3 = bpt::common::util::WallClock::now_ns();
         if (t3 > curr_tick_ts_ns_) {
@@ -115,13 +101,6 @@ void StrategyApp::wire_md_callbacks() {
         if (trading_paused_ || trading_halted_) return;
 
         curr_tick_ts_ns_ = tick.timestampNs();
-
-        if (paper_gw_) {
-            paper_gw_->feed_trade(tick.instrumentId(),
-                                  tick.price(),
-                                  tick.qty(),
-                                  tick.timestampNs());
-        }
 
         strategy_->on_trade(tick);
         const uint64_t t3 = bpt::common::util::WallClock::now_ns();
@@ -231,11 +210,6 @@ void StrategyApp::wire_order_callbacks() {
         }
     };
     order_gw_->on_account_snapshot = on_snap;
-    // In paper mode the real snapshot arrives on snapshot_gw_, not
-    // order_gw_ (which is the PaperOrderGatewayClient no-op path).
-    if (snapshot_gw_) {
-        snapshot_gw_->on_account_snapshot = on_snap;
-    }
 }
 
 }  // namespace bpt::strategy

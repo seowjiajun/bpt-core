@@ -1,21 +1,23 @@
 #pragma once
 
-// Abstract base for any "order gateway" the strategy talks to. Two
-// concrete impls live alongside:
+// Abstract base for the "order gateway" the strategy talks to.
 //
 //   AeronOrderGatewayClient — production path; publishes NewOrder /
 //     CancelOrder / ModifyOrder messages to bpt-order-gateway over
 //     Aeron and consumes the exec-report / heartbeat / account-snapshot
 //     streams it publishes back.
 //
-//   PaperOrderGatewayClient — canary / shadow path; swallows every
-//     order locally, runs a simple fill engine against the MD feed,
-//     and synthesises ExecutionReports back through on_exec_report so
-//     the strategy's normal order-lifecycle machinery fires unchanged.
-//
 // The interface is kept narrow on purpose — everything the strategy
 // actually does with the gateway (send, cancel, modify, poll, snapshot
 // request) is here; Aeron details live only in the Aeron impl.
+//
+// Historical note: a PaperOrderGatewayClient used to sit alongside
+// Aeron as an in-process synthetic exchange driven by a PaperFillEngine.
+// Removed 2026-04-22 after a session showed it gave systematically
+// optimistic (misleading) fill behaviour; see
+// `feedback_avoid_synthetic_fills.md` for the rationale and why future
+// "paper" capabilities — if ever needed — should live as peer venue
+// adapters rather than modal mutations of the strategy path.
 
 #include <messages/AccountSnapshot.h>
 #include <messages/ExchangeId.h>
