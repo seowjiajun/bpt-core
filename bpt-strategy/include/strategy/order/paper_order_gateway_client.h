@@ -10,10 +10,19 @@
 // by the tick arrive on the strategy's next poll — mirroring the real-
 // world ordering where an exchange's match-then-publish sequence is
 // observed downstream.
+//
+// Optional dashboard visibility: if constructed with an Aeron exec-report
+// publication, every dispatched event is ALSO offered to stream 3002 so
+// bpt-bridge sees paper fills identically to live fills (blotter, chart
+// overlay, etc.). Without the publication, dispatch is in-process only
+// (the pattern used by unit tests).
 
 #include "strategy/order/i_order_gateway_client.h"
 #include "strategy/order/paper_fill_engine.h"
 
+#include <Aeron.h>
+
+#include <memory>
 #include <string>
 
 namespace bpt::strategy::order {
@@ -21,6 +30,14 @@ namespace bpt::strategy::order {
 class PaperOrderGatewayClient : public IOrderGatewayClient {
 public:
     PaperOrderGatewayClient();
+
+    // Aeron-publishing variant. Strategy uses this in paper mode so that
+    // bridge / dashboard subscribers on exec_report_stream see paper
+    // fills — without it the in-process callback is the only consumer
+    // and the blotter stays empty.
+    PaperOrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
+                            const std::string& exec_report_channel,
+                            int exec_report_stream);
 
     [[nodiscard]] bool send_new_order(uint64_t order_id,
                                       bpt::messages::ExchangeId::Value exchange_id,
@@ -66,6 +83,9 @@ public:
 
 private:
     PaperFillEngine engine_;
+    // Optional publisher to stream 3002 so bridge / dashboard see paper
+    // fills. Null for in-process-only constructions (unit tests).
+    std::shared_ptr<aeron::Publication> exec_report_pub_;
 };
 
 }  // namespace bpt::strategy::order

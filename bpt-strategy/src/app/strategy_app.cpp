@@ -63,7 +63,12 @@ StrategyApp::StrategyApp(config::AppConfig cfg,
         if (cfg_.strat.strategy.paper_mode) {
             // Canary / shadow run: swallow orders locally, synthesise
             // fills from the MD stream. Exchange never sees anything.
-            auto paper = std::make_unique<order::PaperOrderGatewayClient>();
+            // But the paper gateway DOES publish exec reports to the
+            // live exec_report stream so bpt-bridge / dashboard see
+            // paper fills identically to live ones — otherwise the
+            // blotter + chart overlay are permanently empty in paper.
+            auto paper = std::make_unique<order::PaperOrderGatewayClient>(
+                aeron, ac.exec_report.channel, ac.exec_report.stream_id);
             paper_gw_ = paper.get();
             order_gw_ = std::move(paper);
             bpt::common::log::warn("================================================");

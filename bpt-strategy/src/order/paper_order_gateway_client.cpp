@@ -6,6 +6,8 @@
 
 #include <chrono>
 #include <cstring>
+#include <thread>
+#include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 
 namespace bpt::strategy::order {
@@ -19,14 +21,13 @@ uint64_t now_ns() {
             .count());
 }
 
-// Encode a PaperFillEvent into a stack buffer, decode it as an SBE
-// ExecutionReport view, and fire the consumer's callback synchronously.
-// The buffer outlives the callback, so the view it exposes is valid for
-// the duration of the dispatch.
+// Encode a PaperFillEvent into a stack buffer, optionally publish it to
+// Aeron (so bridge / dashboard see paper fills), then decode it in place
+// and fire the in-process callback. The buffer outlives the callback, so
+// the view it exposes is valid for the duration of the dispatch.
 void dispatch_event(const PaperFillEvent& ev,
-                    const IOrderGatewayClient::OnExecReportFn& cb) {
-    if (!cb)
-        return;
+                    const IOrderGatewayClient::OnExecReportFn& cb,
+                    aeron::Publication* exec_report_pub) {
     using namespace bpt::messages;
 
     constexpr std::size_t kBufSize =
@@ -50,6 +51,20 @@ void dispatch_event(const PaperFillEvent& ev,
         .timestampNs(ev.ts_ns)
         .localTsNs(ev.ts_ns);
 
+    // Publish FIRST so downstream subscribers (bridge) see the event at
+    // the same wall-clock moment the in-process strategy callback does;
+    // callback-first would delay the dashboard update behind any handler
+    // work the strategy does.
+    if (exec_report_pub) {
+        aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf),
+                               static_cast<aeron::util::index_t>(kBufSize));
+        while (exec_report_pub->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0) {
+            std::this_thread::yield();
+        }
+    }
+
+    if (!cb)
+        return;
     // Re-wrap as a decoder for the callback — same storage.
     ExecutionReport view;
     view.wrapForDecode(buf,
@@ -63,6 +78,16 @@ void dispatch_event(const PaperFillEvent& ev,
 }  // namespace
 
 PaperOrderGatewayClient::PaperOrderGatewayClient() = default;
+
+PaperOrderGatewayClient::PaperOrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
+                                                 const std::string& exec_report_channel,
+                                                 int exec_report_stream) {
+    exec_report_pub_ = bpt::common::aeron::wait_for_publication(
+        aeron, exec_report_channel, exec_report_stream);
+    bpt::common::log::info(
+        "PaperOrderGatewayClient: exec-report publisher ready on {} stream {}",
+        exec_report_channel, exec_report_stream);
+}
 
 bool PaperOrderGatewayClient::send_new_order(uint64_t order_id,
                                              bpt::messages::ExchangeId::Value exchange_id,
@@ -139,7 +164,7 @@ void PaperOrderGatewayClient::send_account_snapshot_request(
 
 int PaperOrderGatewayClient::poll(int fragment_limit) {
     return engine_.drain(fragment_limit, [this](const PaperFillEvent& ev) {
-        dispatch_event(ev, on_exec_report);
+        dispatch_event(ev, on_exec_report, exec_report_pub_.get());
     });
 }
 
