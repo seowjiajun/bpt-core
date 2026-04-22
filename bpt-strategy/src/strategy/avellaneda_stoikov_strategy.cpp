@@ -1310,7 +1310,16 @@ std::size_t AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::Accoun
     snap.sbeRewind();
 
     const auto exchange_id = snap.exchangeId();
-    const auto exchange_by_symbol_raw = extract_exchange_positions(snap);
+    // Row-level extract preserves avg entry price alongside qty so we
+    // can seed PositionTracker on a divergence (see reconciler loop
+    // below). Legacy exchange_by_symbol_raw map kept for reconcile() +
+    // the shutdown-flatten cache which only want qty.
+    const auto exchange_row_by_symbol = extract_exchange_position_rows(snap);
+    std::unordered_map<std::string, int64_t> exchange_by_symbol_raw;
+    exchange_by_symbol_raw.reserve(exchange_row_by_symbol.size());
+    for (const auto& [symbol, row] : exchange_row_by_symbol) {
+        exchange_by_symbol_raw[symbol] = row.net_qty_e8;
+    }
     const auto currency_equity_e8 = extract_exchange_currency_balances(snap);
     for (const auto& [symbol, qty_e8] : exchange_by_symbol_raw) {
         last_snapshot_qty_e8_[{exchange_id, symbol}] = qty_e8;
@@ -1385,6 +1394,33 @@ std::size_t AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::Accoun
                                static_cast<double>(d.our_net_qty_e8) / 1e8,
                                static_cast<double>(d.exchange_net_qty_e8) / 1e8,
                                static_cast<double>(d.diff_e8) / 1e8);
+
+        // Seed the tracker to the exchange view. The reconciler used
+        // to only log, which silently left strategies quoting against
+        // a stale inventory count across restarts — AS's inventory-
+        // skew + max_inventory guards read a tracker saying "flat"
+        // while the exchange had accumulated a real position from
+        // prior sessions. See feedback_avoid_silent_divergence note
+        // in project_prod_hardening_backlog.md.
+        //
+        // avg_entry_price is sourced from the same SBE row; for SPOT
+        // symbols we derived qty from currency-balance delta rather
+        // than a positions[] row, so there's no entry price to seed.
+        // Pass 0.0 in that case — subsequent fills blend from 0-avg,
+        // which produces wrong realized_pnl on any close of the
+        // seeded portion but avoids fabricating an entry.
+        double seed_avg_px = 0.0;
+        if (const auto it = exchange_row_by_symbol.find(d.exchange_symbol);
+            it != exchange_row_by_symbol.end()) {
+            seed_avg_px = it->second.avg_entry_price;
+        }
+        positions_.seed(d.instrument_id, exchange_id, d.exchange_net_qty_e8, seed_avg_px);
+        bpt::common::log::info(kLog(),
+                               "reconciler: seeded position instrument_id={} symbol='{}' "
+                               "to exchange view net_qty={:.8f} avg_price={:.4f}",
+                               d.instrument_id, d.exchange_symbol,
+                               static_cast<double>(d.exchange_net_qty_e8) / 1e8,
+                               seed_avg_px);
     }
     return divergences.size();
 }

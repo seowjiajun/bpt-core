@@ -20,6 +20,22 @@ std::unordered_map<std::string, int64_t> extract_exchange_positions(bpt::message
     return exchange_by_symbol;
 }
 
+std::unordered_map<std::string, ExchangePositionRow>
+extract_exchange_position_rows(bpt::messages::AccountSnapshot& snap) {
+    std::unordered_map<std::string, ExchangePositionRow> out;
+    auto& positions = snap.positions();
+    const std::size_t n = positions.count();
+    out.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        positions.next();
+        ExchangePositionRow row;
+        row.net_qty_e8 = positions.netQtyE8();
+        row.avg_entry_price = static_cast<double>(positions.avgEntryPriceE8()) / 1e8;
+        out[positions.getExchangeSymbolAsString()] = row;
+    }
+    return out;
+}
+
 std::unordered_map<std::string, int64_t> extract_exchange_currency_balances(bpt::messages::AccountSnapshot& snap) {
     std::unordered_map<std::string, int64_t> equity_by_ccy;
     auto& balances = snap.currencyBalances();

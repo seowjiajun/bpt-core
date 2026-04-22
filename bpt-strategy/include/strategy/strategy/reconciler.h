@@ -67,6 +67,23 @@ std::vector<Divergence> reconcile(const PositionTracker& tracker,
 // to inspect the snapshot contents without going through reconcile.
 std::unordered_map<std::string, int64_t> extract_exchange_positions(bpt::messages::AccountSnapshot& snap);
 
+// Per-instrument row from the SBE positions group. Qty + entry price
+// preserved — needed by callers that seed PositionTracker from the
+// snapshot (reconciler-driven resync). Callers that only need qty
+// should use `extract_exchange_positions` above; it's slightly
+// cheaper and covers the common reconcile-only case.
+struct ExchangePositionRow {
+    int64_t net_qty_e8{0};
+    double  avg_entry_price{0.0};  // natural units, 0.0 if exchange didn't report one
+};
+
+// Same single-pass traversal as extract_exchange_positions but
+// preserves the avgEntryPriceE8 field alongside qty. Exactly one of
+// the two extract_* helpers should be called per snapshot (they share
+// the SBE group cursor).
+std::unordered_map<std::string, ExchangePositionRow>
+extract_exchange_position_rows(bpt::messages::AccountSnapshot& snap);
+
 // Drain the AccountSnapshot currencyBalances group into a
 // ccy → equity_e8 map. For SPOT reconciliation: exchange holdings
 // land in the base-currency equity row rather than in positions[],

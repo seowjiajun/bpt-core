@@ -57,6 +57,20 @@ void PositionTracker::on_fill(uint64_t instrument_id,
     }
 }
 
+void PositionTracker::seed(uint64_t instrument_id,
+                           bpt::messages::ExchangeId::Value exchange_id,
+                           int64_t net_qty_e8,
+                           double avg_price) {
+    const uint64_t k = key(instrument_id, exchange_id);
+    // If the seeded position is flat we could also erase the entry, but
+    // a zero-qty entry is harmless and callers that already hold a
+    // reference via get() continue to work.
+    auto& pos = positions_[k];
+    pos.net_qty = net_qty_e8;
+    pos.avg_price = avg_price;
+    // realized_pnl deliberately preserved.
+}
+
 std::optional<PositionTracker::Position> PositionTracker::get(uint64_t instrument_id,
                                                               bpt::messages::ExchangeId::Value exchange_id) const {
     auto it = positions_.find(key(instrument_id, exchange_id));

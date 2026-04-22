@@ -238,6 +238,99 @@ TEST(PositionTrackerTest, ClearAll) {
 // Cumulative PnL across multiple round-trips
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// seed — reconciler-driven resync from authoritative exchange state
+// ---------------------------------------------------------------------------
+
+TEST(PositionTrackerTest, SeedOntoEmptyTracker) {
+    // Startup case: strategy restarts with exchange already holding a
+    // position (the bug that caused the 2026-04-22 live-testnet
+    // divergence). Seed must create the entry from nothing.
+    PositionTracker tracker;
+    tracker.seed(INST_BTC, BINANCE,
+                 /*net_qty_e8=*/-static_cast<int64_t>(qty_fp(1.64)),
+                 /*avg_price=*/377.14);
+
+    auto pos = tracker.get(INST_BTC, BINANCE);
+    ASSERT_TRUE(pos.has_value());
+    EXPECT_EQ(pos->net_qty, -static_cast<int64_t>(qty_fp(1.64)));
+    EXPECT_DOUBLE_EQ(pos->avg_price, 377.14);
+    EXPECT_DOUBLE_EQ(pos->realized_pnl, 0.0);
+}
+
+TEST(PositionTrackerTest, SeedOverwritesNetQtyAndAvgPrice) {
+    // Runtime resync case: tracker thinks -0.5, exchange says -1.64.
+    // Seed must hard-overwrite both fields, not accumulate.
+    PositionTracker tracker;
+    tracker.on_fill(INST_BTC, BINANCE, OrderSide::SELL, qty_fp(0.5), px_fp(380.0));
+    ASSERT_EQ(tracker.net_qty(INST_BTC, BINANCE), -static_cast<int64_t>(qty_fp(0.5)));
+
+    tracker.seed(INST_BTC, BINANCE,
+                 /*net_qty_e8=*/-static_cast<int64_t>(qty_fp(1.64)),
+                 /*avg_price=*/377.14);
+
+    auto pos = tracker.get(INST_BTC, BINANCE);
+    ASSERT_TRUE(pos.has_value());
+    EXPECT_EQ(pos->net_qty, -static_cast<int64_t>(qty_fp(1.64)));
+    EXPECT_DOUBLE_EQ(pos->avg_price, 377.14);
+}
+
+TEST(PositionTrackerTest, SeedPreservesRealizedPnl) {
+    // Session-running rpnl from prior round-trips must survive a
+    // reconciler-driven seed — the exchange has no equivalent number
+    // to hand us, and overwriting rpnl to 0 would lose session history.
+    PositionTracker tracker;
+    tracker.on_fill(INST_BTC, BINANCE, OrderSide::BUY, qty_fp(1.0), px_fp(100.0));
+    tracker.on_fill(INST_BTC, BINANCE, OrderSide::SELL, qty_fp(1.0), px_fp(110.0));
+    EXPECT_NEAR(tracker.get(INST_BTC, BINANCE)->realized_pnl, 10.0, 1e-6);
+
+    tracker.seed(INST_BTC, BINANCE,
+                 /*net_qty_e8=*/static_cast<int64_t>(qty_fp(0.5)),
+                 /*avg_price=*/105.0);
+
+    auto post = tracker.get(INST_BTC, BINANCE);
+    ASSERT_TRUE(post.has_value());
+    EXPECT_EQ(post->net_qty, static_cast<int64_t>(qty_fp(0.5)));
+    EXPECT_DOUBLE_EQ(post->avg_price, 105.0);
+    EXPECT_NEAR(post->realized_pnl, 10.0, 1e-6);
+}
+
+TEST(PositionTrackerTest, SeedIsolatedFromOtherInstruments) {
+    // Seeding one (instrument, exchange) must not touch siblings.
+    PositionTracker tracker;
+    tracker.on_fill(INST_BTC, BINANCE, OrderSide::BUY,  qty_fp(1.0), px_fp(100.0));
+    tracker.on_fill(INST_ETH, OKX,     OrderSide::SELL, qty_fp(2.0), px_fp(3500.0));
+
+    tracker.seed(INST_BTC, BINANCE, /*net_qty_e8=*/0, /*avg_price=*/0.0);
+
+    EXPECT_EQ(tracker.net_qty(INST_BTC, BINANCE), 0);
+    auto eth = tracker.get(INST_ETH, OKX);
+    ASSERT_TRUE(eth.has_value());
+    EXPECT_EQ(eth->net_qty, -static_cast<int64_t>(qty_fp(2.0)));
+    EXPECT_DOUBLE_EQ(eth->avg_price, 3500.0);
+}
+
+TEST(PositionTrackerTest, OnFillAfterSeedContinuesFromSeededState) {
+    // After seeding -1.64 @ 377.14 (startup from HL), a subsequent buy
+    // must close against the seeded short at the seeded avg price.
+    PositionTracker tracker;
+    tracker.seed(INST_BTC, BINANCE,
+                 /*net_qty_e8=*/-static_cast<int64_t>(qty_fp(1.64)),
+                 /*avg_price=*/377.14);
+
+    tracker.on_fill(INST_BTC, BINANCE, OrderSide::BUY, qty_fp(0.1), px_fp(376.50));
+
+    auto pos = tracker.get(INST_BTC, BINANCE);
+    ASSERT_TRUE(pos.has_value());
+    EXPECT_EQ(pos->net_qty, -static_cast<int64_t>(qty_fp(1.54)));  // covered 0.1
+    EXPECT_DOUBLE_EQ(pos->avg_price, 377.14);  // unchanged on partial close
+    EXPECT_NEAR(pos->realized_pnl, 0.1 * (377.14 - 376.50), 1e-6);
+}
+
+// ---------------------------------------------------------------------------
+// Cumulative PnL across multiple round-trips
+// ---------------------------------------------------------------------------
+
 TEST(PositionTrackerTest, CumulativePnlAcrossRoundTrips) {
     PositionTracker tracker;
     // Round trip 1: buy 1 @ 100, sell 1 @ 110 → +10
