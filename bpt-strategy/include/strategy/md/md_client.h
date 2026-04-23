@@ -14,6 +14,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::strategy::md {
 
@@ -79,7 +80,7 @@ private:
                                 aeron::util::index_t length,
                                 aeron::Header& header);
 
-    std::shared_ptr<aeron::Publication> ctrl_pub_;
+    std::unique_ptr<bpt::common::aeron::Publisher> ctrl_pub_;
     std::shared_ptr<aeron::Subscription> data_sub_;
     std::shared_ptr<aeron::Subscription> ack_hb_sub_;
     std::unique_ptr<aeron::FragmentAssembler> data_assembler_;

@@ -4,18 +4,16 @@
 #include <messages/MessageHeader.h>
 
 #include <algorithm>
-#include <cstring>
-#include <thread>
-#include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::messaging {
 
-AccountSnapshotPublisher::AccountSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron,
+using Policy = bpt::common::aeron::Publisher::Policy;
+
+AccountSnapshotPublisher::AccountSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
                                                    const std::string& channel,
-                                                   int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-}
+                                                   int stream_id)
+    : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
 
 void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snapshot) {
     using namespace bpt::messages;
@@ -25,9 +23,9 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
     //   positions:    up to 500 × 56 bytes (32-char symbol + 3×int64) + 4-byte header
     //   currencyBal:  up to 32  × 24 bytes (8-char ccy   + 2×int64) + 4-byte header
     constexpr std::size_t kMaxPositions = 500;
-    constexpr std::size_t kPositionSize = 32 + 8 + 8 + 8;  // per SBE block
+    constexpr std::size_t kPositionSize = 32 + 8 + 8 + 8;
     constexpr std::size_t kMaxCurrencyBalances = 32;
-    constexpr std::size_t kCurrencyBalanceSize = 8 + 8 + 8;  // per SBE block
+    constexpr std::size_t kCurrencyBalanceSize = 8 + 8 + 8;
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + AccountSnapshot::sbeBlockLength() +
                                      4 + kMaxPositions * kPositionSize +
                                      4 + kMaxCurrencyBalances * kCurrencyBalanceSize;
@@ -64,18 +62,18 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
             .availableBalanceE8(cb.available_balance_e8);
     }
 
-    const auto encoded_len = static_cast<aeron::util::index_t>(MessageHeader::encodedLength() + msg.encodedLength());
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), encoded_len);
+    const auto encoded_len = static_cast<::aeron::util::index_t>(MessageHeader::encodedLength() + msg.encodedLength());
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), encoded_len);
 
-    std::lock_guard lock(mutex_);
-    while (publication_->offer(ab, 0, encoded_len) < 0)
-        std::this_thread::yield();
-
-    bpt::common::log::info("AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
-                   ExchangeId::c_str(snapshot.exchange_id),
-                   static_cast<double>(snapshot.available_balance_e8) / 1e8,
-                   n_pos,
-                   n_ccy);
+    if (publisher_.offer(ab, 0, encoded_len))
+        bpt::common::log::info("AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
+                       ExchangeId::c_str(snapshot.exchange_id),
+                       static_cast<double>(snapshot.available_balance_e8) / 1e8,
+                       n_pos,
+                       n_ccy);
+    else
+        bpt::common::log::warn("AccountSnapshot dropped — no subscriber on {}:{}",
+                       publisher_.channel(), publisher_.stream_id());
 }
 
 }  // namespace bpt::order_gateway::messaging

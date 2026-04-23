@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::md_gateway::messaging {
 
@@ -29,7 +30,7 @@ namespace bpt::md_gateway::messaging {
 // fetch_add (relaxed — each message carries its own sequence number).
 class MdPublisher : public IMdPublisher {
 public:
-    MdPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    MdPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     void publish(const md::MdBbo& bbo) override;
     void publish(const md::MdTrade& trade) override;
@@ -41,7 +42,7 @@ public:
 private:
     void offer(const char* buf, std::size_t len, uint64_t instrument_id, const char* label);
 
-    std::shared_ptr<aeron::Publication> publication_;
+    bpt::common::aeron::Publisher publisher_;
     std::atomic<uint64_t> seq_{0};
     std::atomic<uint64_t> drops_{0};
 };

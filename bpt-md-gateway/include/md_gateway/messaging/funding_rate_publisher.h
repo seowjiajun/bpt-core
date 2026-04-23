@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::md_gateway::messaging {
 
@@ -24,12 +25,12 @@ using FundingRateCallback = std::function<void(const FundingRateUpdate&)>;
 // Same wire format as Refdata previously published — Strategy consumer unchanged.
 class FundingRatePublisher {
 public:
-    FundingRatePublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    FundingRatePublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     void publish(const FundingRateUpdate& fr);
 
 private:
-    std::shared_ptr<aeron::Publication> publication_;
+    bpt::common::aeron::Publisher publisher_;
 };
 
 }  // namespace bpt::md_gateway::messaging

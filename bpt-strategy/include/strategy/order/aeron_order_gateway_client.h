@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::strategy::order {
 
@@ -72,7 +73,7 @@ private:
                                           aeron::util::index_t length,
                                           aeron::Header& hdr);
 
-    std::shared_ptr<aeron::Publication> order_pub_;
+    std::unique_ptr<bpt::common::aeron::Publisher> order_pub_;
     std::shared_ptr<aeron::Subscription> exec_report_sub_;
     std::shared_ptr<aeron::Subscription> heartbeat_sub_;
     std::shared_ptr<aeron::Subscription> account_snapshot_sub_;

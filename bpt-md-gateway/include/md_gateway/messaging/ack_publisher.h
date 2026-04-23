@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::md_gateway::messaging {
 
@@ -24,7 +25,7 @@ namespace bpt::md_gateway::messaging {
 // guarantee as MdPublisher.
 class AckPublisher : public IAckPublisher {
 public:
-    AckPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    AckPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     void publish_ack(uint64_t correlation_id,
                      uint64_t instrument_id,
@@ -38,7 +39,7 @@ public:
     [[nodiscard]] uint64_t current_seq() const { return seq_.load(std::memory_order_relaxed); }
 
 private:
-    std::shared_ptr<aeron::Publication> publication_;
+    bpt::common::aeron::Publisher publisher_;
     std::atomic<uint64_t> seq_{0};
 };
 

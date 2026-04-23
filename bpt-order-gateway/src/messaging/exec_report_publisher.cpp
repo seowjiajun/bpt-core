@@ -3,16 +3,17 @@
 #include <messages/ExecutionReport.h>
 #include <messages/MessageHeader.h>
 
-#include <thread>
-#include <bpt_common/aeron/aeron_utils.h>
-
 namespace bpt::order_gateway::messaging {
 
-ExecReportPublisher::ExecReportPublisher(std::shared_ptr<aeron::Aeron> aeron,
+using Policy = bpt::common::aeron::Publisher::Policy;
+
+ExecReportPublisher::ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron,
                                          const std::string& channel,
-                                         int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-}
+                                         int stream_id)
+    // Exec reports must reach the strategy — they drive position
+    // tracking. Spin through back-pressure; drop if no subscriber
+    // rather than hang (strategy down → gateway isn't useful anyway).
+    : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
 
 void ExecReportPublisher::publish(uint64_t order_id,
                                   uint64_t exchange_order_id,
@@ -52,11 +53,8 @@ void ExecReportPublisher::publish(uint64_t order_id,
         .timestampNs(exchange_ts_ns)
         .localTsNs(local_ts_ns);
 
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-
-    while (publication_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0) {
-        std::this_thread::yield();
-    }
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<::aeron::util::index_t>(kBufSize));
+    publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(kBufSize));
 }
 
 }  // namespace bpt::order_gateway::messaging

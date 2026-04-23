@@ -48,9 +48,11 @@ AnalyticsApp::AnalyticsApp(config::Settings settings, std::shared_ptr<aeron::Aer
     bpt::common::log::info("MD subscription ready: {} stream {}",
                    settings_.md_data.channel, settings_.md_data.stream_id);
 
-    // Publisher for toxicity updates (stream 5001)
-    toxicity_pub_ = bpt::common::aeron::wait_for_publication(aeron_, settings_.toxicity.channel,
-                                                      settings_.toxicity.stream_id);
+    // Publisher for toxicity updates (stream 5001). Idempotent/periodic
+    // — next tick replaces — so drop on no-subscriber is fine.
+    toxicity_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
+        aeron_, settings_.toxicity.channel, settings_.toxicity.stream_id,
+        bpt::common::aeron::Publisher::Policy::kBoundedRetry);
     bpt::common::log::info("Toxicity publication ready: {} stream {}",
                    settings_.toxicity.channel, settings_.toxicity.stream_id);
 }
@@ -141,9 +143,9 @@ void AnalyticsApp::maybe_publish(uint64_t now_ns) {
         aeron::concurrent::AtomicBuffer ab(
             reinterpret_cast<uint8_t*>(const_cast<messaging::ToxicityUpdate*>(&update)),
             sizeof(update));
-        auto result = toxicity_pub_->offer(ab, 0, static_cast<int32_t>(sizeof(update)));
+        const bool sent = toxicity_pub_->offer(ab, 0, static_cast<int32_t>(sizeof(update)));
 
-        if (result > 0) {
+        if (sent) {
             // Copy packed fields to locals for fmt (can't bind references to packed members)
             double bid_m = update.bid_markout_5s_bps;
             uint32_t bid_n = update.bid_sample_count;

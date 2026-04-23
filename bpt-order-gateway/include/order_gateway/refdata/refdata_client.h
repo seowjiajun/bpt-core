@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::order_gateway::refdata {
 
@@ -64,7 +65,7 @@ private:
                                aeron::util::index_t length,
                                aeron::Header& header);
 
-    std::shared_ptr<aeron::Publication> ctrl_pub_;
+    std::unique_ptr<bpt::common::aeron::Publisher> ctrl_pub_;
     std::shared_ptr<aeron::Subscription> snap_sub_;
     std::shared_ptr<aeron::Subscription> delta_sub_;
     std::unique_ptr<aeron::FragmentAssembler> snap_assembler_;

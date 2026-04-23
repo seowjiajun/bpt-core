@@ -10,7 +10,6 @@
 #include <messages/RefDataSubscriptionRequest.h>
 
 #include <cstring>
-#include <x86intrin.h>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
@@ -29,7 +28,9 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
                              FundingRateCache& funding_rate_cache)
     : fee_cache_(fee_cache),
       funding_rate_cache_(funding_rate_cache) {
-    ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, control_stream);
+    ctrl_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
+        aeron, channel, control_stream,
+        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
     snap_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, snapshot_stream);
     delta_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, delta_stream);
     fee_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, fee_schedule_stream);
@@ -101,8 +102,7 @@ void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilt
     }
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf.data()), static_cast<aeron::util::index_t>(buf_size));
-    while (ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size)) < 0)
-        _mm_pause();
+    ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size));
 
     bpt::common::log::info("Subscription request sent: correlation_id={} canonical_filters={}", correlation_id, nf);
 }

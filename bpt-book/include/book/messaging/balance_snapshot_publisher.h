@@ -5,8 +5,8 @@
 #include <Aeron.h>
 
 #include <memory>
-#include <mutex>
 #include <string>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::book::messaging {
 
@@ -19,8 +19,7 @@ public:
     void publish(const adapter::BalanceSnapshot& snapshot);
 
 private:
-    std::shared_ptr<::aeron::Publication> publication_;
-    std::mutex mutex_;
+    bpt::common::aeron::Publisher publisher_;
 };
 
 }  // namespace bpt::book::messaging

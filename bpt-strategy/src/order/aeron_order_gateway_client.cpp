@@ -10,7 +10,6 @@
 #include <messages/NewOrder.h>
 #include <messages/OrderGatewayHeartbeat.h>
 
-#include <x86intrin.h>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
@@ -23,7 +22,9 @@ AeronOrderGatewayClient::AeronOrderGatewayClient(std::shared_ptr<aeron::Aeron> a
                                        int exec_report_stream,
                                        int heartbeat_stream,
                                        int account_snapshot_stream) {
-    order_pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, order_stream);
+    order_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
+        aeron, channel, order_stream,
+        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
     exec_report_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, exec_report_stream);
     heartbeat_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, heartbeat_stream);
 
@@ -90,8 +91,7 @@ bool AeronOrderGatewayClient::send_new_order(uint64_t order_id,
         .putExchangeSymbol(exchange_symbol);
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
-        _mm_pause();
+    order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize));
     return true;
 }
 
@@ -112,8 +112,7 @@ void AeronOrderGatewayClient::send_cancel(uint64_t order_id,
         .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
-        _mm_pause();
+    order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize));
 }
 
 void AeronOrderGatewayClient::send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) {
@@ -130,8 +129,7 @@ void AeronOrderGatewayClient::send_cancel_all(bpt::messages::ExchangeId::Value e
         .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
-        _mm_pause();
+    order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize));
 }
 
 void AeronOrderGatewayClient::send_modify(uint64_t order_id,
@@ -155,8 +153,7 @@ void AeronOrderGatewayClient::send_modify(uint64_t order_id,
         .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
-        _mm_pause();
+    order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize));
 }
 
 void AeronOrderGatewayClient::send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
@@ -174,8 +171,7 @@ void AeronOrderGatewayClient::send_account_snapshot_request(bpt::messages::Excha
         .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0)
-        _mm_pause();
+    order_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize));
 }
 
 int AeronOrderGatewayClient::poll(int fragment_limit) {

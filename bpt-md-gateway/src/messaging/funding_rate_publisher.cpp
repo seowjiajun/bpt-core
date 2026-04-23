@@ -3,17 +3,19 @@
 #include <messages/FundingRate.h>
 #include <messages/MessageHeader.h>
 
-#include <thread>
-#include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 
 namespace bpt::md_gateway::messaging {
 
-FundingRatePublisher::FundingRatePublisher(std::shared_ptr<aeron::Aeron> aeron,
+using Policy = bpt::common::aeron::Publisher::Policy;
+
+FundingRatePublisher::FundingRatePublisher(std::shared_ptr<::aeron::Aeron> aeron,
                                            const std::string& channel,
-                                           int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-}
+                                           int stream_id)
+    // Original code had custom "spin on back-pressure, exit on
+    // NOT_CONNECTED/CLOSED" — now the default kRetryOnBackpressure
+    // policy is exactly that.
+    : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
 
 void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
     using namespace bpt::messages;
@@ -29,15 +31,8 @@ void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
         .nextFundingTs(fr.next_funding_ts_ns)
         .collectedTs(fr.collected_ts_ns);
 
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
-    std::int64_t result;
-    do {
-        result = publication_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize));
-        if (result == aeron::NOT_CONNECTED || result == aeron::PUBLICATION_CLOSED)
-            break;
-        if (result < 0)
-            std::this_thread::yield();
-    } while (result < 0);
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
+    publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(kBufSize));
 
     bpt::common::log::debug("FundingRate published exchange={} instrument_id={} rate={}bps",
                     ExchangeId::c_str(fr.exchange_id),

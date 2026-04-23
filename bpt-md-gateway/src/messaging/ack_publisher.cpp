@@ -4,8 +4,6 @@
 
 #include <chrono>
 #include <cstring>
-#include <thread>
-#include <bpt_common/aeron/aeron_utils.h>
 
 namespace {
 inline uint64_t now_ns() noexcept {
@@ -17,9 +15,12 @@ inline uint64_t now_ns() noexcept {
 
 namespace bpt::md_gateway::messaging {
 
-AckPublisher::AckPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-}
+using Policy = bpt::common::aeron::Publisher::Policy;
+
+AckPublisher::AckPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
+    // Subscription acks + heartbeats are idempotent/republished. Bounded
+    // retry on back-pressure, drop on no subscriber.
+    : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
 
 void AckPublisher::publish_ack(uint64_t correlation_id,
                                uint64_t instrument_id,
@@ -37,15 +38,12 @@ void AckPublisher::publish_ack(uint64_t correlation_id,
         .instrumentId(instrument_id)
         .ackStatus(status);
 
-    // Write exchange field (fixed 8 chars, null-padded)
     char* ex_field = msg.exchange();
     std::size_t ex_len = std::min(std::strlen(exchange), std::size_t{8});
     std::memcpy(ex_field, exchange, ex_len);
 
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (publication_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0) {
-        std::this_thread::yield();
-    }
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<::aeron::util::index_t>(kBufSize));
+    publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(kBufSize));
 }
 
 void AckPublisher::publish_subscription_heartbeat(uint64_t instrument_id) {
@@ -60,10 +58,8 @@ void AckPublisher::publish_subscription_heartbeat(uint64_t instrument_id) {
         .instrumentId(instrument_id)
         .seqNum(seq_.fetch_add(1, std::memory_order_relaxed) + 1);
 
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (publication_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0) {
-        std::this_thread::yield();
-    }
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<::aeron::util::index_t>(kBufSize));
+    publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(kBufSize));
 }
 
 void AckPublisher::publish_service_heartbeat() {
@@ -77,10 +73,8 @@ void AckPublisher::publish_service_heartbeat() {
         .timestampNs(now_ns())
         .seqNum(seq_.fetch_add(1, std::memory_order_relaxed) + 1);
 
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<aeron::util::index_t>(kBufSize));
-    while (publication_->offer(ab, 0, static_cast<aeron::util::index_t>(kBufSize)) < 0) {
-        std::this_thread::yield();
-    }
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<::aeron::util::index_t>(kBufSize));
+    publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(kBufSize));
 }
 
 }  // namespace bpt::md_gateway::messaging

@@ -11,6 +11,7 @@
 #include <memory>
 #include <unordered_map>
 #include <bpt_app/app.h>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::analytics {
 
@@ -30,7 +31,7 @@ private:
     // Aeron I/O
     std::shared_ptr<aeron::Subscription> exec_sub_;
     std::shared_ptr<aeron::Subscription> md_sub_;
-    std::shared_ptr<aeron::Publication> toxicity_pub_;
+    std::unique_ptr<bpt::common::aeron::Publisher> toxicity_pub_;
 
     // Per-instrument state
     struct InstrumentState {

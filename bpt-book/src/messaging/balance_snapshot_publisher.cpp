@@ -4,25 +4,23 @@
 #include <messages/MessageHeader.h>
 
 #include <algorithm>
-#include <cstring>
-#include <thread>
-#include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 
 namespace bpt::book::messaging {
 
+using Policy = bpt::common::aeron::Publisher::Policy;
+
 BalanceSnapshotPublisher::BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
                                                    const std::string& channel,
-                                                   int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-}
+                                                   int stream_id)
+    // BalanceSnapshot is idempotent — the next poll replaces stale
+    // data — so kBoundedRetry on back-pressure + drop on no-subscriber
+    // is the right shape.
+    : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
 
 void BalanceSnapshotPublisher::publish(const adapter::BalanceSnapshot& snapshot) {
     using namespace bpt::messages;
 
-    // Per-row size: exchangeId(1) + subAccount(8) + ccy(8) + 3×int64 = 41 bytes
-    // + 4-byte group header. Cap at 256 rows — 4 venues × many ccys is still
-    // comfortably under this.
     constexpr std::size_t kMaxRows = 256;
     constexpr std::size_t kRowSize = 1 + 8 + 8 + 8 + 8 + 8;
     constexpr std::size_t kBufSize =
@@ -53,24 +51,10 @@ void BalanceSnapshotPublisher::publish(const adapter::BalanceSnapshot& snapshot)
         static_cast<::aeron::util::index_t>(MessageHeader::encodedLength() + msg.encodedLength());
     ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), encoded_len);
 
-    std::lock_guard lock(mutex_);
-    // Retry on BACK_PRESSURED / ADMIN_ACTION; drop on NOT_CONNECTED.
-    // BalanceSnapshot is idempotent — the next poll republishes, so
-    // missing a publish when no consumer is listening is fine (and far
-    // better than spinning the poll thread forever).
-    for (int attempt = 0; attempt < 1000; ++attempt) {
-        const auto rc = publication_->offer(ab, 0, encoded_len);
-        if (rc >= 0) {
-            bpt::common::log::info("BalanceSnapshot published rows={}", n);
-            return;
-        }
-        if (rc == ::aeron::NOT_CONNECTED) {
-            bpt::common::log::info("BalanceSnapshot drop — no subscriber on stream (rows={})", n);
-            return;
-        }
-        std::this_thread::yield();
-    }
-    bpt::common::log::warn("BalanceSnapshot publish timed out after 1000 attempts (rows={})", n);
+    if (publisher_.offer(ab, 0, encoded_len))
+        bpt::common::log::info("BalanceSnapshot published rows={}", n);
+    else
+        bpt::common::log::debug("BalanceSnapshot drop rows={} (no subscriber / back-pressure)", n);
 }
 
 }  // namespace bpt::book::messaging

@@ -6,12 +6,13 @@
 
 #include <memory>
 #include <string>
+#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::order_gateway::messaging {
 
 class ExecReportPublisher : public IExecReportPublisher {
 public:
-    ExecReportPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     void publish(uint64_t order_id,
                  uint64_t exchange_order_id,
@@ -30,7 +31,7 @@ public:
                  uint64_t local_ts_ns) override;
 
 private:
-    std::shared_ptr<aeron::Publication> publication_;
+    bpt::common::aeron::Publisher publisher_;
 };
 
 }  // namespace bpt::order_gateway::messaging
