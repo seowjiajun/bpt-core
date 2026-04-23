@@ -1,0 +1,42 @@
+# Instance config — QA environment, Hyperliquid testnet.
+#
+# bpt-book is read-only: polls each configured exchange's account
+# endpoints, normalizes into a flat (venue, sub_account, ccy) balance
+# list, publishes on Aeron. No order flow.
+#
+# HL's account endpoints (/info clearinghouseState + spotClearinghouseState)
+# are public — they accept any wallet address. No secret_name needed
+# for HL in testnet. Other venues (OKX/Binance/Deribit) will require
+# read-only API keys when their adapters land; those use the same
+# systemd-creds / ~/.bpt-secrets pattern as bpt-order-gateway.
+environment = "dev"
+exchanges = ["HYPERLIQUID"]
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bpt"
+
+[aeron.balance_snapshot]
+channel = "aeron:ipc"
+stream_id = 6001
+
+[book]
+# Poll every 5 s. HL rate-limits /info generously; 5 s is comfortably
+# under. Dashboards read the last published snapshot, so this cadence
+# sets the UI refresh floor.
+poll_interval_ms = 5000
+
+[[adapters]]
+exchange       = "HYPERLIQUID"
+testnet        = true
+rest_host      = "api.hyperliquid-testnet.xyz"
+rest_port      = "443"
+# Public address — safe to commit. For mainnet / multiple accounts
+# this would move to a secret to avoid accidental mix-ups.
+wallet_address = "0x87b8D67Dd5B4aF939F6c53b18a711BF2654c4d9d"
+
+[metrics]
+port = 9104
+
+[logging]
+level = "info"
+dir   = "logs"

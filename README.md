@@ -154,6 +154,7 @@ bpt-core/
 | 4001 | pricer → strategy | VolSurface |
 | 4002 | pricer → strategy | PricerHeartbeat, PricerReady |
 | 5001 | analytics → strategy/dashboard | MarkoutReport, ToxicityScore, FillRateReport |
+| 6001 | book → dashboard/strategy | BalanceSnapshot (consolidated multi-venue sub-account balances) |
 | 9001 | strategy → backtester | BacktestAck (backtest mode only) |
 | 9002 | backtester → strategy | BacktestControl (backtest mode only) |
 

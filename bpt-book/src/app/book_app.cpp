@@ -1,0 +1,96 @@
+#include "book/app/book_app.h"
+#include "book/adapter/hyperliquid_balance_adapter.h"
+
+#include <chrono>
+#include <stdexcept>
+#include <thread>
+#include <bpt_common/logging.h>
+#include <bpt_common/signal.h>
+
+namespace bpt::book {
+
+namespace {
+
+std::unique_ptr<adapter::IBalanceAdapter>
+make_adapter(const config::AdapterConfig& a) {
+    if (a.exchange == "HYPERLIQUID") {
+        adapter::HyperliquidBalanceAdapter::Config cfg{
+            .rest_host = a.rest_host,
+            .rest_port = a.rest_port,
+            .wallet_address = a.wallet_address,
+        };
+        return std::make_unique<adapter::HyperliquidBalanceAdapter>(std::move(cfg));
+    }
+    // OKX / Binance / Deribit adapters will slot in here as they're
+    // written. Unrecognized venues throw — silent skip would hide
+    // config typos.
+    throw std::runtime_error("Unsupported exchange for bpt-book: " + a.exchange);
+}
+
+uint64_t now_ns() {
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count());
+}
+
+}  // namespace
+
+BookApp::BookApp(config::Settings settings, std::shared_ptr<::aeron::Aeron> aeron)
+    : settings_(std::move(settings)), aeron_(std::move(aeron)) {
+    publisher_ = std::make_unique<messaging::BalanceSnapshotPublisher>(
+        aeron_, settings_.aeron.balance_snapshot.channel,
+        settings_.aeron.balance_snapshot.stream_id);
+    bpt::common::log::info("Balance publication ready: {} stream {}",
+                           settings_.aeron.balance_snapshot.channel,
+                           settings_.aeron.balance_snapshot.stream_id);
+
+    for (const auto& a : settings_.book.adapters) {
+        adapters_.push_back(make_adapter(a));
+        bpt::common::log::info("Balance adapter ready: {}", a.exchange);
+    }
+    if (adapters_.empty())
+        bpt::common::log::warn("No balance adapters configured — bpt-book will publish empty snapshots");
+}
+
+void BookApp::run() {
+    const auto interval = std::chrono::milliseconds(settings_.book.poll_interval_ms);
+    bpt::common::log::info("bpt-book poll loop starting, interval={} ms",
+                           settings_.book.poll_interval_ms);
+
+    while (bpt::common::signal::is_running()) {
+        adapter::BalanceSnapshot snap;
+        snap.correlation_id = ++correlation_id_;
+        snap.timestamp_ns = now_ns();
+
+        for (auto& ad : adapters_) {
+            try {
+                auto rows = ad->fetch();
+                snap.rows.insert(snap.rows.end(),
+                                 std::make_move_iterator(rows.begin()),
+                                 std::make_move_iterator(rows.end()));
+            } catch (const std::exception& e) {
+                // Log and continue. A single-venue failure must not take
+                // down the whole snapshot — dashboards degrade per-venue
+                // gracefully. Next tick will retry.
+                bpt::common::log::warn("{} balance fetch failed: {}",
+                                       ad->venue_name(), e.what());
+            }
+        }
+
+        publisher_->publish(snap);
+
+        // Sleep in small slices so shutdown signals are noticed promptly
+        // instead of being gated by a 5-second poll interval.
+        const auto slice = std::chrono::milliseconds(200);
+        auto slept = std::chrono::milliseconds(0);
+        while (bpt::common::signal::is_running() && slept < interval) {
+            std::this_thread::sleep_for(std::min(slice, interval - slept));
+            slept += slice;
+        }
+    }
+
+    bpt::common::log::info("bpt-book poll loop exiting");
+}
+
+}  // namespace bpt::book

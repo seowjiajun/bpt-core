@@ -62,6 +62,7 @@ if [ -n "${BPT_DEPLOY_ROOT:-}" ]; then
     BIN[bpt-order-gateway]="$BPT_BIN_ROOT/bpt-order-gateway"
     BIN[bpt-strategy]="$BPT_BIN_ROOT/bpt-strategy"
     BIN[bpt-analytics]="$BPT_BIN_ROOT/bpt-analytics"
+    BIN[bpt-book]="$BPT_BIN_ROOT/bpt-book"
     BIN[bpt-bridge]="$BPT_BIN_ROOT/bridge"
 else
     BIN[bpt-refdata]="$BPT_BIN_ROOT/bpt-refdata/bpt-refdata"
@@ -69,6 +70,7 @@ else
     BIN[bpt-order-gateway]="$BPT_BIN_ROOT/bpt-order-gateway/bpt-order-gateway"
     BIN[bpt-strategy]="$BPT_BIN_ROOT/bpt-strategy/bpt-strategy"
     BIN[bpt-analytics]="$BPT_BIN_ROOT/bpt-analytics/bpt-analytics"
+    BIN[bpt-book]="$BPT_BIN_ROOT/bpt-book/bpt-book"
     BIN[bpt-bridge]="$BPT_BIN_ROOT/dashboard/bridge/bridge"
 fi
 
@@ -176,6 +178,29 @@ ExecStart=${BIN[bpt-strategy]} --config \${BPT_STRATEGY_CONFIG}
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
+
+[Install]
+WantedBy=bpt-stack.target
+EOF
+
+# ── bpt-book ─────────────────────────────────────────────────────────────────
+# Read-only multi-venue balance / position aggregator. After refdata so
+# exchange catalog is available; doesn't depend on md-gateway or strategy.
+cat > "$UNIT_DIR/bpt-book.service" <<EOF
+[Unit]
+Description=BPT Book Service (multi-venue balance + position aggregator)
+After=bpt-refdata.service
+Requires=bpt-transport.service
+PartOf=bpt-stack.target bpt-transport.service
+
+[Service]
+Type=simple
+EnvironmentFile=$ENV_FILE
+WorkingDirectory=$BPT_ROOT/bpt-book
+ExecStart=${BIN[bpt-book]} --config \${BPT_BOOK_CONFIG}
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
 
 [Install]
 WantedBy=bpt-stack.target
@@ -341,7 +366,7 @@ EOF
 # ── bpt-stack.target ─────────────────────────────────────────────────────────
 # Frontend unit only exists in laptop mode; keep it out of the target's
 # Wants= in deploy mode so systemd doesn't try to start a ghost unit.
-stack_wants="bpt-transport.service bpt-refdata.service bpt-md-gateway.service bpt-order-gateway.service bpt-strategy.service bpt-analytics.service bpt-bridge.service bpt-heartbeat.timer"
+stack_wants="bpt-transport.service bpt-refdata.service bpt-md-gateway.service bpt-order-gateway.service bpt-strategy.service bpt-analytics.service bpt-book.service bpt-bridge.service bpt-heartbeat.timer"
 if [ -z "${BPT_DEPLOY_ROOT:-}" ]; then
     stack_wants="$stack_wants bpt-frontend.service"
 fi
