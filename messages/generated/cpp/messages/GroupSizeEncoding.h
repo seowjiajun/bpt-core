@@ -198,7 +198,7 @@ public:
 
     SBE_NODISCARD static SBE_CONSTEXPR std::uint16_t sbeSchemaVersion() SBE_NOEXCEPT
     {
-        return static_cast<std::uint16_t>(13);
+        return static_cast<std::uint16_t>(14);
     }
 
     SBE_NODISCARD static const char *blockLengthMetaAttribute(const MetaAttribute metaAttribute) SBE_NOEXCEPT
