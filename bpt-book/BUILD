@@ -49,6 +49,7 @@ cc_binary(
     srcs = ["tools/balance_peek.cpp"],
     deps = [
         "//messages",
+        "//bpt-common",
         "@aeron//:aeron_client",
     ],
 )
