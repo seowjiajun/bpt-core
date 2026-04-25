@@ -1,0 +1,90 @@
+# Strategy params — BACKTEST mode, AS on HL APE.
+# Adapted from avellaneda_stoikov.hyperliquid.toml. APE was selected from
+# the HL universe scan as the only top-volume mainnet perp with median
+# spread (~10 bps) wide enough to clear HL fees with margin for AS to make
+# spread profit. Most other HL perps run sub-2bp spreads — too tight.
+
+[fenrir.strategy]
+type = "AvellanedaStoikovStrategy"
+enabled = true
+instruments = ["APE/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "GTC"
+max_retries = 3
+
+[fenrir.strategy.risk]
+max_position_usd = 1000.0
+max_order_size_usd = 100.0
+max_daily_loss_usd = 200.0
+max_open_orders = 10
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.params]
+gamma = 0.05
+kappa = 15.0
+session_duration_s = 3600
+
+vol_halflife_s = 60.0
+vol_warmup_ticks = 20
+
+kappa_halflife_s = 45.0
+kappa_warmup_ticks = 10
+kappa_min = 5.0
+
+max_half_spread_bps = 12.0
+
+# APE tick is much smaller than XMR. Median spread observed ~10 bps;
+# market price ~$0.18 = ~0.018 USD spread. order_qty 50 APE ≈ ~$9 notional;
+# max_inventory 500 APE ≈ ~$90. Adjust as backtest results suggest.
+order_qty = 50
+requote_threshold = 0.0005
+max_inventory = 500.0
+
+# Disabled in backtest — simulator pushes $0 starting balance so equity-fraction
+# sizing collapses qty to 0. Use absolute order_qty / max_inventory above instead.
+order_qty_fraction      = 0
+order_qty_min           = 50
+max_inventory_fraction  = 0
+min_half_spread_bps     = 1.0
+
+drift_halflife_s    = 15.0
+drift_suppress_bps  = 3.0
+drift_suppress_sigma_mult = 1.5
+
+slow_drift_window_s     = 120.0
+slow_drift_suppress_bps = 20.0
+slow_drift_suppress_sigma_mult = 3.0
+
+tox_suppress_threshold = -2.0
+
+# Cold-start tolerance: real-time backtest replays 10ms apart, so a
+# 1s window of fresh ticks routinely shows σ > 20 bps before the
+# estimator settles. Wider band + zero halt lets AS quote during
+# warmup. Live config (avellaneda_stoikov.hyperliquid.toml) keeps
+# the prod thresholds.
+vol_gate_max_bps    = 100.0
+vol_gate_window_ms  = 1000
+vol_gate_halt_ms    = 0
+vol_gate_sigma_mult = 5.0
+
+gamma_pnl_window_n             = 20
+gamma_pnl_loss_threshold_usd   = -0.25
+gamma_pnl_profit_threshold_usd = 1.0
+gamma_pnl_widen_mult           = 1.5
+gamma_pnl_tighten_mult         = 0.85
+
+pause_below_rpnl_usd = -0.30
+pause_cooldown_s     = 300.0
+
+[fenrir.strategy.params.fair_value]
+mode = "micro"
