@@ -559,7 +559,16 @@ html, body, #root {
 .archive-table th.th-sortable:hover { color: var(--text-primary); }
 .archive-table th.num, .archive-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .archive-row { cursor: pointer; }
+.archive-row--selected { background: rgba(56, 139, 253, 0.10); }
+.archive-row--selected:hover { background: rgba(56, 139, 253, 0.16); }
 .archive-table .mono-7 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
+
+/* Diff variant: single full-height panel with the metrics table + the
+ * dual-equity overlay inside it. No multi-row template — the panel
+ * scrolls internally if content overflows. */
+.archive-body--diff {
+  grid-template-rows: 1fr;
+}
 
 /* ── Kill switch ───────────────────────────────────────────────────────────── */
 .kill-switch {

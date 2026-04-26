@@ -32,6 +32,7 @@ type SortKey = 'name' | 'strategy_name' | 'return_pct' | 'max_drawdown_pct' | 's
 
 interface Props {
   onOpen: (name: string) => void
+  onCompare: (runA: string, runB: string) => void
 }
 
 function fmtPct(x: number) {
@@ -46,11 +47,14 @@ function pnlClass(x: number) {
   return 'pnl-zero'
 }
 
-export function ArchiveList({ onOpen }: Props) {
+export function ArchiveList({ onOpen, onCompare }: Props) {
   const [runs, setRuns] = useState<RunRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDesc, setSortDesc] = useState(true)
+  // Compare-selection: at most two runs at a time. Order = pick order, so
+  // the diff column "Δ (B − A)" reads "second pick − first pick".
+  const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/backtest-runs')
@@ -83,11 +87,34 @@ export function ArchiveList({ onOpen }: Props) {
 
   const arrow = (k: SortKey) => (k === sortKey ? (sortDesc ? ' ↓' : ' ↑') : '')
 
+  const toggleSelect = (name: string) => {
+    setSelected((cur) => {
+      if (cur.includes(name)) return cur.filter((n) => n !== name)
+      // Cap at 2: pick the latest two when user selects a third.
+      if (cur.length >= 2) return [cur[1], name]
+      return [...cur, name]
+    })
+  }
+
   return (
     <div className="archive-body">
       <div className="panel" style={{ height: '100%' }}>
         <div className="panel-header">
           <span className="panel-title">Backtest Runs</span>
+          <span className="panel-badge" style={{ flex: 1, textAlign: 'left', marginLeft: 16, color: 'var(--text-muted)' }}>
+            {selected.length === 0 && 'tip: tick two rows to enable compare'}
+            {selected.length === 1 && `selected: ${selected[0]} — pick one more to compare`}
+            {selected.length === 2 && `selected: ${selected[0]} ↔ ${selected[1]}`}
+          </span>
+          {selected.length === 2 && (
+            <button
+              className="kill-switch"
+              style={{ marginRight: 12, background: 'rgba(56,139,253,0.18)', color: 'var(--blue)', borderColor: 'var(--blue)' }}
+              onClick={() => onCompare(selected[0], selected[1])}
+            >
+              Compare →
+            </button>
+          )}
           <span className="panel-badge">{runs ? `${runs.length} run${runs.length === 1 ? '' : 's'}` : '—'}</span>
         </div>
         <div className="panel-body panel-body--flush">
@@ -102,6 +129,7 @@ export function ArchiveList({ onOpen }: Props) {
             <table className="blotter-table archive-table">
               <thead>
                 <tr>
+                  <th style={{ width: 28 }}></th>
                   <th onClick={() => toggleSort('strategy_name')} className="th-sortable">Strategy{arrow('strategy_name')}</th>
                   <th>SHA</th>
                   <th>Params</th>
@@ -124,8 +152,20 @@ export function ArchiveList({ onOpen }: Props) {
                     r.simulation_start && r.simulation_end
                       ? `${r.simulation_start.slice(0, 10)} → ${r.simulation_end.slice(0, 10)}`
                       : r.name
+                  const isSel = selected.includes(r.name)
                   return (
-                    <tr key={r.name} onClick={() => onOpen(r.name)} className="archive-row">
+                    <tr
+                      key={r.name}
+                      className={`archive-row${isSel ? ' archive-row--selected' : ''}`}
+                      onClick={() => onOpen(r.name)}
+                    >
+                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSel}
+                          onChange={() => toggleSelect(r.name)}
+                        />
+                      </td>
                       <td>{r.strategy_name ?? '—'}</td>
                       <td className="mono-7" style={{ color: 'var(--text-secondary)' }}>
                         {r.git_sha ? r.git_sha.slice(0, 7) : '—'}
