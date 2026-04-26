@@ -4,8 +4,10 @@ import {
   AreaSeries,
   ColorType,
   CrosshairMode,
+  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type UTCTimestamp,
 } from 'lightweight-charts'
 import { useStore } from '../store'
@@ -16,6 +18,10 @@ interface EquityChartProps {
   // the live store.  Used by the backtest archive view.
   fills?: Array<Pick<Fill, 'ts' | 'equity'>>
   startingCapital?: number
+  // Markers — when supplied, render a colour-coded triangle at each fill
+  // ts on the equity curve. Lets a viewer see WHEN fills happened
+  // relative to PnL inflections without cross-referencing the blotter.
+  fillMarkers?: Array<Pick<Fill, 'ts' | 'side' | 'qty'>>
 }
 
 const CHART_THEME = {
@@ -31,17 +37,19 @@ const CHART_THEME = {
 
 export function EquityChart(props: EquityChartProps = {}) {
   // Two modes:
-  //   1. Live/paper — driven by heimdall AccountSnapshots in the store.
+  //   1. Live/paper — driven by bpt-order-gateway AccountSnapshots in the store.
   //      props.fills is undefined; we plot accountHistory directly.
   //   2. Archive — caller passes `fills` (with absolute equity values from
   //      summary.json) and a startingCapital anchor. No store access.
   const accountHistory = useStore((s) => s.accountHistory)
+  const liveFills = useStore((s) => s.fills)
   const isArchive = props.fills !== undefined
   const fills = props.fills ?? []
   const startingCapital = props.startingCapital ?? 0
   const hostRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null)
+  const markersRef = useRef<ISeriesMarkersPluginApi<UTCTimestamp> | null>(null)
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -81,6 +89,10 @@ export function EquityChart(props: EquityChartProps = {}) {
 
     chartRef.current = chart
     seriesRef.current = series
+    // Marker plugin lazily attached on first non-empty fillMarkers update;
+    // creating it eagerly with [] is fine but the plugin holds a series ref
+    // so initialise here for cleanup symmetry.
+    markersRef.current = createSeriesMarkers(series, [])
 
     const ro = new ResizeObserver(entries => {
       for (const e of entries) {
@@ -94,6 +106,7 @@ export function EquityChart(props: EquityChartProps = {}) {
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
+      markersRef.current = null
     }
   }, [])
 
@@ -109,8 +122,26 @@ export function EquityChart(props: EquityChartProps = {}) {
         byTime.set(Math.floor(f.ts / 1_000_000_000), f.equity)
       }
     } else {
-      for (const a of accountHistory) {
-        byTime.set(Math.floor(a.ts / 1_000_000_000), a.equity)
+      // Live mode — build a deposit-immune equity curve: anchor on the first
+      // observed account equity, then add cumulative realizedPnl from each
+      // fill. Raw accountHistory.equity is contaminated by spot↔perp transfers
+      // (HL unified mode auto-collateralizes when AS needs perp margin), so a
+      // raw plot jumps on every transfer and looks like P&L when it isn't.
+      // realizedPnl per fill is the true trading P&L; cumulative sum is the
+      // trading-only equity curve. Same root fix as RiskPanel live mode.
+      //
+      // Caveat (matches RiskPanel Max DD): unrealized PnL between fills isn't
+      // included, so intra-fill swings are invisible. Acceptable at AS-style
+      // fill cadence; revisit if fills become sparse.
+      const anchorEquity = accountHistory[0]?.equity ?? 0
+      if (accountHistory.length > 0) {
+        byTime.set(Math.floor(accountHistory[0].ts / 1_000_000_000), anchorEquity)
+      }
+      const sortedFills = [...liveFills].sort((a, b) => a.ts - b.ts)
+      let runningPnl = 0
+      for (const f of sortedFills) {
+        runningPnl += f.realizedPnl
+        byTime.set(Math.floor(f.ts / 1_000_000_000), anchorEquity + runningPnl)
       }
     }
 
@@ -131,7 +162,31 @@ export function EquityChart(props: EquityChartProps = {}) {
 
     series.setData(points)
     chartRef.current?.timeScale().fitContent()
-  }, [fills, startingCapital, accountHistory, isArchive])
+  }, [fills, startingCapital, accountHistory, liveFills, isArchive])
+
+  // Fill markers: separate effect so the heavier setData path doesn't
+  // run on marker-only changes. Marker positions snap to the same
+  // second-granularity time the equity series uses, otherwise the
+  // crosshair drifts off the line.
+  const fillMarkers = props.fillMarkers
+  useEffect(() => {
+    const m = markersRef.current
+    if (!m) return
+    if (!fillMarkers || fillMarkers.length === 0) {
+      m.setMarkers([])
+      return
+    }
+    const out = fillMarkers
+      .map((f) => ({
+        time: Math.floor(f.ts / 1_000_000_000) as UTCTimestamp,
+        position: (f.side === 'BUY' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+        color: f.side === 'BUY' ? '#3fb950' : '#f85149',
+        shape: (f.side === 'BUY' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+        size: 0.6,
+      }))
+      .sort((a, b) => (a.time as number) - (b.time as number))
+    m.setMarkers(out)
+  }, [fillMarkers])
 
   return <div className="chart-host" ref={hostRef} />
 }

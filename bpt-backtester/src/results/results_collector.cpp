@@ -208,13 +208,22 @@ void ResultsCollector::on_market_event(const data::MarketEvent& event) {
 // ── Output metrics ────────────────────────────────────────────────────────────
 
 double ResultsCollector::compute_max_drawdown() const {
-    if (equity_curve_.size() < 2)
+    if (trades_.empty())
         return 0.0;
-    double peak = starting_capital_;
+    // Compute drawdown on cumulative realised PnL relative to starting
+    // capital — same convention RiskPanel uses live. Earlier impl drew
+    // from equity_curve_ which includes unrealized PnL at each fill ts;
+    // a heavily-short position with a price spike can push the running
+    // equity peak well above what the position can ever realise, making
+    // the resulting "drawdown" exceed 100%. Realised-only is bounded
+    // and matches what a research narrative actually means by DD.
+    double cum_realised = 0.0;
+    double peak = 0.0;
     double max_dd = 0.0;
-    for (const auto& pt : equity_curve_) {
-        peak = std::max(peak, pt.equity);
-        double dd = (peak - pt.equity) / peak;
+    for (const auto& t : trades_) {
+        cum_realised += t.realized_pnl;
+        peak = std::max(peak, cum_realised);
+        const double dd = (peak - cum_realised) / starting_capital_;
         max_dd = std::max(max_dd, dd);
     }
     return max_dd;
