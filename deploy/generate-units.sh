@@ -363,6 +363,85 @@ RandomizedDelaySec=15min
 WantedBy=timers.target
 EOF
 
+# ── bpt-md-recorder.service + recording rotate timer ───────────────────────
+# Recorder = bpt-md-gateway running with [recording] enabled, deployed
+# to a dedicated VPS that just sits there capturing WS frames. Lives
+# in its own bpt-recording.target so a recording-only host doesn't
+# drag in the rest of the trading stack (no refdata, order-gateway,
+# strategy, etc. needed).
+#
+# Config path comes from $BPT_MD_RECORDER_CONFIG in the active env
+# (typically points at bpt-md-gateway.recording-hl.toml). Output dir
+# is /opt/bpt/data/raw/<venue>/<date>/, set inside the TOML — same
+# layout the local record-stack.sh produces, so wslog_to_parquet.py
+# works unchanged.
+cat > "$UNIT_DIR/bpt-md-recorder.service" <<EOF
+[Unit]
+Description=BPT Market-Data Recorder (continuous WS capture)
+After=bpt-transport.service
+Requires=bpt-transport.service
+PartOf=bpt-recording.target
+
+[Service]
+Type=simple
+EnvironmentFile=$ENV_FILE
+WorkingDirectory=$BPT_ROOT/bpt-md-gateway
+ExecStart=${BIN[bpt-md-gateway]} --config \${BPT_MD_RECORDER_CONFIG}
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=bpt-recording.target
+EOF
+
+# Daily wslog → Parquet conversion. Runs at 00:30 UTC for the
+# previous UTC day's files (matches record-stack.sh's UTC dating
+# convention). Idempotent — re-runs on the same day overwrite the
+# same Parquet rows. Scope-limited to the recording host: never
+# fires on trading-stack hosts because the recording.target on
+# them is empty.
+ROTATE_SCRIPT_LAPTOP="$BPT_ROOT/scripts/rotate_recordings.sh"
+ROTATE_SCRIPT_DEPLOY="\$BPT_ROOT/current/scripts/rotate_recordings.sh"
+if [ -n "${BPT_DEPLOY_ROOT:-}" ]; then
+    rotate_exec="$BPT_DEPLOY_ROOT/current/scripts/rotate_recordings.sh"
+else
+    rotate_exec="$ROTATE_SCRIPT_LAPTOP"
+fi
+
+cat > "$UNIT_DIR/bpt-recording-rotate.service" <<EOF
+[Unit]
+Description=BPT recording rotate (yesterday's wslogs → Parquet)
+
+[Service]
+Type=oneshot
+EnvironmentFile=$ENV_FILE
+ExecStart=$rotate_exec
+EOF
+
+cat > "$UNIT_DIR/bpt-recording-rotate.timer" <<EOF
+[Unit]
+Description=Daily BPT recording rotate (00:30 UTC)
+PartOf=bpt-recording.target
+
+[Timer]
+OnCalendar=*-*-* 00:30:00 UTC
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=bpt-recording.target
+EOF
+
+cat > "$UNIT_DIR/bpt-recording.target" <<EOF
+[Unit]
+Description=BPT Recording Stack (md-recorder + daily Parquet rotate)
+Wants=bpt-transport.service bpt-md-recorder.service bpt-recording-rotate.timer
+
+[Install]
+WantedBy=default.target
+EOF
+
 # ── bpt-stack.target ─────────────────────────────────────────────────────────
 # Frontend unit only exists in laptop mode; keep it out of the target's
 # Wants= in deploy mode so systemd doesn't try to start a ghost unit.

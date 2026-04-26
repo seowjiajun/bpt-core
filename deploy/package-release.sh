@@ -163,6 +163,11 @@ cp deploy/sync-config.sh         "$STAGE/scripts/"
 cp scripts/cleanup-stale-logs.sh "$STAGE/scripts/"
 cp deploy/deploy.sh              "$STAGE/scripts/"
 cp deploy/rollback.sh            "$STAGE/scripts/"
+# Recording-host scripts. Always packaged; harmless on a trading host
+# (the units that drive them only get started by bpt-recording.target,
+# not bpt-stack.target).
+cp scripts/rotate_recordings.sh  "$STAGE/scripts/"
+cp scripts/wslog_to_parquet.py   "$STAGE/scripts/"
 
 echo "$VERSION" > "$STAGE/VERSION"
 date -u +%FT%TZ > "$STAGE/BUILT_AT"
