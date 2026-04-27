@@ -18,7 +18,8 @@ namespace bpt::md_gateway::adapter {
 // message, so ping_config emits a JSON ping on a 20s cadence.
 class HyperliquidAdapter : public AdapterBase, private bpt::common::ws::RunLoop {
 public:
-    explicit HyperliquidAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub);
+    explicit HyperliquidAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub,
+                        const config::RecordingConfig& recording = {});
 
     [[nodiscard]] const char* exchange_name() const override { return "HYPERLIQUID"; }
     [[nodiscard]] bpt::common::util::LatencyHistogram& decode_latency_hist() noexcept override { return parser_.decode_lat_; }

@@ -61,13 +61,13 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
     for (const auto& a_cfg : cfg_.adapters) {
         std::shared_ptr<adapter::IAdapter> adapter;
         if (a_cfg.exchange == "BINANCE") {
-            adapter = std::make_shared<adapter::BinanceAdapter>(a_cfg, md_pub_);
+            adapter = std::make_shared<adapter::BinanceAdapter>(a_cfg, md_pub_, cfg_.recording);
         } else if (a_cfg.exchange == "OKX") {
-            adapter = std::make_shared<adapter::OkxAdapter>(a_cfg, md_pub_);
+            adapter = std::make_shared<adapter::OkxAdapter>(a_cfg, md_pub_, cfg_.recording);
         } else if (a_cfg.exchange == "HYPERLIQUID") {
-            adapter = std::make_shared<adapter::HyperliquidAdapter>(a_cfg, md_pub_);
+            adapter = std::make_shared<adapter::HyperliquidAdapter>(a_cfg, md_pub_, cfg_.recording);
         } else if (a_cfg.exchange == "DERIBIT") {
-            adapter = std::make_shared<adapter::DeribitAdapter>(a_cfg, md_pub_);
+            adapter = std::make_shared<adapter::DeribitAdapter>(a_cfg, md_pub_, cfg_.recording);
         } else {
             bpt::common::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
             continue;
@@ -98,6 +98,16 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
         adapter->set_topology(topology);
         adapter->start();
         sub_mgr_.add_adapter(std::move(adapter));
+    }
+
+    if (!cfg_.static_subscriptions.empty()) {
+        std::vector<subscription::SubscriptionManager::SubscribeRequest> reqs;
+        reqs.reserve(cfg_.static_subscriptions.size());
+        for (const auto& s : cfg_.static_subscriptions) {
+            reqs.push_back({s.instrument_id, s.exchange, s.symbol, s.depth});
+        }
+        sub_mgr_.apply_requests(0, reqs, ack_pub_);
+        bpt::common::log::info("MdGateway standalone: applied {} static subscriptions", reqs.size());
     }
 
     bpt::common::log::info("MdGateway ready — polling control stream {}", cfg_.aeron.control.stream_id);

@@ -1,0 +1,70 @@
+# bpt-md-gateway — STANDALONE RECORDING config (no strategy, no refdata).
+#
+# Runs md-gateway as a standalone puller AND records every received WS frame
+# to /opt/bpt/data/raw/{venue}/YYYY-MM-DD/{venue}-HHMMSS.wslog. The raw frames
+# are bit-exact copies of what the venue sent — backtester replay through the
+# venue's own simulator preserves wire-level fidelity (parser bugs surface).
+#
+# Replaces the older bpt-md-recorder + standalone-mdgw 2-process rig.
+# Now it's just: bpt-md-gateway (with recording flag) + the trading-side
+# media driver. No SBE pipeline involved in recording.
+#
+# instrument_id values are operator-assigned — pick any stable uint64.
+# Avoid colliding with IDs the trading stack uses in case you run both
+# rigs on the same host.
+
+environment = "dev"
+exchange_config = "bpt-md-gateway/config/exchanges/testnet.toml"
+exchanges = ["OKX"]
+subscription_heartbeat_interval_ms = 5000
+service_heartbeat_interval_ms = 5000
+
+[aeron]
+# Dedicated recording driver — keeps the trading stack's /dev/shm/aeron-bpt
+# completely untouched.
+media_driver_dir = "/dev/shm/aeron-bpt-record"
+
+[aeron.control]
+channel = "aeron:ipc"
+stream_id = 2001
+
+[aeron.data]
+channel = "aeron:ipc"
+stream_id = 2002
+
+[aeron.ack_hb]
+channel = "aeron:ipc"
+stream_id = 2003
+
+# One entry per symbol you want recorded. Start narrow (BTC-USDT only) and
+# broaden once the end-to-end validation passes.
+[[static_subscriptions]]
+instrument_id = 90001
+exchange = "OKX"
+symbol = "BTC-USDT"
+depth = 5
+
+# Example additional lines for later — leave commented until validated:
+# [[static_subscriptions]]
+# instrument_id = 90002
+# exchange = "OKX"
+# symbol = "ETH-USDT"
+# depth = 5
+
+[recording]
+enabled = true
+output_dir = "/opt/bpt/data/raw"
+rotate_interval_seconds = 3600   # hourly files
+fsync_interval_ms = 1000
+buffer_bytes = 1048576           # 1 MiB userspace buffer
+checkpoint_interval_seconds = 30 # heartbeat marker cadence
+
+[metrics]
+host = "127.0.0.1"
+port = 9108
+
+[logging]
+level = "info"
+dir = "logs"
+flush_level = "warn"
+flush_interval_ms = 1000

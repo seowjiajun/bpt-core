@@ -1,0 +1,22 @@
+# BPT Transport MediaDriver Configuration — RECORDING rig
+# Paired with bpt-md-gateway/config/bpt-md-gateway.standalone-okx.toml and
+# bpt-md-recorder/config/bpt-md-recorder.qa-okx.toml. Kept completely
+# separate from the trading-stack driver at /dev/shm/aeron-bpt.
+
+aeron:
+  directory: "/dev/shm/aeron-bpt-record"
+  threading_mode: "DEDICATED"
+  idle_strategy: "BUSY_SPIN"
+  dir_delete_on_start: true
+  dir_delete_on_shutdown: true
+
+  heartbeat_interval_sec: 10
+  client_liveness_timeout_ns: 20000000000
+  publication_unblock_timeout_ns: 40000000000
+
+logger:
+  level: "info"
+
+metrics:
+  # 9110 is the trading driver's port. Use 9111 for the recording rig.
+  port: 9111

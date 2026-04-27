@@ -1,0 +1,118 @@
+# bpt-md-gateway — HL MAINNET RECORDING config.
+#
+# Records real Hyperliquid mainnet ticks to /opt/bpt/data/raw/hyperliquid/.
+# Read-only (passive subscriber, no orders) so it's safe to point at mainnet
+# even though the trading stack is on testnet.
+#
+# Symbol selection: top mainnet perps by 24h notional volume, spanning a
+# range of liquidity / spread profiles for AS strategy evaluation:
+#   - ETH, SOL: tight-spread controls (lots of data, low margin)
+#   - HYPE, ZEC, AAVE, DOGE, TAO: mid-cap (better AS sweet spot)
+#   - APE, FARTCOIN, kPEPE: lower price / wider spread (memecoin profile)
+#
+# BTC excluded — its spread is too tight on HL mainnet for AS to clear fees.
+# Update the universe by re-running scripts/rank_hl_perps.py (TODO).
+
+environment = "dev"
+exchange_config = "bpt-md-gateway/config/exchanges/recording-hl-mainnet.toml"
+exchanges = ["HYPERLIQUID"]
+subscription_heartbeat_interval_ms = 5000
+service_heartbeat_interval_ms = 5000
+
+[aeron]
+# Dedicated recording driver — same as the OKX recording config so both
+# rigs share /dev/shm/aeron-bpt-record. Run only ONE of them at a time
+# unless you split into separate driver dirs.
+media_driver_dir = "/dev/shm/aeron-bpt-record"
+
+[aeron.control]
+channel = "aeron:ipc"
+stream_id = 2001
+
+[aeron.data]
+channel = "aeron:ipc"
+stream_id = 2002
+
+[aeron.ack_hb]
+channel = "aeron:ipc"
+stream_id = 2003
+
+# instrument_id values are operator-assigned. Using 92xxx range to avoid
+# collisions with OKX recording (90xxx) and trading-stack IDs.
+[[static_subscriptions]]
+instrument_id = 92001
+exchange = "HYPERLIQUID"
+symbol = "ETH"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92002
+exchange = "HYPERLIQUID"
+symbol = "SOL"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92003
+exchange = "HYPERLIQUID"
+symbol = "HYPE"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92004
+exchange = "HYPERLIQUID"
+symbol = "ZEC"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92005
+exchange = "HYPERLIQUID"
+symbol = "APE"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92006
+exchange = "HYPERLIQUID"
+symbol = "AAVE"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92007
+exchange = "HYPERLIQUID"
+symbol = "DOGE"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92008
+exchange = "HYPERLIQUID"
+symbol = "TAO"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92009
+exchange = "HYPERLIQUID"
+symbol = "FARTCOIN"
+depth = 5
+
+[[static_subscriptions]]
+instrument_id = 92010
+exchange = "HYPERLIQUID"
+symbol = "kPEPE"
+depth = 5
+
+[recording]
+enabled = true
+output_dir = "/opt/bpt/data/raw"
+rotate_interval_seconds = 3600
+fsync_interval_ms = 1000
+buffer_bytes = 1048576
+checkpoint_interval_seconds = 30
+
+[metrics]
+host = "127.0.0.1"
+port = 9109
+
+[logging]
+level = "info"
+dir = "logs"
+flush_level = "warn"
+flush_interval_ms = 1000

@@ -27,6 +27,7 @@ cc_library(
         "src/adapter/hyperliquid/hyperliquid_md_encoder.cpp",
         "src/adapter/hyperliquid/hyperliquid_parser.cpp",
         "src/adapter/hyperliquid/hyperliquid_adapter.cpp",
+        "src/recorder/raw_spool.cpp",
         "src/subscription/subscription_manager.cpp",
         "src/metrics/metrics.cpp",
     ],

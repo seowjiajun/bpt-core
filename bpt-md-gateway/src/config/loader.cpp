@@ -141,6 +141,49 @@ Settings load(const std::string& path) {
         s.adapters.push_back(std::move(ac));
     }
 
+    if (auto* r = root["recording"].as_table()) {
+        if (auto v = (*r)["enabled"].value<bool>())
+            s.recording.enabled = *v;
+        if (auto v = (*r)["output_dir"].value<std::string>())
+            s.recording.output_dir = *v;
+        if (auto v = (*r)["rotate_interval_seconds"].value<int64_t>())
+            s.recording.rotate_interval_seconds = static_cast<uint32_t>(*v);
+        if (auto v = (*r)["fsync_interval_ms"].value<int64_t>())
+            s.recording.fsync_interval_ms = static_cast<uint32_t>(*v);
+        if (auto v = (*r)["buffer_bytes"].value<int64_t>())
+            s.recording.buffer_bytes = static_cast<uint32_t>(*v);
+        if (auto v = (*r)["checkpoint_interval_seconds"].value<int64_t>())
+            s.recording.checkpoint_interval_seconds = static_cast<uint32_t>(*v);
+        if (s.recording.enabled) {
+            bpt::common::log::info("Raw-frame recording enabled: dir={} rotate={}s",
+                                   s.recording.output_dir,
+                                   s.recording.rotate_interval_seconds);
+        }
+    }
+
+    if (auto* arr = root["static_subscriptions"].as_array()) {
+        for (auto& elem : *arr) {
+            auto* t = elem.as_table();
+            if (!t)
+                continue;
+            StaticSubscription ss;
+            if (auto v = (*t)["instrument_id"].value<int64_t>())
+                ss.instrument_id = static_cast<uint64_t>(*v);
+            if (auto v = (*t)["exchange"].value<std::string>())
+                ss.exchange = *v;
+            if (auto v = (*t)["symbol"].value<std::string>())
+                ss.symbol = *v;
+            if (auto v = (*t)["depth"].value<int64_t>())
+                ss.depth = static_cast<uint8_t>(*v);
+            if (ss.instrument_id == 0 || ss.exchange.empty() || ss.symbol.empty())
+                throw std::runtime_error(
+                    "static_subscriptions entry missing instrument_id, exchange, or symbol");
+            s.static_subscriptions.push_back(std::move(ss));
+        }
+        bpt::common::log::info("Standalone mode: {} static subscriptions declared",
+                               s.static_subscriptions.size());
+    }
+
     if (auto v = root["subscription_heartbeat_interval_ms"].value<int64_t>())
         s.subscription_heartbeat_interval_ms = static_cast<uint32_t>(*v);
     if (auto v = root["service_heartbeat_interval_ms"].value<int64_t>())

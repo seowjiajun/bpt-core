@@ -14,8 +14,8 @@ namespace beast = boost::beast;
 namespace websocket = beast::websocket;
 namespace net = boost::asio;
 
-DeribitAdapter::DeribitAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub)
-    : AdapterBase(cfg, std::move(md_pub)),
+DeribitAdapter::DeribitAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub, const config::RecordingConfig& recording)
+    : AdapterBase(cfg, std::move(md_pub), recording),
       parser_(subs_) {}
 
 void DeribitAdapter::unsubscribe(uint64_t instrument_id) {
@@ -77,6 +77,7 @@ void DeribitAdapter::read_loop(bpt::common::ws::AnyWsStream& ws) {
 }
 
 void DeribitAdapter::on_frame(std::string_view payload, uint64_t recv_ns) {
+    record_raw(payload, recv_ns);
     push_frame(payload, recv_ns);
 
     // Also check here so test_request gets answered at the cadence of the
@@ -90,6 +91,7 @@ void DeribitAdapter::on_frame(std::string_view payload, uint64_t recv_ns) {
 }
 
 void DeribitAdapter::on_tick() {
+    maybe_checkpoint();
     // Answer a test_request from the parser thread before sending any
     // subscribes — Deribit tears down the session if test goes unanswered
     // past ~30s, and subscribes could race ahead of the reply. Also runs

@@ -12,8 +12,8 @@ namespace bpt::md_gateway::adapter {
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
 
-BinanceAdapter::BinanceAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub)
-    : AdapterBase(cfg, std::move(md_pub)),
+BinanceAdapter::BinanceAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub, const config::RecordingConfig& recording)
+    : AdapterBase(cfg, std::move(md_pub), recording),
       parser_(subs_),
       fr_stream_(cfg_, subs_, on_funding_rate, stop_flag_) {}
 
@@ -74,6 +74,7 @@ void BinanceAdapter::read_loop(bpt::common::ws::AnyWsStream& ws) {
 }
 
 void BinanceAdapter::on_frame(std::string_view payload, uint64_t recv_ns) {
+    record_raw(payload, recv_ns);
     push_frame(payload, recv_ns);
 }
 

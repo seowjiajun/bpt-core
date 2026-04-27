@@ -21,7 +21,8 @@ namespace bpt::md_gateway::adapter {
 // ping_config is left at nullopt (no application ping thread).
 class DeribitAdapter : public AdapterBase, private bpt::common::ws::RunLoop {
 public:
-    explicit DeribitAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub);
+    explicit DeribitAdapter(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub,
+                        const config::RecordingConfig& recording = {});
 
     // Also clears gap-detection state for the instrument in the parser.
     void unsubscribe(uint64_t instrument_id) override;

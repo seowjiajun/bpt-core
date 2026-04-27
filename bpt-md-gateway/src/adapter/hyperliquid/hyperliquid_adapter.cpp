@@ -15,22 +15,35 @@ namespace websocket = beast::websocket;
 namespace net = boost::asio;
 
 HyperliquidAdapter::HyperliquidAdapter(const config::AdapterConfig& cfg,
-                                       std::shared_ptr<messaging::IMdPublisher> md_pub)
-    : AdapterBase(cfg, std::move(md_pub)),
+                                       std::shared_ptr<messaging::IMdPublisher> md_pub,
+                                       const config::RecordingConfig& recording)
+    : AdapterBase(cfg, std::move(md_pub), recording),
       parser_(subs_) {}
 
 std::unique_ptr<bpt::common::ws::AnyWsStream> HyperliquidAdapter::connect_and_subscribe() {
-    bpt::common::log::info("HyperliquidAdapter connecting {}:{}{}", cfg_.ws_host, cfg_.ws_port, cfg_.ws_path);
-    auto tls_ws = bpt::common::ws::ws_connect(ioc_,
-                                      ssl_ctx_,
-                                      cfg_.ws_host,
-                                      cfg_.ws_port,
-                                      cfg_.ws_path,
-                                      cfg_.so_rcvbuf_bytes,
-                                      cfg_.ws_connect_timeout_ms,
-                                      "bpt-md-gateway/0.1",
-                                      cfg_.pinned_tls_sha256);
-    auto ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
+    bpt::common::log::info("HyperliquidAdapter connecting {}:{}{} (tls={})",
+                           cfg_.ws_host, cfg_.ws_port, cfg_.ws_path, cfg_.use_tls);
+    std::unique_ptr<bpt::common::ws::AnyWsStream> ws;
+    if (cfg_.use_tls) {
+        auto tls_ws = bpt::common::ws::ws_connect(ioc_,
+                                          ssl_ctx_,
+                                          cfg_.ws_host,
+                                          cfg_.ws_port,
+                                          cfg_.ws_path,
+                                          cfg_.so_rcvbuf_bytes,
+                                          cfg_.ws_connect_timeout_ms,
+                                          "bpt-md-gateway/0.1",
+                                          cfg_.pinned_tls_sha256);
+        ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
+    } else {
+        auto plain_ws = bpt::common::ws::ws_connect_plain(ioc_,
+                                                  cfg_.ws_host,
+                                                  cfg_.ws_port,
+                                                  cfg_.ws_path,
+                                                  cfg_.so_rcvbuf_bytes,
+                                                  cfg_.ws_connect_timeout_ms);
+        ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(plain_ws));
+    }
 
     // Enable WebSocket-level keep-alive pings. If HL stops responding Beast
     // closes the stream with an error, triggering the reconnect loop.
@@ -63,10 +76,12 @@ void HyperliquidAdapter::read_loop(bpt::common::ws::AnyWsStream& ws) {
 }
 
 void HyperliquidAdapter::on_frame(std::string_view payload, uint64_t recv_ns) {
+    record_raw(payload, recv_ns);
     push_frame(payload, recv_ns);
 }
 
 void HyperliquidAdapter::on_tick() {
+    maybe_checkpoint();
     // Fallback for subs added between connect_and_subscribe's take_pending
     // and the first read iteration. Primary path is subscribe() below.
     for (const auto& entry : subs_.take_pending()) {

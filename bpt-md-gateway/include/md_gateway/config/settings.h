@@ -76,6 +76,30 @@ struct AdapterConfig {
     uint32_t validation_drop_min_events{50};
 };
 
+// Raw-WS-frame recording. When enabled, every adapter tees each received
+// frame to disk via bpt::md_gateway::recorder::RawSpool. Trading instances
+// run with enabled=false (zero overhead). Recording-rig instances run with
+// enabled=true alongside a broader static_subscriptions list.
+struct RecordingConfig {
+    bool enabled{false};
+    std::string output_dir{"/opt/bpt/data/raw"};
+    uint32_t rotate_interval_seconds{3600};
+    uint32_t fsync_interval_ms{1000};
+    uint32_t buffer_bytes{1u << 20};
+    uint32_t checkpoint_interval_seconds{30};
+};
+
+// Subscription declared entirely in md-gateway config. Applied on startup
+// in standalone mode, where no external caller sends MdSubscribeBatch.
+// instrument_id is operator-assigned — pick any uint64 stable for your
+// recording corpus; it's stamped onto every frame for that symbol.
+struct StaticSubscription {
+    uint64_t instrument_id{0};
+    std::string exchange;
+    std::string symbol;
+    uint8_t depth{0};
+};
+
 struct Settings {
     // Shared lifecycle config (environment, media_driver_dir, logging,
     // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
@@ -84,6 +108,15 @@ struct Settings {
     std::vector<std::string> exchanges;  // exchanges to activate from exchange_config (e.g. ["OKX", "BINANCE"])
     AeronConfig aeron;
     std::vector<AdapterConfig> adapters;
+
+    // Non-empty = standalone mode. Subscriptions are applied once at startup.
+    // The control-stream subscriber remains wired so an external caller could
+    // still override at runtime; recording rigs typically run without one.
+    std::vector<StaticSubscription> static_subscriptions;
+
+    // Raw-frame recording. Disabled by default — only recording-rig instances
+    // flip enabled=true. See RecordingConfig.
+    RecordingConfig recording;
 
     // Interval (ms) between per-instrument subscription heartbeats on the ack/hb stream.
     uint32_t subscription_heartbeat_interval_ms{5000};

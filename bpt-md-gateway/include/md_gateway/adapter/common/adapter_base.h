@@ -6,6 +6,7 @@
 #include "md_gateway/md/md_validator.h"
 #include "md_gateway/md/validating_publisher.h"
 #include "md_gateway/messaging/i_md_publisher.h"
+#include "md_gateway/recorder/raw_spool.h"
 
 #include <atomic>
 #include <boost/asio/io_context.hpp>
@@ -42,7 +43,9 @@ public:
     static constexpr size_t SLOT_BYTES = 16384;
     using FrameQueue = bpt::common::util::SpscQueue<QUEUE_CAPACITY, SLOT_BYTES>;
 
-    AdapterBase(const config::AdapterConfig& cfg, std::shared_ptr<messaging::IMdPublisher> md_pub);
+    AdapterBase(const config::AdapterConfig& cfg,
+                std::shared_ptr<messaging::IMdPublisher> md_pub,
+                const config::RecordingConfig& recording = {});
     ~AdapterBase() override = default;
 
     void subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth = 0) override;
@@ -78,6 +81,15 @@ protected:
     // Logs a warning (throttled) when the queue is full or the frame is oversized.
     void push_frame(std::string_view payload, uint64_t recv_ns) noexcept;
 
+    // Tap raw frame to disk if recording is enabled. No-op otherwise.
+    // Adapters call this at the START of on_frame() — BEFORE any keepalive
+    // filter — so ping/pong are also captured (proof of liveness in the tape).
+    void record_raw(std::string_view payload, uint64_t recv_ns) noexcept;
+
+    // Periodic CHECKPOINT marker emission. Adapters call this from their
+    // on_tick() callback. Cheap when disabled, ~1µs when enabled and writing.
+    void maybe_checkpoint() noexcept;
+
     config::AdapterConfig cfg_;
     std::shared_ptr<messaging::IMdPublisher> md_pub_;
     // Optional CPU-affinity topology. Pointer (not reference) because
@@ -96,6 +108,12 @@ protected:
     std::atomic<bool> stop_flag_{false};
 
     FrameQueue frame_queue_;
+
+    // nullptr unless cfg's RecordingConfig.enabled = true. Owned by AdapterBase
+    // because the IO thread is the sole writer; lifetime matches the adapter.
+    std::unique_ptr<recorder::RawSpool> spool_;
+    uint64_t checkpoint_interval_ns_{0};
+    uint64_t last_checkpoint_ns_{0};
 
 private:
     void run();
