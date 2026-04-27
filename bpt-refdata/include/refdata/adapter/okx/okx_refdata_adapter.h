@@ -29,7 +29,8 @@ public:
     OKXRefDataAdapter(const config::AdapterConfig& cfg,
                       const ExchangeCredentials& creds,
                       std::shared_ptr<registry::InstrumentRegistry> registry,
-                      std::shared_ptr<mapping::InstrumentMappingLoader> mapping);
+                      std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                      std::shared_ptr<http::RestClient> client);
     ~OKXRefDataAdapter() override = default;
 
     void fetchSnapshot() override;
@@ -50,7 +51,7 @@ private:
     std::string secret_key_;
     std::string passphrase_;
 
-    http::RestClient client_;
+    std::shared_ptr<http::RestClient> client_;
     OKXParser parser_;
 };
 

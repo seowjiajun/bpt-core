@@ -30,7 +30,8 @@ public:
     DeribitRefDataAdapter(const config::AdapterConfig& cfg,
                           const ExchangeCredentials& creds,
                           std::shared_ptr<registry::InstrumentRegistry> registry,
-                          std::shared_ptr<mapping::InstrumentMappingLoader> mapping);
+                          std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                          std::shared_ptr<http::RestClient> rest_client);
     ~DeribitRefDataAdapter() override = default;
 
     void fetchSnapshot() override;
@@ -51,9 +52,9 @@ private:
     std::string client_secret_;
 
     // Shared HTTPS client — reuses SSL context across calls and retries
-    // on transient failures. Constructed lazily in fetchSnapshot to
-    // honour the cfg_.rest_host empty-fallback.
-    std::unique_ptr<bpt::refdata::http::RestClient> rest_client_;
+    // on transient failures. Injected at construction; refdata_app picks
+    // the host (defaulting to test.deribit.com when cfg_.rest_host empty).
+    std::shared_ptr<bpt::refdata::http::RestClient> rest_client_;
 
     DeribitRefdataParser parser_;
 

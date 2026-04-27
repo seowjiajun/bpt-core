@@ -28,7 +28,8 @@ public:
     HyperliquidRefDataAdapter(const config::AdapterConfig& cfg,
                               const ExchangeCredentials& creds,
                               std::shared_ptr<registry::InstrumentRegistry> registry,
-                              std::shared_ptr<mapping::InstrumentMappingLoader> mapping);
+                              std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                              std::shared_ptr<http::RestClient> client);
     ~HyperliquidRefDataAdapter() override = default;
 
     void fetchSnapshot() override;
@@ -49,7 +50,7 @@ private:
 
     std::string wallet_address_;
 
-    http::RestClient client_;
+    std::shared_ptr<http::RestClient> client_;
     HyperliquidParser parser_;
 };
 

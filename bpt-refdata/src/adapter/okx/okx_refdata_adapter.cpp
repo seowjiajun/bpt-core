@@ -25,13 +25,14 @@ quill::Logger* kLog() {
 OKXRefDataAdapter::OKXRefDataAdapter(const config::AdapterConfig& cfg,
                                      const ExchangeCredentials& creds,
                                      std::shared_ptr<registry::InstrumentRegistry> registry,
-                                     std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
+                                     std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                                     std::shared_ptr<http::RestClient> client)
     : cfg_(cfg),
       registry_(std::move(registry)),
       api_key_(creds.api_key),
       secret_key_(creds.secret_key),
       passphrase_(creds.passphrase),
-      client_(cfg.rest_host.empty() ? "www.okx.com" : cfg.rest_host, cfg.rest_port, cfg.use_tls),
+      client_(std::move(client)),
       parser_(mapping) {}
 
 void OKXRefDataAdapter::fetchSnapshot() {
@@ -44,7 +45,7 @@ void OKXRefDataAdapter::fetchSnapshot() {
 
     // 1. Spot instruments
     try {
-        auto body = client_.get("/api/v5/public/instruments?instType=SPOT", base_headers);
+        auto body = client_->get("/api/v5/public/instruments?instType=SPOT", base_headers);
         for (auto& inst : parser_.parse_instruments(body, "SPOT", ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
@@ -54,7 +55,7 @@ void OKXRefDataAdapter::fetchSnapshot() {
 
     // 2. Perpetual swap instruments
     try {
-        auto body = client_.get("/api/v5/public/instruments?instType=SWAP", base_headers);
+        auto body = client_->get("/api/v5/public/instruments?instType=SWAP", base_headers);
         for (auto& inst : parser_.parse_instruments(body, "SWAP", ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
@@ -67,7 +68,7 @@ void OKXRefDataAdapter::fetchSnapshot() {
     const std::string fee_swap_target = "/api/v5/account/trade-fee?instType=SWAP";
     try {
         auto headers = okx_auth_headers(api_key_, secret_key_, passphrase_, "GET", fee_spot_target, cfg_.simulated);
-        auto body = client_.get(fee_spot_target, headers);
+        auto body = client_->get(fee_spot_target, headers);
         for (auto& fs : parser_.parse_trade_fee(body, ts))
             if (on_fee_schedule)
                 on_fee_schedule(fs);
@@ -76,7 +77,7 @@ void OKXRefDataAdapter::fetchSnapshot() {
     }
     try {
         auto headers = okx_auth_headers(api_key_, secret_key_, passphrase_, "GET", fee_swap_target, cfg_.simulated);
-        auto body = client_.get(fee_swap_target, headers);
+        auto body = client_->get(fee_swap_target, headers);
         for (auto& fs : parser_.parse_trade_fee(body, ts))
             if (on_fee_schedule)
                 on_fee_schedule(fs);
@@ -102,7 +103,7 @@ void OKXRefDataAdapter::fetchInstrumentListing() {
     };
 
     try {
-        auto body = client_.get("/api/v5/public/instruments?instType=SPOT", base_headers);
+        auto body = client_->get("/api/v5/public/instruments?instType=SPOT", base_headers);
         for (auto& inst : parser_.parse_instruments(body, "SPOT", ts))
             notify(inst);
     } catch (const std::exception& e) {
@@ -110,7 +111,7 @@ void OKXRefDataAdapter::fetchInstrumentListing() {
     }
 
     try {
-        auto body = client_.get("/api/v5/public/instruments?instType=SWAP", base_headers);
+        auto body = client_->get("/api/v5/public/instruments?instType=SWAP", base_headers);
         for (auto& inst : parser_.parse_instruments(body, "SWAP", ts))
             notify(inst);
     } catch (const std::exception& e) {

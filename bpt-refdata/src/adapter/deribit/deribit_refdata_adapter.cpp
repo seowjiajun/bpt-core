@@ -25,11 +25,13 @@ std::atomic<uint64_t> g_jsonrpc_id{1};
 DeribitRefDataAdapter::DeribitRefDataAdapter(const config::AdapterConfig& cfg,
                                              const ExchangeCredentials& creds,
                                              std::shared_ptr<registry::InstrumentRegistry> registry,
-                                             std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
+                                             std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                                             std::shared_ptr<http::RestClient> rest_client)
     : cfg_(cfg),
       registry_(std::move(registry)),
       client_id_(creds.client_id),
       client_secret_(creds.client_secret),
+      rest_client_(std::move(rest_client)),
       parser_(std::move(mapping)) {
     if (client_id_.empty() || client_secret_.empty()) {
         bpt::common::log::warn(
@@ -74,11 +76,6 @@ void DeribitRefDataAdapter::ingest_instruments(const std::string& currency,
 void DeribitRefDataAdapter::fetchSnapshot() {
     bpt::common::log::info("[DeribitRefData] Starting snapshot fetch...");
 
-    if (!rest_client_) {
-        const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
-        rest_client_ = std::make_unique<bpt::refdata::http::RestClient>(host, cfg_.rest_port, cfg_.use_tls);
-    }
-
     const uint64_t ts = now_ns();
     for (const auto& currency : {"BTC", "ETH"})
         for (const auto& kind : {"future", "option"})
@@ -90,10 +87,6 @@ void DeribitRefDataAdapter::fetchSnapshot() {
 
 void DeribitRefDataAdapter::fetchInstrumentListing() {
     bpt::common::log::info("[DeribitRefData] Hourly instrument listing refresh...");
-    if (!rest_client_) {
-        const std::string host = cfg_.rest_host.empty() ? "test.deribit.com" : cfg_.rest_host;
-        rest_client_ = std::make_unique<bpt::refdata::http::RestClient>(host, cfg_.rest_port, cfg_.use_tls);
-    }
 
     const uint64_t ts = now_ns();
     for (const auto& currency : {"BTC", "ETH"})

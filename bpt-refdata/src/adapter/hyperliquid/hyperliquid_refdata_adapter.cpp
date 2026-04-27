@@ -18,11 +18,12 @@ uint64_t now_ns() {
 HyperliquidRefDataAdapter::HyperliquidRefDataAdapter(const config::AdapterConfig& cfg,
                                                      const ExchangeCredentials& creds,
                                                      std::shared_ptr<registry::InstrumentRegistry> registry,
-                                                     std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
+                                                     std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                                                     std::shared_ptr<http::RestClient> client)
     : cfg_(cfg),
       registry_(std::move(registry)),
       wallet_address_(creds.wallet_address),
-      client_(cfg.rest_host.empty() ? "api.hyperliquid.xyz" : cfg.rest_host, cfg.rest_port, cfg.use_tls),
+      client_(std::move(client)),
       parser_(mapping) {}
 
 void HyperliquidRefDataAdapter::fetchSnapshot() {
@@ -31,7 +32,7 @@ void HyperliquidRefDataAdapter::fetchSnapshot() {
 
     // 1. Meta — instrument listing (all perps)
     try {
-        auto body = client_.post("/info", R"({"type":"meta"})");
+        auto body = client_->post("/info", R"({"type":"meta"})");
         for (auto& inst : parser_.parse_meta(body, ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
@@ -43,7 +44,7 @@ void HyperliquidRefDataAdapter::fetchSnapshot() {
     if (!wallet_address_.empty()) {
         try {
             nlohmann::json fee_req = {{"type", "userFees"}, {"user", wallet_address_}};
-            auto body = client_.post("/info", fee_req.dump());
+            auto body = client_->post("/info", fee_req.dump());
             for (auto& fs : parser_.parse_user_fees(body, ts))
                 if (on_fee_schedule)
                     on_fee_schedule(fs);
@@ -63,7 +64,7 @@ void HyperliquidRefDataAdapter::fetchInstrumentListing() {
     const uint64_t ts = now_ns();
 
     try {
-        auto body = client_.post("/info", R"({"type":"meta"})");
+        auto body = client_->post("/info", R"({"type":"meta"})");
         for (auto& inst : parser_.parse_meta(body, ts)) {
             if (registry_->update_if_changed(inst) && on_instrument_delta)
                 on_instrument_delta(inst, bpt::messages::DeltaUpdateType::MODIFY, ts);

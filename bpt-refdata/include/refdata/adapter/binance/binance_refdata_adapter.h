@@ -29,7 +29,9 @@ public:
     BinanceRefDataAdapter(const config::AdapterConfig& cfg,
                           const ExchangeCredentials& creds,
                           std::shared_ptr<registry::InstrumentRegistry> registry,
-                          std::shared_ptr<mapping::InstrumentMappingLoader> mapping);
+                          std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                          std::shared_ptr<http::RestClient> spot_client,
+                          std::shared_ptr<http::RestClient> fapi_client);
     ~BinanceRefDataAdapter() override = default;
 
     void fetchSnapshot() override;
@@ -48,8 +50,8 @@ private:
 
     std::string api_key_;
 
-    http::RestClient spot_client_;
-    http::RestClient fapi_client_;
+    std::shared_ptr<http::RestClient> spot_client_;
+    std::shared_ptr<http::RestClient> fapi_client_;
     BinanceParser parser_;
 };
 

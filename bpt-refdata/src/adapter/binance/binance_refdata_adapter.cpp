@@ -23,12 +23,14 @@ quill::Logger* kLog() {
 BinanceRefDataAdapter::BinanceRefDataAdapter(const config::AdapterConfig& cfg,
                                              const ExchangeCredentials& creds,
                                              std::shared_ptr<registry::InstrumentRegistry> registry,
-                                             std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
+                                             std::shared_ptr<mapping::InstrumentMappingLoader> mapping,
+                                             std::shared_ptr<http::RestClient> spot_client,
+                                             std::shared_ptr<http::RestClient> fapi_client)
     : cfg_(cfg),
       registry_(std::move(registry)),
       api_key_(creds.api_key),
-      spot_client_(cfg.rest_host.empty() ? "api.binance.com" : cfg.rest_host, cfg.rest_port, cfg.use_tls),
-      fapi_client_(cfg.rest_host.empty() ? "fapi.binance.com" : cfg.rest_host, cfg.rest_port, cfg.use_tls),
+      spot_client_(std::move(spot_client)),
+      fapi_client_(std::move(fapi_client)),
       parser_(mapping) {}
 
 void BinanceRefDataAdapter::fetchSnapshot() {
@@ -37,7 +39,7 @@ void BinanceRefDataAdapter::fetchSnapshot() {
 
     // 1. Spot instruments
     try {
-        auto body = spot_client_.get("/api/v3/exchangeInfo");
+        auto body = spot_client_->get("/api/v3/exchangeInfo");
         for (auto& inst : parser_.parse_spot_exchange_info(body, ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
@@ -47,7 +49,7 @@ void BinanceRefDataAdapter::fetchSnapshot() {
 
     // 2. Futures / perp instruments
     try {
-        auto body = fapi_client_.get("/fapi/v1/exchangeInfo");
+        auto body = fapi_client_->get("/fapi/v1/exchangeInfo");
         for (auto& inst : parser_.parse_futures_exchange_info(body, ts))
             registry_->add(inst);
     } catch (const std::exception& e) {
@@ -58,7 +60,7 @@ void BinanceRefDataAdapter::fetchSnapshot() {
     // 3. Trade fee (requires API key)
     if (!api_key_.empty()) {
         try {
-            auto body = spot_client_.get("/sapi/v1/asset/tradeFee", {{"X-MBX-APIKEY", api_key_}});
+            auto body = spot_client_->get("/sapi/v1/asset/tradeFee", {{"X-MBX-APIKEY", api_key_}});
             for (auto& fs : parser_.parse_trade_fee(body, ts))
                 if (on_fee_schedule)
                     on_fee_schedule(fs);
@@ -83,7 +85,7 @@ void BinanceRefDataAdapter::fetchInstrumentListing() {
     };
 
     try {
-        auto body = spot_client_.get("/api/v3/exchangeInfo");
+        auto body = spot_client_->get("/api/v3/exchangeInfo");
         for (auto& inst : parser_.parse_spot_exchange_info(body, ts))
             notify(inst);
     } catch (const std::exception& e) {
@@ -91,7 +93,7 @@ void BinanceRefDataAdapter::fetchInstrumentListing() {
     }
 
     try {
-        auto body = fapi_client_.get("/fapi/v1/exchangeInfo");
+        auto body = fapi_client_->get("/fapi/v1/exchangeInfo");
         for (auto& inst : parser_.parse_futures_exchange_info(body, ts))
             notify(inst);
     } catch (const std::exception& e) {

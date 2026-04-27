@@ -83,20 +83,33 @@ RefdataApp::RefdataApp(config::Settings settings,
             return it != creds.end() ? it->second : empty;
         }();
 
+        // Build the RestClient(s) here so a recording-aware subclass can be
+        // substituted at this construction site without touching adapter code.
+        // Per-venue host fallback lives here too — adapters consume the client
+        // pre-configured.
+        auto make_client = [&cfg](const std::string& default_host) {
+            const std::string host = cfg.rest_host.empty() ? default_host : cfg.rest_host;
+            return std::make_shared<http::RestClient>(host, cfg.rest_port, cfg.use_tls);
+        };
+
         std::unique_ptr<adapter::IExchangeRefDataAdapter> adapter;
         if (cfg.exchange == "BINANCE") {
-            adapter =
-                std::make_unique<adapter::BinanceRefDataAdapter>(cfg, exchange_creds, registry_, instrument_mapping_);
+            adapter = std::make_unique<adapter::BinanceRefDataAdapter>(
+                cfg, exchange_creds, registry_, instrument_mapping_,
+                make_client("api.binance.com"),
+                make_client("fapi.binance.com"));
         } else if (cfg.exchange == "OKX") {
-            adapter = std::make_unique<adapter::OKXRefDataAdapter>(cfg, exchange_creds, registry_, instrument_mapping_);
+            adapter = std::make_unique<adapter::OKXRefDataAdapter>(
+                cfg, exchange_creds, registry_, instrument_mapping_,
+                make_client("www.okx.com"));
         } else if (cfg.exchange == "HYPERLIQUID") {
-            adapter = std::make_unique<adapter::HyperliquidRefDataAdapter>(cfg,
-                                                                           exchange_creds,
-                                                                           registry_,
-                                                                           instrument_mapping_);
+            adapter = std::make_unique<adapter::HyperliquidRefDataAdapter>(
+                cfg, exchange_creds, registry_, instrument_mapping_,
+                make_client("api.hyperliquid.xyz"));
         } else if (cfg.exchange == "DERIBIT") {
-            adapter =
-                std::make_unique<adapter::DeribitRefDataAdapter>(cfg, exchange_creds, registry_, instrument_mapping_);
+            adapter = std::make_unique<adapter::DeribitRefDataAdapter>(
+                cfg, exchange_creds, registry_, instrument_mapping_,
+                make_client("test.deribit.com"));
         } else {
             bpt::common::log::error("Unknown exchange '{}' in config — skipping", cfg.exchange);
             continue;
