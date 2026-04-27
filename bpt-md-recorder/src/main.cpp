@@ -13,6 +13,7 @@
 #include "bpt_common/recorder/raw_spool.h"
 #include "md_gateway/messaging/i_md_publisher.h"
 #include "md_gateway/adapter/common/i_adapter.h"
+#include <messages/ExchangeRegistry.h>
 
 #include <CLI/CLI.hpp>
 
@@ -84,18 +85,30 @@ public:
                                 snapshot);
             spool->flush();
 
+            const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a_cfg.exchange);
+            if (!exch_id) {
+                throw std::runtime_error(fmt::format(
+                    "Unknown exchange '{}' in md-recorder config — not in messages/exchanges.yaml",
+                    a_cfg.exchange));
+            }
             std::shared_ptr<bpt::md_gateway::adapter::IAdapter> adapter;
-            if (a_cfg.exchange == "BINANCE")
-                adapter = std::make_shared<adapter::RecordingBinanceAdapter>(spool, a_cfg, pub);
-            else if (a_cfg.exchange == "OKX")
-                adapter = std::make_shared<adapter::RecordingOkxAdapter>(spool, a_cfg, pub);
-            else if (a_cfg.exchange == "HYPERLIQUID")
-                adapter = std::make_shared<adapter::RecordingHyperliquidAdapter>(spool, a_cfg, pub);
-            else if (a_cfg.exchange == "DERIBIT")
-                adapter = std::make_shared<adapter::RecordingDeribitAdapter>(spool, a_cfg, pub);
-            else {
-                bpt::common::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
-                continue;
+            switch (*exch_id) {
+                case bpt::messages::ExchangeId::BINANCE:
+                    adapter = std::make_shared<adapter::RecordingBinanceAdapter>(spool, a_cfg, pub);
+                    break;
+                case bpt::messages::ExchangeId::OKX:
+                    adapter = std::make_shared<adapter::RecordingOkxAdapter>(spool, a_cfg, pub);
+                    break;
+                case bpt::messages::ExchangeId::HYPERLIQUID:
+                    adapter = std::make_shared<adapter::RecordingHyperliquidAdapter>(spool, a_cfg, pub);
+                    break;
+                case bpt::messages::ExchangeId::DERIBIT:
+                    adapter = std::make_shared<adapter::RecordingDeribitAdapter>(spool, a_cfg, pub);
+                    break;
+                default:
+                    throw std::runtime_error(fmt::format(
+                        "Exchange '{}' is in the registry but md-recorder has no recording adapter for it",
+                        a_cfg.exchange));
             }
 
             // Connection-state markers via the existing on_connect/on_disconnect

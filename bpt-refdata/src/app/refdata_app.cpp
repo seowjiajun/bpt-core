@@ -7,6 +7,7 @@
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
+#include <messages/ExchangeRegistry.h>
 #include <messages/RefDataErrorType.h>
 
 #include <chrono>
@@ -92,27 +93,44 @@ RefdataApp::RefdataApp(config::Settings settings,
             return std::make_shared<http::RestClient>(host, cfg.rest_port, cfg.use_tls);
         };
 
+        // Validate at the boundary via ExchangeRegistry — typo in TOML
+        // throws here rather than silently skipping with a logged error
+        // (which previously meant catalog instruments for that venue
+        // never published, with no obvious cause beyond the log line).
+        const auto exch_id = bpt::messages::ExchangeRegistry::from_name(cfg.exchange);
+        if (!exch_id) {
+            throw std::runtime_error(fmt::format(
+                "Unknown exchange '{}' in refdata config — not in messages/exchanges.yaml",
+                cfg.exchange));
+        }
+
         std::unique_ptr<adapter::IExchangeRefDataAdapter> adapter;
-        if (cfg.exchange == "BINANCE") {
-            adapter = std::make_unique<adapter::BinanceRefDataAdapter>(
-                cfg, exchange_creds, registry_, instrument_mapping_,
-                make_client("api.binance.com"),
-                make_client("fapi.binance.com"));
-        } else if (cfg.exchange == "OKX") {
-            adapter = std::make_unique<adapter::OKXRefDataAdapter>(
-                cfg, exchange_creds, registry_, instrument_mapping_,
-                make_client("www.okx.com"));
-        } else if (cfg.exchange == "HYPERLIQUID") {
-            adapter = std::make_unique<adapter::HyperliquidRefDataAdapter>(
-                cfg, exchange_creds, registry_, instrument_mapping_,
-                make_client("api.hyperliquid.xyz"));
-        } else if (cfg.exchange == "DERIBIT") {
-            adapter = std::make_unique<adapter::DeribitRefDataAdapter>(
-                cfg, exchange_creds, registry_, instrument_mapping_,
-                make_client("test.deribit.com"));
-        } else {
-            bpt::common::log::error("Unknown exchange '{}' in config — skipping", cfg.exchange);
-            continue;
+        switch (*exch_id) {
+            case bpt::messages::ExchangeId::BINANCE:
+                adapter = std::make_unique<adapter::BinanceRefDataAdapter>(
+                    cfg, exchange_creds, registry_, instrument_mapping_,
+                    make_client("api.binance.com"),
+                    make_client("fapi.binance.com"));
+                break;
+            case bpt::messages::ExchangeId::OKX:
+                adapter = std::make_unique<adapter::OKXRefDataAdapter>(
+                    cfg, exchange_creds, registry_, instrument_mapping_,
+                    make_client("www.okx.com"));
+                break;
+            case bpt::messages::ExchangeId::HYPERLIQUID:
+                adapter = std::make_unique<adapter::HyperliquidRefDataAdapter>(
+                    cfg, exchange_creds, registry_, instrument_mapping_,
+                    make_client("api.hyperliquid.xyz"));
+                break;
+            case bpt::messages::ExchangeId::DERIBIT:
+                adapter = std::make_unique<adapter::DeribitRefDataAdapter>(
+                    cfg, exchange_creds, registry_, instrument_mapping_,
+                    make_client("test.deribit.com"));
+                break;
+            default:
+                throw std::runtime_error(fmt::format(
+                    "Exchange '{}' is in the registry but refdata has no adapter implementation for it",
+                    cfg.exchange));
         }
 
         const std::string exch_name = adapter->exchange_name();

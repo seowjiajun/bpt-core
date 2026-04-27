@@ -7,6 +7,7 @@
 
 #include <FragmentAssembler.h>
 
+#include <messages/ExchangeRegistry.h>
 #include <messages/MdSubscribeBatch.h>
 #include <messages/MessageHeader.h>
 
@@ -59,18 +60,34 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
         });
 
     for (const auto& a_cfg : cfg_.adapters) {
+        // Validate against ExchangeRegistry at the boundary so a typo in
+        // the TOML fails immediately rather than skipping silently with a
+        // warning. The registry is YAML-driven; new venues land here when
+        // messages/exchanges.yaml is edited and codegen rerun.
+        const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a_cfg.exchange);
+        if (!exch_id) {
+            throw std::runtime_error(fmt::format(
+                "Unknown exchange '{}' in mdgw config — not in messages/exchanges.yaml",
+                a_cfg.exchange));
+        }
         std::shared_ptr<adapter::IAdapter> adapter;
-        if (a_cfg.exchange == "BINANCE") {
-            adapter = std::make_shared<adapter::BinanceAdapter>(a_cfg, md_pub_);
-        } else if (a_cfg.exchange == "OKX") {
-            adapter = std::make_shared<adapter::OkxAdapter>(a_cfg, md_pub_);
-        } else if (a_cfg.exchange == "HYPERLIQUID") {
-            adapter = std::make_shared<adapter::HyperliquidAdapter>(a_cfg, md_pub_);
-        } else if (a_cfg.exchange == "DERIBIT") {
-            adapter = std::make_shared<adapter::DeribitAdapter>(a_cfg, md_pub_);
-        } else {
-            bpt::common::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
-            continue;
+        switch (*exch_id) {
+            case bpt::messages::ExchangeId::BINANCE:
+                adapter = std::make_shared<adapter::BinanceAdapter>(a_cfg, md_pub_);
+                break;
+            case bpt::messages::ExchangeId::OKX:
+                adapter = std::make_shared<adapter::OkxAdapter>(a_cfg, md_pub_);
+                break;
+            case bpt::messages::ExchangeId::HYPERLIQUID:
+                adapter = std::make_shared<adapter::HyperliquidAdapter>(a_cfg, md_pub_);
+                break;
+            case bpt::messages::ExchangeId::DERIBIT:
+                adapter = std::make_shared<adapter::DeribitAdapter>(a_cfg, md_pub_);
+                break;
+            default:
+                throw std::runtime_error(fmt::format(
+                    "Exchange '{}' is in the registry but mdgw has no adapter implementation for it",
+                    a_cfg.exchange));
         }
 
         adapter->on_funding_rate = [this](const messaging::FundingRateUpdate& fr) {

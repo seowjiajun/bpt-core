@@ -6,7 +6,13 @@ from pathlib import Path
 
 import typer
 
-from bpt_ops.jobs.exchange_catalog import check_cpp, emit, generate, model
+from bpt_ops.jobs.exchange_catalog import (
+    check_cpp,
+    emit,
+    generate,
+    generate_cpp,
+    model,
+)
 
 app = typer.Typer(
     help="Exchange catalog codegen and verification.",
@@ -19,6 +25,7 @@ DEFAULT_YAML = Path("../messages/exchanges.yaml")
 DEFAULT_PY_OUT = Path("bpt_ops/common/_exchanges_generated.py")
 DEFAULT_JSON_OUT = Path("../config/exchanges/catalog.json")
 DEFAULT_CPP_HEADER = Path("../messages/generated/cpp/messages/ExchangeId.h")
+DEFAULT_CPP_REGISTRY = Path("../messages/generated/cpp/messages/ExchangeRegistry.h")
 
 
 @app.command("generate-python")
@@ -72,6 +79,69 @@ def check_generated(
     if expected != actual:
         typer.secho(
             f"❌ {current} is stale. Run `bpt-ops exchange-catalog generate-python` and commit.",
+            fg="red",
+            err=True,
+        )
+        raise typer.Exit(1)
+    typer.echo(f"✓ {current.name} is up to date with {yaml_path.name}.")
+
+
+@app.command("generate-cpp-registry")
+def generate_cpp_registry_cmd(
+    yaml_path: Path = typer.Option(DEFAULT_YAML, "--yaml"),
+    out: Path = typer.Option(DEFAULT_CPP_REGISTRY, "--out"),
+) -> None:
+    """Regenerate messages/generated/cpp/messages/ExchangeRegistry.h from the YAML.
+    The registry sits alongside the SBE-generated ExchangeId.h and adds
+    string→enum lookup, display names, and a constexpr table for iteration."""
+    catalog = model.load(yaml_path)
+    generate_cpp.write(catalog, out)
+    typer.echo(f"[exchange-catalog] wrote {out} ({len(catalog.exchanges)} exchanges)")
+
+
+@app.command("check-cpp-registry")
+def check_cpp_registry(
+    yaml_path: Path = typer.Option(DEFAULT_YAML, "--yaml"),
+    current: Path = typer.Option(DEFAULT_CPP_REGISTRY, "--current"),
+) -> None:
+    """Verify the committed ExchangeRegistry.h matches what the YAML would produce.
+    Fails if someone edited the YAML without running `generate-cpp-registry`."""
+    catalog = model.load(yaml_path)
+    expected = generate_cpp.render(catalog)
+    actual = current.read_text() if current.exists() else ""
+    if expected != actual:
+        typer.secho(
+            f"❌ {current} is stale. Run `bpt-ops exchange-catalog generate-cpp-registry` and commit.",
+            fg="red",
+            err=True,
+        )
+        raise typer.Exit(1)
+    typer.echo(f"✓ {current.name} is up to date with {yaml_path.name}.")
+
+
+@app.command("check-json")
+def check_json(
+    yaml_path: Path = typer.Option(DEFAULT_YAML, "--yaml"),
+    current: Path = typer.Option(DEFAULT_JSON_OUT, "--current"),
+) -> None:
+    """Verify the committed catalog.json matches what the YAML would produce.
+    Fails if someone edited the YAML without running `emit-json`."""
+    import json
+    catalog = model.load(yaml_path)
+    expected = {
+        "exchanges": [
+            {"id": e.id, "name": e.name, "display_name": e.display_name}
+            for e in sorted(catalog.exchanges, key=lambda x: x.id)
+        ]
+    }
+    actual_text = current.read_text() if current.exists() else ""
+    try:
+        actual = json.loads(actual_text)
+    except json.JSONDecodeError:
+        actual = None
+    if actual != expected:
+        typer.secho(
+            f"❌ {current} is stale. Run `bpt-ops exchange-catalog emit-json` and commit.",
             fg="red",
             err=True,
         )
