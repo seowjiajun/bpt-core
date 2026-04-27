@@ -114,6 +114,11 @@ protected:
     std::unique_ptr<recorder::RawSpool> spool_;
     uint64_t checkpoint_interval_ns_{0};
     uint64_t last_checkpoint_ns_{0};
+    // Tracks WS connection state across run() iterations so we only emit a
+    // WS_RECONNECT marker after a prior WS_DISCONNECT — the first connect on
+    // process start is bracketed by SESSION_START instead.
+    bool was_disconnected_{false};
+    uint32_t reconnect_count_{0};
 
 private:
     void run();

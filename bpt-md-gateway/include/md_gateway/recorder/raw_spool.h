@@ -42,6 +42,8 @@ enum class RecordType : uint8_t {
     SESSION_START = 1,  // recorder process started; payload = config snapshot JSON
     SESSION_STOP  = 2,  // recorder process stopping cleanly; payload = exit reason JSON
     CHECKPOINT    = 3,  // periodic heartbeat; payload = JSON {frames, bytes, uptime_s}
+    WS_DISCONNECT = 4,  // unexpected WS connection loss; payload = JSON {reason, attempt}
+    WS_RECONNECT  = 5,  // WS reconnect succeeded after a prior disconnect; payload = JSON {attempt}
 };
 
 class RawSpool {

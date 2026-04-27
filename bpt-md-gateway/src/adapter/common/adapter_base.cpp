@@ -41,6 +41,37 @@ std::string pub_thread_name(const char* exchange) {
     return "mdgw-" + lowercase_venue(exchange) + "-pub";
 }
 
+// Minimal JSON escape for embedding caught exception messages into a
+// WS_DISCONNECT marker payload. Handles the characters that would break
+// json.loads() in the Python converter; non-ASCII bytes pass through.
+std::string json_escape(std::string_view s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    out += fmt::format("\\u{:04x}", static_cast<unsigned char>(c));
+                } else {
+                    out += c;
+                }
+                break;
+        }
+    }
+    return out;
+}
+
+uint64_t wall_now_ns() {
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+}
+
 }  // namespace
 
 namespace ssl = boost::asio::ssl;
@@ -202,11 +233,27 @@ void AdapterBase::run() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
+            if (spool_ && was_disconnected_) {
+                ++reconnect_count_;
+                spool_->write_marker(
+                    wall_now_ns(), recorder::RecordType::WS_RECONNECT,
+                    fmt::format(R"({{"attempt":{}}})", reconnect_count_));
+                spool_->flush();
+                was_disconnected_ = false;
+            }
             if (on_connect)
                 on_connect();
             read_loop(*ws);  // NOLINT(bugprone-unchecked-optional-access)
         } catch (const std::exception& e) {
             if (!stop_flag_.load(std::memory_order_relaxed)) {
+                if (spool_) {
+                    spool_->write_marker(
+                        wall_now_ns(), recorder::RecordType::WS_DISCONNECT,
+                        fmt::format(R"({{"reason":"{}","attempt":{}}})",
+                                    json_escape(e.what()), reconnect_count_ + 1));
+                    spool_->flush();
+                    was_disconnected_ = true;
+                }
                 if (on_disconnect)
                     on_disconnect();
                 bpt::common::log::error("{} error: {}, reconnecting in {}ms",
