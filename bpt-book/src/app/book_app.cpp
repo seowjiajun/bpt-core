@@ -1,6 +1,9 @@
 #include "book/app/book_app.h"
 #include "book/adapter/hyperliquid_balance_adapter.h"
 
+#include <fmt/format.h>
+#include <messages/ExchangeRegistry.h>
+
 #include <chrono>
 #include <stdexcept>
 #include <thread>
@@ -13,18 +16,27 @@ namespace {
 
 std::unique_ptr<adapter::IBalanceAdapter>
 make_adapter(const config::AdapterConfig& a) {
-    if (a.exchange == "HYPERLIQUID") {
-        adapter::HyperliquidBalanceAdapter::Config cfg{
-            .rest_host = a.rest_host,
-            .rest_port = a.rest_port,
-            .wallet_address = a.wallet_address,
-        };
-        return std::make_unique<adapter::HyperliquidBalanceAdapter>(std::move(cfg));
+    const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a.exchange);
+    if (!exch_id) {
+        throw std::runtime_error(fmt::format(
+            "Unknown exchange '{}' in bpt-book config — not in messages/exchanges.yaml",
+            a.exchange));
     }
-    // OKX / Binance / Deribit adapters will slot in here as they're
-    // written. Unrecognized venues throw — silent skip would hide
-    // config typos.
-    throw std::runtime_error("Unsupported exchange for bpt-book: " + a.exchange);
+    switch (*exch_id) {
+        case bpt::messages::ExchangeId::HYPERLIQUID: {
+            adapter::HyperliquidBalanceAdapter::Config cfg{
+                .rest_host = a.rest_host,
+                .rest_port = a.rest_port,
+                .wallet_address = a.wallet_address,
+            };
+            return std::make_unique<adapter::HyperliquidBalanceAdapter>(std::move(cfg));
+        }
+        // OKX / Binance / Deribit adapters will slot in here as they're written.
+        default:
+            throw std::runtime_error(fmt::format(
+                "bpt-book has no balance adapter for {} yet",
+                a.exchange));
+    }
 }
 
 uint64_t now_ns() {

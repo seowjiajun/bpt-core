@@ -6,6 +6,7 @@
 #include "order_gateway/adapter/okx/okx_order_adapter.h"
 
 #include <messages/ExchangeId.h>
+#include <messages/ExchangeRegistry.h>
 
 #include <bpt_common/signal.h>
 #include <bpt_common/util/thread_pin.h>
@@ -66,18 +67,30 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
             return it != creds.end() ? it->second : empty;
         }();
 
+        const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a_cfg.exchange);
+        if (!exch_id) {
+            throw std::runtime_error(fmt::format(
+                "Unknown exchange '{}' in order-gateway config — not in messages/exchanges.yaml",
+                a_cfg.exchange));
+        }
         std::shared_ptr<adapter::IOrderAdapter> adapter;
-        if (a_cfg.exchange == "BINANCE") {
-            adapter = std::make_shared<adapter::BinanceOrderAdapter>(a_cfg, exchange_creds);
-        } else if (a_cfg.exchange == "OKX") {
-            adapter = std::make_shared<adapter::OKXOrderAdapter>(a_cfg, exchange_creds);
-        } else if (a_cfg.exchange == "DERIBIT") {
-            adapter = std::make_shared<adapter::DeribitOrderAdapter>(a_cfg, exchange_creds);
-        } else if (a_cfg.exchange == "HYPERLIQUID") {
-            adapter = std::make_shared<adapter::HyperliquidOrderAdapter>(a_cfg, exchange_creds);
-        } else {
-            bpt::common::log::warn("Unknown exchange in config: {}", a_cfg.exchange);
-            continue;
+        switch (*exch_id) {
+            case bpt::messages::ExchangeId::BINANCE:
+                adapter = std::make_shared<adapter::BinanceOrderAdapter>(a_cfg, exchange_creds);
+                break;
+            case bpt::messages::ExchangeId::OKX:
+                adapter = std::make_shared<adapter::OKXOrderAdapter>(a_cfg, exchange_creds);
+                break;
+            case bpt::messages::ExchangeId::DERIBIT:
+                adapter = std::make_shared<adapter::DeribitOrderAdapter>(a_cfg, exchange_creds);
+                break;
+            case bpt::messages::ExchangeId::HYPERLIQUID:
+                adapter = std::make_shared<adapter::HyperliquidOrderAdapter>(a_cfg, exchange_creds);
+                break;
+            default:
+                throw std::runtime_error(fmt::format(
+                    "Exchange '{}' is in the registry but order-gateway has no adapter implementation for it",
+                    a_cfg.exchange));
         }
 
         adapter->set_disconnect_breaker_config(disc_cfg);

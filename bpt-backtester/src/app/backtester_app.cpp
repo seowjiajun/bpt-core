@@ -1,5 +1,7 @@
 #include "backtester/app/backtester_app.h"
 
+#include <messages/ExchangeRegistry.h>
+
 #include <chrono>
 #include <format>
 #include <thread>
@@ -109,14 +111,24 @@ BacktesterApp::BacktesterApp(config::Settings settings, std::shared_ptr<aeron::A
 
     matching_engine_->set_fill_callback([this](matching::FillReport fill) {
         results_->on_fill(fill);
-        if (fill.exchange == "BINANCE") {
-            binance_order_server_->push_fill(fill);
-        } else if (fill.exchange == "OKX") {
-            okx_order_server_->push_fill(fill);
-        } else if (fill.exchange == "HYPERLIQUID") {
-            hyperliquid_order_server_->push_fill(fill);
-        } else {
-            bpt::common::log::warn("[BacktesterApp] No order server for exchange '{}' — fill dropped", fill.exchange);
+        const auto exch_id = bpt::messages::ExchangeRegistry::from_name(fill.exchange);
+        if (!exch_id) {
+            bpt::common::log::warn("[BacktesterApp] Unknown exchange '{}' on fill — dropped", fill.exchange);
+            return;
+        }
+        switch (*exch_id) {
+            case bpt::messages::ExchangeId::BINANCE:
+                binance_order_server_->push_fill(fill);
+                break;
+            case bpt::messages::ExchangeId::OKX:
+                okx_order_server_->push_fill(fill);
+                break;
+            case bpt::messages::ExchangeId::HYPERLIQUID:
+                hyperliquid_order_server_->push_fill(fill);
+                break;
+            default:
+                bpt::common::log::warn("[BacktesterApp] No order server for exchange '{}' — fill dropped", fill.exchange);
+                break;
         }
     });
 

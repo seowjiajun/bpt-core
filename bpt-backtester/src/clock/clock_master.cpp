@@ -6,6 +6,7 @@
 #include "backtester/results/results_collector.h"
 
 #include <messages/BacktestCommand.h>
+#include <messages/ExchangeRegistry.h>
 
 #include <bpt_common/logging.h>
 
@@ -80,17 +81,28 @@ void ClockMaster::dispatch(const data::MarketEvent& event) {
                                       ? std::get<data::TradeRecord>(event.payload).exchange
                                       : std::get<data::OrderBookRecord>(event.payload).exchange;
 
-    if (exchange == "BINANCE") {
-        if (binance_server_)
-            binance_server_->push(event);
-    } else if (exchange == "OKX") {
-        if (okx_server_)
-            okx_server_->push(event);
-    } else if (exchange == "HYPERLIQUID") {
-        if (hyperliquid_server_)
-            hyperliquid_server_->push(event);
+    // Hot dispatch path. ExchangeRegistry::from_name iterates a 4-element
+    // constexpr table — same order-of-magnitude as the previous string
+    // chain but routed through canonical IDs so a typo in source data
+    // becomes a single warning rather than a silent skip.
+    const auto exch_id = bpt::messages::ExchangeRegistry::from_name(exchange);
+    if (!exch_id) {
+        bpt::common::log::warn(kLog(), "Unknown exchange '{}' in market event — dropped", exchange);
     } else {
-        bpt::common::log::warn(kLog(), "No WS server for exchange '{}' — event dropped", exchange);
+        switch (*exch_id) {
+            case bpt::messages::ExchangeId::BINANCE:
+                if (binance_server_) binance_server_->push(event);
+                break;
+            case bpt::messages::ExchangeId::OKX:
+                if (okx_server_) okx_server_->push(event);
+                break;
+            case bpt::messages::ExchangeId::HYPERLIQUID:
+                if (hyperliquid_server_) hyperliquid_server_->push(event);
+                break;
+            default:
+                bpt::common::log::warn(kLog(), "No WS server for exchange '{}' — event dropped", exchange);
+                break;
+        }
     }
 
     if (matching_engine_)
