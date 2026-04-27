@@ -1,0 +1,74 @@
+# bpt-md-recorder — HL MAINNET RECORDING config.
+#
+# Records real Hyperliquid mainnet ticks to /opt/bpt/data/raw/hyperliquid/.
+# Read-only (passive subscriber, no orders) so it's safe to point at
+# mainnet even when the trading stack is on testnet.
+#
+# Symbol selection: top mainnet perps by 24h notional volume, spanning a
+# range of liquidity / spread profiles for AS strategy evaluation. BTC
+# excluded because spread is too tight on HL mainnet for AS to clear fees.
+
+environment = "dev"
+calibrate_tsc = true
+
+# Inline adapter list (md-recorder accepts either [[adapters]] inline or
+# exchange_config indirection — same shape as bpt-md-gateway's loader).
+[[adapters]]
+exchange = "HYPERLIQUID"
+ws_host = "api.hyperliquid.xyz"
+ws_port = "443"
+ws_path = "/ws"
+use_tls = true
+ws_connect_timeout_ms = 30000
+ws_ping_interval_ms = 20000
+ws_read_timeout_ms = 5000
+ws_liveness_timeout_ms = 60000
+max_price_deviation_pct = 0.0  # disable validator on the recorder
+io_thread_cpu = -1
+
+recording_universe_venues = ["HYPERLIQUID"]
+
+[recording]
+output_dir = "/opt/bpt/data/raw"
+rotate_interval_seconds = 3600
+fsync_interval_ms = 1000
+buffer_bytes = 1048576
+
+[metrics]
+host = "127.0.0.1"
+port = 9110
+
+[logging]
+level = "info"
+dir = "logs"
+flush_level = "warn"
+flush_interval_ms = 1000
+
+# Recording universe — operator-curated. instrument_id values are the
+# canonical IDs from config/instruments/instrument_mapping.hyperliquid.json
+# (1001=BTC, 1002=ETH, 1003=SOL, 1004=XMR, 1005=APE, ...). Add tagging in
+# the mapping JSON later for declarative selection; today this list is
+# the source of truth for what gets recorded.
+[[universe]]
+instrument_id = 1002
+venue = "HYPERLIQUID"
+symbol = "ETH"
+depth = 5
+
+[[universe]]
+instrument_id = 1003
+venue = "HYPERLIQUID"
+symbol = "SOL"
+depth = 5
+
+[[universe]]
+instrument_id = 1004
+venue = "HYPERLIQUID"
+symbol = "XMR"
+depth = 5
+
+[[universe]]
+instrument_id = 1005
+venue = "HYPERLIQUID"
+symbol = "APE"
+depth = 5
