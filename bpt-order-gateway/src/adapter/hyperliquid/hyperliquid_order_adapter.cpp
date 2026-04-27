@@ -33,7 +33,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
         ioc_, ssl_ctx_, cfg.ws_host, cfg.ws_port, cfg.ws_path, wallet_address_,
         cfg.pinned_tls_sha256, cfg.use_tls);
 
-    parser_.on_exec_event = [this](const ExecEvent& ev) {
+    decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
             bpt::common::log::error("[Hyperliquid] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
@@ -41,7 +41,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
     // Route userFills frames from the ws read loop into our exec parser.
     ws_client_->set_user_fills_handler(
         [this](const boost::json::array& fills, uint64_t recv_ns) {
-            parser_.handle_fills(fills, recv_ns);
+            decoder_.handle_fills(fills, recv_ns);
         });
 
     // Backtest mode: when the adapter is pointed at the local backtester
@@ -265,7 +265,7 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
                 // Register with the parser so userFills entries for this oid
                 // can be resolved to a client_order_id AND tracked across
                 // multiple partial-fill slices.
-                parser_.register_order(exch_oid, client_id, qty_e8);
+                decoder_.register_order(exch_oid, client_id, qty_e8);
             });
     } catch (const std::exception& e) {
         // post_action threw: either the WS was already disconnected,
@@ -330,7 +330,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
                 c.client_order_id, r.exch_oid);
             client_to_exch_oid_[c.client_order_id] = r.exch_oid;
             exch_oid_to_client_[r.exch_oid] = c.client_order_id;
-            parser_.register_order(r.exch_oid, c.client_order_id, c.quantity_e8);
+            decoder_.register_order(r.exch_oid, c.client_order_id, c.quantity_e8);
             exec_emitter_.emit_recovered_ack(ctx, r.exch_oid);
             return;
         case MK::UserFill:
@@ -344,7 +344,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
             // know the original intent so any trailing partial slices
             // that arrive later via WS userFills resolve to FILLED at
             // the right cumulative total.
-            parser_.register_order(r.exch_oid, c.client_order_id, c.quantity_e8);
+            decoder_.register_order(r.exch_oid, c.client_order_id, c.quantity_e8);
             exec_emitter_.emit_recovered_fill(ctx, r.exch_oid, r.fill_price_e8,
                                               r.fill_fee_e8, r.fill_qty_e8, r.fill_time_ns);
             return;

@@ -2,7 +2,7 @@
 
 #include "order_gateway/adapter/common/credentials.h"
 #include "order_gateway/adapter/common/order_adapter_base.h"
-#include "order_gateway/adapter/deribit/deribit_exec_parser.h"
+#include "order_gateway/adapter/deribit/deribit_exec_decoder.h"
 #include "order_gateway/adapter/deribit/deribit_ws_client.h"
 
 #include <atomic>
@@ -66,7 +66,7 @@ private:
     mutable std::mutex pending_mu_;
     std::vector<std::string> pending_sends_;
 
-    DeribitExecParser parser_;
+    DeribitExecDecoder decoder_;
     deribit::DeribitWsClient ws_client_;
 };
 

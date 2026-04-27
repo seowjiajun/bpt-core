@@ -2,7 +2,7 @@
 
 #include "order_gateway/adapter/common/credentials.h"
 #include "order_gateway/adapter/common/order_adapter_base.h"
-#include "order_gateway/adapter/okx/okx_exec_parser.h"
+#include "order_gateway/adapter/okx/okx_exec_decoder.h"
 #include "order_gateway/adapter/okx/okx_https_client.h"
 #include "order_gateway/adapter/okx/okx_instruments_service.h"
 #include "order_gateway/adapter/okx/okx_ws_client.h"
@@ -67,7 +67,7 @@ private:
     // WS request id counter
     std::atomic<uint64_t> ws_req_id_{1};
 
-    OKXExecParser parser_;
+    OKXExecDecoder decoder_;
     okx::OKXHttpsClient https_client_;
     okx::OKXInstrumentsService instruments_;
     okx::OKXWsClient ws_client_;

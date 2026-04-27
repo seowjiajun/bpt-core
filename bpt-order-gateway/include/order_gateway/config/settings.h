@@ -87,6 +87,12 @@ struct AdapterConfig {
     // bpt::common::ws::ws_connect). Lowercase hex SHA-256 leaf-cert
     // fingerprints, 64 chars each. Empty = no pinning.
     std::vector<std::string> pinned_tls_sha256;
+
+    // Backtest-only override for HYPERLIQUID public address. In live mode
+    // wallet_address comes from secrets (HYPERLIQUID_WALLET_ADDRESS); in
+    // backtest secrets are empty so we set it directly here. Empty = use
+    // whatever credentials_from_secret returns.
+    std::string wallet_address;
 };
 
 struct GatewayConfig {

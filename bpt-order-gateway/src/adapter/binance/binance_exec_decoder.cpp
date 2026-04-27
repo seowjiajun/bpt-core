@@ -1,4 +1,4 @@
-#include "order_gateway/adapter/binance/binance_exec_parser.h"
+#include "order_gateway/adapter/binance/binance_exec_decoder.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -28,12 +28,12 @@ static bpt::messages::FeeCurrency::Value parse_fee_currency(const std::string& a
     return FC::USDT;
 }
 
-void BinanceExecParser::register_order(const std::string& cloid, uint64_t order_id) {
+void BinanceExecDecoder::register_order(const std::string& cloid, uint64_t order_id) {
     std::lock_guard<std::mutex> lk(mu_);
     cloid_to_order_id_[cloid] = order_id;
 }
 
-void BinanceExecParser::handle_execution_report(const json::object& obj, uint64_t recv_ns) {
+void BinanceExecDecoder::handle_execution_report(const json::object& obj, uint64_t recv_ns) {
     auto eit = obj.find("e");
     if (eit == obj.end())
         return;
@@ -51,7 +51,7 @@ void BinanceExecParser::handle_execution_report(const json::object& obj, uint64_
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::warn("BinanceExecParser: unknown cloid={}", cloid);
+        bpt::common::log::warn("BinanceExecDecoder: unknown cloid={}", cloid);
         return;
     }
 
@@ -106,7 +106,7 @@ void BinanceExecParser::handle_execution_report(const json::object& obj, uint64_
         on_exec_event(ev);
 }
 
-void BinanceExecParser::handle_order_response(const json::object& obj,
+void BinanceExecDecoder::handle_order_response(const json::object& obj,
                                                uint64_t order_id,
                                                bpt::messages::OrderSide::Value side,
                                                bpt::messages::OrderType::Value order_type,
@@ -128,7 +128,7 @@ void BinanceExecParser::handle_order_response(const json::object& obj,
         auto msg_it = obj.find("msg");
         std::string msg = (msg_it != obj.end()) ? std::string(msg_it->value().as_string()) : "?";
         bpt::common::log::error(
-            "BinanceExecParser: exchange rejected order={} code={} msg={}",
+            "BinanceExecDecoder: exchange rejected order={} code={} msg={}",
             order_id,
             code_it->value().as_int64(),
             msg);

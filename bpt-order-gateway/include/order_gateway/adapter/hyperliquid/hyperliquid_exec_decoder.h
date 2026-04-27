@@ -21,7 +21,7 @@ namespace bpt::order_gateway::adapter {
 // per-order routing state. If we emit FILLED on the first partial slice of a
 // multi-slice fill, every subsequent slice gets dropped — which is exactly
 // the bug that was causing fenrir's inventory to diverge from the exchange.
-class HyperliquidExecParser {
+class HyperliquidExecDecoder {
 public:
     std::function<void(const ExecEvent&)> on_exec_event;
 

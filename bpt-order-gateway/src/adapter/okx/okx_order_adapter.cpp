@@ -33,7 +33,7 @@ OKXOrderAdapter::OKXOrderAdapter(const config::AdapterConfig& cfg, const Exchang
     std::snprintf(buf, sizeof(buf), "%08x", epoch_s);
     session_prefix_ = std::string(buf, 8);
 
-    parser_.on_exec_event = [this](const ExecEvent& ev) {
+    decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
             bpt::common::log::error("[OKX] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
@@ -49,7 +49,7 @@ void OKXOrderAdapter::start() {
     // (use_tls=false means we're talking to a local simulation server).
     if (cfg_.use_tls) {
         instruments_.fetch();
-        parser_.set_contract_sizes(instruments_.contract_sizes());
+        decoder_.set_contract_sizes(instruments_.contract_sizes());
         fetch_and_log_account_config();
     }
     OrderAdapterBase::start();
@@ -104,7 +104,7 @@ void OKXOrderAdapter::handle_message(const std::string& payload, uint64_t recv_n
             if (data_it == obj.end() || !data_it->value().is_array())
                 return;
             for (const auto& item : data_it->value().as_array())
-                parser_.handle_order_ack(item.as_object(), recv_ns);
+                decoder_.handle_order_ack(item.as_object(), recv_ns);
         }
         return;
     }
@@ -120,20 +120,20 @@ void OKXOrderAdapter::handle_message(const std::string& payload, uint64_t recv_n
     std::string channel = std::string(arg_it->value().as_object().at("channel").as_string());
     if (channel == "orders") {
         for (const auto& item : data_it->value().as_array())
-            parser_.handle_orders_channel_item(item.as_object(), recv_ns);
+            decoder_.handle_orders_channel_item(item.as_object(), recv_ns);
     }
 }
 
 void OKXOrderAdapter::connect_and_run() {
     logged_in_.store(false, std::memory_order_relaxed);
-    parser_.reset();
+    decoder_.reset();
     ws_client_.run(stop_flag_, connected_);
 }
 
 void OKXOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     const std::string exchange_symbol = order.getExchangeSymbolAsString();
     const std::string cloid = session_prefix_ + "G" + std::to_string(order.orderId());
-    parser_.register_order(cloid, order.orderId());
+    decoder_.register_order(cloid, order.orderId());
 
     const okx::OrderSpec spec{
         exchange_symbol,

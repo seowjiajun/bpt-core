@@ -1,9 +1,9 @@
-// Unit tests for HyperliquidExecParser — the multi-slice fill tracker
+// Unit tests for HyperliquidExecDecoder — the multi-slice fill tracker
 // that decides when to emit PARTIAL vs FILLED. This logic is load-bearing:
 // emitting FILLED too early on a multi-slice fill causes fenrir's
 // inventory to diverge from the exchange.
 
-#include "order_gateway/adapter/hyperliquid/hyperliquid_exec_parser.h"
+#include "order_gateway/adapter/hyperliquid/hyperliquid_exec_decoder.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -19,14 +19,14 @@ namespace {
 
 namespace json = boost::json;
 using bpt::order_gateway::adapter::ExecEvent;
-using bpt::order_gateway::adapter::HyperliquidExecParser;
+using bpt::order_gateway::adapter::HyperliquidExecDecoder;
 using namespace bpt::messages;
 
 static constexpr double kScale = 1e8;
 
 class HLExecParserFixture : public ::testing::Test {
 protected:
-    HyperliquidExecParser parser;
+    HyperliquidExecDecoder parser;
     std::vector<ExecEvent> events;
 
     void SetUp() override {

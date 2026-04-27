@@ -1,4 +1,4 @@
-#include "order_gateway/adapter/deribit/deribit_exec_parser.h"
+#include "order_gateway/adapter/deribit/deribit_exec_decoder.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -26,24 +26,24 @@ static bpt::messages::FeeCurrency::Value parse_fee_ccy(const std::string& instru
     return bpt::messages::FeeCurrency::USDT;
 }
 
-void DeribitExecParser::register_order(const std::string& label, uint64_t order_id) {
+void DeribitExecDecoder::register_order(const std::string& label, uint64_t order_id) {
     std::lock_guard<std::mutex> lk(mu_);
     label_to_order_id_[label] = order_id;
 }
 
-std::string DeribitExecParser::get_exchange_order_id(uint64_t order_id) const {
+std::string DeribitExecDecoder::get_exchange_order_id(uint64_t order_id) const {
     std::lock_guard<std::mutex> lk(mu_);
     auto it = order_id_to_exch_oid_.find(order_id);
     return (it != order_id_to_exch_oid_.end()) ? it->second : std::string{};
 }
 
-void DeribitExecParser::reset() {
+void DeribitExecDecoder::reset() {
     std::lock_guard<std::mutex> lk(mu_);
     acked_orders_.clear();
     cancelled_orders_.clear();
 }
 
-void DeribitExecParser::handle_subscription_event(const json::object& d, uint64_t recv_ns) {
+void DeribitExecDecoder::handle_subscription_event(const json::object& d, uint64_t recv_ns) {
     using ES = bpt::messages::ExecStatus;
     using OS = bpt::messages::OrderSide;
     using OT = bpt::messages::OrderType;
@@ -61,7 +61,7 @@ void DeribitExecParser::handle_subscription_event(const json::object& d, uint64_
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::debug("DeribitExecParser: subscription unknown label={}", label);
+        bpt::common::log::debug("DeribitExecDecoder: subscription unknown label={}", label);
         return;
     }
 
@@ -146,13 +146,13 @@ void DeribitExecParser::handle_subscription_event(const json::object& d, uint64_
     if (ev.status == ES::ACKED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!acked_orders_.insert(ev.order_id).second) {
-            bpt::common::log::debug("DeribitExecParser: suppressed duplicate ACKED order_id={}", ev.order_id);
+            bpt::common::log::debug("DeribitExecDecoder: suppressed duplicate ACKED order_id={}", ev.order_id);
             return;
         }
     } else if (ev.status == ES::CANCELLED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!cancelled_orders_.insert(ev.order_id).second) {
-            bpt::common::log::debug("DeribitExecParser: suppressed duplicate CANCELLED order_id={}", ev.order_id);
+            bpt::common::log::debug("DeribitExecDecoder: suppressed duplicate CANCELLED order_id={}", ev.order_id);
             return;
         }
         acked_orders_.erase(ev.order_id);
@@ -165,7 +165,7 @@ void DeribitExecParser::handle_subscription_event(const json::object& d, uint64_
         on_exec_event(ev);
 }
 
-void DeribitExecParser::handle_order_response(const json::object& order_obj, uint64_t recv_ns) {
+void DeribitExecDecoder::handle_order_response(const json::object& order_obj, uint64_t recv_ns) {
     using ES = bpt::messages::ExecStatus;
     using OS = bpt::messages::OrderSide;
     using OT = bpt::messages::OrderType;
@@ -183,7 +183,7 @@ void DeribitExecParser::handle_order_response(const json::object& order_obj, uin
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::warn("DeribitExecParser: order response unknown label={}", label);
+        bpt::common::log::warn("DeribitExecDecoder: order response unknown label={}", label);
         return;
     }
 
@@ -200,7 +200,7 @@ void DeribitExecParser::handle_order_response(const json::object& order_obj, uin
     if (auto sit = order_obj.find("order_state"); sit != order_obj.end() && sit->value().is_string())
         order_state = std::string(sit->value().as_string());
 
-    bpt::common::log::info("DeribitExecParser: order response label={} exchange_oid={} state={}",
+    bpt::common::log::info("DeribitExecDecoder: order response label={} exchange_oid={} state={}",
                    label,
                    exch_oid,
                    order_state);

@@ -16,7 +16,7 @@ namespace bpt::order_gateway::adapter {
 // Parses Binance executionReport WebSocket events into ExecEvents.
 // Owns the cloid→order_id map so both the WS handler and send_new_order
 // can register/look up client order IDs without locking from two places.
-class BinanceExecParser {
+class BinanceExecDecoder {
 public:
     std::function<void(const ExecEvent&)> on_exec_event;
 

@@ -1,4 +1,4 @@
-#include "order_gateway/adapter/hyperliquid/hyperliquid_exec_parser.h"
+#include "order_gateway/adapter/hyperliquid/hyperliquid_exec_decoder.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -17,14 +17,14 @@ namespace json = boost::json;
 
 static constexpr double kScale = 1e8;
 
-void HyperliquidExecParser::register_order(uint64_t exch_oid,
+void HyperliquidExecDecoder::register_order(uint64_t exch_oid,
                                            uint64_t client_order_id,
                                            uint64_t original_qty_e8) {
     if (exch_oid == 0) return;
     pending_[exch_oid] = PendingOrder{client_order_id, original_qty_e8, 0};
 }
 
-void HyperliquidExecParser::handle_fills(const json::array& fills, uint64_t recv_ns) {
+void HyperliquidExecDecoder::handle_fills(const json::array& fills, uint64_t recv_ns) {
     for (const auto& fill_val : fills) {
         const auto& fill = fill_val.as_object();
 

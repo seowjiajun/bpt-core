@@ -159,6 +159,8 @@ Settings load(const std::string& path) {
                 if (auto v = elem.value<std::string>())
                     ac.pinned_tls_sha256.push_back(*v);
         }
+        if (auto v = (*a)["wallet_address"].value<std::string>())
+            ac.wallet_address = *v;
 
         // Adapter connectivity must be fully specified; silently-empty
         // fields would surface as a cryptic connect-time crash later.

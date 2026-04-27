@@ -29,7 +29,7 @@ DeribitOrderAdapter::DeribitOrderAdapter(const config::AdapterConfig& cfg, const
     std::snprintf(buf, sizeof(buf), "%08x", epoch_s);
     session_prefix_ = std::string(buf, 8);
 
-    parser_.on_exec_event = [this](const ExecEvent& ev) {
+    decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
             bpt::common::log::error("[Deribit] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
@@ -83,7 +83,7 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
             if (std::string(channel_it->value().as_string()) == "user.orders.any.raw") {
                 auto data_it = params.find("data");
                 if (data_it != params.end() && data_it->value().is_object())
-                    parser_.handle_subscription_event(data_it->value().as_object(), recv_ns);
+                    decoder_.handle_subscription_event(data_it->value().as_object(), recv_ns);
             }
         }
         return;
@@ -151,19 +151,19 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
 
     // Order response (private/buy or private/sell)
     if (auto order_it = res.find("order"); order_it != res.end())
-        parser_.handle_order_response(order_it->value().as_object(), recv_ns);
+        decoder_.handle_order_response(order_it->value().as_object(), recv_ns);
 }
 
 void DeribitOrderAdapter::connect_and_run() {
     logged_in_.store(false, std::memory_order_relaxed);
-    parser_.reset();
+    decoder_.reset();
     ws_client_.run(stop_flag_, connected_);
 }
 
 void DeribitOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     const std::string exchange_symbol = order.getExchangeSymbolAsString();
     const std::string label = session_prefix_ + "G" + std::to_string(order.orderId());
-    parser_.register_order(label, order.orderId());
+    decoder_.register_order(label, order.orderId());
 
     const deribit::OrderSpec spec{
         exchange_symbol,
@@ -220,7 +220,7 @@ void DeribitOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
 void DeribitOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
                                       const std::string& /*native_symbol*/) {
     // Deribit cancel uses exchange order_id, not instrument symbol.
-    const std::string exch_oid = parser_.get_exchange_order_id(cancel.orderId());
+    const std::string exch_oid = decoder_.get_exchange_order_id(cancel.orderId());
     if (exch_oid.empty()) {
         bpt::common::log::warn(
             "DeribitOrderAdapter: send_cancel: no exchange "
@@ -247,7 +247,7 @@ void DeribitOrderAdapter::send_cancel_all(uint64_t instrument_id) {
 
 void DeribitOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
                                       const std::string& /*native_symbol*/) {
-    const std::string exch_oid = parser_.get_exchange_order_id(modify.orderId());
+    const std::string exch_oid = decoder_.get_exchange_order_id(modify.orderId());
     if (exch_oid.empty()) {
         bpt::common::log::warn(
             "DeribitOrderAdapter: send_modify: no exchange "

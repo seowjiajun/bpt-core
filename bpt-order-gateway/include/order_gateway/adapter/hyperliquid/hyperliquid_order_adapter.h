@@ -4,7 +4,7 @@
 #include "order_gateway/adapter/common/order_adapter_base.h"
 #include "order_gateway/adapter/hyperliquid/hyperliquid_action_encoder.h"
 #include "order_gateway/adapter/hyperliquid/hyperliquid_exec_emitter.h"
-#include "order_gateway/adapter/hyperliquid/hyperliquid_exec_parser.h"
+#include "order_gateway/adapter/hyperliquid/hyperliquid_exec_decoder.h"
 #include "order_gateway/adapter/hyperliquid/hyperliquid_https_client.h"
 #include "order_gateway/adapter/hyperliquid/hyperliquid_reconciler.h"
 #include "order_gateway/adapter/hyperliquid/hyperliquid_signer.h"
@@ -23,6 +23,24 @@ namespace bpt::order_gateway::adapter {
 // Private key is passed via ExchangeCredentials.private_key (64-char hex).
 // If the key is empty, the adapter starts in disabled mode — connect_and_run()
 // spins on stop_flag_ rather than attempting a connection.
+// Account abstraction modes returned by HL's `userAbstraction` info endpoint.
+// Determines how spot and perp balances interact:
+//   - kUnifiedAccount, kPortfolioMargin: spot USDC auto-collateralizes perp.
+//     spotClearinghouseState is the source of truth for total trading capacity.
+//   - kDisabled (a.k.a. "standard"): spot/perp are strictly segregated.
+//     clearinghouseState (perp-only) IS the trading capacity.
+//   - kDefault, kDexAbstraction: HL-internal modes; treated as kDisabled
+//     conservatively until we see one in practice.
+//   - kUnknown: query failed at startup; fall back to perp-only reporting.
+enum class HyperliquidAccountMode {
+    kUnknown,
+    kDisabled,
+    kUnifiedAccount,
+    kPortfolioMargin,
+    kDefault,
+    kDexAbstraction,
+};
+
 class HyperliquidOrderAdapter : public OrderAdapterBase {
 public:
     HyperliquidOrderAdapter(const config::AdapterConfig& cfg, const ExchangeCredentials& creds);
@@ -51,8 +69,9 @@ private:
 
     bool enabled_{false};  // false if private_key credential is empty
     std::string wallet_address_;
+    HyperliquidAccountMode account_mode_{HyperliquidAccountMode::kUnknown};
     std::unique_ptr<HyperliquidSigner> signer_;
-    HyperliquidExecParser parser_;
+    HyperliquidExecDecoder decoder_;
     hyperliquid::HyperliquidExecEmitter exec_emitter_{exec_queue_};
     std::unique_ptr<hyperliquid::HyperliquidWsClient> ws_client_;
 

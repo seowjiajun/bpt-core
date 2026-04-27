@@ -25,7 +25,7 @@ BinanceOrderAdapter::BinanceOrderAdapter(const config::AdapterConfig& cfg, const
       secret_key_(creds.secret_key),
       https_client_(cfg_, creds),
       user_data_ws_(ioc_, ssl_ctx_, cfg_, https_client_) {
-    parser_.on_exec_event = [this](const ExecEvent& ev) {
+    decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
             bpt::common::log::error("[Binance] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
@@ -37,7 +37,7 @@ void BinanceOrderAdapter::handle_user_data_message(const std::string& payload, u
     auto root = json::parse(payload);
     if (!root.is_object())
         return;
-    parser_.handle_execution_report(root.as_object(), recv_ns);
+    decoder_.handle_execution_report(root.as_object(), recv_ns);
 }
 
 void BinanceOrderAdapter::connect_and_run() {
@@ -47,7 +47,7 @@ void BinanceOrderAdapter::connect_and_run() {
 void BinanceOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     const std::string exchange_symbol = order.getExchangeSymbolAsString();
     const std::string cloid = "G" + std::to_string(order.orderId());
-    parser_.register_order(cloid, order.orderId());
+    decoder_.register_order(cloid, order.orderId());
 
     const binance::OrderSpec spec{
         exchange_symbol,
@@ -88,7 +88,7 @@ void BinanceOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
         auto root = json::parse(resp);
         if (!root.is_object())
             return;
-        parser_.handle_order_response(root.as_object(), order.orderId(), order.side(), order.orderType(), recv_ns);
+        decoder_.handle_order_response(root.as_object(), order.orderId(), order.side(), order.orderType(), recv_ns);
     } catch (const std::exception& e) {
         bpt::common::log::error("BinanceOrderAdapter: send_new_order failed: {}", e.what());
         emit_rejection();

@@ -15,7 +15,7 @@ namespace bpt::order_gateway::adapter {
 // Parses Deribit WebSocket execution events into ExecEvents.
 // Handles the user.orders.any.raw subscription channel and the inline order
 // result embedded in private/buy + private/sell JSON-RPC responses.
-class DeribitExecParser {
+class DeribitExecDecoder {
 public:
     std::function<void(const ExecEvent&)> on_exec_event;
 

@@ -15,7 +15,7 @@ namespace bpt::order_gateway::adapter {
 // Parses OKX WebSocket order-acknowledgement and orders-channel events into
 // ExecEvents.  Owns the cloid→order_id map and the duplicate-suppression sets
 // for ACKED/CANCELLED orders.
-class OKXExecParser {
+class OKXExecDecoder {
 public:
     std::function<void(const ExecEvent&)> on_exec_event;
 

@@ -1,4 +1,4 @@
-#include "order_gateway/adapter/okx/okx_exec_parser.h"
+#include "order_gateway/adapter/okx/okx_exec_decoder.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -35,23 +35,23 @@ static bpt::messages::FeeCurrency::Value parse_fee_ccy(const std::string& ccy) {
     return FC::USDT;
 }
 
-void OKXExecParser::register_order(const std::string& cloid, uint64_t order_id) {
+void OKXExecDecoder::register_order(const std::string& cloid, uint64_t order_id) {
     std::lock_guard<std::mutex> lk(mu_);
     cloid_to_order_id_[cloid] = order_id;
 }
 
-void OKXExecParser::set_contract_sizes(const std::unordered_map<std::string, double>& sizes) {
+void OKXExecDecoder::set_contract_sizes(const std::unordered_map<std::string, double>& sizes) {
     std::lock_guard<std::mutex> lk(mu_);
     contract_sizes_ = sizes;
 }
 
-void OKXExecParser::reset() {
+void OKXExecDecoder::reset() {
     std::lock_guard<std::mutex> lk(mu_);
     acked_orders_.clear();
     cancelled_orders_.clear();
 }
 
-void OKXExecParser::handle_order_ack(const json::object& d, uint64_t recv_ns) {
+void OKXExecDecoder::handle_order_ack(const json::object& d, uint64_t recv_ns) {
     using ES = bpt::messages::ExecStatus;
     using RR = bpt::messages::RejectReason;
 
@@ -67,7 +67,7 @@ void OKXExecParser::handle_order_ack(const json::object& d, uint64_t recv_ns) {
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::warn("OKXExecParser: op=order response unknown cloid={}", cloid);
+        bpt::common::log::warn("OKXExecDecoder: op=order response unknown cloid={}", cloid);
         return;
     }
 
@@ -85,10 +85,10 @@ void OKXExecParser::handle_order_ack(const json::object& d, uint64_t recv_ns) {
             if (!oid_str.empty())
                 exch_oid = static_cast<uint64_t>(std::stoull(oid_str));
         }
-        bpt::common::log::info("OKXExecParser: order acked cloid={} ordId={}", cloid, exch_oid);
+        bpt::common::log::info("OKXExecDecoder: order acked cloid={} ordId={}", cloid, exch_oid);
         // ACKED events come from the orders channel — skip emitting here.
     } else {
-        bpt::common::log::error("OKXExecParser: order rejected cloid={} sCode={} sMsg={}", cloid, s_code, s_msg);
+        bpt::common::log::error("OKXExecDecoder: order rejected cloid={} sCode={} sMsg={}", cloid, s_code, s_msg);
         ExecEvent ev{};
         ev.order_id = order_id;
         ev.exchange_id = bpt::messages::ExchangeId::OKX;
@@ -103,7 +103,7 @@ void OKXExecParser::handle_order_ack(const json::object& d, uint64_t recv_ns) {
     }
 }
 
-void OKXExecParser::handle_orders_channel_item(const json::object& d, uint64_t recv_ns) {
+void OKXExecDecoder::handle_orders_channel_item(const json::object& d, uint64_t recv_ns) {
     using ES = bpt::messages::ExecStatus;
     using OS = bpt::messages::OrderSide;
     using OT = bpt::messages::OrderType;
@@ -118,7 +118,7 @@ void OKXExecParser::handle_orders_channel_item(const json::object& d, uint64_t r
             order_id = it->second;
     }
     if (order_id == 0) {
-        bpt::common::log::warn("OKXExecParser: unknown cloid={}", cloid);
+        bpt::common::log::warn("OKXExecDecoder: unknown cloid={}", cloid);
         return;
     }
 
@@ -184,13 +184,13 @@ void OKXExecParser::handle_orders_channel_item(const json::object& d, uint64_t r
     if (ev.status == ES::ACKED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!acked_orders_.insert(ev.order_id).second) {
-            bpt::common::log::debug("OKXExecParser: suppressed duplicate ACKED order_id={}", ev.order_id);
+            bpt::common::log::debug("OKXExecDecoder: suppressed duplicate ACKED order_id={}", ev.order_id);
             return;
         }
     } else if (ev.status == ES::CANCELLED) {
         std::lock_guard<std::mutex> lk(mu_);
         if (!cancelled_orders_.insert(ev.order_id).second) {
-            bpt::common::log::debug("OKXExecParser: suppressed duplicate CANCELLED order_id={}", ev.order_id);
+            bpt::common::log::debug("OKXExecDecoder: suppressed duplicate CANCELLED order_id={}", ev.order_id);
             return;
         }
         acked_orders_.erase(ev.order_id);

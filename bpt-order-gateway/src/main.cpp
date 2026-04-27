@@ -40,11 +40,17 @@ load_credentials(const std::vector<bpt::order_gateway::config::AdapterConfig>& a
                 "No secret_name for {} — adapter will have empty credentials (dev only)",
                 a_cfg.exchange);
             creds[a_cfg.exchange] = {};
-            continue;
+        } else {
+            const auto kv = bpt::common::secrets::fetch(a_cfg.secret_name, env);
+            creds[a_cfg.exchange] = bpt::order_gateway::adapter::credentials_from_secret(a_cfg.exchange, kv);
+            bpt::common::log::info("Loaded credentials for {}", a_cfg.exchange);
         }
-        const auto kv = bpt::common::secrets::fetch(a_cfg.secret_name, env);
-        creds[a_cfg.exchange] = bpt::order_gateway::adapter::credentials_from_secret(a_cfg.exchange, kv);
-        bpt::common::log::info("Loaded credentials for {}", a_cfg.exchange);
+        // Backtest-only: a wallet_address set directly in AdapterConfig
+        // overrides what we got (or didn't get) from secrets. Lets HL
+        // backtests pretend a wallet is configured without populating
+        // a real secret — the backtester accepts any address.
+        if (!a_cfg.wallet_address.empty())
+            creds[a_cfg.exchange].wallet_address = a_cfg.wallet_address;
     }
     return creds;
 }
