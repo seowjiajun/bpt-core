@@ -146,6 +146,12 @@ public:
                                    a_cfg.exchange, spool->current_path());
         }
 
+        // Anything below this point that throws would leave the just-started
+        // adapter threads orphaned (AdapterBase has no joining destructor —
+        // by design, since stop() is the lifecycle handle the framework
+        // calls). Wrap in a try so we can stop cleanly before re-throwing.
+        try {
+
         // Build the universe by reading the canonical instrument-mapping
         // JSON (same file bpt-refdata reads on the trading host) and
         // filtering per venue. No refdata service needed on the recording
@@ -183,6 +189,12 @@ public:
         }
         bpt::common::log::info("md-recorder: subscribed {} symbols across {} adapters",
                                n_subscribed, adapters_.size());
+        } catch (...) {
+            // Reraise after stopping so adapter threads join cleanly —
+            // otherwise std::thread destructor calls std::terminate.
+            for (auto& a : adapters_) a->stop();
+            throw;
+        }
     }
 
     void run() override {

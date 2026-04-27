@@ -11,7 +11,26 @@
 # the mapping JSON (which bpt-ops fetchers maintain), not this TOML.
 
 environment = "dev"
-calibrate_tsc = true
+calibrate_tsc = false  # skip the ~2s TSC calibration on a smoke test
+
+# Top-level keys must come BEFORE any [section] / [[array]] header — TOML's
+# scoping rule is "a key after a section header belongs to that section."
+# All root-level Settings fields therefore land here.
+
+recording_universe_venues = ["HYPERLIQUID"]
+
+# Path to the canonical instrument_mapping.json. Same file bpt-refdata
+# reads on the trading host; here it's the source of truth for what
+# md-recorder subscribes to. bpt-ops fetchers update this file on
+# schedule — point at a path under config/instruments/ so a config-sync
+# pull also refreshes the recording universe.
+instrument_mapping_path = "config/instruments/instrument_mapping.hyperliquid.json"
+
+# Recording host gets its own Aeron media driver dir so disk-IO stalls in
+# the recorder cannot backpressure the trading stack's IO thread (when both
+# stacks are running on the same machine, e.g. during local smoke).
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bpt-record"
 
 # Inline adapter list (md-recorder accepts either [[adapters]] inline or
 # exchange_config indirection — same shape as bpt-md-gateway's loader).
@@ -27,15 +46,6 @@ ws_read_timeout_ms = 5000
 ws_liveness_timeout_ms = 60000
 max_price_deviation_pct = 0.0  # disable validator on the recorder
 io_thread_cpu = -1
-
-recording_universe_venues = ["HYPERLIQUID"]
-
-# Path to the canonical instrument_mapping.json. Same file bpt-refdata
-# reads on the trading host; here it's the source of truth for what
-# md-recorder subscribes to. bpt-ops fetchers update this file on
-# schedule — point at a path under config/instruments/ so a config-sync
-# pull also refreshes the recording universe.
-instrument_mapping_path = "config/instruments/instrument_mapping.hyperliquid.json"
 
 [universe_filter]
 # Only record perps. Spot/futures live on different venues; HL is perp-only
