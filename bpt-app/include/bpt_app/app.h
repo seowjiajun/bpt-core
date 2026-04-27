@@ -1,37 +1,37 @@
 #pragma once
 
-// bpt::app::run — shared application lifecycle. Every bpt-core service's
-// main() should look like:
-//
-//   int main(int argc, char** argv) {
-//       CLI::App cli{"my-service"};
-//       std::string config_path = "config/my-service.toml";
-//       cli.add_option("-c,--config", config_path)->check(CLI::ExistingFile);
-//       CLI11_PARSE(cli, argc, argv);
-//
-//       auto settings = config::load(config_path);   // service-specific loader
-//       return bpt::app::run("my-service", std::move(settings),
-//           [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-//               return std::make_unique<MyService>(std::move(cfg), ctx.aeron);
-//           });
-//   }
-//
-// What bpt::app::run owns:
-//   - signal handler install (SIGINT / SIGTERM via bpt::common::signal)
-//   - invariant-TSC calibration (if settings.base.calibrate_tsc)
-//   - async Quill logging init (based on settings.base.logging)
-//   - Aeron MediaDriver connection
-//   - Main-thread service loop — service->run() blocks until signal fires
-//   - Graceful shutdown — service->stop() on the way out
-//
-// What services still own:
-//   - CLI argument definition (service-specific flags go here)
-//   - Settings struct + TOML loader (which internally calls load_base_settings)
-//   - The IService implementation (adapters, publishers, strategies, etc.)
-//
-// Settings requirements: the Settings type must expose a
-// `bpt::app::BaseSettings base;` member. The template reads `settings.base`
-// for lifecycle knobs before handing the full settings to the build callable.
+/// \file
+/// \brief Shared application lifecycle for every bpt-core service.
+///
+/// Every service's main() funnels through bpt::app::run<Settings>(...) so
+/// signal handling, logging, TSC calibration, optional Aeron connect, and
+/// graceful shutdown are identical across binaries.
+///
+/// Typical use:
+/// \code
+///     int main(int argc, char** argv) {
+///         CLI::App cli{"my-service"};
+///         std::string config_path = "config/my-service.toml";
+///         cli.add_option("-c,--config", config_path)->check(CLI::ExistingFile);
+///         CLI11_PARSE(cli, argc, argv);
+///
+///         auto settings = config::load(config_path);
+///         return bpt::app::run("my-service", std::move(settings),
+///             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
+///                 return std::make_unique<MyService>(std::move(cfg), ctx.aeron);
+///             });
+///     }
+/// \endcode
+///
+/// What bpt::app::run owns: signal install, TSC calibrate, logging init,
+/// optional Aeron connect, main-thread loop, graceful shutdown.
+///
+/// What services own: CLI definition, Settings struct + loader, the
+/// IService implementation.
+///
+/// Settings type must expose a `bpt::app::BaseSettings base;` member —
+/// the template reads `settings.base` for lifecycle knobs before handing
+/// the full settings to the build callable.
 
 #include "bpt_app/base_settings.h"
 
@@ -53,19 +53,23 @@
 
 namespace bpt::app {
 
-// Context handed to the service's build callable. Populated by bpt-app
-// before the service is constructed. Kept intentionally minimal — services
-// that need additional pre-built resources (credentials, additional
-// sockets) can construct them inside their own code using ctx.aeron.
+/// \brief Context handed to the service's build callable.
+///
+/// Populated by bpt-app before the service is constructed. Kept
+/// intentionally minimal — services that need additional pre-built
+/// resources (credentials, sockets) can construct them inside their own
+/// code using ctx.aeron.
 struct AppContext {
-    std::shared_ptr<::aeron::Aeron> aeron;
-    bpt::common::util::Topology     topology;  // empty when base.topology_path is unset
+    std::shared_ptr<::aeron::Aeron> aeron;     ///< nullptr if RunOptions::connect_aeron == false
+    bpt::common::util::Topology     topology;  ///< empty when base.topology_path is unset
 };
 
-// Service contract. run() is expected to block on its own poll loop,
-// checking bpt::common::signal::is_running() for shutdown. stop() is
-// called after run() returns, for any post-loop cleanup (draining queues,
-// flushing state) that shouldn't be in the destructor.
+/// \brief Service contract.
+///
+/// run() is expected to block on its own poll loop, checking
+/// bpt::common::signal::is_running() for shutdown. stop() is called
+/// after run() returns, for post-loop cleanup (draining queues,
+/// flushing state) that shouldn't live in the destructor.
 class IService {
 public:
     virtual ~IService() = default;
@@ -73,23 +77,28 @@ public:
     virtual void stop() {}
 };
 
-// Optional knobs for run(). Default-constructed RunOptions matches the
-// historical behavior — every existing caller keeps connecting to Aeron.
-// Opt out per-service when there's no Aeron consumer (e.g. bpt-md-recorder
-// captures venue WS frames to disk only; nothing publishes).
+/// \brief Optional knobs for run().
+///
+/// Default-constructed RunOptions matches the historical behavior — every
+/// existing caller keeps connecting to Aeron. Opt out per-service when
+/// there's no Aeron consumer (e.g. bpt-md-recorder captures WS frames to
+/// disk only; nothing publishes).
 struct RunOptions {
-    // Connect to the Aeron MediaDriver and populate AppContext::aeron.
-    // false → skip the connect; AppContext::aeron is nullptr; service
-    // must not dereference it.
+    /// Connect to the Aeron MediaDriver and populate AppContext::aeron.
+    /// When false, AppContext::aeron is nullptr and the service must not
+    /// dereference it.
     bool connect_aeron{true};
 };
 
-// Run the shared lifecycle. Template parameters are deduced:
-//   Settings — the service's settings struct, must have `.base` member
-//   BuildFn  — callable taking (Settings&, AppContext&) -> unique_ptr<IService>
-//
-// Returns 0 on clean shutdown, non-zero if a startup step fails (exceptions
-// from build_fn propagate so the service can decide; bpt-app does not swallow).
+/// \brief Run the shared lifecycle.
+///
+/// Template parameters are deduced: \c Settings is the service's settings
+/// struct (must have a `.base` member of type BaseSettings); \c BuildFn
+/// is a callable `(Settings&, AppContext&) -> unique_ptr<IService>`.
+///
+/// \return 0 on clean shutdown, non-zero if a startup step fails.
+///         Exceptions from \c build_fn propagate so the service can
+///         decide whether to translate them; bpt-app doesn't swallow.
 template <typename Settings, typename BuildFn>
 int run(const std::string& service_name, Settings settings, BuildFn build_fn,
         RunOptions opts = {}) {

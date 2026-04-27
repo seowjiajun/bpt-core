@@ -1,5 +1,13 @@
 #pragma once
 
+/// \file
+/// \brief Common base class for bpt-md-gateway venue adapters.
+///
+/// AdapterBase owns the IO + publisher threads and the WS reconnect loop.
+/// Each venue subclass plugs in connect/read/parse via the protected
+/// virtual hooks. md-recorder reuses the same adapter library by
+/// substituting recording-aware on_frame() overrides on derived classes.
+
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/config/settings.h"
@@ -19,25 +27,27 @@
 
 namespace bpt::md_gateway::adapter {
 
-// Base class for all exchange market-data adapters.
-//
-// Owns the common lifecycle state: io_context, ssl_context, subscription map,
-// stop flag, and two threads:
-//   IO thread      — WebSocket receive, stamps recv_ns, pushes raw frames to frame_queue_.
-//   Publisher thread — drains frame_queue_, calls parse_frame() → Aeron offer.
-//
-// Subclasses implement:
-//   connect_and_subscribe() — open WS, send initial subscribe frames.
-//   read_loop(ws)           — receive loop; call push_frame() for each data frame.
-//   parse_frame(payload, recv_ns) — calls the exchange parser + md_pub_ publish.
-//
-// The reconnect loop in run() calls connect_and_subscribe() + read_loop() in a
-// tight try/catch.  Subclasses may override reconnect_delay() (default: 1 s).
+/// \brief Base class for every exchange market-data adapter.
+///
+/// Owns the common lifecycle state — io_context, ssl_context, subscription
+/// map, stop flag — and two threads:
+///   - **IO thread** drives WebSocket receive, stamps recv_ns, pushes raw
+///     frames into frame_queue_.
+///   - **Publisher thread** drains frame_queue_, calls parse_frame() → Aeron.
+///
+/// Subclasses implement:
+///   - connect_and_subscribe() — open WS, send initial subscribe frames.
+///   - read_loop(ws) — receive loop; call push_frame() for each data frame.
+///   - parse_frame(payload, recv_ns) — venue parser + md_pub_ publish.
+///
+/// The reconnect loop in run() calls connect_and_subscribe() + read_loop()
+/// in a tight try/catch. Subclasses may override reconnect_delay()
+/// (default 1 s).
 class AdapterBase : public IAdapter {
 public:
-    // 512 slots × 16 KiB each ≈ 8 MiB per adapter.
-    // 16 KiB covers the largest expected WS frame (Deribit book snapshot at
-    // depth=255: ~15 KiB).  Increase SLOT_BYTES if larger frames are needed.
+    /// 512 slots × 16 KiB ≈ 8 MiB per adapter. 16 KiB covers the largest
+    /// expected WS frame (Deribit book snapshot at depth=255 is ~15 KiB).
+    /// Bump SLOT_BYTES if a venue starts emitting bigger frames.
     static constexpr size_t QUEUE_CAPACITY = 512;
     static constexpr size_t SLOT_BYTES = 16384;
     using FrameQueue = bpt::common::util::SpscQueue<QUEUE_CAPACITY, SLOT_BYTES>;
@@ -59,34 +69,38 @@ public:
     }
 
 protected:
-    // How long to wait after a connection error before reconnecting.
-    // Default: 1 s.  Override in derived class to change.
+    /// \brief Backoff before the next reconnect attempt. Default 1 s.
     virtual std::chrono::milliseconds reconnect_delay() const;
 
-    // Establish the WebSocket connection and send all initial subscribe frames.
-    // Return nullptr if no subscriptions exist yet (run() will retry after 100ms).
+    /// \brief Open the WebSocket and send all initial subscribe frames.
+    /// \return nullptr if no subscriptions exist yet — run() retries in 100 ms.
     virtual std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() = 0;
 
-    // Run the synchronous message-receive loop.  Call push_frame() for each
-    // data message.  Throw on any fatal error to trigger a reconnect.
+    /// \brief Synchronous receive loop.
+    ///
+    /// Implementations call push_frame() for each data frame and throw on
+    /// any fatal error to trigger a reconnect.
     virtual void read_loop(bpt::common::ws::AnyWsStream& ws) = 0;
 
-    // Called by the publisher thread for each frame dequeued from frame_queue_.
-    // Implementations call their parser then md_pub_ publish methods.
+    /// \brief Publisher-thread callback invoked once per dequeued frame.
+    ///
+    /// Implementations run the venue parser then call md_pub_ publish methods.
     virtual void parse_frame(std::string_view payload, uint64_t recv_ns) = 0;
 
-    // Push a raw WS frame onto the SPSC queue.  Called from the IO thread.
-    // Logs a warning (throttled) when the queue is full or the frame is oversized.
+    /// \brief Push a raw WS frame onto the SPSC queue. IO-thread only.
+    ///
+    /// Logs a throttled warning when the queue is full or the frame is
+    /// oversized — never blocks the receive path.
     void push_frame(std::string_view payload, uint64_t recv_ns) noexcept;
 
     config::AdapterConfig cfg_;
     std::shared_ptr<messaging::IMdPublisher> md_pub_;
-    // Optional CPU-affinity topology. Pointer (not reference) because
-    // the base can be constructed before topology is known; set via
-    // set_topology() before start(). nullptr = fall back to the legacy
-    // cfg_.io_thread_cpu TOML knob.
+    /// Optional CPU-affinity topology. Pointer (not reference) because the
+    /// base can be constructed before topology is known; set via
+    /// set_topology() before start(). nullptr = fall back to the legacy
+    /// cfg_.io_thread_cpu TOML knob.
     const bpt::common::util::Topology* topology_{nullptr};
-    // validator_ must be declared before validating_pub_ (initializer-list order).
+    /// validator_ must be declared before validating_pub_ (init-list order).
     md::MdValidator validator_;
     md::ValidatingPublisher validating_pub_;
 
