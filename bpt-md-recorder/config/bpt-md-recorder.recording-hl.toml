@@ -4,9 +4,11 @@
 # Read-only (passive subscriber, no orders) so it's safe to point at
 # mainnet even when the trading stack is on testnet.
 #
-# Symbol selection: top mainnet perps by 24h notional volume, spanning a
-# range of liquidity / spread profiles for AS strategy evaluation. BTC
-# excluded because spread is too tight on HL mainnet for AS to clear fees.
+# Universe selection: derived dynamically from the canonical
+# instrument_mapping.json. md-recorder loads the file at boot, walks it
+# per venue, filters by inst_types + exclude_bases, and subscribes to
+# every survivor. Adding/removing recording symbols becomes an edit to
+# the mapping JSON (which bpt-ops fetchers maintain), not this TOML.
 
 environment = "dev"
 calibrate_tsc = true
@@ -28,6 +30,22 @@ io_thread_cpu = -1
 
 recording_universe_venues = ["HYPERLIQUID"]
 
+# Path to the canonical instrument_mapping.json. Same file bpt-refdata
+# reads on the trading host; here it's the source of truth for what
+# md-recorder subscribes to. bpt-ops fetchers update this file on
+# schedule — point at a path under config/instruments/ so a config-sync
+# pull also refreshes the recording universe.
+instrument_mapping_path = "config/instruments/instrument_mapping.hyperliquid.json"
+
+[universe_filter]
+# Only record perps. Spot/futures live on different venues; HL is perp-only
+# so this is mostly defensive (and self-documenting).
+inst_types = ["PERP"]
+# BTC excluded because spread on HL mainnet is too tight for AS to clear
+# fees. Other venues might want this filter list venue-specific later.
+exclude_bases = ["BTC"]
+default_depth = 5
+
 [recording]
 output_dir = "/opt/bpt/data/raw"
 rotate_interval_seconds = 3600
@@ -43,32 +61,3 @@ level = "info"
 dir = "logs"
 flush_level = "warn"
 flush_interval_ms = 1000
-
-# Recording universe — operator-curated. instrument_id values are the
-# canonical IDs from config/instruments/instrument_mapping.hyperliquid.json
-# (1001=BTC, 1002=ETH, 1003=SOL, 1004=XMR, 1005=APE, ...). Add tagging in
-# the mapping JSON later for declarative selection; today this list is
-# the source of truth for what gets recorded.
-[[universe]]
-instrument_id = 1002
-venue = "HYPERLIQUID"
-symbol = "ETH"
-depth = 5
-
-[[universe]]
-instrument_id = 1003
-venue = "HYPERLIQUID"
-symbol = "SOL"
-depth = 5
-
-[[universe]]
-instrument_id = 1004
-venue = "HYPERLIQUID"
-symbol = "XMR"
-depth = 5
-
-[[universe]]
-instrument_id = 1005
-venue = "HYPERLIQUID"
-symbol = "APE"
-depth = 5

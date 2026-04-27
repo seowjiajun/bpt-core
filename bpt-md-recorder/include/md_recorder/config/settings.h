@@ -9,15 +9,20 @@
 
 namespace bpt::md_recorder::config {
 
-// Per-venue capture spec — what symbols to subscribe + at what depth.
-// instrument_id is canonical, sourced from instrument_mapping.{venue}.json
-// at startup and stamped onto SBE messages (downstream is no-op-published
-// but adapters still parse + decode internally).
-struct UniverseEntry {
-    uint64_t instrument_id{0};
-    std::string venue;       // "HYPERLIQUID", "OKX", "DERIBIT", "BINANCE"
-    std::string symbol;      // exchange-native (HL coin, OKX instId, Deribit instrument)
-    uint8_t depth{0};
+// Universe filter — what to record from the instrument-mapping JSON.
+// Operator declares high-level criteria; md-recorder iterates the loaded
+// mapping for each venue, applies these filters, and calls subscribe()
+// per surviving entry. Replaces the per-symbol [[universe]] hand-curation.
+struct UniverseFilter {
+    // Instrument types to include (empty = accept all). Matches
+    // InstrumentInfo::type, e.g. "PERP", "SPOT", "FUTURE".
+    std::vector<std::string> inst_types;
+    // Symbols (canonical base) to drop even if they pass the type filter.
+    // E.g. exclude BTC because spread is too tight for AS to clear fees.
+    std::vector<std::string> exclude_bases;
+    // Default subscription depth applied to every entry that survives
+    // the filters. 0 = top-of-book bbo only; 5 = depth-5 ladder.
+    uint8_t default_depth{5};
 };
 
 // Recording knobs — one set per spool flavour. Today only mdgw recording
@@ -38,11 +43,15 @@ struct Settings {
     // subclasses that tee bytes to disk.
     std::vector<bpt::md_gateway::config::AdapterConfig> mdgw_adapters;
 
-    // Recording universe — flat list of (venue, symbol, instrument_id, depth)
-    // declared in the TOML. Future enhancement: derive from
-    // instrument_mapping.{venue}.json with a tag filter; today the operator
-    // hand-curates per recording corpus.
-    std::vector<UniverseEntry> universe;
+    // Path to the canonical instrument_mapping.json (the same file
+    // bpt-refdata reads on the trading host). md-recorder loads this
+    // at boot, iterates by venue, applies UniverseFilter, calls
+    // subscribe() per surviving entry. Hot-reloadable on a periodic
+    // tick if the operator wants new listings to land mid-session.
+    std::string instrument_mapping_path{"config/instruments/instrument_mapping.json"};
+
+    // Universe filter applied against the loaded mapping.
+    UniverseFilter universe_filter;
 
     // Per-venue allowlist applied against the adapter list — drops adapters
     // whose exchange isn't in this set. Empty = accept all.

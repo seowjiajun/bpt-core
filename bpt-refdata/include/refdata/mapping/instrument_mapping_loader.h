@@ -5,6 +5,7 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace bpt::refdata::mapping {
 
@@ -41,6 +42,16 @@ struct InstrumentInfo {
     std::string base;
     std::string quote;
     std::string type;  // "PERP", "SPOT", "FUTURE"
+};
+
+// One row in the universe view — emitted by instruments_for_venue() so
+// callers can iterate the catalog without poking at private maps. Stable
+// across reloads; the loader rebuilds entries from the JSON each load().
+struct InstrumentEntry {
+    uint32_t        canonical_id;
+    uint8_t         exchange_id;
+    std::string     venue_symbol;   // exchange-native string (e.g. "BTC-USDT-SWAP", "BTC")
+    InstrumentInfo  info;
 };
 
 // Loads and caches the instrument mapping file (instrument_mapping.json).
@@ -82,6 +93,13 @@ public:
     [[nodiscard]] std::optional<InstrumentInfo> get_instrument_info(uint32_t canonical_id) const;
 
     [[nodiscard]] std::size_t instrument_count() const;
+
+    // Snapshot view: every instrument in the mapping that has a listing
+    // for the requested exchange_id. Returned by value (small per-process
+    // catalog, hundreds-of-KB at most) so callers can iterate without
+    // holding the read lock. md-recorder uses this to build its universe
+    // from the JSON without needing a running refdata service.
+    [[nodiscard]] std::vector<InstrumentEntry> instruments_for_venue(uint8_t exchange_id) const;
 
 private:
     struct ReverseEntry {

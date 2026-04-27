@@ -2,11 +2,32 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
+# Standalone instrument-mapping loader + merger. No Aeron, no REST, no SBE
+# protocol — just JSON parsing + bidirectional symbology lookup. Split out
+# so consumers like bpt-md-recorder can import the mapping logic without
+# pulling in the full refdata service (venue REST clients, Aeron publishers,
+# etc.). bpt-refdata itself depends on this transitively via :refdata_lib.
 cc_library(
-    name = "refdata_lib",
+    name = "mapping_lib",
     srcs = [
         "src/mapping/instrument_mapping_loader.cpp",
         "src/mapping/instrument_mapping_merger.cpp",
+    ],
+    hdrs = [
+        "include/refdata/mapping/instrument_mapping_loader.h",
+        "include/refdata/mapping/instrument_mapping_merger.h",
+    ],
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bpt-common",
+        "@nlohmann_json//:nlohmann_json",
+    ],
+)
+
+cc_library(
+    name = "refdata_lib",
+    srcs = [
         "src/registry/instrument_registry.cpp",
         "src/resolver/instrument_resolver.cpp",
         "src/messaging/refdata_control_subscriber.cpp",
@@ -33,6 +54,7 @@ cc_library(
     includes = ["include"],
     visibility = ["//visibility:public"],
     deps = [
+        ":mapping_lib",
         "//messages",
         "//bpt-app",
         "//bpt-common",

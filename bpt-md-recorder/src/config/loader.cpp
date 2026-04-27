@@ -83,26 +83,27 @@ Settings load(const std::string& path) {
     bpt::common::log::info("md-recorder adapters: {} venues",
                            s.mdgw_adapters.size());
 
-    if (auto* arr = root["universe"].as_array()) {
-        for (auto& elem : *arr) {
-            auto* t = elem.as_table();
-            if (!t) continue;
-            UniverseEntry u;
-            if (auto v = (*t)["instrument_id"].value<int64_t>())
-                u.instrument_id = static_cast<uint64_t>(*v);
-            if (auto v = (*t)["venue"].value<std::string>()) u.venue = *v;
-            if (auto v = (*t)["symbol"].value<std::string>()) u.symbol = *v;
-            if (auto v = (*t)["depth"].value<int64_t>())
-                u.depth = static_cast<uint8_t>(*v);
-            if (u.instrument_id == 0 || u.venue.empty() || u.symbol.empty())
-                throw std::runtime_error(
-                    "[[universe]] entry missing instrument_id, venue, or symbol");
-            if (!venue_filter.empty() && !venue_filter.count(u.venue))
-                continue;
-            s.universe.push_back(std::move(u));
+    if (auto v = root["instrument_mapping_path"].value<std::string>())
+        s.instrument_mapping_path = *v;
+
+    if (auto* uf = root["universe_filter"].as_table()) {
+        if (auto* arr = (*uf)["inst_types"].as_array()) {
+            for (auto& elem : *arr)
+                if (auto v = elem.value<std::string>())
+                    s.universe_filter.inst_types.push_back(*v);
         }
+        if (auto* arr = (*uf)["exclude_bases"].as_array()) {
+            for (auto& elem : *arr)
+                if (auto v = elem.value<std::string>())
+                    s.universe_filter.exclude_bases.push_back(*v);
+        }
+        if (auto v = (*uf)["default_depth"].value<int64_t>())
+            s.universe_filter.default_depth = static_cast<uint8_t>(*v);
     }
-    bpt::common::log::info("md-recorder universe: {} entries", s.universe.size());
+    bpt::common::log::info("md-recorder universe filter: types=[{}] exclude=[{}] depth={}",
+                           fmt::join(s.universe_filter.inst_types, ","),
+                           fmt::join(s.universe_filter.exclude_bases, ","),
+                           s.universe_filter.default_depth);
 
     if (auto* r = root["recording"].as_table()) {
         if (auto v = (*r)["output_dir"].value<std::string>())

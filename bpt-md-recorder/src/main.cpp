@@ -13,7 +13,10 @@
 #include "bpt_common/recorder/raw_spool.h"
 #include "md_gateway/messaging/i_md_publisher.h"
 #include "md_gateway/adapter/common/i_adapter.h"
+#include "refdata/mapping/instrument_mapping_loader.h"
 #include <messages/ExchangeRegistry.h>
+
+#include <algorithm>
 
 #include <CLI/CLI.hpp>
 
@@ -143,20 +146,40 @@ public:
                                    a_cfg.exchange, spool->current_path());
         }
 
-        // Apply universe — each (venue, symbol, instrument_id) becomes a
-        // subscribe call on the matching adapter. Adapters sit in a
-        // pre-connect state until subscribe lands the first symbol; first
-        // subscribe drives connect_and_subscribe on the IO thread.
-        size_t n_subscribed = 0;
-        for (const auto& u : settings_.universe) {
-            auto it = adapters_per_venue_.find(u.venue);
-            if (it == adapters_per_venue_.end()) {
-                bpt::common::log::warn("Universe entry venue '{}' has no matching adapter — skipping {}",
-                                       u.venue, u.symbol);
-                continue;
+        // Build the universe by reading the canonical instrument-mapping
+        // JSON (same file bpt-refdata reads on the trading host) and
+        // filtering per venue. No refdata service needed on the recording
+        // host — the mapping logic is imported as a library
+        // (//bpt-refdata:mapping_lib).
+        bpt::refdata::mapping::InstrumentMappingLoader mapping;
+        mapping.load(settings_.instrument_mapping_path);
+        bpt::common::log::info("md-recorder: loaded instrument mapping from {} ({} instruments)",
+                               settings_.instrument_mapping_path,
+                               mapping.instrument_count());
+
+        const auto& filter = settings_.universe_filter;
+        const auto matches_filter = [&filter](const auto& entry) {
+            if (!filter.inst_types.empty()) {
+                if (std::find(filter.inst_types.begin(), filter.inst_types.end(),
+                              entry.info.type) == filter.inst_types.end())
+                    return false;
             }
-            it->second->subscribe(u.instrument_id, u.symbol, u.depth);
-            ++n_subscribed;
+            if (std::find(filter.exclude_bases.begin(), filter.exclude_bases.end(),
+                          entry.info.base) != filter.exclude_bases.end())
+                return false;
+            return true;
+        };
+
+        size_t n_subscribed = 0;
+        for (const auto& [venue_name, adapter] : adapters_per_venue_) {
+            const auto venue_id = bpt::messages::ExchangeRegistry::from_name(venue_name);
+            if (!venue_id) continue;  // unreachable: ctor validates above
+            const auto entries = mapping.instruments_for_venue(static_cast<uint8_t>(*venue_id));
+            for (const auto& e : entries) {
+                if (!matches_filter(e)) continue;
+                adapter->subscribe(e.canonical_id, e.venue_symbol, filter.default_depth);
+                ++n_subscribed;
+            }
         }
         bpt::common::log::info("md-recorder: subscribed {} symbols across {} adapters",
                                n_subscribed, adapters_.size());

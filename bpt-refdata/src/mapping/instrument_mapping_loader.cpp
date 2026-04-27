@@ -105,4 +105,22 @@ std::size_t InstrumentMappingLoader::instrument_count() const {
     return instrument_count_;
 }
 
+std::vector<InstrumentEntry> InstrumentMappingLoader::instruments_for_venue(uint8_t exchange_id) const {
+    std::vector<InstrumentEntry> out;
+    std::shared_lock lock(mutex_);
+    out.reserve(reverse_.size());
+    for (const auto& [cid, entry] : reverse_) {
+        auto it = entry.exchanges.find(exchange_id);
+        if (it == entry.exchanges.end())
+            continue;
+        out.push_back(InstrumentEntry{
+            .canonical_id = cid,
+            .exchange_id  = exchange_id,
+            .venue_symbol = it->second,
+            .info         = entry.info,
+        });
+    }
+    return out;
+}
+
 }  // namespace bpt::refdata::mapping
