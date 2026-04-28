@@ -18,33 +18,33 @@ void HyperliquidMdDecoder::decode(std::string_view payload,
     pad(payload);
 
     simdjson::ondemand::document doc;
-    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc))
+    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc)) [[unlikely]]
         return;
 
     std::string_view channel;
-    if (doc["channel"].get_string().get(channel))
+    if (doc["channel"].get_string().get(channel)) [[unlikely]]
         return;
 
     simdjson::ondemand::value data_val;
-    if (doc.find_field_unordered("data").get(data_val))
+    if (doc.find_field_unordered("data").get(data_val)) [[unlikely]]
         return;
 
     // --- BBO ---
     if (channel == "l2Book") {
         simdjson::ondemand::object book;
-        if (data_val.get_object().get(book))
+        if (data_val.get_object().get(book)) [[unlikely]]
             return;
 
         std::string_view coin;
-        if (book["coin"].get_string().get(coin))
+        if (book["coin"].get_string().get(coin)) [[unlikely]]
             return;
 
         uint64_t instrument_id = subs_.find_id(coin);
-        if (!instrument_id)
+        if (!instrument_id) [[unlikely]]
             return;
 
         simdjson::ondemand::array levels_outer;
-        if (book.find_field_unordered("levels").get_array().get(levels_outer))
+        if (book.find_field_unordered("levels").get_array().get(levels_outer)) [[unlikely]]
             return;
 
         md::MdBbo bbo;
@@ -72,7 +72,7 @@ void HyperliquidMdDecoder::decode(std::string_view payload,
             ++side_idx;
         }
 
-        if (side_idx < 2)
+        if (side_idx < 2) [[unlikely]]
             return;
 
         uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;

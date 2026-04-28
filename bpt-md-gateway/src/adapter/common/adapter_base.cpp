@@ -104,11 +104,33 @@ void AdapterBase::push_frame(std::string_view payload, uint64_t recv_ns) noexcep
 
 void AdapterBase::publish_loop() {
     bpt::common::util::set_thread_name(pub_thread_name(exchange_name()));
+
+    // Adaptive backoff: tight spin with `pause` while the queue is hot,
+    // then yield when it stays empty long enough that we're paying real
+    // CPU for nothing. Picking the spin budget conservatively (~few µs
+    // worth of pause iterations on x86) keeps wake-up latency in the
+    // tens of nanoseconds when the IO thread pushes between consumer
+    // iterations — std::this_thread::yield() on a pinned/isolated core
+    // is a wasted syscall that adds ~µs of context-switch jitter.
+    constexpr int kSpinBudget = 1000;
+    int empty_iters = 0;
     while (!stop_flag_.load(std::memory_order_relaxed)) {
-        bool processed =
+        const bool processed =
             frame_queue_.try_pop([this](uint64_t recv_ns, std::string_view payload) { parse_frame(payload, recv_ns); });
-        if (!processed)
+        if (processed) {
+            empty_iters = 0;
+            continue;
+        }
+        if (++empty_iters < kSpinBudget) {
+#if defined(__x86_64__) || defined(__i386__)
+            __builtin_ia32_pause();
+#elif defined(__aarch64__)
+            asm volatile("yield" ::: "memory");
+#endif
+        } else {
             std::this_thread::yield();
+            empty_iters = kSpinBudget;  // stay in yield mode until next frame
+        }
     }
     // Drain any frames queued between the IO thread stopping and publish_loop waking.
     while (

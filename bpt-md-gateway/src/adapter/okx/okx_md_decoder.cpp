@@ -20,14 +20,14 @@ void OkxMdDecoder::decode(std::string_view payload,
     pad(payload);
 
     simdjson::ondemand::document doc;
-    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc))
+    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc)) [[unlikely]]
         return;
 
     {
         std::string_view event_sv;
         bool has_event = !doc.find_field_unordered("event").get_string().get(event_sv);
         doc.rewind();
-        if (has_event) {
+        if (has_event) [[unlikely]] {
             bpt::common::log::info("OKX event: {}", event_sv);
             return;
         }
@@ -36,11 +36,11 @@ void OkxMdDecoder::decode(std::string_view payload,
     std::string_view channel, inst_id;
     {
         simdjson::ondemand::object arg;
-        if (doc.find_field_unordered("arg").get_object().get(arg))
+        if (doc.find_field_unordered("arg").get_object().get(arg)) [[unlikely]]
             return;
-        if (arg["channel"].get_string().get(channel))
+        if (arg["channel"].get_string().get(channel)) [[unlikely]]
             return;
-        if (arg["instId"].get_string().get(inst_id))
+        if (arg["instId"].get_string().get(inst_id)) [[unlikely]]
             return;
     }
 
@@ -56,16 +56,16 @@ void OkxMdDecoder::decode(std::string_view payload,
     }
 
     simdjson::ondemand::array data_arr;
-    if (doc.find_field_unordered("data").get_array().get(data_arr))
+    if (doc.find_field_unordered("data").get_array().get(data_arr)) [[unlikely]]
         return;
 
     simdjson::ondemand::object entry;
-    if (data_arr.at(0).get_object().get(entry))
+    if (data_arr.at(0).get_object().get(entry)) [[unlikely]]
         return;
 
     // Single lock + single hash lookup for both instrument_id and depth.
     auto [instrument_id, depth] = subs_.find(inst_id);
-    if (!instrument_id)
+    if (!instrument_id) [[unlikely]]
         return;
 
     // Classify channel with two single-char checks — no multi-char string
@@ -112,29 +112,29 @@ void OkxMdDecoder::handle_bbo(simdjson::ondemand::object& entry,
     bbo.instrument_id = instrument_id;
     {
         simdjson::ondemand::array outer, lvl;
-        if (entry["bids"].get_array().get(outer))
+        if (entry["bids"].get_array().get(outer)) [[unlikely]]
             return;
-        if (outer.at(0).get_array().get(lvl))
+        if (outer.at(0).get_array().get(lvl)) [[unlikely]]
             return;
         auto it = lvl.begin();
-        if (it.error())
+        if (it.error()) [[unlikely]]
             return;
         (void)bpt::common::util::ff_double(*it, bbo.bid_price);
-        if ((++it).error())
+        if ((++it).error()) [[unlikely]]
             return;
         (void)bpt::common::util::ff_double(*it, bbo.bid_qty);
     }
     {
         simdjson::ondemand::array outer, lvl;
-        if (entry.find_field_unordered("asks").get_array().get(outer))
+        if (entry.find_field_unordered("asks").get_array().get(outer)) [[unlikely]]
             return;
-        if (outer.at(0).get_array().get(lvl))
+        if (outer.at(0).get_array().get(lvl)) [[unlikely]]
             return;
         auto it = lvl.begin();
-        if (it.error())
+        if (it.error()) [[unlikely]]
             return;
         (void)bpt::common::util::ff_double(*it, bbo.ask_price);
-        if ((++it).error())
+        if ((++it).error()) [[unlikely]]
             return;
         (void)bpt::common::util::ff_double(*it, bbo.ask_qty);
     }
@@ -169,14 +169,14 @@ void OkxMdDecoder::handle_book(simdjson::ondemand::object& entry,
     auto apply_side = [](simdjson::ondemand::array& outer, auto& side) {
         for (auto level_res : outer) {
             simdjson::ondemand::array lvl;
-            if (level_res.get_array().get(lvl))
+            if (level_res.get_array().get(lvl)) [[unlikely]]
                 continue;
             double px = 0, qty = 0;
             auto it = lvl.begin();
-            if (it.error())
+            if (it.error()) [[unlikely]]
                 continue;
             (void)bpt::common::util::ff_double(*it, px);
-            if ((++it).error())
+            if ((++it).error()) [[unlikely]]
                 continue;
             (void)bpt::common::util::ff_double(*it, qty);
             if (qty == 0.0)
@@ -188,18 +188,18 @@ void OkxMdDecoder::handle_book(simdjson::ondemand::object& entry,
 
     {
         simdjson::ondemand::array outer;
-        if (entry["bids"].get_array().get(outer))
+        if (entry["bids"].get_array().get(outer)) [[unlikely]]
             return;
         apply_side(outer, state.bids);
     }
     {
         simdjson::ondemand::array outer;
-        if (entry.find_field_unordered("asks").get_array().get(outer))
+        if (entry.find_field_unordered("asks").get_array().get(outer)) [[unlikely]]
             return;
         apply_side(outer, state.asks);
     }
 
-    if (state.bids.empty() || state.asks.empty())
+    if (state.bids.empty() || state.asks.empty()) [[unlikely]]
         return;
 
     // Flatten top-`depth` of the maintained state into a fresh MdOrderBook
@@ -237,13 +237,13 @@ void OkxMdDecoder::handle_trades(simdjson::ondemand::object& entry,
     md::MdTrade trade;
     trade.timestamp_ns = recv_ns;
     trade.instrument_id = instrument_id;
-    if (bpt::common::util::ff_double(entry["px"], trade.price))
+    if (bpt::common::util::ff_double(entry["px"], trade.price)) [[unlikely]]
         return;
-    if (bpt::common::util::ff_double(entry.find_field_unordered("sz"), trade.qty))
+    if (bpt::common::util::ff_double(entry.find_field_unordered("sz"), trade.qty)) [[unlikely]]
         return;
 
     std::string_view side_sv;
-    if (entry.find_field_unordered("side").get_string().get(side_sv))
+    if (entry.find_field_unordered("side").get_string().get(side_sv)) [[unlikely]]
         return;
 
     trade.side = (side_sv == "sell") ? bpt::messages::TradeSide::SELL : bpt::messages::TradeSide::BUY;

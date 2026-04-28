@@ -30,15 +30,15 @@ void DeribitMdDecoder::decode(std::string_view payload,
     pad(payload);
 
     simdjson::ondemand::document doc;
-    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc))
+    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc)) [[unlikely]]
         return;
 
     std::string_view method;
-    if (doc["method"].get_string().get(method))
+    if (doc["method"].get_string().get(method)) [[unlikely]]
         return;
 
     // --- Heartbeat test_request ---
-    if (method == "heartbeat") {
+    if (method == "heartbeat") [[unlikely]] {
         simdjson::ondemand::object params;
         if (doc.find_field_unordered("params").get_object().get(params))
             return;
@@ -48,19 +48,19 @@ void DeribitMdDecoder::decode(std::string_view payload,
         return;
     }
 
-    if (method != "subscription")
+    if (method != "subscription") [[unlikely]]
         return;
 
     simdjson::ondemand::object params;
-    if (doc.find_field_unordered("params").get_object().get(params))
+    if (doc.find_field_unordered("params").get_object().get(params)) [[unlikely]]
         return;
 
     std::string_view channel;
-    if (params["channel"].get_string().get(channel))
+    if (params["channel"].get_string().get(channel)) [[unlikely]]
         return;
 
     simdjson::ondemand::value data_val;
-    if (params.find_field_unordered("data").get(data_val))
+    if (params.find_field_unordered("data").get(data_val)) [[unlikely]]
         return;
 
     // Extract instrument symbol from channel name.
@@ -78,7 +78,7 @@ void DeribitMdDecoder::decode(std::string_view payload,
     }
 
     uint64_t instrument_id = subs_.find_id(symbol);
-    if (!instrument_id)
+    if (!instrument_id) [[unlikely]]
         return;
 
     uint8_t depth = subs_.find_depth(instrument_id);
@@ -86,19 +86,19 @@ void DeribitMdDecoder::decode(std::string_view payload,
     // --- Quote (BBO) ---
     if (channel.starts_with("quote.")) {
         simdjson::ondemand::object data;
-        if (data_val.get_object().get(data))
+        if (data_val.get_object().get(data)) [[unlikely]]
             return;
 
         md::MdBbo bbo;
         bbo.timestamp_ns = recv_ns;
         bbo.instrument_id = instrument_id;
-        if (data["best_bid_price"].get_double().get(bbo.bid_price))
+        if (data["best_bid_price"].get_double().get(bbo.bid_price)) [[unlikely]]
             return;
-        if (data.find_field_unordered("best_bid_amount").get_double().get(bbo.bid_qty))
+        if (data.find_field_unordered("best_bid_amount").get_double().get(bbo.bid_qty)) [[unlikely]]
             return;
-        if (data.find_field_unordered("best_ask_price").get_double().get(bbo.ask_price))
+        if (data.find_field_unordered("best_ask_price").get_double().get(bbo.ask_price)) [[unlikely]]
             return;
-        if (data.find_field_unordered("best_ask_amount").get_double().get(bbo.ask_qty))
+        if (data.find_field_unordered("best_ask_amount").get_double().get(bbo.ask_qty)) [[unlikely]]
             return;
 
         uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;

@@ -17,26 +17,26 @@ void BinanceMdDecoder::decode(std::string_view payload,
     pad(payload);
 
     simdjson::ondemand::document doc;
-    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc))
+    if (json_parser_.iterate(padded_buf_.data(), payload.size(), padded_buf_.size()).get(doc)) [[unlikely]]
         return;
 
     std::string_view stream_name;
-    if (doc["stream"].get_string().get(stream_name))
+    if (doc["stream"].get_string().get(stream_name)) [[unlikely]]
         return;
 
     simdjson::ondemand::object data;
-    if (doc.find_field_unordered("data").get_object().get(data))
+    if (doc.find_field_unordered("data").get_object().get(data)) [[unlikely]]
         return;
 
     const auto at_pos = stream_name.find('@');
-    if (at_pos == std::string_view::npos)
+    if (at_pos == std::string_view::npos) [[unlikely]]
         return;
 
     std::string_view sym = stream_name.substr(0, at_pos);
     std::string_view type = stream_name.substr(at_pos + 1);
 
     uint64_t instrument_id = subs_.find_id(sym);
-    if (!instrument_id)
+    if (!instrument_id) [[unlikely]]
         return;
 
     if (type == "bookTicker") {
@@ -44,13 +44,13 @@ void BinanceMdDecoder::decode(std::string_view payload,
         md::MdBbo bbo;
         bbo.timestamp_ns = recv_ns;
         bbo.instrument_id = instrument_id;
-        if (bpt::common::util::ff_double(data["b"], bbo.bid_price))
+        if (bpt::common::util::ff_double(data["b"], bbo.bid_price)) [[unlikely]]
             return;
-        if (bpt::common::util::ff_double(data.find_field_unordered("B"), bbo.bid_qty))
+        if (bpt::common::util::ff_double(data.find_field_unordered("B"), bbo.bid_qty)) [[unlikely]]
             return;
-        if (bpt::common::util::ff_double(data.find_field_unordered("a"), bbo.ask_price))
+        if (bpt::common::util::ff_double(data.find_field_unordered("a"), bbo.ask_price)) [[unlikely]]
             return;
-        if (bpt::common::util::ff_double(data.find_field_unordered("A"), bbo.ask_qty))
+        if (bpt::common::util::ff_double(data.find_field_unordered("A"), bbo.ask_qty)) [[unlikely]]
             return;
 
         uint64_t lat_ns = bpt::common::util::TscClock::now_mono_ns() - parse_start_ns;
@@ -65,13 +65,13 @@ void BinanceMdDecoder::decode(std::string_view payload,
         md::MdTrade trade;
         trade.timestamp_ns = recv_ns;
         trade.instrument_id = instrument_id;
-        if (bpt::common::util::ff_double(data["p"], trade.price))
+        if (bpt::common::util::ff_double(data["p"], trade.price)) [[unlikely]]
             return;
-        if (bpt::common::util::ff_double(data.find_field_unordered("q"), trade.qty))
+        if (bpt::common::util::ff_double(data.find_field_unordered("q"), trade.qty)) [[unlikely]]
             return;
 
         bool maker_is_buyer = false;
-        if (data.find_field_unordered("m").get_bool().get(maker_is_buyer))
+        if (data.find_field_unordered("m").get_bool().get(maker_is_buyer)) [[unlikely]]
             return;
 
         trade.side = maker_is_buyer ? bpt::messages::TradeSide::SELL : bpt::messages::TradeSide::BUY;
