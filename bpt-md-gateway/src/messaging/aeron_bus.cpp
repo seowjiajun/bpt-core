@@ -1,3 +1,11 @@
+/// \file
+/// \brief AeronBus::build — instantiate the prod messaging-port concrete classes.
+///
+/// One place that maps `settings.aeron.*` channel+stream pairs onto the
+/// concrete Aeron-backed classes. Kept tiny on purpose: the app's wiring
+/// is a single call (`AeronBus::build`) which the rest of the binary
+/// never has to look at again.
+
 #include "md_gateway/messaging/aeron_bus.h"
 
 #include "md_gateway/config/settings.h"
