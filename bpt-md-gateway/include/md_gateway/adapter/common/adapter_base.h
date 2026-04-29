@@ -210,7 +210,11 @@ protected:
     boost::asio::io_context ioc_;
     boost::asio::ssl::context ssl_ctx_;
 
-    std::atomic<bool> stop_flag_{false};
+    /// Cache-line isolated. publish_loop checks stop_flag_ on every
+    /// spin iteration; without this, it could share a line with the
+    /// frame_queue_'s producer-side `head_` atomic and cause every
+    /// IO-thread push to invalidate the consumer's stop_flag check.
+    alignas(64) std::atomic<bool> stop_flag_{false};
 
     FrameQueue frame_queue_;
 

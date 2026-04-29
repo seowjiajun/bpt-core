@@ -101,8 +101,13 @@ private:
     MdValidator& validator_;
     const char* adapter_name_;
     ValidationDropBreaker breaker_;
-    std::atomic<uint64_t> published_{0};
-    std::atomic<uint64_t> drops_{0};
+    /// Cache-line isolated. published_ is incremented every successful
+    /// forward (the 99%+ path). MdGatewayApp's reporter reads both
+    /// counters every ~5s. Separating them from each other and from the
+    /// upstream class state keeps the producer's hot line untouched by
+    /// reporter polling.
+    alignas(64) std::atomic<uint64_t> published_{0};
+    alignas(64) std::atomic<uint64_t> drops_{0};
 };
 
 }  // namespace bpt::md_gateway::md

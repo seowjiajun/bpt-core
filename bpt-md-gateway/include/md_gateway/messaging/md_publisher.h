@@ -40,8 +40,12 @@ private:
     void record_drop(uint64_t instrument_id, const char* label);
 
     bpt::common::aeron::Publisher publisher_;
-    std::atomic<uint64_t> seq_{0};
-    std::atomic<uint64_t> drops_{0};
+    /// Cache-line isolated: the publisher thread does a `lock add` on seq_
+    /// every publish; MdGatewayApp's reporter reads drop_count() every
+    /// ~10µs idle iteration. Separating them keeps the reporter's read
+    /// out of the publisher's hot line.
+    alignas(64) std::atomic<uint64_t> seq_{0};
+    alignas(64) std::atomic<uint64_t> drops_{0};
 };
 
 }  // namespace bpt::md_gateway::messaging
