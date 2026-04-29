@@ -16,7 +16,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
-#include <vector>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/latency_histogram.h>
 #include <bpt_common/util/tsc_clock.h>
@@ -198,7 +197,7 @@ public:
             book.bids.reserve(max_levels);
             book.asks.reserve(max_levels);
 
-            auto parse_levels = [&](simdjson::ondemand::array src, std::vector<std::pair<double, double>>& dst) {
+            auto parse_levels = [&](simdjson::ondemand::array src, md::MdOrderBook::Levels& dst) {
                 for (auto lvl_res : src) {
                     if (dst.size() >= max_levels)
                         break;

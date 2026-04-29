@@ -18,7 +18,9 @@ class MdEncoder {
 public:
     // --- OrderBook ----------------------------------------------------------
     // Max supported levels per side. Books larger than this are silently dropped.
-    static constexpr std::size_t kMaxLevels = 20;
+    // Aliased to the domain-side constant in md_types.h so the InlineVec
+    // capacity and the encoder's per-side cap can never drift apart.
+    static constexpr std::size_t kMaxLevels = kMaxBookLevels;
     // kMaxLevels * 2 sides * 16 bytes/level + headers fits well under 2 KiB.
     static constexpr std::size_t kMaxOrderBookBufSize = 2048;
 
