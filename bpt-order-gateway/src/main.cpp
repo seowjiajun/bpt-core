@@ -3,6 +3,7 @@
 #include "order_gateway/adapter/common/credentials.h"
 #include "order_gateway/app/gateway_app.h"
 #include "order_gateway/config/settings.h"
+#include "order_gateway/messaging/aeron_bus.h"
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
@@ -100,8 +101,15 @@ int main(int argc, char* argv[]) {
         return bpt::app::run(service_name, std::move(cfg),
             [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 auto creds = load_credentials(settings.gateway.adapters, settings.base.environment);
+                auto bus = bpt::order_gateway::messaging::AeronBus::build(ctx.aeron, settings);
                 return std::make_unique<bpt::order_gateway::OrderGatewayApp>(
-                    std::move(settings), ctx.aeron, std::move(creds), ctx.topology);
+                    std::move(settings),
+                    std::move(bus.control_source),
+                    std::move(bus.exec_sink),
+                    std::move(bus.account_snapshot_sink),
+                    std::move(bus.heartbeat_sink),
+                    std::move(creds),
+                    ctx.topology);
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

@@ -3,10 +3,10 @@
 #include "order_gateway/adapter/common/credentials.h"
 #include "order_gateway/adapter/common/i_order_adapter.h"
 #include "order_gateway/config/settings.h"
-#include "order_gateway/messaging/account_snapshot_publisher.h"
-#include "order_gateway/messaging/exec_report_publisher.h"
-#include "order_gateway/messaging/heartbeat_publisher.h"
-#include "order_gateway/messaging/order_subscriber.h"
+#include "order_gateway/messaging/i_account_snapshot_publisher.h"
+#include "order_gateway/messaging/i_exec_report_publisher.h"
+#include "order_gateway/messaging/i_heartbeat_publisher.h"
+#include "order_gateway/messaging/i_order_control_source.h"
 #include "order_gateway/metrics/metrics.h"
 #include "order_gateway/order/order_processor.h"
 #include "order_gateway/order/order_state_manager.h"
@@ -25,20 +25,22 @@ namespace bpt::order_gateway {
 class OrderGatewayApp : public bpt::app::IService {
 public:
     OrderGatewayApp(config::Settings cfg,
-                std::shared_ptr<aeron::Aeron> aeron,
-                std::map<std::string, adapter::ExchangeCredentials> creds,
-                const bpt::common::util::Topology& topology);
+                    std::shared_ptr<messaging::IOrderControlSource> control_source,
+                    std::shared_ptr<messaging::IExecReportPublisher> exec_sink,
+                    std::shared_ptr<messaging::IAccountSnapshotPublisher> account_snapshot_sink,
+                    std::shared_ptr<messaging::IHeartbeatPublisher> heartbeat_sink,
+                    std::map<std::string, adapter::ExchangeCredentials> creds,
+                    const bpt::common::util::Topology& topology);
     void run() override;
     void stop() override;
 
 private:
     config::Settings cfg_;
-    std::shared_ptr<aeron::Aeron> aeron_;
     metrics::OrderGatewayMetrics metrics_;
-    std::shared_ptr<messaging::ExecReportPublisher> exec_pub_;
-    std::shared_ptr<messaging::AccountSnapshotPublisher> account_snap_pub_;
-    std::shared_ptr<messaging::HeartbeatPublisher> hb_pub_;
-    std::shared_ptr<messaging::OrderSubscriber> order_sub_;
+    std::shared_ptr<messaging::IExecReportPublisher> exec_pub_;
+    std::shared_ptr<messaging::IAccountSnapshotPublisher> account_snap_pub_;
+    std::shared_ptr<messaging::IHeartbeatPublisher> hb_pub_;
+    std::shared_ptr<messaging::IOrderControlSource> order_sub_;
     risk::RiskChecker risk_checker_;
     risk::PnlTracker pnl_tracker_;
     order::OrderStateManager state_mgr_;

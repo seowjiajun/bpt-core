@@ -1,14 +1,18 @@
 #pragma once
 
-// Publisher interface for ExecutionReport emission. Carved out of the
-// concrete ExecReportPublisher so OrderProcessor can be constructed in
-// unit tests against a capturing or null implementation without
-// bringing up an Aeron MediaDriver.
-//
-// The full 15-argument publish() signature is preserved verbatim
-// from the pre-refactor ExecReportPublisher; callers upcast the
-// concrete instance to `IExecReportPublisher&` at the OrderProcessor
-// boundary.
+/// \file
+/// \brief Outbound port: ExecutionReport emission toward strategy.
+///
+/// Carved out of the concrete ExecReportPublisher so OrderProcessor can
+/// be constructed in unit tests against a capturing or null
+/// implementation without bringing up an Aeron MediaDriver.
+///
+/// Implementations: ExecReportPublisher (Aeron-backed) in prod;
+/// CapturingExecReportPublisher in unit tests.
+///
+/// The 15-argument publish() signature is preserved verbatim from the
+/// pre-port-extraction ExecReportPublisher. Callers upcast the concrete
+/// instance to `IExecReportPublisher&` at the OrderProcessor boundary.
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -21,6 +25,13 @@
 
 namespace bpt::order_gateway::messaging {
 
+/// \brief Contract for the exec-report outbound port.
+///
+/// Called from the main poll thread in OrderProcessor on every exec
+/// event drained from a venue adapter (ack, partial fill, fill, cancel,
+/// reject) and on synthetic events (cancellations of stale orders,
+/// risk-rejected NewOrders). Single-threaded contract — implementations
+/// need not be thread-safe.
 class IExecReportPublisher {
 public:
     virtual ~IExecReportPublisher() = default;

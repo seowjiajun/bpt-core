@@ -23,30 +23,24 @@ using bpt::messages::ExchangeId;
 namespace bpt::order_gateway {
 
 OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
-                                 std::shared_ptr<aeron::Aeron> aeron,
+                                 std::shared_ptr<messaging::IOrderControlSource> control_source,
+                                 std::shared_ptr<messaging::IExecReportPublisher> exec_sink,
+                                 std::shared_ptr<messaging::IAccountSnapshotPublisher> account_snapshot_sink,
+                                 std::shared_ptr<messaging::IHeartbeatPublisher> heartbeat_sink,
                                  std::map<std::string, adapter::ExchangeCredentials> creds,
                                  const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),
-      aeron_(aeron),
       metrics_(cfg_.base.metrics_port),
+      exec_pub_(std::move(exec_sink)),
+      account_snap_pub_(std::move(account_snapshot_sink)),
+      hb_pub_(std::move(heartbeat_sink)),
+      order_sub_(std::move(control_source)),
       risk_checker_(cfg_.gateway.risk.max_order_size_usd,
                     cfg_.gateway.risk.max_notional_per_order_usd,
                     cfg_.gateway.risk.max_open_orders_per_venue,
                     cfg_.gateway.risk.max_orders_per_second),
       topology_(topology) {
     risk_checker_.set_trading_enabled(cfg_.gateway.risk.trading_enabled);
-
-    exec_pub_ = std::make_shared<messaging::ExecReportPublisher>(aeron,
-                                                                 cfg_.aeron.exec_report.channel,
-                                                                 cfg_.aeron.exec_report.stream_id);
-    hb_pub_ = std::make_shared<messaging::HeartbeatPublisher>(aeron,
-                                                              cfg_.aeron.heartbeat.channel,
-                                                              cfg_.aeron.heartbeat.stream_id);
-    account_snap_pub_ = std::make_shared<messaging::AccountSnapshotPublisher>(aeron,
-                                                                              cfg_.aeron.account_snapshot.channel,
-                                                                              cfg_.aeron.account_snapshot.stream_id);
-    order_sub_ =
-        std::make_shared<messaging::OrderSubscriber>(aeron, cfg_.aeron.order.channel, cfg_.aeron.order.stream_id);
 
     // Shared per-adapter disconnect breaker config. Populated once,
     // applied to each adapter before start().

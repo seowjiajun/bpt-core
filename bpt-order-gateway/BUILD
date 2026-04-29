@@ -54,6 +54,7 @@ cc_binary(
         "src/main.cpp",
         "src/app/gateway_app.cpp",
         "src/messaging/account_snapshot_publisher.cpp",
+        "src/messaging/aeron_bus.cpp",
         "src/messaging/exec_report_publisher.cpp",
         "src/messaging/heartbeat_publisher.cpp",
         "src/messaging/order_subscriber.cpp",

@@ -10,9 +10,18 @@
 
 namespace bpt::order_gateway::messaging {
 
-class ExecReportPublisher : public IExecReportPublisher {
+/// \brief Aeron-backed concrete for IExecReportPublisher.
+///
+/// Publishes ExecutionReport (SBE) on the exec-report stream toward
+/// strategy. Back-pressure policy is `kRetryOnBackpressure` — exec
+/// reports drive position tracking, so we'd rather block briefly than
+/// drop them. If no subscriber is connected at all, drop instead of
+/// hang (strategy down → gateway can't be useful anyway).
+class ExecReportPublisher final : public IExecReportPublisher {
 public:
-    ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron,
+                        const std::string& channel,
+                        int stream_id);
 
     void publish(uint64_t order_id,
                  uint64_t exchange_order_id,
