@@ -38,6 +38,7 @@ cc_binary(
         "src/app/pricer_app.cpp",
         "src/config/config.cpp",
         "src/surface/surface_builder.cpp",
+        "src/messaging/aeron_bus.cpp",
         "src/messaging/vol_surface_publisher.cpp",
         "src/messaging/status_publisher.cpp",
         "src/md/md_subscriber.cpp",

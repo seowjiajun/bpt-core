@@ -1,5 +1,6 @@
 #include "pricer/app/pricer_app.h"
 #include "pricer/config/settings.h"
+#include "pricer/messaging/aeron_bus.h"
 
 #include <CLI/CLI.hpp>
 #include <memory>
@@ -27,8 +28,9 @@ int main(int argc, char** argv) {
     try {
         return bpt::app::run("bpt-pricer", std::move(settings),
             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
+                auto bus = bpt::pricer::messaging::PricerAeronBus::build(ctx.aeron, cfg);
                 return std::make_unique<bpt::pricer::PricerApp>(
-                    std::move(cfg), ctx.aeron);
+                    std::move(cfg), std::move(bus));
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

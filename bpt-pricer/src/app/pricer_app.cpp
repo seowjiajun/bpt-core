@@ -24,25 +24,11 @@ using namespace std::chrono_literals;
 
 namespace bpt::pricer {
 
-PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron)
+PricerApp::PricerApp(config::Settings settings, messaging::PricerBus bus)
     : settings_(std::move(settings)),
-      builder_(settings_.risk_free_rate, settings_.newton_max_iterations, settings_.newton_tolerance) {
-    vol_pub_ = std::make_unique<messaging::VolSurfacePublisher>(aeron,
-                                                                settings_.vol_surface.channel,
-                                                                settings_.vol_surface.stream_id);
-    status_pub_ = std::make_unique<messaging::StatusPublisher>(aeron,
-                                                               settings_.status.channel,
-                                                               settings_.status.stream_id);
-    md_sub_ = std::make_unique<md::MdSubscriber>(aeron, settings_.md_input.channel, settings_.md_input.stream_id);
-    refdata_sub_ = std::make_unique<refdata::RefdataSubscriber>(aeron,
-                                                                settings_.refdata_snapshot.channel,
-                                                                settings_.refdata_snapshot.stream_id,
-                                                                settings_.refdata_delta.channel,
-                                                                settings_.refdata_delta.stream_id,
-                                                                settings_.refdata_control.channel,
-                                                                settings_.refdata_control.stream_id);
-
-    md_sub_->set_bbo_callback([this](uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns) {
+      builder_(settings_.risk_free_rate, settings_.newton_max_iterations, settings_.newton_tolerance),
+      bus_(std::move(bus)) {
+    bus_.md_sub->set_bbo_callback([this](uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns) {
         auto pit = perp_map_.find(instrument_id);
         if (pit != perp_map_.end()) {
             builder_.set_spot(pit->second.underlying, pit->second.exchange_id, (bid + ask) * 0.5);
@@ -51,7 +37,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
         builder_.on_bbo(instrument_id, bid, ask, timestamp_ns);
     });
 
-    refdata_sub_->set_on_option([this](const surface::OptionInstrument& inst) {
+    bus_.refdata_sub->set_on_option([this](const surface::OptionInstrument& inst) {
         builder_.add_instrument(inst);
         bpt::common::log::info("Option instrument: id={} {} {} K={} exp={}",
                        inst.instrument_id,
@@ -61,7 +47,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
                        inst.expiry_date);
     });
 
-    refdata_sub_->set_on_perp([this](const refdata::PerpInstrument& inst) {
+    bus_.refdata_sub->set_on_perp([this](const refdata::PerpInstrument& inst) {
         perp_map_[inst.instrument_id] = {inst.underlying, inst.exchange_id};
         bpt::common::log::info("Perp instrument registered: id={} {} {}",
                        inst.instrument_id,
@@ -69,7 +55,7 @@ PricerApp::PricerApp(config::Settings settings, std::shared_ptr<aeron::Aeron> ae
                        inst.exchange);
     });
 
-    refdata_sub_->set_on_remove([this](uint64_t instrument_id) { builder_.remove_instrument(instrument_id); });
+    bus_.refdata_sub->set_on_remove([this](uint64_t instrument_id) { builder_.remove_instrument(instrument_id); });
 
     bpt::common::log::info("publish_interval_ms={} risk_free_rate={:.4f}",
                            settings_.publish_interval_ms, settings_.risk_free_rate);
@@ -95,8 +81,8 @@ void PricerApp::run() {
 
     while (bpt::common::signal::is_running()) {
         int fragments = 0;
-        fragments += md_sub_->poll(64);
-        fragments += refdata_sub_->poll(64);
+        fragments += bus_.md_sub->poll(64);
+        fragments += bus_.refdata_sub->poll(64);
 
         auto now = std::chrono::steady_clock::now();
 
@@ -105,7 +91,7 @@ void PricerApp::run() {
             auto grids = builder_.build(today);
 
             for (const auto& grid : grids) {
-                vol_pub_->publish(grid, now_ns());
+                bus_.vol_pub->publish(grid, now_ns());
                 bpt::common::log::debug("Published surface: {} {} points={}",
                                 grid.underlying,
                                 static_cast<int>(grid.exchange_id),
@@ -127,10 +113,10 @@ void PricerApp::run() {
                     else if (g.exchange_id == EX::DERIBIT)
                         exchanges_loaded |= 0x08;
                 }
-                status_pub_->publish_ready(now_ns(),
-                                           exchanges_loaded,
-                                           static_cast<uint16_t>(grids.size()),
-                                           total_points);
+                bus_.status_pub->publish_ready(now_ns(),
+                                               exchanges_loaded,
+                                               static_cast<uint16_t>(grids.size()),
+                                               total_points);
                 initial_ready_sent = true;
             }
 
@@ -138,7 +124,7 @@ void PricerApp::run() {
         }
 
         if (now - last_heartbeat >= heartbeat_interval) {
-            status_pub_->publish_heartbeat(now_ns(), ++heartbeat_seq);
+            bus_.status_pub->publish_heartbeat(now_ns(), ++heartbeat_seq);
             last_heartbeat = now;
         }
 
@@ -159,7 +145,7 @@ void PricerApp::run() {
                 else if (g.exchange_id == EX::DERIBIT)
                     exchanges_loaded |= 0x08;
             }
-            status_pub_->publish_ready(now_ns(), exchanges_loaded, static_cast<uint16_t>(grids.size()), total_points);
+            bus_.status_pub->publish_ready(now_ns(), exchanges_loaded, static_cast<uint16_t>(grids.size()), total_points);
             last_ready = now;
         }
 
