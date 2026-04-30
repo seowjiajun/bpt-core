@@ -11,6 +11,7 @@ add_library(backtester_lib
     exchange/okx_md_server.cpp
     exchange/okx_order_server.cpp
     matching/matching_engine.cpp
+    messaging/aeron_bus.cpp
     messaging/backtest_ack_subscriber.cpp
     messaging/backtest_control_publisher.cpp
     results/results_collector.cpp

@@ -2,6 +2,7 @@
 
 #include "backtester/app/backtester_app.h"
 #include "backtester/config/settings.h"
+#include "backtester/messaging/aeron_bus.h"
 
 #include <CLI/CLI.hpp>
 #include <memory>
@@ -56,8 +57,9 @@ int main(int argc, char* argv[]) {
             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 bpt::common::log::info("starting_capital=${:.2f}",
                                        cfg.results.starting_capital);
+                auto bus = bpt::backtester::messaging::BacktesterAeronBus::build(ctx.aeron, cfg);
                 return std::make_unique<bpt::backtester::BacktesterApp>(
-                    std::move(cfg), ctx.aeron);
+                    std::move(cfg), std::move(bus));
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

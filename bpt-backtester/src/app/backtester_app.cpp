@@ -5,27 +5,17 @@
 #include <chrono>
 #include <format>
 #include <thread>
-#include <bpt_common/aeron/aeron_utils.h>
 
 namespace bpt::backtester {
 
-BacktesterApp::BacktesterApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron)
-    : settings_(std::move(settings)), aeron_(std::move(aeron)) {
+BacktesterApp::BacktesterApp(config::Settings settings, messaging::BacktesterBus bus)
+    : settings_(std::move(settings)), bus_(std::move(bus)) {
     bpt::common::log::info("Initialising — window: {} → {}, {} instrument(s)",
                    settings_.simulation.start,
                    settings_.simulation.end,
                    settings_.instruments.size());
 
     const auto& ac = settings_.aeron;
-
-    auto ctrl_pub =
-        bpt::common::aeron::wait_for_publication(aeron_, ac.backtest_control.channel, ac.backtest_control.stream_id);
-    auto ack_sub =
-        bpt::common::aeron::wait_for_subscription(aeron_, ac.backtest_ack.channel, ac.backtest_ack.stream_id);
-
-    ctrl_pub_ = std::make_unique<messaging::BacktestControlPublisher>(std::move(ctrl_pub));
-    ack_sub_ = std::make_unique<messaging::BacktestAckSubscriber>(std::move(ack_sub));
-
     bpt::common::log::info("Backtest tick-gating ready: ctrl_pub=stream:{} ack_sub=stream:{}",
                    ac.backtest_control.stream_id,
                    ac.backtest_ack.stream_id);
@@ -139,8 +129,8 @@ BacktesterApp::BacktesterApp(config::Settings settings, std::shared_ptr<aeron::A
                                                          hyperliquid_md_server_.get(),
                                                          matching_engine_.get(),
                                                          results_.get(),
-                                                         ctrl_pub_.get(),
-                                                         ack_sub_.get());
+                                                         bus_.ctrl_pub.get(),
+                                                         bus_.ack_sub.get());
 
     bpt::common::log::info("Ready — results will be written to {}", out_dir);
 }
