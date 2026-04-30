@@ -2,9 +2,7 @@
 
 #include "book/adapter/i_balance_adapter.h"
 #include "book/config/settings.h"
-#include "book/messaging/balance_snapshot_publisher.h"
-
-#include <Aeron.h>
+#include "book/messaging/aeron_bus.h"
 
 #include <memory>
 #include <vector>
@@ -14,14 +12,13 @@ namespace bpt::book {
 
 class BookApp final : public bpt::app::IService {
 public:
-    BookApp(config::Settings settings, std::shared_ptr<::aeron::Aeron> aeron);
+    BookApp(config::Settings settings, messaging::BookBus bus);
 
     void run() override;
 
 private:
     config::Settings settings_;
-    std::shared_ptr<::aeron::Aeron> aeron_;
-    std::unique_ptr<messaging::BalanceSnapshotPublisher> publisher_;
+    messaging::BookBus bus_;
     std::vector<std::unique_ptr<adapter::IBalanceAdapter>> adapters_;
 
     uint64_t correlation_id_{0};

@@ -5,6 +5,7 @@
 
 #include "book/app/book_app.h"
 #include "book/config/settings.h"
+#include "book/messaging/aeron_bus.h"
 
 #include <CLI/CLI.hpp>
 #include <memory>
@@ -32,7 +33,8 @@ int main(int argc, char** argv) {
     try {
         return bpt::app::run("bpt-book", std::move(settings),
             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-                return std::make_unique<bpt::book::BookApp>(std::move(cfg), ctx.aeron);
+                auto bus = bpt::book::messaging::BookAeronBus::build(ctx.aeron, cfg);
+                return std::make_unique<bpt::book::BookApp>(std::move(cfg), std::move(bus));
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

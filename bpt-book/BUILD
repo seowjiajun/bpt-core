@@ -24,6 +24,7 @@ cc_binary(
         "src/main.cpp",
         "src/app/book_app.cpp",
         "src/adapter/hyperliquid_balance_adapter.cpp",
+        "src/messaging/aeron_bus.cpp",
         "src/messaging/balance_snapshot_publisher.cpp",
     ],
     deps = [

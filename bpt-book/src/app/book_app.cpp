@@ -48,11 +48,8 @@ uint64_t now_ns() {
 
 }  // namespace
 
-BookApp::BookApp(config::Settings settings, std::shared_ptr<::aeron::Aeron> aeron)
-    : settings_(std::move(settings)), aeron_(std::move(aeron)) {
-    publisher_ = std::make_unique<messaging::BalanceSnapshotPublisher>(
-        aeron_, settings_.aeron.balance_snapshot.channel,
-        settings_.aeron.balance_snapshot.stream_id);
+BookApp::BookApp(config::Settings settings, messaging::BookBus bus)
+    : settings_(std::move(settings)), bus_(std::move(bus)) {
     bpt::common::log::info("Balance publication ready: {} stream {}",
                            settings_.aeron.balance_snapshot.channel,
                            settings_.aeron.balance_snapshot.stream_id);
@@ -90,7 +87,7 @@ void BookApp::run() {
             }
         }
 
-        publisher_->publish(snap);
+        bus_.snapshot_pub->publish(snap);
 
         // Sleep in small slices so shutdown signals are noticed promptly
         // instead of being gated by a 5-second poll interval.
