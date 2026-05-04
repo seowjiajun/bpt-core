@@ -3,9 +3,12 @@
 #include "strategy/messaging/aeron_bus.h"
 
 #include <CLI/CLI.hpp>
+
 #include <memory>
 #include <string>
 #include <bpt_app/app.h>
+#include <bpt_common/aeron/chaos_config.h>
+#include <bpt_common/env.h>
 #include <bpt_common/logging.h>
 
 namespace {
@@ -53,6 +56,19 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string service_name = derive_service_name(app_cfg.strat.strategy.type);
+
+    // Optional fault injection (dev/qa only). Must run before bpt::app::run
+    // builds the AeronBus — Subscribers consult the registry at ctor time.
+    try {
+        bpt::common::aeron::install_chaos_from_toml(
+            config_path,
+            bpt::common::to_string(app_cfg.base.environment),
+            service_name);
+    } catch (const std::exception& e) {
+        bpt::common::logging::init(service_name);
+        bpt::common::log::error("[chaos] config rejected: {}", e.what());
+        return 1;
+    }
 
     try {
         return bpt::app::run(service_name, std::move(app_cfg),

@@ -9,6 +9,8 @@
 #include <optional>
 #include <string>
 #include <bpt_app/app.h>
+#include <bpt_common/aeron/chaos_config.h>
+#include <bpt_common/env.h>
 #include <bpt_common/logging.h>
 
 int main(int argc, char* argv[]) {
@@ -51,6 +53,19 @@ int main(int argc, char* argv[]) {
     if (!params_hash.empty())   settings.results.params_hash   = std::move(params_hash);
     if (!git_sha.empty())       settings.results.git_sha       = std::move(git_sha);
     if (!params_file.empty())   settings.results.params_file   = std::move(params_file);
+
+    // Optional fault injection (dev/qa only). Must run before bpt::app::run
+    // builds the AeronBus — Subscribers consult the registry at ctor time.
+    try {
+        bpt::common::aeron::install_chaos_from_toml(
+            config_path,
+            bpt::common::to_string(settings.base.environment),
+            "bpt-backtester");
+    } catch (const std::exception& e) {
+        bpt::common::logging::init("bpt-backtester");
+        bpt::common::log::error("[chaos] config rejected: {}", e.what());
+        return 1;
+    }
 
     try {
         return bpt::app::run("bpt-backtester", std::move(settings),

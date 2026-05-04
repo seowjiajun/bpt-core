@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 #include <bpt_app/app.h>
+#include <bpt_common/aeron/chaos_config.h>
+#include <bpt_common/env.h>
 #include <bpt_common/logging.h>
 
 int main(int argc, char** argv) {
@@ -22,6 +24,19 @@ int main(int argc, char** argv) {
     } catch (const std::exception& e) {
         bpt::common::logging::init("bpt-pricer");
         bpt::common::log::error("Failed to load config: {}", e.what());
+        return 1;
+    }
+
+    // Optional fault injection (dev/qa only). Must run before bpt::app::run
+    // builds the AeronBus — Subscribers consult the registry at ctor time.
+    try {
+        bpt::common::aeron::install_chaos_from_toml(
+            config_path,
+            bpt::common::to_string(settings.base.environment),
+            "bpt-pricer");
+    } catch (const std::exception& e) {
+        bpt::common::logging::init("bpt-pricer");
+        bpt::common::log::error("[chaos] config rejected: {}", e.what());
         return 1;
     }
 

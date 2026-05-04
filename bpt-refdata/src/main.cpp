@@ -1,6 +1,7 @@
 #include "refdata/adapter/credentials.h"
 #include "refdata/app/refdata_app.h"
 #include "refdata/config/settings.h"
+#include "refdata/messaging/aeron_bus.h"
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
@@ -12,6 +13,8 @@
 #include <utility>
 #include <vector>
 #include <bpt_app/app.h>
+#include <bpt_common/aeron/chaos_config.h>
+#include <bpt_common/env.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/secrets/secrets_client.h>
 #include <fmt/format.h>
@@ -95,12 +98,36 @@ int main(int argc, char** argv) {
 
     const std::string service_name = derive_service_name(settings.adapters);
 
+    // Optional fault injection (dev/qa only). Must run before bpt::app::run
+    // builds the AeronBus — Subscribers consult the registry at ctor time.
+    try {
+        bpt::common::aeron::install_chaos_from_toml(
+            config_path,
+            bpt::common::to_string(settings.base.environment),
+            service_name);
+    } catch (const std::exception& e) {
+        bpt::common::logging::init(service_name);
+        bpt::common::log::error("[chaos] config rejected: {}", e.what());
+        return 1;
+    }
+
     try {
         return bpt::app::run(service_name, std::move(settings),
             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 auto creds = load_credentials(cfg.adapters, cfg.base.environment);
+
+                // Composition root: build the Aeron-backed bus adapters
+                // as one unit, then hand the ports to RefdataApp.
+                auto bus = bpt::refdata::messaging::AeronBus::build(ctx.aeron, cfg);
+
                 return std::make_unique<bpt::refdata::RefdataApp>(
-                    std::move(cfg), ctx.aeron, std::move(creds));
+                    std::move(cfg),
+                    std::move(bus.control_source),
+                    std::move(bus.snapshot_sink),
+                    std::move(bus.delta_sink),
+                    std::move(bus.fee_sink),
+                    std::move(bus.status_sink),
+                    std::move(creds));
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());
