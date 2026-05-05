@@ -89,6 +89,7 @@ declare -A SERVICES=(
     ["bpt-refdata/bpt-refdata"]="bpt-refdata"
     ["bpt-analytics/bpt-analytics"]="bpt-analytics"
     ["bpt-pricer/bpt-pricer"]="bpt-pricer"
+    ["bpt-book/bpt-book"]="bpt-book"
     ["dashboard/bridge/bridge"]="bridge"
 )
 for src in "${!SERVICES[@]}"; do
