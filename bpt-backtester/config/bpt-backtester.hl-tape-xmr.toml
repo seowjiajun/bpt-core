@@ -1,0 +1,57 @@
+environment    = "dev"
+
+# Backtest configured against the live HL tape capture from 2026-05-05
+# (/tmp/tape-replay/parquet/, pulled from S3 via the reader IAM key).
+# 1 hour of 11 HL PERPs at depth 5 + funding + mark.
+
+[simulation]
+start              = "2026-05-05T01:40:00Z"
+end                = "2026-05-05T02:40:00Z"
+allow_partial_data = true
+
+[simulation.latency]
+cex_base_ms           = 2
+hyperliquid_base_ms   = 200
+hyperliquid_jitter_ms = 50
+
+[data]
+local_cache = "/tmp/tape-replay/parquet"
+# Reuses the HL meta.json snapshot from the prior 2026-04-25 run —
+# universe metadata (tick size, contract size, etc.) doesn't change
+# in 10 days; only the prices in the actual MD do.
+hyperliquid_refdata_snapshot = "/opt/bpt/data/raw/hyperliquid/2026-04-25/meta.json"
+
+# XMR — widest HL PERP spread in the captured window (~3.7 bps median),
+# vs APE which got eaten by adverse selection. Matches
+# avellaneda_stoikov.backtest-xmr.toml's pinned XMR instrument.
+
+[[instruments]]
+exchange = "HYPERLIQUID"
+symbol   = "XMR"
+
+[endpoints]
+binance_md_port       = 18100
+okx_md_port           = 18101
+hyperliquid_md_port   = 18102
+binance_order_port    = 18110
+okx_order_port        = 18111
+hyperliquid_order_port = 18112
+hyperliquid_info_port  = 18113
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bpt"
+
+[aeron.backtest_control]
+channel   = "aeron:ipc"
+stream_id = 9002
+
+[aeron.backtest_ack]
+channel   = "aeron:ipc"
+stream_id = 9001
+
+[logging]
+level = "info"
+dir   = "logs/backtest"
+
+[metrics]
+port = 9105
