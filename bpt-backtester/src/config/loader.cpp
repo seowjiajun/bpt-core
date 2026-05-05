@@ -79,6 +79,8 @@ Settings load(const std::string& path) {
             s.results.output_dir = *v;
         if (auto v = (*r)["starting_capital"].value<double>())
             s.results.starting_capital = *v;
+        if (auto v = (*r)["fee_bps_per_fill"].value<double>())
+            s.results.fee_bps_per_fill = *v;
     }
 
     if (auto* a = root["aeron"].as_table()) {

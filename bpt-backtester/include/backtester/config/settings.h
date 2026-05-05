@@ -58,6 +58,14 @@ struct DataConfig {
 struct ResultsConfig {
     std::string output_dir{"results"};
     double starting_capital{100'000.0};
+    // Per-fill fee in basis points of notional. Default 1.0 = HL maker fee
+    // (0.01%, the most common case for AS / passive market making which
+    // posts limit orders that rest in the book). For strategies that
+    // aggressively cross the spread, set to taker fee (e.g. HL ~4.5 bps).
+    // The model applies the same rate to every fill regardless of aggressor
+    // side — a more principled split awaits a per-fill maker/taker flag
+    // on FillReport.
+    double fee_bps_per_fill{1.0};
     // Run identity — populated from CLI flags by main.cpp (the orchestrator
     // script knows the strategy file + git state, the backtester binary
     // doesn't). All optional; when unset, ResultsCollector falls back to

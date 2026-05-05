@@ -45,14 +45,15 @@ std::string ResultsCollector::compose_run_id(const RunMetadata& m,
 }
 
 ResultsCollector::ResultsCollector(double starting_capital, std::string output_dir,
-                                   RunMetadata metadata)
+                                   RunMetadata metadata, double fee_bps_per_fill)
     : starting_capital_(starting_capital),
       output_dir_(std::move(output_dir)),
       metadata_(std::move(metadata)),
       wallclock_start_ns_(static_cast<uint64_t>(
           std::chrono::duration_cast<std::chrono::nanoseconds>(
               std::chrono::system_clock::now().time_since_epoch())
-              .count())) {
+              .count())),
+      fee_bps_per_fill_(fee_bps_per_fill) {
     // Seed the equity curve with the starting point (ts=0 means pre-simulation).
     equity_curve_.push_back({0, starting_capital_});
 }
@@ -126,7 +127,7 @@ double ResultsCollector::total_unrealized_pnl() const {
 }
 
 double ResultsCollector::current_equity() const {
-    return starting_capital_ + total_realized_pnl() + total_unrealized_pnl();
+    return starting_capital_ + total_realized_pnl() + total_unrealized_pnl() - total_fees_paid_;
 }
 
 // ── Event handlers ────────────────────────────────────────────────────────────
@@ -140,6 +141,13 @@ void ResultsCollector::on_fill(const matching::FillReport& fill) {
     auto& pos = positions_[key];
     const double pre_qty = pos.net_qty;
     double realized = apply_fill(pos, fill.last_fill_qty, fill.last_fill_price, fill.side);
+    // Fees deducted at every fill — round-trip realized_pnl below
+    // does NOT subtract fees so it stays a pure spread-capture metric.
+    // Total equity / final P&L deducts fees via current_equity()'s
+    // total_fees_paid_ term.
+    const double fill_notional = fill.last_fill_qty * fill.last_fill_price;
+    const double fee = fill_notional * fee_bps_per_fill_ * 1e-4;
+    total_fees_paid_ += fee;
     open_realized_[key] += realized;
 
     constexpr double kFlatTol = 1e-12;
@@ -172,6 +180,7 @@ void ResultsCollector::on_fill(const matching::FillReport& fill) {
     row.qty = fill.last_fill_qty;
     row.price = fill.last_fill_price;
     row.realized_pnl = realized;
+    row.fee_paid = fee;
     row.equity = eq;
     const std::size_t trade_idx = trades_.size();
     trades_.push_back(std::move(row));
@@ -311,10 +320,10 @@ void ResultsCollector::write() const {
         if (!f)
             throw std::runtime_error("Cannot open " + output_dir_ + "/trades.csv");
         f << "simulation_ts,exchange,symbol,order_id,client_order_id,"
-             "side,type,qty,price,realized_pnl,equity,"
+             "side,type,qty,price,realized_pnl,fee_paid,equity,"
              "markout_50ms_bps,markout_1s_bps,markout_5s_bps,markout_30s_bps\n";
         for (const auto& r : trades_) {
-            f << std::format("{},{},{},{},{},{},{},{:.10g},{:.10g},{:.10g},{:.10g}",
+            f << std::format("{},{},{},{},{},{},{},{:.10g},{:.10g},{:.10g},{:.10g},{:.10g}",
                              r.simulation_ts,
                              r.exchange,
                              r.symbol,
@@ -325,6 +334,7 @@ void ResultsCollector::write() const {
                              r.qty,
                              r.price,
                              r.realized_pnl,
+                             r.fee_paid,
                              r.equity);
             // Empty cell instead of NaN for unresolved horizons — pandas
             // and dashboard parsers both treat it as missing.
@@ -405,6 +415,8 @@ void ResultsCollector::write() const {
         obj["sell_count"] = static_cast<int64_t>(sell_count);
         obj["buy_notional_usd"] = buy_notional;
         obj["sell_notional_usd"] = sell_notional;
+        obj["fees_paid_usd"] = total_fees_paid_;
+        obj["fee_bps_per_fill"] = fee_bps_per_fill_;
         obj["simulation_start"] = metadata_.simulation_start;
         obj["simulation_end"] = metadata_.simulation_end;
         obj["wallclock_duration_ms"] = static_cast<int64_t>(wallclock_duration_ms);

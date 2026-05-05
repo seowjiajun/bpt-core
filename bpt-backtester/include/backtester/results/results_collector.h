@@ -64,7 +64,8 @@ public:
                                       const std::string& end_tag);
 
     ResultsCollector(double starting_capital, std::string output_dir,
-                     RunMetadata metadata = {});
+                     RunMetadata metadata = {},
+                     double fee_bps_per_fill = 1.0);
 
     // Called on every fill from MatchingEngine.
     void on_fill(const matching::FillReport& fill);
@@ -120,8 +121,9 @@ private:
         std::string order_type;
         double qty;
         double price;
-        double realized_pnl;  // from this fill only
-        double equity;        // total equity after this fill
+        double realized_pnl;  // from this fill only (gross, fee not deducted here)
+        double fee_paid;      // notional × fee_bps / 1e4 — already deducted from `equity`
+        double equity;        // total equity after this fill (NET of fees)
         // Markouts in basis points, sign-corrected so positive = good fill.
         // Filled async as later MD events cross each horizon's target_ts.
         // Slot remains kUnresolved if data ran out before the horizon hit.
@@ -143,6 +145,11 @@ private:
     std::string output_dir_;
     RunMetadata metadata_;
     uint64_t wallclock_start_ns_{0};
+
+    // Per-fill fee rate (bps of notional). Same rate for every fill in v0;
+    // a per-fill maker/taker split needs FillReport to surface aggressor side.
+    double fee_bps_per_fill_{1.0};
+    double total_fees_paid_{0.0};
 
     std::unordered_map<std::string, Position> positions_;  // key = "EXCHANGE:SYMBOL"
     std::unordered_map<std::string, double> mid_prices_;   // key = "EXCHANGE:SYMBOL"
