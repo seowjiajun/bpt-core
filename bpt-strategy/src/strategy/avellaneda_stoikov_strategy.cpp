@@ -814,7 +814,18 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
                                     ? std::clamp(net_qty / max_inventory_, -1.0, 1.0)
                                     : 0.0;
     const double inventory_skew_frac = q_normalized * gamma_sigma_sq_T;
-    const double drift_skew_frac = st.ewma_drift * T_minus_t;
+    // Drift contribution to reservation. ewma_drift is the EWMA of
+    // log_ret/√dt — units of log-returns per √second. Integrating that
+    // over a horizon T gives a dimensionless cumulative drift of
+    // µ·√T (Itô convention for a Brownian µ·dt term with µ measured per
+    // √s). The pre-fix code used µ·T which has units log_ret·√s, off
+    // by a factor of √T from the correct dimensionless form. On HL APE
+    // with µ ≈ -7e-4 per √s and T = 3600 s, that error sent
+    // drift_skew_frac to -2.52 (-252% of mid) routinely; the b684b17
+    // sanity clamp absorbed the spikes but the distribution was still
+    // skewed. Switching to √T brings drift_skew_frac to ~-0.042 (-4.2%)
+    // for the same inputs — bounded and dimensionally honest.
+    const double drift_skew_frac = st.ewma_drift * std::sqrt(T_minus_t);
     const double reservation = mid * (1.0 + drift_skew_frac - inventory_skew_frac);
     // Kept for the debug log below; same as drift_skew_frac * mid.
     const double drift_adjustment = drift_skew_frac * mid;
