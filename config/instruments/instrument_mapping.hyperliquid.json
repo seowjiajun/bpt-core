@@ -1,44 +1,32 @@
 {
-  "forward": {
-    "3_BTC": 1001,
-    "3_ETH": 1002,
-    "3_SOL": 1003,
-    "3_XMR": 1004
-  },
-  "reverse": {
-    "1001": {
-      "base": "BTC",
-      "quote": "USDT",
-      "type": "PERP",
-      "exchanges": {
-        "3": "BTC"
-      }
+    "forward": {
+        "3_BTC": 1001,
+        "3_ETH": 1002,
+        "3_SOL": 1003,
+        "3_XMR": 1004,
+        "3_APE": 1005,
+        "3_HYPE": 1006,
+        "3_ZEC": 1007,
+        "3_AAVE": 1008,
+        "3_DOGE": 1009,
+        "3_TAO": 1010,
+        "3_FARTCOIN": 1011,
+        "3_kPEPE": 1012
     },
-    "1002": {
-      "base": "ETH",
-      "quote": "USDT",
-      "type": "PERP",
-      "exchanges": {
-        "3": "ETH"
-      }
+    "reverse": {
+        "1001": { "base": "BTC", "quote": "USDT", "type": "PERP", "exchanges": { "3": "BTC" } },
+        "1002": { "base": "ETH", "quote": "USDT", "type": "PERP", "exchanges": { "3": "ETH" } },
+        "1003": { "base": "SOL", "quote": "USDT", "type": "PERP", "exchanges": { "3": "SOL" } },
+        "1004": { "base": "XMR", "quote": "USDT", "type": "PERP", "exchanges": { "3": "XMR" } },
+        "1005": { "base": "APE", "quote": "USDT", "type": "PERP", "exchanges": { "3": "APE" } },
+        "1006": { "base": "HYPE", "quote": "USDT", "type": "PERP", "exchanges": { "3": "HYPE" } },
+        "1007": { "base": "ZEC", "quote": "USDT", "type": "PERP", "exchanges": { "3": "ZEC" } },
+        "1008": { "base": "AAVE", "quote": "USDT", "type": "PERP", "exchanges": { "3": "AAVE" } },
+        "1009": { "base": "DOGE", "quote": "USDT", "type": "PERP", "exchanges": { "3": "DOGE" } },
+        "1010": { "base": "TAO", "quote": "USDT", "type": "PERP", "exchanges": { "3": "TAO" } },
+        "1011": { "base": "FARTCOIN", "quote": "USDT", "type": "PERP", "exchanges": { "3": "FARTCOIN" } },
+        "1012": { "base": "kPEPE", "quote": "USDT", "type": "PERP", "exchanges": { "3": "kPEPE" } }
     },
-    "1003": {
-      "base": "SOL",
-      "quote": "USDT",
-      "type": "PERP",
-      "exchanges": {
-        "3": "SOL"
-      }
-    },
-    "1004": {
-      "base": "XMR",
-      "quote": "USDT",
-      "type": "PERP",
-      "exchanges": {
-        "3": "XMR"
-      }
-    }
-  },
-  "exported_at": 1776450537661,
-  "instrument_count": 4
+    "exported_at": 1776450537661,
+    "instrument_count": 12
 }
