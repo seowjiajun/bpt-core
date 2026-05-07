@@ -3,17 +3,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SERVICE=huginn
+SERVICE=bpt-md-gateway
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
-CONFIG="${1:-$PROJECT_DIR/config/huginn.qa-okx.toml}"
+CONFIG="${1:-$PROJECT_DIR/config/bpt-md-gateway.qa-okx.toml}"
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
 # Prefer installed binary (deployed mode); fall back to CMake build dir (dev mode).
 if [ -f "$PROJECT_DIR/bin/$SERVICE" ]; then
     BINARY="$PROJECT_DIR/bin/$SERVICE"
+elif [ -f "$(cd "$PROJECT_DIR/.." && pwd)/bazel-bin/$SERVICE/$SERVICE" ]; then
+    BINARY="$(cd "$PROJECT_DIR/.." && pwd)/bazel-bin/$SERVICE/$SERVICE"
 else
     BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
 fi
-READY_PATTERN="Huginn ready"
+READY_PATTERN="bpt-md-gateway ready"
 
 # ── Guard against double-start ────────────────────────────────────
 if [ -f "$PID_FILE" ]; then
@@ -43,7 +45,7 @@ echo "  Config : $CONFIG"
 echo "  Log    : $LOG_FILE"
 
 cd "$PROJECT_DIR"
-"$BINARY" "$CONFIG" > /dev/null 2>&1 &
+"$BINARY" --config "$CONFIG" >> "$LOG_FILE" 2>&1 &
 PID=$!
 echo "$PID" > "$PID_FILE"
 

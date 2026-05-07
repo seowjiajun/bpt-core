@@ -5,11 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVICE=order-gateway
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
-CONFIG="${1:-$PROJECT_DIR/config/order-gateway.qa-okx.toml}"
+CONFIG="${1:-$PROJECT_DIR/config/bpt-order-gateway.qa-okx.toml}"
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
 # Prefer installed binary (deployed mode); fall back to CMake build dir (dev mode).
 if [ -f "$PROJECT_DIR/bin/$SERVICE" ]; then
     BINARY="$PROJECT_DIR/bin/$SERVICE"
+elif [ -f "$(cd "$PROJECT_DIR/.." && pwd)/bazel-bin/$(basename "$PROJECT_DIR")/$(basename "$PROJECT_DIR")" ]; then
+    BINARY="$(cd "$PROJECT_DIR/.." && pwd)/bazel-bin/$(basename "$PROJECT_DIR")/$(basename "$PROJECT_DIR")"
 else
     BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
 fi
@@ -47,7 +49,7 @@ echo "  Config : $CONFIG"
 echo "  Log    : $LOG_FILE"
 
 cd "$PROJECT_DIR"
-"$BINARY" "$CONFIG" > /dev/null 2>&1 &
+"$BINARY" --config "$CONFIG" >> "$LOG_FILE" 2>&1 &
 PID=$!
 echo "$PID" > "$PID_FILE"
 

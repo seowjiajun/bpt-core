@@ -3,9 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SERVICE=jormungandr
+SERVICE=bpt-backtester
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
-CONFIG="${1:-$PROJECT_DIR/config/jormungandr.qa-okx.toml}"
+CONFIG="${1:-$PROJECT_DIR/config/bpt-backtester.qa-okx.toml}"
 LOG_FILE="$PROJECT_DIR/logs/$SERVICE.log"
 # Prefer installed binary (deployed mode); fall back to CMake build dir (dev mode).
 if [ -f "$PROJECT_DIR/bin/$SERVICE" ]; then
@@ -13,7 +13,7 @@ if [ -f "$PROJECT_DIR/bin/$SERVICE" ]; then
 else
     BINARY="$(cd "$PROJECT_DIR/.." && pwd)/build/$SERVICE/src/$SERVICE"
 fi
-READY_PATTERN="\[Jormungandr\] Ready"
+READY_PATTERN="\[bpt-backtester\] Ready"
 
 # ── Guard against double-start ────────────────────────────────────
 if [ -f "$PID_FILE" ]; then
@@ -31,7 +31,7 @@ fi
 # ── Check binary ──────────────────────────────────────────────────
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: Binary not found: $BINARY"
-    echo "Run: cmake --build build --target jormungandr"
+    echo "Run: cmake --build build --target bpt-backtester"
     exit 1
 fi
 
@@ -46,11 +46,11 @@ echo "  Log    : $LOG_FILE"
 
 cd "$PROJECT_DIR"
 # Arrow/Parquet from anaconda3 pull in anaconda's older libstdc++.
-# Preload the system one so jormungandr's GLIBCXX_3.4.30+ requirements are satisfied.
-# JORMUNGANDR_EXTRA_ARGS (optional env var) forwards CLI flags from the caller
+# Preload the system one so bpt-backtester's GLIBCXX_3.4.30+ requirements are satisfied.
+# BACKTESTER_EXTRA_ARGS (optional env var) forwards CLI flags from the caller
 # (e.g. --starting-capital 50000 from backtest.sh / smoke_test.sh).
 # shellcheck disable=SC2086
-LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 "$BINARY" "$CONFIG" ${JORMUNGANDR_EXTRA_ARGS:-} >> "$LOG_FILE" 2>&1 &
+LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 "$BINARY" --config "$CONFIG" ${BACKTESTER_EXTRA_ARGS:-} >> "$LOG_FILE" 2>&1 &
 PID=$!
 echo "$PID" > "$PID_FILE"
 

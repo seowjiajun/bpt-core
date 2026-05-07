@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SERVICE=huginn
+SERVICE=bpt-md-gateway
 PID_FILE="$PROJECT_DIR/.$SERVICE.pid"
 
 if [ ! -f "$PID_FILE" ]; then
