@@ -95,5 +95,14 @@ gamma_pnl_tighten_mult         = 0.85
 pause_below_rpnl_usd = -1000.0
 pause_cooldown_s     = 300.0
 
+# Phase 2.1 — per-side post-fill cooldown.
+# Threshold: when the next BBO after a fill shows the market moved
+# > 10 bps unfavorably, treat as an adverse-selection event and
+# suspend that side for the cooldown window. The toxic burst that
+# picked us off typically reverts within tens of seconds; staying
+# out cuts adverse-fill accumulation. Set threshold to 0 to disable.
+post_fill_markout_threshold_bps = -25.0
+post_fill_markout_cooldown_s    = 10.0
+
 [fenrir.strategy.params.fair_value]
 mode = "micro"

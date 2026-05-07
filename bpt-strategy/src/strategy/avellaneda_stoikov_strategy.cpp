@@ -92,6 +92,8 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       fv_cfg_(parse_fair_value_config(cfg.params)),
       pause_below_rpnl_usd_(cfg.params["pause_below_rpnl_usd"].value<double>().value_or(0.0)),
       pause_cooldown_s_(cfg.params["pause_cooldown_s"].value<double>().value_or(300.0)),
+      post_fill_markout_threshold_bps_(cfg.params["post_fill_markout_threshold_bps"].value<double>().value_or(0.0)),
+      post_fill_markout_cooldown_s_(cfg.params["post_fill_markout_cooldown_s"].value<double>().value_or(30.0)),
       drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
       drift_suppress_bps_(cfg.params["drift_suppress_bps"].value<double>().value_or(0.0)),
       drift_suppress_sigma_mult_(cfg.params["drift_suppress_sigma_mult"].value<double>().value_or(0.0)),
@@ -442,6 +444,44 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     st.last_market_bid = bid_px;
     st.last_market_ask = ask_px;
 
+    // Phase 2.1 — evaluate post-fill markout on the first BBO tick
+    // after a fill. Convention: positive markout = favorable for us
+    // (BUY → mid moved up; SELL → mid moved down). If markout breaches
+    // the threshold, suspend that side for the configured cooldown
+    // window. Cooldown timestamps are in simulation time (ts_ns) so
+    // they translate consistently between live and backtest.
+    if (st.pending_buy_fill_price > 0.0) {
+        const double markout_bps =
+            (mid - st.pending_buy_fill_price) / st.pending_buy_fill_price * 1e4;
+        if (markout_bps < post_fill_markout_threshold_bps_) {
+            const uint64_t cooldown_ns =
+                static_cast<uint64_t>(post_fill_markout_cooldown_s_ * 1e9);
+            st.post_fill_suspend_until_bid = ts_ns + cooldown_ns;
+            bpt::common::log::warn(
+                kLog(),
+                "{} post-fill BUY markout {:.2f} bps < {:.2f} — suspending bid for {:.1f}s",
+                st.symbol, markout_bps,
+                post_fill_markout_threshold_bps_, post_fill_markout_cooldown_s_);
+        }
+        st.pending_buy_fill_price = 0.0;
+    }
+    if (st.pending_sell_fill_price > 0.0) {
+        // SELL favorable = mid moved DOWN, so flip sign vs BUY case.
+        const double markout_bps =
+            (st.pending_sell_fill_price - mid) / st.pending_sell_fill_price * 1e4;
+        if (markout_bps < post_fill_markout_threshold_bps_) {
+            const uint64_t cooldown_ns =
+                static_cast<uint64_t>(post_fill_markout_cooldown_s_ * 1e9);
+            st.post_fill_suspend_until_ask = ts_ns + cooldown_ns;
+            bpt::common::log::warn(
+                kLog(),
+                "{} post-fill SELL markout {:.2f} bps < {:.2f} — suspending ask for {:.1f}s",
+                st.symbol, markout_bps,
+                post_fill_markout_threshold_bps_, post_fill_markout_cooldown_s_);
+        }
+        st.pending_sell_fill_price = 0.0;
+    }
+
     // Slow-drift anchor. Seeded on first tick, advanced once per
     // window duration. slow_drift_bps expresses cumulative return
     // from the anchor in bps — see the trend-suppression block in
@@ -626,6 +666,26 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
 
         positions_.on_fill(canonical_id, st.exchange_id, rpt.side(), rpt.filledQty(), rpt.price());
         st.queue.on_fill(order_id, static_cast<double>(rpt.filledQty()) / 1e8);
+
+        // Phase 2.1 — record the fill for post-fill markout evaluation
+        // on the next BBO tick. Skip when the feature is disabled
+        // (threshold == 0). Excludes unwind orders: those are
+        // intentionally aggressive and we don't want their adverse
+        // markout to trip the cooldown for the passive side.
+        // Timestamps are simulation time (st.last_tick_ns), not wall
+        // clock — backtest replays compress 11h of sim time into a few
+        // seconds of wall clock, so a wall-clock cooldown would span
+        // the whole run.
+        if (post_fill_markout_threshold_bps_ < 0.0 && order_id != st.unwind_order_id) {
+            const double fill_px = static_cast<double>(rpt.price()) / 1e8;
+            if (rpt.side() == bpt::messages::TradeSide::BUY) {
+                st.pending_buy_fill_price = fill_px;
+                st.pending_buy_fill_ts    = st.last_tick_ns;
+            } else {
+                st.pending_sell_fill_price = fill_px;
+                st.pending_sell_fill_ts    = st.last_tick_ns;
+            }
+        }
 
         if (const auto pos = positions_.get(canonical_id, st.exchange_id)) {
             bpt::common::log::info(kLog(),
@@ -1003,6 +1063,19 @@ AvellanedaStoikovStrategy::compute_suppression(const InstrumentState& st,
     const double max_inv = effective_max_inventory(st);
     s.inventory_bid = net_qty >= max_inv;
     s.inventory_ask = net_qty <= -max_inv;
+
+    // Phase 2.1 — per-side post-fill cooldown after an adverse fill.
+    // Driven by the markout evaluation in on_bbo (writes
+    // post_fill_suspend_until_*); 0 means no cooldown active. Compares
+    // against st.last_tick_ns (simulation time) so backtest replays —
+    // which compress 11h of sim time into a few seconds of wall clock —
+    // honor the cooldown window correctly.
+    if (post_fill_markout_threshold_bps_ < 0.0) {
+        s.post_fill_bid = st.post_fill_suspend_until_bid > 0
+                       && st.last_tick_ns < st.post_fill_suspend_until_bid;
+        s.post_fill_ask = st.post_fill_suspend_until_ask > 0
+                       && st.last_tick_ns < st.post_fill_suspend_until_ask;
+    }
 
     // Intra-tick realized-vol gate — blocks BOTH sides during fast moves.
     s.vol_halted = st.vol_gate.is_halted(st.last_tick_ns);

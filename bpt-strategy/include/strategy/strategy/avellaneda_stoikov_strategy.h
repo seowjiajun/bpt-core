@@ -217,6 +217,30 @@ private:
         // (gamma_pnl_window_n_ == 0) or pre-fill warmup.
         std::deque<double> recent_rpnl;
 
+        // ── Post-fill markout-based per-side cooldown (Phase 2.1) ───────────
+        //
+        // After each fill, record the fill price + timestamp. The next
+        // BBO tick to arrive computes the markout — for a BUY fill this
+        // is (mid_now - fill_price) / fill_price * 1e4 (positive = the
+        // market moved up after our buy, favorable). For a SELL fill we
+        // negate (positive = market moved down after our sell). If the
+        // markout is below post_fill_markout_threshold_bps, we suspend
+        // that side's quoting for post_fill_markout_cooldown_s — the
+        // toxic-flow burst typically reverts within tens of seconds, so
+        // staying out during it cuts adverse selection.
+        //
+        // pending_*_fill_price > 0 indicates a fill awaiting evaluation;
+        // cleared once the next BBO tick computes the markout.
+        double   pending_buy_fill_price{0.0};
+        uint64_t pending_buy_fill_ts{0};
+        double   pending_sell_fill_price{0.0};
+        uint64_t pending_sell_fill_ts{0};
+
+        // While now < post_fill_suspend_until_*, the corresponding side
+        // is suppressed via SuppressionState. 0 means not suspended.
+        uint64_t post_fill_suspend_until_bid{0};
+        uint64_t post_fill_suspend_until_ask{0};
+
         // Maintained L2 ladder. Populated from MdOrderBook deltas in
         // on_order_book(); read by the queuing logic in Phase 3+.
         OrderBookState book;
@@ -278,6 +302,7 @@ private:
         bool tox_bid{false},  tox_ask{false};             // analytics toxicity score
         bool queue_bid{false}, queue_ask{false};          // projected fill-prob too low
         bool inventory_bid{false}, inventory_ask{false};  // |net_qty| >= max_inventory
+        bool post_fill_bid{false}, post_fill_ask{false};  // post-fill markout cooldown (Phase 2.1)
         bool vol_halted{false};                            // intra-tick realized-vol gate
         bool pause_active{false};                          // PnL drawdown circuit-breaker
 
@@ -288,45 +313,49 @@ private:
         // Full aggregate — every reason counted. Used by the dashboard
         // bidSuppressed / askSuppressed flags.
         [[nodiscard]] bool bid_suppressed() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid || vol_halted || pause_active;
+            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid
+                || post_fill_bid || vol_halted || pause_active;
         }
         [[nodiscard]] bool ask_suppressed() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask || vol_halted || pause_active;
+            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask
+                || post_fill_ask || vol_halted || pause_active;
         }
 
-        // "Signal-only" aggregate — drift/trend/tyr/queue. Used by
+        // "Signal-only" aggregate — drift/trend/tyr/queue/post_fill. Used by
         // maybe_requote for the "cancel + don't replace" logic; the
         // caller checks inventory + vol_gate separately because it
         // wants different log strings for those cases.
         [[nodiscard]] bool bid_signal() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || pause_active;
+            return drift_bid || trend_bid || tox_bid || queue_bid || post_fill_bid || pause_active;
         }
         [[nodiscard]] bool ask_signal() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || pause_active;
+            return drift_ask || trend_ask || tox_ask || queue_ask || post_fill_ask || pause_active;
         }
 
         // Priority-ordered reason string. Priority: vol_gate →
-        // inventory → drift → trend → tox → queue (most to least
-        // severe). Shared by the dashboard and any future consumer
-        // that wants a single human-readable label.
+        // inventory → post_fill → drift → trend → tox → queue (most to
+        // least severe). post_fill ranks above drift because it's a
+        // direct response to a confirmed adverse fill, not a forecast.
         [[nodiscard]] std::string_view bid_reason() const noexcept {
-            if (pause_active)  return "pause";
-            if (vol_halted)    return "vol_gate";
-            if (inventory_bid) return "inventory";
-            if (drift_bid)     return "drift";
-            if (trend_bid)     return "trend";
-            if (tox_bid)       return "tyr";
-            if (queue_bid)     return "queue";
+            if (pause_active)   return "pause";
+            if (vol_halted)     return "vol_gate";
+            if (inventory_bid)  return "inventory";
+            if (post_fill_bid)  return "post_fill";
+            if (drift_bid)      return "drift";
+            if (trend_bid)      return "trend";
+            if (tox_bid)        return "tyr";
+            if (queue_bid)      return "queue";
             return "";
         }
         [[nodiscard]] std::string_view ask_reason() const noexcept {
-            if (pause_active)  return "pause";
-            if (vol_halted)    return "vol_gate";
-            if (inventory_ask) return "inventory";
-            if (drift_ask)     return "drift";
-            if (trend_ask)     return "trend";
-            if (tox_ask)       return "tyr";
-            if (queue_ask)     return "queue";
+            if (pause_active)   return "pause";
+            if (vol_halted)     return "vol_gate";
+            if (inventory_ask)  return "inventory";
+            if (post_fill_ask)  return "post_fill";
+            if (drift_ask)      return "drift";
+            if (trend_ask)      return "trend";
+            if (tox_ask)        return "tyr";
+            if (queue_ask)      return "queue";
             return "";
         }
     };
@@ -419,6 +448,19 @@ private:
     // instrument that breached pauses; others continue.
     double pause_below_rpnl_usd_;
     double pause_cooldown_s_;
+
+    // Phase 2.1 — per-side post-fill cooldown (adverse-selection defense).
+    // After a fill, the next BBO tick computes its markout. If markout
+    // is below post_fill_markout_threshold_bps, the corresponding side
+    // is suspended for post_fill_markout_cooldown_s seconds. The toxic
+    // burst that picked us off typically reverts within tens of seconds;
+    // staying out during it cuts adverse selection at the cost of
+    // missing some valid passive fills. Threshold is in bps of the
+    // fill price; sign convention is "positive = favorable for us"
+    // (so threshold should be a small negative number, e.g. -10.0).
+    // Set threshold to 0 (or positive) to disable.
+    double post_fill_markout_threshold_bps_;
+    double post_fill_markout_cooldown_s_;
 
     // Drift (momentum) detection — Cartea-Jaimungal extension of AS.
     double drift_halflife_s_;    // EWMA half-life for µ estimation (seconds)
