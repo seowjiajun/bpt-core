@@ -8,8 +8,12 @@ namespace bpt::refdata::metrics {
 RefdataMetrics::RefdataMetrics(uint16_t port) {
     registry = std::make_shared<prometheus::Registry>();
 
-    exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
-    exposer->RegisterCollectable(registry);
+    // port==0 disables the HTTP exposer — used by tests so a fixture
+    // can spin up RefdataApp without binding a TCP socket.
+    if (port != 0) {
+        exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
+        exposer->RegisterCollectable(registry);
+    }
 
     auto& healthy_fam =
         prometheus::BuildGauge().Name("refdata_healthy").Help("1 if Refdata is running normally").Register(*registry);

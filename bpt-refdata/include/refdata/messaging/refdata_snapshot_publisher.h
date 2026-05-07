@@ -1,6 +1,7 @@
 #pragma once
 
 #include "refdata/messaging/messages.h"
+#include "refdata/port/i_refdata_snapshot_sink.h"
 #include "refdata/registry/instrument_registry.h"
 
 #include <Aeron.h>
@@ -9,11 +10,13 @@
 
 namespace bpt::refdata::messaging {
 
-class RefdataSnapshotPublisher {
+class RefdataSnapshotPublisher final : public port::IRefdataSnapshotSink {
 public:
     RefdataSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
-    void publish(const registry::InstrumentRegistry& registry, const RefdataRequest& request, uint64_t seq_start);
+    void publish(const registry::InstrumentRegistry& registry,
+                 const RefdataRequest& request,
+                 uint64_t seq_start) override;
 
 private:
     std::shared_ptr<aeron::Publication> publication_;

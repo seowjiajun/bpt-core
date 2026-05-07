@@ -1,5 +1,6 @@
 #pragma once
 
+#include "refdata/port/i_fee_schedule_sink.h"
 #include "refdata/refdata/funding_rate.h"
 
 #include <Aeron.h>
@@ -9,11 +10,11 @@
 namespace bpt::refdata::messaging {
 
 // Publishes FeeSchedule SBE messages (template id=19) on stream 1004.
-class FeeSchedulePublisher {
+class FeeSchedulePublisher final : public port::IFeeScheduleSink {
 public:
     FeeSchedulePublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
-    void publish(const refdata::FeeScheduleState& fs);
+    void publish(const refdata::FeeScheduleState& fs) override;
 
 private:
     std::shared_ptr<aeron::Publication> publication_;

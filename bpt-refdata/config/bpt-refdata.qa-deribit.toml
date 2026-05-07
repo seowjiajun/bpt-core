@@ -27,7 +27,7 @@ stream_id = 1004
 channel = "aeron:ipc"
 stream_id = 1005
 
-[aeron.muninn_status]
+[aeron.refdata_status]
 channel = "aeron:ipc"
 stream_id = 1006
 

@@ -42,13 +42,21 @@ uint8_t exchange_id_to_bit(bpt::messages::ExchangeId::Value id) {
 }  // namespace
 
 RefdataApp::RefdataApp(config::Settings settings,
-                     std::shared_ptr<aeron::Aeron> aeron,
+                     std::unique_ptr<port::IRefdataControlSource> control_source,
+                     std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
+                     std::shared_ptr<port::IRefdataDeltaSink> delta_sink,
+                     std::shared_ptr<port::IFeeScheduleSink> fee_sink,
+                     std::shared_ptr<port::IRefdataStatusSink> status_sink,
                      std::map<std::string, adapter::ExchangeCredentials> creds)
     : settings_(std::move(settings)),
-      aeron_(aeron),
       metrics_(settings_.base.metrics_port),
       instrument_mapping_(std::make_shared<mapping::InstrumentMappingLoader>()),
-      registry_(std::make_shared<registry::InstrumentRegistry>()) {
+      registry_(std::make_shared<registry::InstrumentRegistry>()),
+      control_sub_(std::move(control_source)),
+      snapshot_pub_(std::move(snapshot_sink)),
+      delta_pub_(std::move(delta_sink)),
+      fee_pub_(std::move(fee_sink)),
+      status_pub_(std::move(status_sink)) {
     const auto& im_cfg = settings_.instrument_mapping;
 
     // If per-exchange sources are configured, merge them into the canonical
@@ -60,22 +68,10 @@ RefdataApp::RefdataApp(config::Settings settings,
             bpt::common::log::warn("Merge failed — attempting to load cached local file");
     }
 
-    instrument_mapping_->load(im_cfg.local_path);
-
-    control_sub_ = std::make_unique<messaging::RefdataControlSubscriber>(aeron,
-                                                                         settings_.control.channel,
-                                                                         settings_.control.stream_id);
-    snapshot_pub_ = std::make_unique<messaging::RefdataSnapshotPublisher>(aeron,
-                                                                          settings_.snapshot.channel,
-                                                                          settings_.snapshot.stream_id);
-    delta_pub_ =
-        std::make_shared<messaging::RefdataDeltaPublisher>(aeron, settings_.delta.channel, settings_.delta.stream_id);
-    fee_pub_ = std::make_shared<messaging::FeeSchedulePublisher>(aeron,
-                                                                 settings_.fee_schedule.channel,
-                                                                 settings_.fee_schedule.stream_id);
-    status_pub_ = std::make_shared<messaging::RefdataStatusPublisher>(aeron,
-                                                                     settings_.refdata_status.channel,
-                                                                     settings_.refdata_status.stream_id);
+    // Empty local_path skips the load — used by unit tests that construct
+    // the app without a real mapping file on disk.
+    if (!im_cfg.local_path.empty())
+        instrument_mapping_->load(im_cfg.local_path);
 
     for (const auto& cfg : settings_.adapters) {
         const auto& exchange_creds = [&]() -> const adapter::ExchangeCredentials& {
@@ -151,15 +147,29 @@ RefdataApp::RefdataApp(config::Settings settings,
         adapters_.push_back(std::move(adapter));
     }
 
-    if (adapters_.empty())
-        throw std::runtime_error("No adapters configured — nothing to serve.");
-
     bpt::common::log::info("Ready — listening on {} stream {}",
                    settings_.control.channel,
                    settings_.control.stream_id);
 }
 
+void RefdataApp::handle_request(const messaging::RefdataRequest& request) {
+    bpt::common::log::info("Request correlation_id={} filters={}",
+                   request.correlation_id,
+                   request.instruments.size());
+    sub_manager_.upsert(request);
+    snapshot_pub_->publish(*registry_, request, delta_pub_->current_sequence());
+    metrics_.requests_served_total->Increment();
+    metrics_.last_update_ns->Set(static_cast<double>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count()));
+}
+
 void RefdataApp::run() {
+    // Empty adapters is legal at construction (tests construct that way);
+    // fail fast at run() so production misconfiguration still surfaces.
+    if (adapters_.empty())
+        throw std::runtime_error("No adapters configured — nothing to serve.");
+
     // Parallel snapshot fetch — all adapters run concurrently; registry is thread-safe.
     // fee_pub_ is guarded by pub_mutex_ in the on_fee_schedule callback.
     uint8_t exchanges_loaded = 0;
@@ -215,15 +225,7 @@ void RefdataApp::run() {
 
     while (bpt::common::signal::is_running()) {
         int fragments = control_sub_->poll([this](const messaging::RefdataRequest& request) {
-            bpt::common::log::info("Request correlation_id={} filters={}",
-                           request.correlation_id,
-                           request.instruments.size());
-            sub_manager_.upsert(request);
-            snapshot_pub_->publish(*registry_, request, delta_pub_->current_sequence());
-            metrics_.requests_served_total->Increment();
-            metrics_.last_update_ns->Set(static_cast<double>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()).count()));
+            handle_request(request);
         });
 
         auto now = std::chrono::steady_clock::now();

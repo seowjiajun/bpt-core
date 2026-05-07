@@ -2,7 +2,7 @@
 # Pairs with scripts/live-hl.sh. Credentials for HL mainnet are loaded
 # via exchange_config → config/exchanges/live.toml → secret_name
 # "bpt/prod/HYPERLIQUID" (systemd-creds in deployed mode, or
-# ~/.bpt-secrets/ locally — see muninn/config/exchanges/testnet.toml
+# ~/.bpt-secrets/ locally — see bpt-refdata/config/exchanges/testnet.toml
 # header comment for the local loading convention).
 environment = "live"
 exchange_config = "config/exchanges/live.toml"
@@ -28,7 +28,7 @@ stream_id = 1003
 channel = "aeron:ipc"
 stream_id = 1004
 
-[aeron.muninn_status]
+[aeron.refdata_status]
 channel = "aeron:ipc"
 stream_id = 1006
 

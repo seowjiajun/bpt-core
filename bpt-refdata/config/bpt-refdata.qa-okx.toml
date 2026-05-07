@@ -1,5 +1,5 @@
 # Instance config — QA environment (demo trading, testnet endpoints).
-# Switch to muninn.prod.toml for live trading.
+# Switch to bpt-refdata.prod.toml for live trading.
 environment = "dev"
 exchange_config = "config/exchanges/testnet.toml"
 exchanges = ["OKX"]
@@ -10,23 +10,23 @@ media_driver_dir = "/dev/shm/aeron-bpt"
 
 [aeron.snapshot]
 channel = "aeron:ipc"
-stream_id = 1001    # Muninn → Fenrir (RefDataSnapshot)
+stream_id = 1001    # bpt-refdata → Fenrir (RefDataSnapshot)
 
 [aeron.delta]
 channel = "aeron:ipc"
-stream_id = 1002    # Muninn → Fenrir (RefDataDelta)
+stream_id = 1002    # bpt-refdata → Fenrir (RefDataDelta)
 
 [aeron.control]
 channel = "aeron:ipc"
-stream_id = 1003    # Fenrir → Muninn (RefDataSubscriptionRequest)
+stream_id = 1003    # Fenrir → bpt-refdata (RefDataSubscriptionRequest)
 
 [aeron.fee_schedule]
 channel = "aeron:ipc"
-stream_id = 1004    # Muninn → Fenrir (FeeSchedule)
+stream_id = 1004    # bpt-refdata → Fenrir (FeeSchedule)
 
-[aeron.muninn_status]
+[aeron.refdata_status]
 channel = "aeron:ipc"
-stream_id = 1006    # Muninn → Fenrir (RefDataReady, RefDataError)
+stream_id = 1006    # bpt-refdata → Fenrir (RefDataReady, RefDataError)
 
 [instrument_mapping]
 local_path = "/opt/bpt/data/instrument_mapping.json"
