@@ -6,7 +6,12 @@ set -euo pipefail
 
 SBE_VERSION="1.30.0"
 JAR_NAME="sbe-all-${SBE_VERSION}.jar"
-TOOLS_DIR="$(cd "$(dirname "$0")/../tools" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TOOLS_DIR="${SCRIPT_DIR}/../tools"
+# Create the tools/ dir if missing — on a fresh checkout it doesn't exist
+# (the JAR is gitignored, so git doesn't track an empty tools/ dir).
+mkdir -p "${TOOLS_DIR}"
+TOOLS_DIR="$(cd "${TOOLS_DIR}" && pwd)"
 DEST="${TOOLS_DIR}/${JAR_NAME}"
 
 if [[ -f "${DEST}" ]]; then

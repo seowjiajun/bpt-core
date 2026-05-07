@@ -285,22 +285,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Check formatting
-        working-directory: transport
+        working-directory: transport/aeron
         run: ./gradlew spotlessCheck
 
       - name: Run tests
-        working-directory: transport
+        working-directory: transport/aeron
         run: ./gradlew test
 
       - name: Build shadow JAR
-        working-directory: transport
+        working-directory: transport/aeron
         run: ./gradlew shadowJar
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: transport-jar
-          path: transport/build/libs/*-all.jar
+          path: transport/aeron/build/libs/*-all.jar
 
   # ── Dashboard frontend (TypeScript / Vite) ─────────────────────────────────
   frontend:
