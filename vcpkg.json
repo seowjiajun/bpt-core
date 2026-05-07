@@ -1,7 +1,7 @@
 {
     "name": "bpt-core",
     "version-string": "0.1.0",
-    "_comment": "CMake is retained only for bpt-backtester (arrow/parquet). All other services build via Bazel and their deps come from the Bazel Central Registry or third_party/*.BUILD http_archives.",
+    "description": "CMake is retained only for bpt-backtester (arrow/parquet). All other services build via Bazel and their deps come from the Bazel Central Registry or third_party/*.BUILD http_archives.",
     "dependencies": [
         "fmt",
         "tomlplusplus",

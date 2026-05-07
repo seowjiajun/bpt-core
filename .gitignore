@@ -1,5 +1,6 @@
 # Build output
 build/
+build-cmake/
 
 # Bazel convenience symlinks (output dirs, not sources)
 bazel-*
@@ -37,7 +38,7 @@ dashboard/frontend/node_modules/
 dashboard/frontend/dist/
 
 # Backtest results (per-run output)
-jormungandr/results/
+bpt-backtester/results/
 
 # OS
 .DS_Store

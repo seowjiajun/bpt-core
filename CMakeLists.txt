@@ -56,7 +56,8 @@ find_package(Parquet REQUIRED)
 find_package(CLI11   CONFIG REQUIRED)
 
 # ── Libraries + the one remaining service ────────────────────────────────────
-add_subdirectory(third_party/yggdrasil)
+add_subdirectory(bpt-common)
+add_subdirectory(bpt-app)
 add_subdirectory(messages)
 
 enable_testing()
