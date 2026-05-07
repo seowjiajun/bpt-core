@@ -75,40 +75,64 @@ OpenOrder MatchingEngine::submit_order(OpenOrder order) {
             if (it != books_.end()) {
                 const auto& book = it->second;
 
-                // Crossing-LIMIT path: if our price is at or through
-                // the touch, the crossing portion fills as TAKER at
-                // book level prices (NOT at our limit). This mirrors
-                // real exchange semantics — submitting a BUY at a
-                // price >= best ask immediately consumes the ask side
-                // and pays taker fees. Without this, AS's
-                // inventory-skew quotes (which intentionally cross to
-                // unwind position) get phantom-filled at the limit
-                // price, biasing backtest P&L by tens of bps per fill.
                 const bool crosses =
                     (order.side == OrderSide::BUY  && book.ask_px[0] > 0.0 && order.price >= book.ask_px[0] - 1e-9) ||
                     (order.side == OrderSide::SELL && book.bid_px[0] > 0.0 && order.price <= book.bid_px[0] + 1e-9);
-                if (crosses) {
-                    fill_book_until(order, book, order.price, OrderType::LIMIT, fills);
-                }
 
-                // Residual (or non-crossing fully) rests in pending_
-                // with queue_ahead seeded from the book.
-                if (order.filled_qty < order.quantity - 1e-12) {
-                    order.queue_ahead = book_qty_at_price(book, order.side, order.price);
-                    order.queue_seeded = true;
-                    pending_[key(order.exchange, order.symbol)].push_back(order);
-                    bpt::common::log::debug("[MatchingEngine] Queued LIMIT {} {} {} @ {} queue_ahead={:.4f} cross_filled={:.4f}",
-                                    order.symbol,
-                                    (order.side == OrderSide::BUY ? "BUY" : "SELL"),
-                                    order.quantity - order.filled_qty,
-                                    order.price,
-                                    order.queue_ahead,
-                                    order.filled_qty);
+                // POST_ONLY: the venue rejects a crossing order at
+                // submit (HL Alo, OKX post_only, Binance LIMIT_MAKER
+                // semantics). Never fills as TAKER, never enters
+                // pending_. Caller checks order.rejected and emits
+                // a venue-format error.
+                if (order.type == OrderType::POST_ONLY && crosses) {
+                    order.rejected = true;
+                    bpt::common::log::debug(
+                        "[MatchingEngine] POST_ONLY rejected (would cross): {} {} {} @ {} touch=({:.6f}/{:.6f})",
+                        order.symbol,
+                        (order.side == OrderSide::BUY ? "BUY" : "SELL"),
+                        order.quantity,
+                        order.price,
+                        book.bid_px[0],
+                        book.ask_px[0]);
+                } else {
+                    // Crossing-LIMIT path: if our price is at or through
+                    // the touch, the crossing portion fills as TAKER at
+                    // book level prices (NOT at our limit). This mirrors
+                    // real exchange semantics — submitting a BUY at a
+                    // price >= best ask immediately consumes the ask side
+                    // and pays taker fees. Without this, AS's
+                    // inventory-skew quotes (which intentionally cross to
+                    // unwind position) get phantom-filled at the limit
+                    // price, biasing backtest P&L by tens of bps per fill.
+                    if (crosses && order.type == OrderType::LIMIT) {
+                        fill_book_until(order, book, order.price, OrderType::LIMIT, fills);
+                    }
+
+                    // Residual (or non-crossing fully) rests in pending_
+                    // with queue_ahead seeded from the book. POST_ONLY
+                    // that didn't cross also rests here as a passive
+                    // maker quote.
+                    if (order.filled_qty < order.quantity - 1e-12) {
+                        order.queue_ahead = book_qty_at_price(book, order.side, order.price);
+                        order.queue_seeded = true;
+                        pending_[key(order.exchange, order.symbol)].push_back(order);
+                        bpt::common::log::debug("[MatchingEngine] Queued LIMIT {} {} {} @ {} queue_ahead={:.4f} cross_filled={:.4f}",
+                                        order.symbol,
+                                        (order.side == OrderSide::BUY ? "BUY" : "SELL"),
+                                        order.quantity - order.filled_qty,
+                                        order.price,
+                                        order.queue_ahead,
+                                        order.filled_qty);
+                    }
                 }
             } else {
-                // No book yet — queue without seeding. Legacy
-                // fill_crossing_limits backstop will catch it on the
-                // first book snapshot.
+                // No book yet. POST_ONLY can't be evaluated without a
+                // book, but in practice the AS strategy doesn't quote
+                // until it has BBO, so this branch shouldn't fire for
+                // POST_ONLY. If it does, queue defensively — once the
+                // book arrives, the legacy fill_crossing_limits path
+                // would (incorrectly for POST_ONLY) fill as MAKER, but
+                // that's no worse than the pre-POST_ONLY state.
                 pending_[key(order.exchange, order.symbol)].push_back(order);
             }
         }

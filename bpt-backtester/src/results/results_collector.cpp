@@ -200,7 +200,9 @@ void ResultsCollector::on_fill(const matching::FillReport& fill) {
     row.order_id = fill.order_id;
     row.client_order_id = fill.client_order_id;
     row.side = (fill.side == OrderSide::BUY) ? "BUY" : "SELL";
-    row.order_type = (fill.order_type == matching::OrderType::MARKET) ? "MARKET" : "LIMIT";
+    row.order_type = (fill.order_type == matching::OrderType::MARKET)    ? "MARKET"
+                   : (fill.order_type == matching::OrderType::POST_ONLY) ? "POST_ONLY"
+                                                                         : "LIMIT";
     row.liquidity = (fill.liquidity_role == matching::LiquidityRole::TAKER) ? "TAKER" : "MAKER";
     row.qty = fill.last_fill_qty;
     row.price = fill.last_fill_price;

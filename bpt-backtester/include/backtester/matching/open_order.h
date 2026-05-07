@@ -5,7 +5,14 @@
 
 namespace bpt::backtester::matching {
 
-enum class OrderType { MARKET, LIMIT };
+// MARKET    — always crosses the book on submission (TAKER).
+// LIMIT     — rests in pending_ if non-crossing; fills as TAKER if it
+//             crosses at submit (the crossing-LIMIT path).
+// POST_ONLY — must rest as MAKER. If it would cross at submit time,
+//             the matching engine rejects it (mirrors HL Alo / OKX
+//             post_only / Binance LIMIT_MAKER). Never appears as a
+//             TAKER fill on results, by construction.
+enum class OrderType { MARKET, LIMIT, POST_ONLY };
 enum class OrderSide { BUY, SELL };
 
 // Identifies whether a fill consumed liquidity (TAKER) or provided it
@@ -58,6 +65,13 @@ struct OpenOrder {
     // cross" engine.
     double queue_ahead{0.0};
     bool   queue_seeded{false};
+
+    // True iff the matching engine refused the order at submit time
+    // (currently only POST_ONLY orders that would cross). Returned in
+    // the OpenOrder MatchingEngine::submit_order(...) returns; the
+    // caller (each venue's order server) inspects it to send a
+    // venue-format error response back to the OGW.
+    bool rejected{false};
 };
 
 struct FillReport {

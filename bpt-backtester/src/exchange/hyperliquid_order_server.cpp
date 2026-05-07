@@ -217,22 +217,29 @@ private:
             uint64_t oid = ++order_id_seq_;
             order.client_order_id = std::to_string(oid);
             order.order_id = std::to_string(oid);
-            order.type = matching::OrderType::LIMIT;  // HL post uses limit always
+            // HL signals POST_ONLY via tif="Alo" (Add Liquidity Only).
+            order.type = (tif == "Alo") ? matching::OrderType::POST_ONLY
+                                        : matching::OrderType::LIMIT;
             order.side = is_buy ? matching::OrderSide::BUY : matching::OrderSide::SELL;
             order.quantity = std::stod(sz);
             order.price = std::stod(px);
 
-            engine_.submit_order(std::move(order));
-
-            // Build a "resting" status so the adapter knows the order is on book.
-            json::object resting;
-            resting["oid"] = static_cast<int64_t>(oid);
+            const auto submitted = engine_.submit_order(std::move(order));
 
             json::object status;
-            status["resting"] = std::move(resting);
+            if (submitted.rejected) {
+                // HL rejection format: status carries an "error" string.
+                // Specific phrasing matches HL's "Order would immediately
+                // match" error so the OGW decoder routes it to a REJECTED
+                // ExecReport instead of an ACK.
+                status["error"] =
+                    "Order would immediately match and was rejected because POST_ONLY (Alo) was set.";
+            } else {
+                json::object resting;
+                resting["oid"] = static_cast<int64_t>(oid);
+                status["resting"] = std::move(resting);
+            }
             statuses.push_back(std::move(status));
-
-            (void)tif;  // tif is informational; matching engine doesn't model it
         }
 
         json::object data;
