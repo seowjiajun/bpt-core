@@ -131,6 +131,10 @@ AppConfig AppConfig::load(const std::string& path) {
             static_cast<uint64_t>((*sch)["md_staleness_threshold_ms"].value<int64_t>().value_or(5000));
         sc.schedule.max_refdata_staleness_ns =
             static_cast<uint64_t>((*sch)["max_refdata_staleness_ns"].value<int64_t>().value_or(300'000'000'000LL));
+        sc.schedule.refdata_heartbeat_timeout_ns =
+            static_cast<uint64_t>((*sch)["refdata_heartbeat_timeout_ns"].value<int64_t>().value_or(25'000'000'000LL));
+        sc.schedule.startup_refdata_timeout_ns =
+            static_cast<uint64_t>((*sch)["startup_refdata_timeout_ns"].value<int64_t>().value_or(60'000'000'000LL));
 
         if (auto* arr = (*sch)["configured_exchanges"].as_array())
             for (auto& elem : *arr)

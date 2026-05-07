@@ -29,6 +29,10 @@ StrategyApp::StrategyApp(config::AppConfig cfg,
     : cfg_(std::move(cfg)),
       metrics_(cfg_.base.metrics_port),
       bus_(std::move(bus)),
+      refdata_stale_gate_({
+          .startup_timeout_ns = cfg_.strat.strategy.schedule.startup_refdata_timeout_ns,
+          .stale_threshold_ns = cfg_.strat.strategy.schedule.refdata_heartbeat_timeout_ns,
+      }),
       topology_(topology) {
     const auto& fc = cfg_.strat;
 
@@ -65,6 +69,17 @@ void StrategyApp::run() {
     bpt::common::log::info("Polling... waiting for RefDataReady before subscribing (Ctrl+C to exit)");
     bpt::common::log::info("Emergency flatten: `kill -USR1 {}` (or systemctl --user kill --signal=SIGUSR1 bpt-strategy)",
                    ::getpid());
+
+    // Anchor for the refdata startup timeout. If no heartbeat arrives
+    // within startup_refdata_timeout_ns, check_service_liveness() will
+    // exit the process — replaces the previous hang-forever behaviour.
+    //
+    // Must use TscClock (wall-epoch ns), NOT steady_clock — the
+    // heartbeat we compare against is published with TscClock by
+    // bpt-refdata's RefdataDeltaPublisher. Mixing clocks here produces
+    // a garbage stale check that fires immediately at startup.
+    startup_anchor_ns_ = bpt::common::util::TscClock::now_epoch_ns();
+    refdata_stale_gate_.set_started_at(startup_anchor_ns_);
 
     while (bpt::common::signal::is_running()) {
         // SIGUSR1 → flip to halted state + run the shutdown flatten
@@ -119,6 +134,11 @@ void StrategyApp::run() {
             }
             frags += bus_.dashboard_ctrl->poll();
         }
+
+        // Refdata watchdog runs unconditionally — it must fire during
+        // the WaitRefdata startup phase so we don't hang forever if
+        // bpt-refdata never comes up.
+        check_refdata_watchdog();
 
         startup_gate_->tick();
 
@@ -210,6 +230,58 @@ void StrategyApp::check_service_liveness() {
         trading_paused_ = false;
         metrics_.trading_paused->Set(0.0);
         bpt::common::log::info("Trading RESUMED — all service heartbeats healthy");
+    }
+}
+
+void StrategyApp::check_refdata_watchdog() {
+    // Refdata's heartbeat lives on a 5s cadence
+    // (RefdataDeltaPublisher::publish_heartbeat) and its failure mode
+    // is silent fee_cache staleness, not lost MD/exec flow — separate
+    // concern from md/order-gw heartbeats. Runs every iteration
+    // (rate-limited to 1 Hz internally) regardless of startup_gate
+    // state, because the StartupTimedOut case needs to fire during
+    // the WaitRefdata phase to break the previous hang-forever
+    // behaviour when bpt-refdata never comes up.
+    //
+    // TscClock (wall-epoch ns) — must match the clock used by
+    // bpt-refdata's heartbeat publisher (TscClock::now_epoch_ns).
+    const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
+
+    if (now_ns - last_refdata_check_ns_ < 1'000'000'000ULL)
+        return;
+    last_refdata_check_ns_ = now_ns;
+
+    using strategy::RefdataStaleGate;
+    const uint64_t hb = bus_.refdata->last_heartbeat_ns();
+    const auto state = refdata_stale_gate_.evaluate(now_ns, hb);
+    switch (state) {
+        case RefdataStaleGate::State::StartupTimedOut: {
+            const double elapsed_s = (now_ns - startup_anchor_ns_) / 1e9;
+            bpt::common::log::critical(
+                "Refdata never published a heartbeat in {:.0f}s — refusing to trade. "
+                "Is bpt-refdata running? Stopping process.",
+                elapsed_s);
+            bpt::common::signal::stop();
+            break;
+        }
+        case RefdataStaleGate::State::GoneStale: {
+            const double age_s = (now_ns - hb) / 1e9;
+            bpt::common::log::warn(
+                "Refdata heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing strategy quotes",
+                age_s,
+                cfg_.strat.strategy.schedule.refdata_heartbeat_timeout_ns / 1e9);
+            metrics_.refdata_stale->Set(1.0);
+            strategy_->on_refdata_stale_changed(true);
+            break;
+        }
+        case RefdataStaleGate::State::Recovered: {
+            bpt::common::log::info("Refdata heartbeat recovered — resuming strategy quotes");
+            metrics_.refdata_stale->Set(0.0);
+            strategy_->on_refdata_stale_changed(false);
+            break;
+        }
+        case RefdataStaleGate::State::Ok:
+            break;
     }
 }
 

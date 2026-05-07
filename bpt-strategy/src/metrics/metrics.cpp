@@ -49,6 +49,13 @@ StrategyMetrics::StrategyMetrics(int port) {
     trading_halted = &th.Add({});
     trading_halted->Set(0.0);
 
+    auto& rs = prometheus::BuildGauge()
+                   .Name("strategy_refdata_stale")
+                   .Help("1 if strategy detected stale refdata heartbeat and paused new quotes")
+                   .Register(*registry);
+    refdata_stale = &rs.Add({});
+    refdata_stale->Set(0.0);
+
     auto& rd = prometheus::BuildCounter()
                    .Name("strategy_reconciliation_divergences_total")
                    .Help("Count of reconciliation passes that produced at least one divergence")

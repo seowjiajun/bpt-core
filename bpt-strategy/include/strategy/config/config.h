@@ -78,7 +78,15 @@ struct RiskConfig {
 struct ScheduleConfig {
     bool require_refdata_ready{true};                       // Block trading until Sindri snapshot received
     uint64_t md_staleness_threshold_ms{5000};               // Pause if no MD heartbeat within this window
-    uint64_t max_refdata_staleness_ns{300'000'000'000ULL};  // 300 s: stale if fee/funding not updated
+    uint64_t max_refdata_staleness_ns{300'000'000'000ULL};  // 300 s: feeds FeeCache stale threshold
+
+    // Refdata heartbeat-based pause for AS. Distinct from
+    // max_refdata_staleness_ns above (which is the fee/funding
+    // freshness knob inside FeeCache). These two govern the
+    // strategy-side breaker on top of the heartbeat published every 5s
+    // by bpt-refdata/RefdataDeltaPublisher.
+    uint64_t refdata_heartbeat_timeout_ns{25'000'000'000ULL};   // 25s = 5× heartbeat
+    uint64_t startup_refdata_timeout_ns{60'000'000'000ULL};      // 60s — fail startup if never heard
 
     // Bitmask of exchanges Strategy expects Sindri to have loaded.
     // bit0=BINANCE(0x01), bit1=OKX(0x02), bit2=HYPERLIQUID(0x04).

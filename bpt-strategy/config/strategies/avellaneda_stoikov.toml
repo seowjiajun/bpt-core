@@ -21,6 +21,12 @@ max_open_orders = 10
 require_refdata_ready = true
 md_staleness_threshold_ms = 5000
 max_refdata_staleness_ns = 300000000000
+# Strategy-side refdata heartbeat watchdog. Pauses new quotes if
+# bpt-refdata stops heartbeating (5s cadence), and exits the
+# strategy process if no heartbeat ever arrives at startup. AS-only
+# (other strategies don't read fee_cache on the hot path).
+refdata_heartbeat_timeout_ns = 25000000000   # 25s = 5× heartbeat
+startup_refdata_timeout_ns   = 60000000000   # 60s
 configured_exchanges = ["OKX"]
 
 [fenrir.strategy.params]
@@ -62,8 +68,8 @@ order_book_depth = 5
 drift_halflife_s    = 15.0
 drift_suppress_bps  = 1.5
 
-# ── Tyr toxicity feedback ───────────────────────────────────────
-tyr_suppress_threshold = -2.0
+# ── Analytics toxicity feedback ─────────────────────────────────
+tox_suppress_threshold = -2.0
 
 # ── Queue-position-based side suppression ───────────────────────
 # Computed at quote time: fill_prob = our_qty / (our_qty + queue_ahead)

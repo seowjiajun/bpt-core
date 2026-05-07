@@ -6,6 +6,7 @@
 #include "strategy/metrics/metrics.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/strategy/i_strategy.h"
+#include "strategy/strategy/refdata_stale_gate.h"
 
 #include <cstdint>
 #include <memory>
@@ -31,6 +32,7 @@ private:
     void wire_order_callbacks();
     void run_backtest_loop();
     void check_service_liveness();
+    void check_refdata_watchdog();
     void report_latency_stats();
     void shutdown_flatten();
 
@@ -57,6 +59,14 @@ private:
     uint64_t last_md_hb_recv_ns_{0};  // steady_clock receipt time of last MD Gateway heartbeat
     uint64_t last_gw_hb_recv_ns_{0};  // steady_clock receipt time of last OrderGateway heartbeat
     uint64_t last_liveness_check_ns_{0};
+
+    // Refdata heartbeat tracker. Tells the strategy to pause new quotes
+    // when bpt-refdata stops publishing — without this, AS keeps quoting
+    // off cached fees that go stale and silently ships zero-fee-buffer
+    // trades (item #16, prod hardening backlog).
+    strategy::RefdataStaleGate refdata_stale_gate_;
+    uint64_t startup_anchor_ns_{0};   // steady_clock @ run() entry — feeds startup timeout
+    uint64_t last_refdata_check_ns_{0};  // 1Hz rate limit for check_refdata_watchdog
 
     // Latency histograms — T0 = bpt-md-gateway receipt timestamp in MD message (TSC ns).
     // tick_lat: every MD tick, T0 → strategy callback returns.

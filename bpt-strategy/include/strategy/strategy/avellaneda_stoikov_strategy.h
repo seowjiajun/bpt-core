@@ -5,6 +5,7 @@
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
+#include "strategy/strategy/fair_value_estimator.h"
 #include "strategy/strategy/i_strategy.h"
 #include "strategy/strategy/order_book_state.h"
 #include "strategy/strategy/position_tracker.h"
@@ -78,6 +79,7 @@ public:
     void on_exec_report(const bpt::messages::ExecutionReport& rpt) override;
     std::size_t on_account_snapshot(bpt::messages::AccountSnapshot& snap) override;
     void on_toxicity_update(const bpt::analytics::messaging::ToxicityUpdate& update) override;
+    void on_refdata_stale_changed(bool stale) override;
     std::string get_strategy_state_json() override;
     void on_shutdown_flatten() override;
     [[nodiscard]] bool has_pending_flatten() const override;
@@ -130,6 +132,13 @@ private:
         // completion. Zero during normal operation so non-shutdown
         // unwinds (inventory-cap breaches) don't auto-retry.
         uint32_t unwind_retries_left{0};
+
+        // True only when the currently in-flight unwind was issued by
+        // on_shutdown_flatten() (vs by inventory-cap auto-unwind in
+        // on_exec_report). Gates the "SHUTDOWN RETRIES EXHAUSTED" log
+        // so it doesn't spam on every normal-path unwind terminal.
+        // Cleared when the unwind reaches a terminal status.
+        bool unwind_is_shutdown_drain{false};
 
         // Prices of the currently live (or most recently placed) orders.
         // Used to detect whether the quote has drifted beyond requote_threshold_.
@@ -186,9 +195,9 @@ private:
 
         // Latest toxicity scores from Analytics (updated via on_toxicity_update).
         // NaN when no data. Used for side suppression alongside drift.
-        double tyr_bid_toxicity{0.0};
-        double tyr_ask_toxicity{0.0};
-        bool tyr_data_received{false};
+        double tox_bid_toxicity{0.0};
+        double tox_ask_toxicity{0.0};
+        bool tox_data_received{false};
 
         // Slow-drift (trend) tracking — cumulative return from a window-
         // start anchor. Catches multi-minute trends that the per-√s
@@ -216,6 +225,19 @@ private:
         // Populated on order placement (in send_limit_order), updated on
         // trade prints (in on_trade) and our own fills (in on_exec_report).
         QueueTracker queue;
+
+        // Fair-value estimator providing the AS reservation-price `s`.
+        // Default-constructs to Mode::kMid (no behavior change). The
+        // strategy overwrites with the configured estimator after each
+        // InstrumentState is inserted into state_.
+        FairValueEstimator fv;
+
+        // Drawdown circuit-breaker. When set non-zero (in steady_clock ns),
+        // both sides are suppressed until this timestamp passes. Set in
+        // on_exec_report when realized PnL crosses the configured loss
+        // threshold; cleared implicitly by the timestamp check (no resume
+        // event needed). 0 = not paused.
+        uint64_t pause_until_ns{0};
     };
 
     // Compute new bid/ask from the AS model.
@@ -253,10 +275,11 @@ private:
     struct SuppressionState {
         bool drift_bid{false}, drift_ask{false};          // per-√s EWMA drift
         bool trend_bid{false}, trend_ask{false};          // cumulative return over slow_drift_window_s
-        bool tyr_bid{false},  tyr_ask{false};             // analytics toxicity score
+        bool tox_bid{false},  tox_ask{false};             // analytics toxicity score
         bool queue_bid{false}, queue_ask{false};          // projected fill-prob too low
         bool inventory_bid{false}, inventory_ask{false};  // |net_qty| >= max_inventory
         bool vol_halted{false};                            // intra-tick realized-vol gate
+        bool pause_active{false};                          // PnL drawdown circuit-breaker
 
         // Queue projection side outputs — populated when queue check
         // runs, cached here so logging + dashboard don't recompute.
@@ -265,10 +288,10 @@ private:
         // Full aggregate — every reason counted. Used by the dashboard
         // bidSuppressed / askSuppressed flags.
         [[nodiscard]] bool bid_suppressed() const noexcept {
-            return drift_bid || trend_bid || tyr_bid || queue_bid || inventory_bid || vol_halted;
+            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid || vol_halted || pause_active;
         }
         [[nodiscard]] bool ask_suppressed() const noexcept {
-            return drift_ask || trend_ask || tyr_ask || queue_ask || inventory_ask || vol_halted;
+            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask || vol_halted || pause_active;
         }
 
         // "Signal-only" aggregate — drift/trend/tyr/queue. Used by
@@ -276,31 +299,33 @@ private:
         // caller checks inventory + vol_gate separately because it
         // wants different log strings for those cases.
         [[nodiscard]] bool bid_signal() const noexcept {
-            return drift_bid || trend_bid || tyr_bid || queue_bid;
+            return drift_bid || trend_bid || tox_bid || queue_bid || pause_active;
         }
         [[nodiscard]] bool ask_signal() const noexcept {
-            return drift_ask || trend_ask || tyr_ask || queue_ask;
+            return drift_ask || trend_ask || tox_ask || queue_ask || pause_active;
         }
 
         // Priority-ordered reason string. Priority: vol_gate →
-        // inventory → drift → trend → tyr → queue (most to least
+        // inventory → drift → trend → tox → queue (most to least
         // severe). Shared by the dashboard and any future consumer
         // that wants a single human-readable label.
         [[nodiscard]] std::string_view bid_reason() const noexcept {
+            if (pause_active)  return "pause";
             if (vol_halted)    return "vol_gate";
             if (inventory_bid) return "inventory";
             if (drift_bid)     return "drift";
             if (trend_bid)     return "trend";
-            if (tyr_bid)       return "tyr";
+            if (tox_bid)       return "tyr";
             if (queue_bid)     return "queue";
             return "";
         }
         [[nodiscard]] std::string_view ask_reason() const noexcept {
+            if (pause_active)  return "pause";
             if (vol_halted)    return "vol_gate";
             if (inventory_ask) return "inventory";
             if (drift_ask)     return "drift";
             if (trend_ask)     return "trend";
-            if (tyr_ask)       return "tyr";
+            if (tox_ask)       return "tyr";
             if (queue_ask)     return "queue";
             return "";
         }
@@ -372,6 +397,19 @@ private:
     double max_half_spread_bps_;      // ceiling on half-spread in basis points
     uint8_t order_book_depth_;        // 0 = BBO only, >0 subscribes to L2 ladder
 
+    // Fair-value estimator config — drives the choice of AS reference
+    // price `s`. Parsed from [fair_value] TOML table; defaults to
+    // Mode::kMid which preserves the pre-estimator behavior.
+    FairValueEstimator::Config fv_cfg_;
+
+    // Drawdown circuit-breaker. When realized PnL drops below
+    // pause_below_rpnl_usd_ (negative number, e.g. -0.50), AS pauses
+    // both sides for pause_cooldown_s_. Resumes implicitly when the
+    // pause timestamp passes. 0 disables. Per-instrument: only the
+    // instrument that breached pauses; others continue.
+    double pause_below_rpnl_usd_;
+    double pause_cooldown_s_;
+
     // Drift (momentum) detection — Cartea-Jaimungal extension of AS.
     double drift_halflife_s_;    // EWMA half-life for µ estimation (seconds)
     double drift_suppress_bps_;  // suppress adverse side when |µ| > this (bps/√s, fixed floor)
@@ -409,9 +447,9 @@ private:
     // 0 disables adaptive part.
     double slow_drift_suppress_sigma_mult_;
 
-    // Analytics toxicity suppression — suppress side when tyr score < threshold.
+    // Analytics toxicity suppression — suppress side when toxicity score < threshold.
     // 0 disables. Typical value: -2.0 (suppress when 5s markout is -2bps or worse).
-    double tyr_suppress_threshold_;  // negative value; 0 disables
+    double tox_suppress_threshold_;  // negative value; 0 disables
 
     // Queue-position suppression — suppress a side if the projected
     // fill probability at the candidate quote price (our_qty /
@@ -534,6 +572,15 @@ private:
     // are used until the first snapshot arrives. Refreshed on every
     // on_account_snapshot call (bpt-order-gateway polls every 5s).
     int64_t last_equity_e8_{0};
+
+    // Strategy-wide refdata-staleness flag, set by StrategyApp via
+    // on_refdata_stale_changed(). When true, on_bbo / on_order_book
+    // skip new-quote computation early (existing cancels still flow)
+    // because fee_cache.get() will return nullopt without a fresh
+    // heartbeat, and quoting without a fee buffer is a silent bleed
+    // against taker fees on every fill. Cleared automatically when
+    // the heartbeat resumes; no operator intervention required.
+    bool refdata_stale_{false};
 
     // Resolve the per-instrument order quote size. Returns adaptive
     // value when order_qty_fraction_ > 0 and equity + mid are known,

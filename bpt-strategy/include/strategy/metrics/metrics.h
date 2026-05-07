@@ -28,6 +28,12 @@ struct StrategyMetrics {
     prometheus::Gauge* strategy_active{};  // 1 = strategy started (post startup gate)
     prometheus::Gauge* trading_paused{};   // 1 = trading paused (heartbeat stale)
     prometheus::Gauge* trading_halted{};   // 1 = dashboard kill-switch latched
+    // 1 = strategy noticed refdata heartbeat stale and paused new quotes.
+    // Distinct from refdata's own RefdataStale alert (which fires on the
+    // refdata side when its publisher stops). This gauge says "the
+    // strategy noticed and reacted" — useful for confirming the breaker
+    // tripped, not that refdata died.
+    prometheus::Gauge* refdata_stale{};
 
     // Throughput counters
     prometheus::Counter* md_ticks_total{};      // every MD tick from bpt-md-gateway

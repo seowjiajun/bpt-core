@@ -98,6 +98,18 @@ public:
     // Default no-op — only strategies that want live toxicity feedback override this.
     virtual void on_toxicity_update(const bpt::analytics::messaging::ToxicityUpdate& /*update*/) {}
 
+    // Fired by StrategyApp when the refdata heartbeat staleness state
+    // changes. true → refdata heartbeat aged past the configured
+    // threshold, strategy should stop emitting NEW quotes (cancels of
+    // existing orders should still flow). false → fresh heartbeat
+    // received, strategy may resume normal quoting.
+    //
+    // Default no-op — strategies that read fee_cache / funding_rate_cache
+    // on the hot path (presently AS) should override this. Other
+    // strategies survive refdata loss because they only consume snapshot
+    // data, which is cached in InstrumentState at on_snapshot() time.
+    virtual void on_refdata_stale_changed(bool /*stale*/) {}
+
     // Fired once per exchange at startup when the account snapshot is received.
     // Non-const ref: SBE group iterators are stateful.
     // Default no-op — strategies that need startup position seeding should override this.

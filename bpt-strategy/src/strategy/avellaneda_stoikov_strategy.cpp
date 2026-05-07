@@ -39,6 +39,28 @@ quill::Logger* kLog() {
     static quill::Logger* l = bpt::common::logging::get_logger("AS");
     return l;
 }
+
+FairValueEstimator::Config parse_fair_value_config(const toml::table& params) {
+    FairValueEstimator::Config c;
+    auto fv = params["fair_value"];
+    if (!fv)
+        return c;  // No table → keep defaults (Mode::kMid).
+    const std::string mode = fv["mode"].value<std::string>().value_or("mid");
+    if (mode == "mid")                c.mode = FairValueEstimator::Mode::kMid;
+    else if (mode == "micro")         c.mode = FairValueEstimator::Mode::kMicro;
+    else if (mode == "micro_capped")  c.mode = FairValueEstimator::Mode::kMicroSizeCapped;
+    else if (mode == "l2_weighted")   c.mode = FairValueEstimator::Mode::kL2WeightedMicro;
+    else if (mode == "ewma_micro")    c.mode = FairValueEstimator::Mode::kEwmaMicro;
+    else
+        bpt::common::log::warn(kLog(),
+            "[fair_value] unknown mode='{}' — falling back to 'mid'", mode);
+    c.size_cap_qty = fv["size_cap_qty"].value<double>().value_or(c.size_cap_qty);
+    c.ladder_depth = static_cast<std::size_t>(
+        fv["ladder_depth"].value<int64_t>().value_or(static_cast<int64_t>(c.ladder_depth)));
+    c.ladder_decay = fv["ladder_decay"].value<double>().value_or(c.ladder_decay);
+    c.ewma_alpha = fv["ewma_alpha"].value<double>().value_or(c.ewma_alpha);
+    return c;
+}
 }  // namespace
 
 static constexpr double kPriceScale = 1e8;
@@ -66,13 +88,16 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       min_half_spread_bps_(cfg.params["min_half_spread_bps"].value<double>().value_or(1.0)),
       max_half_spread_bps_(cfg.params["max_half_spread_bps"].value<double>().value_or(50.0)),
       order_book_depth_(static_cast<uint8_t>(cfg.params["order_book_depth"].value<int64_t>().value_or(0))),
+      fv_cfg_(parse_fair_value_config(cfg.params)),
+      pause_below_rpnl_usd_(cfg.params["pause_below_rpnl_usd"].value<double>().value_or(0.0)),
+      pause_cooldown_s_(cfg.params["pause_cooldown_s"].value<double>().value_or(300.0)),
       drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
       drift_suppress_bps_(cfg.params["drift_suppress_bps"].value<double>().value_or(0.0)),
       drift_suppress_sigma_mult_(cfg.params["drift_suppress_sigma_mult"].value<double>().value_or(0.0)),
       slow_drift_window_s_(cfg.params["slow_drift_window_s"].value<double>().value_or(300.0)),
       slow_drift_suppress_bps_(cfg.params["slow_drift_suppress_bps"].value<double>().value_or(0.0)),
       slow_drift_suppress_sigma_mult_(cfg.params["slow_drift_suppress_sigma_mult"].value<double>().value_or(0.0)),
-      tyr_suppress_threshold_(cfg.params["tyr_suppress_threshold"].value<double>().value_or(0.0)),
+      tox_suppress_threshold_(cfg.params["tox_suppress_threshold"].value<double>().value_or(0.0)),
       queue_suppress_fill_prob_min_(cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0)),
       shutdown_cross_bps_(cfg.params["shutdown_cross_bps"].value<double>().value_or(20.0)),
       shutdown_max_unwind_retries_(
@@ -141,6 +166,31 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                            "order_book_depth={} queue_suppress_fill_prob_min={:.4f}",
                            static_cast<int>(order_book_depth_),
                            queue_suppress_fill_prob_min_);
+    {
+        const char* fv_mode_str = "mid";
+        switch (fv_cfg_.mode) {
+            case FairValueEstimator::Mode::kMid:             fv_mode_str = "mid"; break;
+            case FairValueEstimator::Mode::kMicro:           fv_mode_str = "micro"; break;
+            case FairValueEstimator::Mode::kMicroSizeCapped: fv_mode_str = "micro_capped"; break;
+            case FairValueEstimator::Mode::kL2WeightedMicro: fv_mode_str = "l2_weighted"; break;
+            case FairValueEstimator::Mode::kEwmaMicro:       fv_mode_str = "ewma_micro"; break;
+        }
+        bpt::common::log::info(kLog(),
+                               "fair_value: mode={} size_cap={:.4f} ladder_depth={} ladder_decay={:.2f} ewma_alpha={:.2f}",
+                               fv_mode_str,
+                               fv_cfg_.size_cap_qty,
+                               fv_cfg_.ladder_depth,
+                               fv_cfg_.ladder_decay,
+                               fv_cfg_.ewma_alpha);
+    }
+    if (pause_below_rpnl_usd_ < 0.0) {
+        bpt::common::log::info(kLog(),
+                               "drawdown_pause: threshold_usd={:.4f} cooldown_s={:.0f}",
+                               pause_below_rpnl_usd_,
+                               pause_cooldown_s_);
+    } else {
+        bpt::common::log::info(kLog(), "drawdown_pause: disabled");
+    }
 
     if (vol_gate_cfg_.max_bps_per_window > 0.0) {
         bpt::common::log::info(kLog(),
@@ -216,7 +266,7 @@ void AvellanedaStoikovStrategy::on_snapshot(const refdata::InstrumentCache& cach
         else if (inst->exchange == "HYPERLIQUID")
             ex_id = ExchangeId::HYPERLIQUID;
 
-        state_.emplace(id,
+        auto [it, inserted] = state_.emplace(id,
                        InstrumentState{.symbol = inst->symbol,
                                        .exchange = inst->exchange,
                                        .exchange_id = ex_id,
@@ -226,6 +276,8 @@ void AvellanedaStoikovStrategy::on_snapshot(const refdata::InstrumentCache& cach
                                        .lot_size = inst->lot_size,
                                        .vol_gate = VolatilityGate(vol_gate_cfg_),
                                        .regime = RegimeDetector(regime_cfg_)});
+        if (inserted)
+            it->second.fv = FairValueEstimator{fv_cfg_};
         bpt::common::log::info("  [{}] {} @ {} tick={} lot={}",
                                id,
                                inst->symbol,
@@ -267,7 +319,7 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
         else if (inst.exchange == "HYPERLIQUID")
             ex_id = EX::HYPERLIQUID;
 
-        state_.emplace(inst.instrument_id,
+        auto [it, inserted] = state_.emplace(inst.instrument_id,
                        InstrumentState{.symbol = inst.symbol,
                                        .exchange = inst.exchange,
                                        .exchange_id = ex_id,
@@ -277,6 +329,8 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
                                        .lot_size = inst.lot_size,
                                        .vol_gate = VolatilityGate(vol_gate_cfg_),
                                        .regime = RegimeDetector(regime_cfg_)});
+        if (inserted)
+            it->second.fv = FairValueEstimator{fv_cfg_};
         bpt::common::log::info(kLog(),
                                "Delta ADD {} @ {} tick={} lot={}",
                                inst.symbol,
@@ -358,6 +412,14 @@ void AvellanedaStoikovStrategy::on_trade(const bpt::messages::MdTrade& tick) {
 }
 
 void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
+    // Refdata heartbeat stale → fee_cache.get() will return nullopt and
+    // quotes would ship with zero fee buffer. Skip the entire tick path;
+    // existing cancels (issued by on_refdata_stale_changed) keep flowing
+    // through on_exec_report. EWMA estimators see a gap during the pause
+    // window — accepted; warmup re-bootstraps quickly when refdata returns.
+    if (refdata_stale_)
+        return;
+
     auto it = state_.find(tick.instrumentId());
     if (it == state_.end())
         return;
@@ -488,11 +550,19 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     // Divide by 1e8 to convert raw position to base units (BTC).
     const double net_qty = static_cast<double>(positions_.net_qty(tick.instrumentId(), st.exchange_id)) / 1e8;
 
+    // AS reservation-price reference. Estimator may bias toward micro
+    // (size-weighted), L2-weighted, or EWMA — see [fair_value] config.
+    // EWMA σ², drift µ, slow-drift anchor, and st.last_mid all stay on
+    // raw mid above; only the `s` consumed by compute_quotes shifts.
+    // Fall back to mid if the estimator returns NaN (degenerate quote).
+    const double s_est = st.fv.estimate(bid_px, ask_px, tick.bidQty(), tick.askQty());
+    const double s = std::isnan(s_est) ? mid : s_est;
+
     double new_bid{0.0}, new_ask{0.0};
-    if (!compute_quotes(st, tick.instrumentId(), net_qty, mid, ts_ns, new_bid, new_ask))
+    if (!compute_quotes(st, tick.instrumentId(), net_qty, s, ts_ns, new_bid, new_ask))
         return;
 
-    maybe_requote(tick.instrumentId(), st, net_qty, mid, new_bid, new_ask);
+    maybe_requote(tick.instrumentId(), st, net_qty, s, new_bid, new_ask);
 }
 
 void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionReport& rpt) {
@@ -576,6 +646,36 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
                         st.recent_rpnl.pop_front();
                 }
             }
+
+            // Drawdown circuit-breaker. Trigger when realized PnL crosses
+            // the configured loss threshold AND we're not already in a
+            // pause window. The pause_active flag in SuppressionState
+            // prevents NEW quotes; we ALSO have to actively cancel any
+            // resting bid/ask here — otherwise pre-existing live orders
+            // sit in the book and keep filling during the pause window.
+            // (Same pattern as the vol_halted cancel block in on_bbo:
+            // suppression alone doesn't pull live orders, only stops
+            // requotes; explicit cancel is required.)
+            if (pause_below_rpnl_usd_ < 0.0 &&
+                pos->realized_pnl < pause_below_rpnl_usd_ &&
+                prior_rpnl >= pause_below_rpnl_usd_) {
+                const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
+                st.pause_until_ns = now_ns + static_cast<uint64_t>(pause_cooldown_s_ * 1e9);
+                bpt::common::log::warn(kLog(),
+                    "{} PAUSE TRIGGERED rpnl={:.4f} crossed below threshold={:.4f} — "
+                    "halting both sides for {:.0f}s",
+                    st.symbol, pos->realized_pnl, pause_below_rpnl_usd_, pause_cooldown_s_);
+                if (order_mgr_) {
+                    if (st.bid_order_id != 0 && !st.bid_cancel_pending) {
+                        order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, canonical_id);
+                        st.bid_cancel_pending = true;
+                    }
+                    if (st.ask_order_id != 0 && !st.ask_cancel_pending) {
+                        order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, canonical_id);
+                        st.ask_cancel_pending = true;
+                    }
+                }
+            }
         }
     }
 
@@ -620,7 +720,7 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
             // Flat — clear budget so has_pending_flatten() settles.
             st.unwind_retries_left = 0;
         }
-    } else if (was_unwind_terminal && st.unwind_retries_left == 0) {
+    } else if (was_unwind_terminal && st.unwind_retries_left == 0 && st.unwind_is_shutdown_drain) {
         const int64_t net_qty_e8 = positions_.net_qty(canonical_id, st.exchange_id);
         if (net_qty_e8 != 0) {
             bpt::common::log::error(
@@ -631,6 +731,8 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
                 static_cast<double>(std::abs(net_qty_e8)) / 1e8);
         }
     }
+    if (was_unwind_terminal)
+        st.unwind_is_shutdown_drain = false;
 
     // Exchange-error backoff: consecutive EXCHANGE-sourced rejections trigger
     // increasing cooldowns so we don't flood a broken/unfunded account.
@@ -746,6 +848,36 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
     out_bid = reservation - half_spread;
     out_ask = reservation + half_spread;
 
+    // ── Reservation-skew cap ────────────────────────────────────────────
+    //
+    // Inventory pressure can push the reservation through the touch
+    // (when net_qty * γ * σ² * T > spread/2). Without a cap, AS posts
+    // BIDs at or above the best ask, or ASKs at or below the best bid —
+    // POST_ONLY orders that the venue rejects, GTC orders that pay
+    // taker fees. Either way: not the maker behaviour AS is designed
+    // for.
+    //
+    // Clamp each side to strictly inside the BBO by one tick. Skipped
+    // when the cached BBO isn't valid (cold start, gap, etc.) — better
+    // to let the unclamped quote through than block on missing data.
+    //
+    // Effect: AS still skews aggressively toward the inventory-unwind
+    // side (e.g. when long, the ASK tightens), but neither side is
+    // allowed to cross. Real exchanges treat at-touch quotes as
+    // contestable maker fills, so the −tick clamp is conservative;
+    // tightening to −0 (touch) would be an option later.
+    if (st.tick_size > 0.0 && st.last_market_bid > 0.0 && st.last_market_ask > 0.0) {
+        const double bid_cap = st.last_market_ask - st.tick_size;
+        const double ask_floor = st.last_market_bid + st.tick_size;
+        if (out_bid > bid_cap) out_bid = bid_cap;
+        if (out_ask < ask_floor) out_ask = ask_floor;
+        // Defensive: if the clamp inverts the spread (only possible on
+        // a crossed market, which shouldn't happen but might in
+        // transient feed states), treat as "don't quote this tick."
+        if (out_bid >= out_ask)
+            return false;
+    }
+
     bpt::common::log::debug(
         kLog(),
         "quotes σ²={:.2e} µ={:.2e} κ={:.4f} ({}) half_spread={:.4f} reservation={:.2f} drift_adj={:.4f}",
@@ -808,6 +940,12 @@ AvellanedaStoikovStrategy::compute_suppression(const InstrumentState& st,
     // Intra-tick realized-vol gate — blocks BOTH sides during fast moves.
     s.vol_halted = st.vol_gate.is_halted(st.last_tick_ns);
 
+    // Drawdown circuit-breaker — blocks BOTH sides while pause window
+    // is active. Set in on_exec_report when realized PnL crosses the
+    // configured loss threshold; resumes implicitly via the timestamp
+    // check (no explicit resume event).
+    s.pause_active = st.pause_until_ns > 0 && st.last_tick_ns < st.pause_until_ns;
+
     // Current σ in bps/√s — derived from the per-√s² variance EWMA
     // AS already maintains. Used to scale drift, slow-drift, and
     // vol-gate thresholds adaptively so one set of k-multiples works
@@ -843,9 +981,9 @@ AvellanedaStoikovStrategy::compute_suppression(const InstrumentState& st,
     // below threshold. Outcome-based (realized markout from our own
     // fills), complements drift's signal-based approach. Threshold is
     // negative; 0 disables.
-    if (tyr_suppress_threshold_ < 0.0 && st.tyr_data_received) {
-        s.tyr_bid = st.tyr_bid_toxicity < tyr_suppress_threshold_;
-        s.tyr_ask = st.tyr_ask_toxicity < tyr_suppress_threshold_;
+    if (tox_suppress_threshold_ < 0.0 && st.tox_data_received) {
+        s.tox_bid = st.tox_bid_toxicity < tox_suppress_threshold_;
+        s.tox_ask = st.tox_ask_toxicity < tox_suppress_threshold_;
     }
 
     // Queue position: project fill_prob at the candidate quote price
@@ -912,15 +1050,15 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
                                drift_suppress_bps_,
                                supp.drift_ask ? "asks" : "bids");
     }
-    if (supp.tyr_bid) {
+    if (supp.tox_bid) {
         bpt::common::log::info(kLog(),
-                               "{} tyr suppress bids: score={:.2f} < {:.2f}",
-                               st.symbol, st.tyr_bid_toxicity, tyr_suppress_threshold_);
+                               "{} tox suppress bids: score={:.2f} < {:.2f}",
+                               st.symbol, st.tox_bid_toxicity, tox_suppress_threshold_);
     }
-    if (supp.tyr_ask) {
+    if (supp.tox_ask) {
         bpt::common::log::info(kLog(),
-                               "{} tyr suppress asks: score={:.2f} < {:.2f}",
-                               st.symbol, st.tyr_ask_toxicity, tyr_suppress_threshold_);
+                               "{} tox suppress asks: score={:.2f} < {:.2f}",
+                               st.symbol, st.tox_ask_toxicity, tox_suppress_threshold_);
     }
     if (supp.queue_bid) {
         bpt::common::log::info(kLog(),
@@ -1174,9 +1312,9 @@ void AvellanedaStoikovStrategy::on_toxicity_update(const bpt::analytics::messagi
         return;
 
     auto& st = it->second;
-    st.tyr_bid_toxicity = update.bid_toxicity_score;
-    st.tyr_ask_toxicity = update.ask_toxicity_score;
-    st.tyr_data_received = true;
+    st.tox_bid_toxicity = update.bid_toxicity_score;
+    st.tox_ask_toxicity = update.ask_toxicity_score;
+    st.tox_data_received = true;
 
     double bid_score = update.bid_toxicity_score;
     double ask_score = update.ask_toxicity_score;
@@ -1189,6 +1327,37 @@ void AvellanedaStoikovStrategy::on_toxicity_update(const bpt::analytics::messagi
                            bid_n,
                            ask_score,
                            ask_n);
+}
+
+void AvellanedaStoikovStrategy::on_refdata_stale_changed(bool stale) {
+    if (stale == refdata_stale_)
+        return;  // idempotent — only act on edge
+
+    refdata_stale_ = stale;
+
+    if (stale) {
+        bpt::common::log::warn(kLog(),
+            "Refdata heartbeat stale — pausing new quotes, cancelling resting orders");
+        // Cancel every live bid/ask. Without this, existing orders keep
+        // filling at prices computed before the pause — which is exactly
+        // the silent-bleed failure mode this gate is designed to prevent.
+        // Same pattern as the vol_halted branch in on_bbo.
+        if (!order_mgr_)
+            return;
+        for (auto& [inst_id, st] : state_) {
+            if (st.bid_order_id != 0 && !st.bid_cancel_pending) {
+                order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, inst_id);
+                st.bid_cancel_pending = true;
+            }
+            if (st.ask_order_id != 0 && !st.ask_cancel_pending) {
+                order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, inst_id);
+                st.ask_cancel_pending = true;
+            }
+        }
+    } else {
+        bpt::common::log::info(kLog(),
+            "Refdata heartbeat resumed — quoting re-enabled");
+    }
 }
 
 // ── Strategy state for dashboard ────────────────────────────────────────────
@@ -1290,7 +1459,7 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
 
     // Suppression state per side — priority ladder lives on the
     // SuppressionState struct (vol_gate → inventory → drift → trend →
-    // tyr → queue). Both the boolean and reason string come from the
+    // tox → queue). Both the boolean and reason string come from the
     // same struct so they can never drift.
     j["bidSuppressed"] = supp.bid_suppressed();
     j["bidSuppressReason"] = std::string(supp.bid_reason());
@@ -1426,6 +1595,11 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
         // status of this unwind (rejected or partial+cancelled). Resets
         // to 0 once residual is flat or the budget is exhausted.
         st.unwind_retries_left = shutdown_max_unwind_retries_;
+        // Mark this unwind as shutdown-originated so the EXHAUSTED
+        // watchdog only fires for actual drain failures (not for the
+        // normal-path inventory-cap unwinds that flow through the same
+        // on_exec_report code path).
+        st.unwind_is_shutdown_drain = true;
         send_unwind_order(instrument_id, st, side, st.last_mid, std::abs(net_qty));
         ++unwinds;
     }

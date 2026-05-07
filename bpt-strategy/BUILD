@@ -37,6 +37,7 @@ cc_test(
         "tests/unit/test_position_tracker.cpp",
         "tests/unit/test_queue_tracker.cpp",
         "tests/unit/test_reconciler.cpp",
+        "tests/unit/test_refdata_stale_gate.cpp",
         "tests/unit/test_regime_detector.cpp",
         "tests/unit/test_volatility_gate.cpp",
     ],

@@ -88,11 +88,22 @@ max_inventory = 1.0
 order_qty_fraction      = 0.05
 order_qty_min           = 0.05
 max_inventory_fraction  = 0.5
-# Unlike BTC spot where pro MMs pin the touch at 1 tick (0.14 bps),
-# XMR on HL has a 7 bps natural spread with fewer participants — a
-# 0.1 bps floor lets the AS formula pick the half-spread; gamma and
-# kappa provide the real backstop.
-min_half_spread_bps = 0.1
+# Bumped 2026-04-25 from 0.1 → 2.0. Refdata reports tick=0 for XMR
+# (real fix is in refdata's HL meta lookup), so AS doesn't tick-round
+# and emits 6-decimal prices that HL then quantizes server-side. The
+# prior 0.1 bps floor (~$0.038 at $377) was SMALLER than HL's implicit
+# ~$0.01 tick — effective on-the-wire spread collapsed below tick,
+# producing same-price round-trips on the dashboard and ~$0.01/fill
+# of leakage. 2.0 bps forces total spread ≥ ~$0.15 (~15 ticks),
+# guaranteeing visible separation. Reconsider once refdata tick is
+# populated correctly.
+#
+# Original rationale (kept for context):
+#   "Unlike BTC spot where pro MMs pin the touch at 1 tick (0.14 bps),
+#   XMR on HL has a 7 bps natural spread with fewer participants — a
+#   0.1 bps floor lets the AS formula pick the half-spread; gamma and
+#   kappa provide the real backstop."
+min_half_spread_bps = 2.0
 
 # ── Drift / momentum defence (Cartea-Jaimungal extension) ────────
 # Estimates signed drift µ via EWMA of normalized log returns (same
@@ -120,7 +131,15 @@ drift_suppress_bps  = 3.0
 # 3.0 ≈ "fire on 3-SD-per-√s moves." Lets the same config target
 # different vol regimes without re-tuning the bps floor; the floor
 # stays as a hard minimum.
-drift_suppress_sigma_mult = 3.0
+#
+# Halved 2026-04-25 from 3.0 → 1.5 because we flipped fair_value mode
+# to micro. Micro-price already responds to top-of-book imbalance, and
+# drift_α responds to the same signal over a window. Keeping both at
+# original weight double-counts and over-tilts the reservation price —
+# observed live on the soak: AS scaled to 0.75 long then 0.94 short
+# within an hour, ~$0.91 of realized losses from forced unwinds at
+# the inventory cap. Halving is the conservative first cut.
+drift_suppress_sigma_mult = 1.5
 
 # ── Slow-drift (trend) suppression ─────────────────────────────────
 # Complements the per-√s drift EWMA above. Same wrong-side logic —
@@ -158,14 +177,14 @@ slow_drift_suppress_bps = 20.0
 # adaptive part from going below the manually-validated XMR threshold.
 slow_drift_suppress_sigma_mult = 3.0
 
-# ── Tyr toxicity feedback (optional) ──────────────────────────────
-# When tyr is running and fenrir subscribes to stream 5001 (set
-# [aeron.toxicity] stream_id = 5001 in the instance config), AS
-# receives live per-side toxicity scores. When a side's score drops
-# below tyr_suppress_threshold, that side is suppressed.
-# 0 disables tyr-based suppression even if the stream is connected.
+# ── Analytics toxicity feedback (optional) ────────────────────────
+# When bpt-analytics is running and the strategy subscribes to stream
+# 5001 (set [aeron.toxicity] stream_id = 5001 in the instance config),
+# AS receives live per-side toxicity scores. When a side's score drops
+# below tox_suppress_threshold, that side is suppressed.
+# 0 disables tox-based suppression even if the stream is connected.
 # Typical value: -2.0 (suppress when 5s markout is -2bps or worse).
-tyr_suppress_threshold = -2.0
+tox_suppress_threshold = -2.0
 
 # ── Volatility halt ───────────────────────────────────────────────
 # Addresses the pathology we observed live: stoikov got stuck with
@@ -213,3 +232,29 @@ gamma_pnl_loss_threshold_usd   = -0.25
 gamma_pnl_profit_threshold_usd = 1.0
 gamma_pnl_widen_mult       = 1.5
 gamma_pnl_tighten_mult     = 0.85
+
+# Drawdown circuit-breaker. When realized PnL drops below this absolute
+# USD threshold (negative number), AS pauses both bid+ask for
+# pause_cooldown_s before resuming. Per-instrument: only the breaching
+# instrument pauses. Set to 0 (or positive) to disable.
+#
+# Initial value tuned from observed live behavior 2026-04-25: a single
+# adverse cycle on XMR with mode=micro typically bleeds ~$0.05-0.20 of
+# realized PnL before mean-reverting. -0.30 leaves headroom for normal
+# oscillation but trips on the kind of sustained leak that destroyed
+# the pre-hotfix run (-$0.91 in 30min). 5min cooldown gives the market
+# time to flip regime — short enough to resume quickly, long enough
+# that we're not just bleeding at half-rate.
+#
+# Must live BEFORE [fenrir.strategy.params.fair_value] table — TOML
+# scopes any bare keys appearing after a [table] header to that table.
+pause_below_rpnl_usd = -0.30
+pause_cooldown_s     = 300.0
+
+# Fair-value estimator for the AS reservation-price `s`.
+# Modes: mid | micro | micro_capped | l2_weighted | ewma_micro
+# Switched from mid → micro 2026-04-24: micro-price is closer to a true
+# martingale than mid (Stoikov 2017), reducing adverse-selection on
+# fills by weighting the price toward the thin side of the book.
+[fenrir.strategy.params.fair_value]
+mode = "micro"
