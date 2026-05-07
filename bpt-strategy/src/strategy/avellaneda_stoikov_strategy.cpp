@@ -87,6 +87,7 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       max_inventory_fraction_(cfg.params["max_inventory_fraction"].value<double>().value_or(0.0)),
       min_half_spread_bps_(cfg.params["min_half_spread_bps"].value<double>().value_or(1.0)),
       max_half_spread_bps_(cfg.params["max_half_spread_bps"].value<double>().value_or(50.0)),
+      quote_sanity_bps_(cfg.params["quote_sanity_bps"].value<double>().value_or(5000.0)),
       order_book_depth_(static_cast<uint8_t>(cfg.params["order_book_depth"].value<int64_t>().value_or(0))),
       fv_cfg_(parse_fair_value_config(cfg.params)),
       pause_below_rpnl_usd_(cfg.params["pause_below_rpnl_usd"].value<double>().value_or(0.0)),
@@ -876,6 +877,43 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
         // transient feed states), treat as "don't quote this tick."
         if (out_bid >= out_ask)
             return false;
+    }
+
+    // ── Final sanity check on quote level ───────────────────────────────
+    //
+    // Even after every cap above, the formula can land on absurd quote
+    // levels — most commonly on cheap instruments where the inventory
+    // penalty (q*γ*σ²*T) is dimensionally wrong and overwhelms mid. APE
+    // at $0.16 produced bids at -$2.74 in the 2026-05-07 backtest; the
+    // OrderManager rejected 899 of them in 11h because price ≤ 0. By the
+    // time OrderMgr saw them, the strategy had already built and tracked
+    // an order. Cheaper to skip the whole tick here.
+    //
+    // Bound is symmetric around mid in bps. Fires also on cold start
+    // (last_market_bid/ask ≈ 0 makes the post-touch cap silently no-op).
+    if (st.last_mid > 0.0 && quote_sanity_bps_ > 0.0) {
+        const double bound = st.last_mid * (quote_sanity_bps_ / 10000.0);
+        const double lo = st.last_mid - bound;
+        const double hi = st.last_mid + bound;
+        if (out_bid < lo || out_ask > hi || out_bid <= 0.0) {
+            static std::size_t skip_count = 0;
+            if (++skip_count <= 5 || skip_count % 1000 == 0) {
+                bpt::common::log::warn(
+                    kLog(),
+                    "{} quote out of sanity range — skipping tick: "
+                    "bid={:.6f} ask={:.6f} mid={:.6f} reservation={:.6f} "
+                    "half_spread={:.6f} (sanity_bps={:.1f}; {} skips so far)",
+                    st.symbol,
+                    out_bid,
+                    out_ask,
+                    st.last_mid,
+                    reservation,
+                    half_spread,
+                    quote_sanity_bps_,
+                    skip_count);
+            }
+            return false;
+        }
     }
 
     bpt::common::log::debug(

@@ -395,6 +395,16 @@ private:
     // can see that warmup isn't done yet — better than silently
     // quoting wide.
     double max_half_spread_bps_;      // ceiling on half-spread in basis points
+    // Sanity range around mid that any emitted quote must fall inside.
+    // Last line of defence: if the AS formula produces a bid or ask
+    // outside [mid * (1 - bps/10000), mid * (1 + bps/10000)] — typically
+    // because the dimensional units in the inventory penalty break on
+    // cheap instruments, or warmup is wildly off — skip the tick rather
+    // than emitting nonsense to the OrderManager. Tracked separately
+    // from max_half_spread_bps_ because that one bounds the FORMULA's
+    // half-spread; this one bounds the FINAL quote level after all
+    // adjustments (reservation skew, drift, post-touch cap).
+    double quote_sanity_bps_;
     uint8_t order_book_depth_;        // 0 = BBO only, >0 subscribes to L2 ladder
 
     // Fair-value estimator config — drives the choice of AS reference
