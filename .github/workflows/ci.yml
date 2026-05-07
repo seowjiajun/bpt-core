@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded PR runs (a force-push or new commit kills the older pipeline).
+# Don't cancel on main — every push there should populate caches to completion.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # ── Path filter ────────────────────────────────────────────────────────────
   # Decides which downstream jobs need to run based on what actually changed.
@@ -16,6 +22,7 @@ jobs:
   # on PR events, against the base branch. Both modes handle this correctly.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       cpp: ${{ steps.filter.outputs.cpp }}
       backtester_cmake: ${{ steps.filter.outputs.backtester_cmake }}
@@ -75,6 +82,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.sbe == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -106,6 +114,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.cpp == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -139,6 +148,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backtester_cmake == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
 
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
@@ -271,6 +281,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.transport == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -308,6 +319,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     defaults:
       run:
