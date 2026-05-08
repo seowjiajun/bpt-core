@@ -145,6 +145,7 @@ public:
 
     void publish(const bpt::md_gateway::md::MdOrderBook& book) {
         ++seq_;
+        ++orderbook_count_;
 
         if (matching_ && cache_) {
             if (auto inst = cache_->get(book.instrument_id)) {
@@ -192,6 +193,7 @@ public:
     /// Diagnostic counters — useful for confirming trades reached the
     /// matching engine when a backtest produces zero fills.
     [[nodiscard]] uint64_t trade_count() const { return trade_count_; }
+    [[nodiscard]] uint64_t orderbook_count() const { return orderbook_count_; }
 
 private:
     bpt::strategy::md::InProcessMdClient& client_;
@@ -199,6 +201,7 @@ private:
     const bpt::strategy::refdata::InstrumentCache* cache_{nullptr};
     uint64_t seq_{0};
     uint64_t trade_count_{0};
+    uint64_t orderbook_count_{0};
 };
 
 }  // namespace bpt::backtester::harness

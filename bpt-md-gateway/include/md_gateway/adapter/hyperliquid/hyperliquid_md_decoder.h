@@ -75,6 +75,20 @@ public:
             bbo.timestamp_ns = recv_ns;
             bbo.instrument_id = instrument_id;
 
+            // Per-subscription depth — drives whether to emit MdOrderBook
+            // alongside MdBbo. Strategies with order_book_depth=0 only need
+            // BBO; depth>0 strategies (and the deterministic backtest
+            // harness) need the L2 ladder for queue-aware fill matching
+            // and OFI features. HL's `l2Book` payload ships up to 20 levels
+            // per side; cap at min(subscribed_depth, kMaxBookLevels).
+            const uint8_t sub_depth = subs_.find_depth(instrument_id);
+            const std::size_t depth_cap = std::min<std::size_t>(
+                sub_depth > 0 ? sub_depth : 0, md::kMaxBookLevels);
+
+            md::MdOrderBook out_book;
+            out_book.timestamp_ns = recv_ns;
+            out_book.instrument_id = instrument_id;
+
             uint8_t side_idx = 0;
             for (auto side_res : levels_outer) {
                 if (side_idx > 1)
@@ -84,15 +98,34 @@ public:
                     ++side_idx;
                     continue;
                 }
-                simdjson::ondemand::object lvl;
-                if (side_arr.at(0).get_object().get(lvl)) {
-                    ++side_idx;
-                    continue;
+                std::size_t level_idx = 0;
+                for (auto lvl_res : side_arr) {
+                    simdjson::ondemand::object lvl;
+                    if (lvl_res.get_object().get(lvl))
+                        break;
+                    double px = 0.0, qty = 0.0;
+                    (void)bpt::common::util::ff_double(lvl["px"], px);
+                    (void)bpt::common::util::ff_double(lvl.find_field_unordered("sz"), qty);
+                    if (level_idx == 0) {
+                        // Top-of-book — populate MdBbo for BBO consumers.
+                        if (side_idx == 0) {
+                            bbo.bid_price = px;
+                            bbo.bid_qty = qty;
+                        } else {
+                            bbo.ask_price = px;
+                            bbo.ask_qty = qty;
+                        }
+                    }
+                    if (depth_cap > 0 && level_idx < depth_cap) {
+                        if (side_idx == 0)
+                            out_book.bids.emplace_back(px, qty);
+                        else
+                            out_book.asks.emplace_back(px, qty);
+                    }
+                    ++level_idx;
+                    if (depth_cap == 0 && level_idx >= 1)
+                        break;  // BBO-only consumer — stop after [0]
                 }
-                double& px = (side_idx == 0) ? bbo.bid_price : bbo.ask_price;
-                double& qty = (side_idx == 0) ? bbo.bid_qty : bbo.ask_qty;
-                (void)bpt::common::util::ff_double(lvl["px"], px);
-                (void)bpt::common::util::ff_double(lvl.find_field_unordered("sz"), qty);
                 ++side_idx;
             }
 
@@ -104,6 +137,12 @@ public:
             if (++tick_count_ <= 20 || tick_count_ % 500 == 0)
                 bpt::common::log::info("Hyperliquid BBO decode: {}ns tick={}", lat_ns, tick_count_);
             pub.publish(bbo);
+            // Only publish MdOrderBook when at least one side had levels
+            // captured at sub_depth. Production HL strategies with
+            // order_book_depth=0 won't set sub_depth>0, so this branch is
+            // a no-op for them — preserving today's wire-level behavior.
+            if (depth_cap > 0 && (!out_book.bids.empty() || !out_book.asks.empty()))
+                pub.publish(out_book);
 
         // --- Trades ---
         } else if (channel == "trades") {

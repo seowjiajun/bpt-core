@@ -50,6 +50,11 @@ order_qty = 50
 requote_threshold = 0.0005
 max_inventory = 500.0
 
+# Subscribe to L2 ladder (depth 5) so the deterministic backtest harness's
+# matching engine has real depth for queue_ahead seeding + fill-against-book
+# logic. Multi-process backtest stack also works with this.
+order_book_depth = 5
+
 # Disabled in backtest — simulator pushes $0 starting balance so equity-fraction
 # sizing collapses qty to 0. Use absolute order_qty / max_inventory above instead.
 order_qty_fraction      = 0

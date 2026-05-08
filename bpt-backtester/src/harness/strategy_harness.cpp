@@ -210,8 +210,8 @@ uint64_t StrategyHarness::replay() {
 void StrategyHarness::finalize(uint64_t end_ts_ns) {
     if (hl_publisher_) {
         bpt::common::log::info(
-            "[harness] decoder produced {} trades for matching engine",
-            hl_publisher_->trade_count());
+            "[harness] decoder produced {} trades + {} orderbooks for matching engine",
+            hl_publisher_->trade_count(), hl_publisher_->orderbook_count());
     }
     // Tell the strategy to flatten any open positions. Multi-process
     // backtest does this via on_shutdown_flatten which sends IOC
