@@ -22,7 +22,13 @@
 /// Header-only: every method is small enough to inline at the decoder
 /// call site, and there's exactly one consumer (StrategyHarness).
 
+#include "backtester/data/market_event.h"
+#include "backtester/data/orderbook_record.h"
+#include "backtester/data/trade_record.h"
+#include "backtester/matching/matching_engine.h"
+
 #include "strategy/md/inprocess_md_client.h"
+#include "strategy/refdata/instrument_cache.h"
 
 #include "md_gateway/md/md_encoder.h"
 #include "md_gateway/md/md_types.h"
@@ -32,6 +38,7 @@
 #include <messages/MdTrade.h>
 #include <messages/MessageHeader.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
@@ -39,8 +46,20 @@ namespace bpt::backtester::harness {
 
 class HarnessMdPublisher {
 public:
+    /// Strategy-only ctor (no matching-engine fan-out — useful for
+    /// unit tests that want to assert the publisher → strategy hop).
     explicit HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client)
         : client_(client) {}
+
+    /// Production ctor for the harness — every published OrderBook/Trade
+    /// is also dispatched to the matching engine so resting LIMITs can
+    /// be filled. The instrument cache resolves instrument_id back to
+    /// venue (exchange, symbol) — MatchingEngine's API keys orders by
+    /// strings, not by canonical id.
+    HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client,
+                       matching::MatchingEngine* matching,
+                       const bpt::strategy::refdata::InstrumentCache* cache)
+        : client_(client), matching_(matching), cache_(cache) {}
 
     void publish(const bpt::md_gateway::md::MdBbo& bbo) {
         ++seq_;
@@ -62,6 +81,29 @@ public:
 
     void publish(const bpt::md_gateway::md::MdTrade& trade) {
         ++seq_;
+
+        // Matching engine first — fills against book based on prior
+        // book state aren't directly affected by trades, but the
+        // existing engine has a fill_against_trade() path that drains
+        // queue_ahead from resting LIMITs at the trade price. Mirrors
+        // ClockMaster's ordering: market_event → matching → strategy.
+        if (matching_ && cache_) {
+            if (auto inst = cache_->get(trade.instrument_id)) {
+                bpt::backtester::data::TradeRecord tr{
+                    .timestamp_ns = trade.timestamp_ns,
+                    .price        = trade.price,
+                    .quantity     = trade.qty,
+                    .side         = trade.side == bpt::messages::TradeSide::BUY
+                                        ? bpt::backtester::data::TradeSide::BUY
+                                        : bpt::backtester::data::TradeSide::SELL,
+                    .exchange     = inst->exchange,
+                    .symbol       = inst->symbol,
+                };
+                matching_->on_market_event(
+                    bpt::backtester::data::MarketEvent::from_trade(std::move(tr)));
+            }
+        }
+
         constexpr std::size_t kBufSize =
             bpt::messages::MessageHeader::encodedLength() +
             bpt::messages::MdTrade::sbeBlockLength();
@@ -79,6 +121,30 @@ public:
 
     void publish(const bpt::md_gateway::md::MdOrderBook& book) {
         ++seq_;
+
+        if (matching_ && cache_) {
+            if (auto inst = cache_->get(book.instrument_id)) {
+                bpt::backtester::data::OrderBookRecord ob;
+                ob.timestamp_ns = book.timestamp_ns;
+                ob.exchange     = inst->exchange;
+                ob.symbol       = inst->symbol;
+                const std::size_t n_bid = std::min<std::size_t>(
+                    book.bids.size(), bpt::backtester::data::kOrderBookDepth);
+                for (std::size_t i = 0; i < n_bid; ++i) {
+                    ob.bid_px[i] = book.bids[i].first;
+                    ob.bid_sz[i] = book.bids[i].second;
+                }
+                const std::size_t n_ask = std::min<std::size_t>(
+                    book.asks.size(), bpt::backtester::data::kOrderBookDepth);
+                for (std::size_t i = 0; i < n_ask; ++i) {
+                    ob.ask_px[i] = book.asks[i].first;
+                    ob.ask_sz[i] = book.asks[i].second;
+                }
+                matching_->on_market_event(
+                    bpt::backtester::data::MarketEvent::from_orderbook(std::move(ob)));
+            }
+        }
+
         // Encoder is the same one mdgw uses on the live wire, so
         // OrderBook's variable-length payload is bit-identical between
         // backtest replay and production.
@@ -101,6 +167,8 @@ public:
 
 private:
     bpt::strategy::md::InProcessMdClient& client_;
+    matching::MatchingEngine* matching_{nullptr};
+    const bpt::strategy::refdata::InstrumentCache* cache_{nullptr};
     uint64_t seq_{0};
 };
 

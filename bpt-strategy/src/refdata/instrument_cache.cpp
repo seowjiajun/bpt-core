@@ -147,6 +147,18 @@ void InstrumentCache::reset() {
     last_delta_seq_ = 0;
 }
 
+void InstrumentCache::seed(std::vector<Instrument> instruments) {
+    cache_.clear();
+    cache_.reserve(instruments.size());
+    for (auto& inst : instruments) {
+        const uint64_t id = inst.instrument_id;
+        cache_.emplace(id, std::move(inst));
+    }
+    snapshot_received_ = true;
+    snapshot_seq_num_ = 0;
+    last_delta_seq_ = 0;
+}
+
 std::optional<Instrument> InstrumentCache::get(uint64_t instrument_id) const {
     auto it = cache_.find(instrument_id);
     if (it == cache_.end())

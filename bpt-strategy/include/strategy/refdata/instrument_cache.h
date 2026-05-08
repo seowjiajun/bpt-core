@@ -24,6 +24,14 @@ public:
 
     void reset();
 
+    /// Populate the cache directly from a vector of Instrument values,
+    /// bypassing the SBE snapshot/delta path. Used by the deterministic
+    /// backtest harness which loads instrument metadata from JSON
+    /// (no Aeron, no SBE serialisation). Marks the cache as
+    /// snapshot_received so consumers that gate on that flag (e.g.
+    /// startup gate) treat the seeded state as a real snapshot.
+    void seed(std::vector<Instrument> instruments);
+
     [[nodiscard]] std::optional<Instrument> get(uint64_t instrument_id) const;
     [[nodiscard]] std::vector<Instrument> get_all() const;
     [[nodiscard]] std::size_t size() const { return cache_.size(); }
