@@ -149,6 +149,10 @@ private:
     /// this as a tie-breaker on duplicates; harness needs to fire
     /// strictly increasing.
     uint64_t exec_seq_{0};
+
+    /// Diagnostic — counts POST_ONLY-would-cross rejections. Useful
+    /// for operators investigating why a backtest produced zero fills.
+    uint64_t rejected_count_{0};
 };
 
 }  // namespace bpt::backtester::harness

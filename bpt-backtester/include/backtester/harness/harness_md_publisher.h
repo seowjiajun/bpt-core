@@ -63,6 +63,29 @@ public:
 
     void publish(const bpt::md_gateway::md::MdBbo& bbo) {
         ++seq_;
+
+        // Feed matching engine. HL's `l2Book` channel produces BBO at
+        // this layer (MdBbo, not MdOrderBook), so without this fan-out
+        // the engine's books_ map stays empty and no resting LIMIT
+        // ever fills (no crossing-LIMIT path, no queue-ahead seeding,
+        // no book-cross backstop). Build a depth-1 OrderBookRecord
+        // from the top-of-book — the matching engine uses bid_px[0]/
+        // ask_px[0] for the cross check, which is all we have anyway.
+        if (matching_ && cache_) {
+            if (auto inst = cache_->get(bbo.instrument_id)) {
+                bpt::backtester::data::OrderBookRecord ob;
+                ob.timestamp_ns = bbo.timestamp_ns;
+                ob.exchange     = inst->exchange;
+                ob.symbol       = inst->symbol;
+                ob.bid_px[0]    = bbo.bid_price;
+                ob.bid_sz[0]    = bbo.bid_qty;
+                ob.ask_px[0]    = bbo.ask_price;
+                ob.ask_sz[0]    = bbo.ask_qty;
+                matching_->on_market_event(
+                    bpt::backtester::data::MarketEvent::from_orderbook(std::move(ob)));
+            }
+        }
+
         constexpr std::size_t kBufSize =
             bpt::messages::MessageHeader::encodedLength() +
             bpt::messages::MdMarketData::sbeBlockLength();
@@ -81,6 +104,7 @@ public:
 
     void publish(const bpt::md_gateway::md::MdTrade& trade) {
         ++seq_;
+        ++trade_count_;
 
         // Matching engine first — fills against book based on prior
         // book state aren't directly affected by trades, but the
@@ -165,11 +189,16 @@ public:
     /// The harness never drops (synchronous fan-out, no backpressure).
     [[nodiscard]] uint64_t drop_count() const { return 0; }
 
+    /// Diagnostic counters — useful for confirming trades reached the
+    /// matching engine when a backtest produces zero fills.
+    [[nodiscard]] uint64_t trade_count() const { return trade_count_; }
+
 private:
     bpt::strategy::md::InProcessMdClient& client_;
     matching::MatchingEngine* matching_{nullptr};
     const bpt::strategy::refdata::InstrumentCache* cache_{nullptr};
     uint64_t seq_{0};
+    uint64_t trade_count_{0};
 };
 
 }  // namespace bpt::backtester::harness

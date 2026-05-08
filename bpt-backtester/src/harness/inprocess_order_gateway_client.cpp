@@ -112,6 +112,19 @@ bool InProcessOrderGatewayClient::send_new_order(uint64_t order_id,
     matching::OpenOrder result = matching_.submit_order(std::move(mo));
 
     if (result.rejected) {
+        // POST_ONLY crossing → rejected. Logged once per occurrence so
+        // the operator can see WHY a backtest produces no fills if the
+        // strategy's quotes consistently cross the book at submit time.
+        ++rejected_count_;
+        if (rejected_count_ <= 5 || rejected_count_ % 100 == 0) {
+            bpt::common::log::warn(
+                "[harness-OGW] POST_ONLY rejected (would cross): {} {} {} @ {} (count={})",
+                exchange_str,
+                exchange_symbol,
+                side == bpt::messages::OrderSide::BUY ? "BUY" : "SELL",
+                static_cast<double>(price) / kPriceScale,
+                rejected_count_);
+        }
         // POST_ONLY would have crossed; venue rejects.
         publish_exec_status(order_id, exchange_id, instrument_id,
                             bpt::messages::ExecStatus::REJECTED,
@@ -237,7 +250,15 @@ void InProcessOrderGatewayClient::publish_fill(const matching::FillReport& fr) {
     try { order_id = std::stoull(fr.order_id); } catch (...) { return; }
 
     auto it = live_.find(order_id);
-    if (it == live_.end()) return;
+    if (it == live_.end()) {
+        bpt::common::log::warn("[harness-OGW] fill for unknown order_id={} ({}/{} @ {})",
+                               fr.order_id, fr.exchange, fr.symbol, fr.last_fill_price);
+        return;
+    }
+    bpt::common::log::info("[harness-OGW] FILL order_id={} {} {} @ {} qty={} ({})",
+                            order_id, fr.exchange, fr.symbol,
+                            fr.last_fill_price, fr.last_fill_qty,
+                            fr.liquidity_role == matching::LiquidityRole::MAKER ? "MAKER" : "TAKER");
     auto& lo = it->second;
 
     const uint64_t fill_qty_scaled = static_cast<uint64_t>(fr.last_fill_qty * kQtyScale + 0.5);
