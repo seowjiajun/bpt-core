@@ -25,13 +25,31 @@ struct UniverseFilter {
     uint8_t default_depth{5};
 };
 
-// Recording knobs — one set per spool flavour. Today only mdgw recording
-// is wired; refdata recording is a follow-up.
+// Recording knobs — one set per spool flavour. WS frames go under
+// {output_dir}/{venue}/...; refdata REST bodies under
+// {output_dir}/{venue}-rest/... — same RawSpool format, distinct path so
+// the WS converter doesn't have to filter them out.
 struct RecordingConfig {
     std::string output_dir{"/opt/bpt/data/raw"};
     uint32_t rotate_interval_seconds{3600};
     uint32_t fsync_interval_ms{1000};
     uint32_t buffer_bytes{1u << 20};
+};
+
+// One configured REST endpoint to poll. bpt-tape pulls these on a timer
+// and tees the response bodies to a `{venue}-rest` spool. Operator
+// declares the URL shape — bpt-tape doesn't introspect bpt-refdata's
+// adapter code, on purpose: the refdata service can grow new endpoints
+// without changing the recorder, and vice versa.
+struct RefdataEndpoint {
+    std::string exchange;            ///< "HYPERLIQUID" — picks the spool
+    std::string host;                ///< e.g. "api.hyperliquid.xyz"
+    std::string port{"443"};
+    bool use_tls{true};
+    std::string method{"GET"};       ///< "GET" | "POST"
+    std::string path;                ///< e.g. "/info"
+    std::string body;                ///< POST body; ignored for GET
+    uint32_t interval_seconds{3600}; ///< per-endpoint poll cadence
 };
 
 struct Settings {
@@ -58,6 +76,10 @@ struct Settings {
     std::vector<std::string> recording_universe_venues;
 
     RecordingConfig recording;
+
+    // Operator-declared REST endpoints to poll + capture. Empty = refdata
+    // recording disabled (the existing WS-only deploy).
+    std::vector<RefdataEndpoint> refdata_endpoints;
 
     // Prometheus metrics bind host. Port comes from base.metrics_port.
     std::string metrics_host{"127.0.0.1"};

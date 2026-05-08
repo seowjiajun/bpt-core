@@ -25,6 +25,29 @@ cc_library(
     ],
 )
 
+# Standalone REST client (Boost.Beast over TLS, with retries). Split out so
+# bpt-tape can import the same class — and subclass it to tee response bodies
+# to disk — without dragging in Aeron, the registry, or the per-venue
+# decoders. bpt-refdata's main library re-exports it via :refdata_lib deps.
+cc_library(
+    name = "rest_client_lib",
+    srcs = [
+        "src/http/rest_client.cpp",
+    ],
+    hdrs = [
+        "include/refdata/http/rest_client.h",
+    ],
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bpt-common",
+        "@boost.asio",
+        "@boost.beast",
+        "@boost.system",
+        "@openssl",
+    ],
+)
+
 cc_library(
     name = "refdata_lib",
     srcs = [
@@ -39,7 +62,6 @@ cc_library(
         "src/messaging/fee_schedule_publisher.cpp",
         "src/messaging/refdata_status_publisher.cpp",
         "src/config/loader.cpp",
-        "src/http/rest_client.cpp",
         "src/adapter/binance/binance_refdata_decoder.cpp",
         "src/adapter/binance/binance_refdata_adapter.cpp",
         "src/adapter/okx/okx_refdata_decoder.cpp",
@@ -57,6 +79,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":mapping_lib",
+        ":rest_client_lib",
         "//messages",
         "//bpt-app",
         "//bpt-common",

@@ -121,6 +121,34 @@ Settings load(const std::string& path) {
             s.metrics_host = *v;
     }
 
+    if (auto* arr = root["refdata_endpoints"].as_array()) {
+        for (auto& elem : *arr) {
+            auto* t = elem.as_table();
+            if (!t) continue;
+            RefdataEndpoint ep;
+            if (auto v = (*t)["exchange"].value<std::string>()) ep.exchange = *v;
+            if (auto v = (*t)["host"].value<std::string>()) ep.host = *v;
+            if (auto v = (*t)["port"].value<std::string>()) ep.port = *v;
+            if (auto v = (*t)["use_tls"].value<bool>()) ep.use_tls = *v;
+            if (auto v = (*t)["method"].value<std::string>()) ep.method = *v;
+            if (auto v = (*t)["path"].value<std::string>()) ep.path = *v;
+            if (auto v = (*t)["body"].value<std::string>()) ep.body = *v;
+            if (auto v = (*t)["interval_seconds"].value<int64_t>())
+                ep.interval_seconds = static_cast<uint32_t>(*v);
+            if (ep.exchange.empty() || ep.host.empty() || ep.path.empty()) {
+                throw std::runtime_error(
+                    "bpt-tape config: [[refdata_endpoints]] entry missing exchange/host/path");
+            }
+            // Honour recording_universe_venues if it's set — keeps the
+            // recorder host single-purpose to a venue subset.
+            if (!venue_filter.empty() && !venue_filter.count(ep.exchange))
+                continue;
+            s.refdata_endpoints.push_back(std::move(ep));
+        }
+    }
+    bpt::common::log::info("bpt-tape refdata_endpoints: {} entries",
+                           s.refdata_endpoints.size());
+
     return s;
 }
 

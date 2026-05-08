@@ -70,3 +70,30 @@ level = "info"
 dir = "logs"
 flush_level = "warn"
 flush_interval_ms = 1000
+
+# Refdata REST capture. One spool per exchange (path:
+# /opt/bpt/data/raw/hyperliquid-rest/...) — separate from the WS spool so
+# the WS converter never sees these records. Body envelope is
+# `u8 method | u16 target_len | target | body` (see RawSpool::RecordType
+# REST_RESPONSE). HL uses POST /info with a JSON body discriminator;
+# enumerated explicitly here so the recorder's surface is decoupled from
+# bpt-refdata's adapter code.
+[[refdata_endpoints]]
+exchange = "HYPERLIQUID"
+host = "api.hyperliquid.xyz"
+port = "443"
+use_tls = true
+method = "POST"
+path = "/info"
+body = '{"type":"meta"}'
+interval_seconds = 3600
+
+[[refdata_endpoints]]
+exchange = "HYPERLIQUID"
+host = "api.hyperliquid.xyz"
+port = "443"
+use_tls = true
+method = "POST"
+path = "/info"
+body = '{"type":"spotMeta"}'
+interval_seconds = 3600

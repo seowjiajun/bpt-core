@@ -11,6 +11,7 @@ cc_library(
     name = "tape_lib",
     srcs = [
         "src/config/loader.cpp",
+        "src/refdata/refdata_poller.cpp",
     ],
     hdrs = glob(["include/tape/**/*.h"]),
     includes = ["include"],
@@ -20,6 +21,7 @@ cc_library(
         "//bpt-common",
         "//bpt-md-gateway:md_gateway_lib",
         "//bpt-refdata:mapping_lib",
+        "//bpt-refdata:rest_client_lib",
         "@fmt",
         "@tomlplusplus//:tomlplusplus",
     ],
@@ -36,6 +38,7 @@ cc_binary(
         "//bpt-common",
         "//bpt-md-gateway:md_gateway_lib",
         "//bpt-refdata:mapping_lib",
+        "//bpt-refdata:rest_client_lib",
         "@cli11",
         "@fmt",
     ],

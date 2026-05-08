@@ -46,6 +46,13 @@ enum class RecordType : uint8_t {
     CHECKPOINT    = 3,  ///< periodic heartbeat; payload = JSON {frames, bytes, uptime_s}
     WS_DISCONNECT = 4,  ///< unexpected WS connection loss; payload = JSON {reason, attempt}
     WS_RECONNECT  = 5,  ///< WS reconnect succeeded after a prior disconnect; payload = JSON {attempt}
+    /// REST response body captured from a refdata poll (bpt-tape only).
+    /// Payload envelope (little-endian):
+    ///   u8  method  (0=GET, 1=POST)
+    ///   u16 target_len
+    ///   char target[target_len]
+    ///   char body[remainder]
+    REST_RESPONSE = 6,
 };
 
 /// \brief Single-writer append-only spool that emits the .wslog binary format.

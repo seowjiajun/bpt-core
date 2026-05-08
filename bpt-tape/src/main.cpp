@@ -14,6 +14,7 @@
 
 #include "tape/adapter/recording_mdgw_adapters.h"
 #include "tape/config/settings.h"
+#include "tape/refdata/refdata_poller.h"
 #include "bpt_common/recorder/raw_spool.h"
 #include "md_gateway/md/md_types.h"
 #include "md_gateway/adapter/common/i_adapter.h"
@@ -200,6 +201,50 @@ public:
             for (auto& a : adapters_) a->stop();
             throw;
         }
+
+        // Refdata REST pollers — independent of the mdgw adapter pipeline.
+        // Group endpoints by exchange so each venue gets its own spool +
+        // single-writer thread. Spool path is `{venue}-rest` so the WS
+        // converter doesn't see these records.
+        std::unordered_map<std::string, std::vector<refdata::EndpointSpec>>
+            endpoints_per_venue;
+        for (const auto& e : settings_.refdata_endpoints) {
+            refdata::EndpointSpec spec;
+            spec.exchange = e.exchange;
+            spec.host = e.host;
+            spec.port = e.port;
+            spec.use_tls = e.use_tls;
+            spec.method = e.method;
+            spec.path = e.path;
+            spec.body = e.body;
+            spec.interval_seconds = e.interval_seconds;
+            endpoints_per_venue[e.exchange].push_back(std::move(spec));
+        }
+        for (auto& [venue_name, eps] : endpoints_per_venue) {
+            const std::string venue_tag = lowercase_venue(venue_name) + "-rest";
+            auto spool = std::make_shared<bpt::common::recorder::RawSpool>(
+                bpt::common::recorder::RawSpool::Config{
+                    .root_dir = settings_.recording.output_dir,
+                    .venue_tag = venue_tag,
+                    .rotate_interval_seconds = settings_.recording.rotate_interval_seconds,
+                    .buffer_bytes = settings_.recording.buffer_bytes,
+                    .flush_interval_ns =
+                        static_cast<uint64_t>(settings_.recording.fsync_interval_ms) *
+                        1'000'000ULL,
+                });
+            const std::string snapshot = fmt::format(
+                R"({{"pid":{},"exchange":"{}","kind":"refdata","endpoints":{}}})",
+                ::getpid(), venue_name, eps.size());
+            spool->write_marker(wall_now_ns(),
+                                bpt::common::recorder::RecordType::SESSION_START,
+                                snapshot);
+            spool->flush();
+            auto poller = std::make_unique<refdata::RefdataPoller>(
+                venue_tag, spool, std::move(eps));
+            poller->start();
+            refdata_spools_.push_back(spool);
+            refdata_pollers_.push_back(std::move(poller));
+        }
     }
 
     void run() override {
@@ -224,6 +269,15 @@ public:
                             R"({"reason":"stop"})");
             s->flush();
         }
+        // Same dance for refdata pollers — stop() joins each poll thread,
+        // so the spool is quiescent by the time we write SESSION_STOP.
+        for (auto& p : refdata_pollers_) p->stop();
+        for (auto& s : refdata_spools_) {
+            s->write_marker(wall_now_ns(),
+                            bpt::common::recorder::RecordType::SESSION_STOP,
+                            R"({"reason":"stop"})");
+            s->flush();
+        }
     }
 
 private:
@@ -238,6 +292,8 @@ private:
     std::vector<std::shared_ptr<bpt::md_gateway::adapter::IAdapter>> adapters_;
     std::unordered_map<std::string,
                        std::shared_ptr<bpt::md_gateway::adapter::IAdapter>> adapters_per_venue_;
+    std::vector<std::shared_ptr<bpt::common::recorder::RawSpool>> refdata_spools_;
+    std::vector<std::unique_ptr<refdata::RefdataPoller>> refdata_pollers_;
 };
 
 }  // namespace
