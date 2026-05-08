@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
@@ -53,6 +54,7 @@ cc_library(
     name = "harness_lib",
     srcs = [
         "src/harness/inprocess_order_gateway_client.cpp",
+        "src/harness/strategy_harness.cpp",
     ],
     hdrs = glob(["include/backtester/harness/*.h"]),
     includes = ["include"],
@@ -60,7 +62,18 @@ cc_library(
     deps = [
         ":backtester_core",
         "//bpt-strategy:strategy_lib",
+        "//bpt-md-gateway:md_gateway_lib",
+        "//bpt-refdata:mapping_lib",
         "//bpt-common",
         "//messages",
+    ],
+)
+
+cc_binary(
+    name = "bpt-backtester-mono",
+    srcs = ["src/main_mono.cpp"],
+    deps = [
+        ":harness_lib",
+        "@cli11",
     ],
 )

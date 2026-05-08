@@ -24,7 +24,13 @@ namespace bpt::strategy::refdata {
 
 class InProcessRefdataClient : public IRefdataClient {
 public:
-    InProcessRefdataClient() = default;
+    /// `max_staleness_ns` propagates into FeeCache + FundingRateCache —
+    /// matches the production AeronRefdataClient ctor's last argument.
+    /// Default = 1 hour, ample for backtest replay (the strategy's
+    /// stale-gate fires off the heartbeat clock, not the cache TTL).
+    explicit InProcessRefdataClient(uint64_t max_staleness_ns = 3'600'000'000'000ULL)
+        : fee_cache_(max_staleness_ns),
+          funding_rate_cache_(max_staleness_ns) {}
 
     /// Strategy calls this on startup. The harness has already
     /// populated the cache before strategy is run, so subscribe is
