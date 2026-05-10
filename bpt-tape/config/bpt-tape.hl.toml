@@ -62,7 +62,12 @@ fsync_interval_ms = 1000
 buffer_bytes = 1048576
 
 [metrics]
-host = "127.0.0.1"
+# 0.0.0.0 so the same-VPC monitoring host (terraform module
+# infra/terraform/monitoring-host) can scrape over the private IP. The
+# tape-host security group restricts ingress on 9111 to the monitor
+# host's SG, so this is not publicly reachable. Don't change to
+# 127.0.0.1 in any environment that has an in-VPC scraper.
+host = "0.0.0.0"
 # 9110 is bpt-transport (Aeron MediaDriver) — different host in prod, but
 # the same monitoring stack scrapes both, so they need disjoint ports.
 # bpt-tape at 9111; trading hosts at 9110.
