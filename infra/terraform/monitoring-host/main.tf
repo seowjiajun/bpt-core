@@ -118,6 +118,16 @@ resource "aws_security_group_rule" "tape_ingress_node_exporter" {
   description              = "tape host node-exporter scraped by monitor host"
 }
 
+resource "aws_security_group_rule" "tape_ingress_process_exporter" {
+  type                     = "ingress"
+  from_port                = 9256
+  to_port                  = 9256
+  protocol                 = "tcp"
+  security_group_id        = data.aws_security_group.tape.id
+  source_security_group_id = aws_security_group.monitor.id
+  description              = "tape host process-exporter scraped by monitor host"
+}
+
 // ── SSH key pair ───────────────────────────────────────────────────────────
 resource "aws_key_pair" "operator" {
   key_name   = "bpt-monitor-operator"

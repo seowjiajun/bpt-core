@@ -52,6 +52,16 @@ scrape_configs:
           service: host
           host: tape-hl-tokyo-01
 
+  - job_name: tape-host-processes
+    # process-exporter on the tape recorder. Per-process CPU / RSS /
+    # FD count, scoped to bpt-* + monitoring daemons. Catches mem
+    # leaks + FD leaks before they hit OS-level limits.
+    static_configs:
+      - targets: ['{{TAPE_HOST_PRIVATE_IP}}:9256']
+        labels:
+          service: processes
+          host: tape-hl-tokyo-01
+
   - job_name: monitor-host
     # Self-scrape — node-exporter on this monitoring host. Tells us when
     # the box itself is in trouble (high CPU, disk full, network, etc).
@@ -61,4 +71,14 @@ scrape_configs:
       - targets: ['host.docker.internal:9100']
         labels:
           service: host
+          host: bpt-monitor-tokyo-01
+
+  - job_name: monitor-host-processes
+    # Per-process telemetry on the monitor host itself. Tracks the
+    # docker container processes (prometheus, grafana, alertmanager)
+    # plus dockerd/tailscaled/etc.
+    static_configs:
+      - targets: ['host.docker.internal:9256']
+        labels:
+          service: processes
           host: bpt-monitor-tokyo-01
