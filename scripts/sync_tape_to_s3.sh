@@ -60,3 +60,10 @@ push "$RAW_ROOT"     "raw"
 push "$PARQUET_ROOT" "parquet"
 
 log "sync complete"
+
+# Reclaim disk: prune local copies older than retention that are
+# byte-matched on S3. See sync_tape_cleanup.sh for safety properties.
+# Exported so the cleanup script picks up the same env without needing
+# the EnvironmentFile from the systemd unit (we're already inside it).
+script_dir="$(dirname "$(readlink -f "$0")")"
+"$script_dir/sync_tape_cleanup.sh"
