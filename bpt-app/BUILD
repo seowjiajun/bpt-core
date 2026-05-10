@@ -10,14 +10,17 @@ cc_library(
     name = "bpt-app",
     srcs = [
         "src/base_settings.cpp",
+        "src/cli.cpp",
     ],
     hdrs = glob(["include/bpt_app/**/*.h"]),
     includes = ["include"],
     visibility = ["//visibility:public"],
     deps = [
         "//bpt-common",
-        "@tomlplusplus//:tomlplusplus",
         "@aeron//:aeron_client",
+        "@cli11",
+        "@fmt",
+        "@tomlplusplus//:tomlplusplus",
     ],
 )
 

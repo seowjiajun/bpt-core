@@ -10,12 +10,10 @@
 /// Typical use:
 /// \code
 ///     int main(int argc, char** argv) {
-///         CLI::App cli{"my-service"};
-///         std::string config_path = "config/my-service.toml";
-///         cli.add_option("-c,--config", config_path)->check(CLI::ExistingFile);
-///         CLI11_PARSE(cli, argc, argv);
-///
-///         auto settings = config::load(config_path);
+///         auto args = bpt::app::parse_cli(argc, argv,
+///                                         "my-service",
+///                                         "what this service does");
+///         auto settings = config::load(args.config_path);
 ///         return bpt::app::run("my-service", std::move(settings),
 ///             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
 ///                 return std::make_unique<MyService>(std::move(cfg), ctx.aeron);
@@ -26,8 +24,9 @@
 /// What bpt::app::run owns: signal install, TSC calibrate, logging init,
 /// optional Aeron connect, main-thread loop, graceful shutdown.
 ///
-/// What services own: CLI definition, Settings struct + loader, the
-/// IService implementation.
+/// What services own: Settings struct + loader, IService implementation.
+/// CLI definition is shared via bpt::app::parse_cli (see bpt_app/cli.h)
+/// so all services pick up new common flags (--version, etc.) for free.
 ///
 /// Settings type must expose a `bpt::app::BaseSettings base;` member —
 /// the template reads `settings.base` for lifecycle knobs before handing
