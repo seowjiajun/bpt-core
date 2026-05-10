@@ -10,7 +10,9 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 cc_library(
     name = "tape_lib",
     srcs = [
+        "src/app/recorder_service.cpp",
         "src/config/loader.cpp",
+        "src/metrics/metrics.cpp",
         "src/refdata/refdata_poller.cpp",
     ],
     hdrs = glob(["include/tape/**/*.h"]),
@@ -23,6 +25,8 @@ cc_library(
         "//bpt-refdata:mapping_lib",
         "//bpt-refdata:rest_client_lib",
         "@fmt",
+        "@prometheus_cpp//:core",
+        "@prometheus_cpp//:pull",
         "@tomlplusplus//:tomlplusplus",
     ],
 )
@@ -39,7 +43,5 @@ cc_binary(
         "//bpt-md-gateway:md_gateway_lib",
         "//bpt-refdata:mapping_lib",
         "//bpt-refdata:rest_client_lib",
-        "@cli11",
-        "@fmt",
     ],
 )
