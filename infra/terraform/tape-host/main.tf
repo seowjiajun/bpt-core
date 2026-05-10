@@ -120,12 +120,21 @@ resource "aws_instance" "tape" {
     apt-get update
     apt-get install -y rclone zstd jq curl htop
 
-    # Find the unmounted block device (the data EBS). Wait up to 2 min
-    # for the kernel to register it — cloud-init can race the attachment.
+    # Find the data EBS. The previous awk-on-MOUNTPOINT pattern was
+    # fragile: lsblk collapses adjacent whitespace, so a row with empty
+    # MOUNTPOINT had its TYPE column shifted into $2 and the filter
+    # missed every disk. Discover the root device first, then pick the
+    # first non-root "disk" device.
+    ROOT_PART=$(findmnt -no SOURCE /)
+    ROOT_DISK="/dev/$(lsblk -no PKNAME "$ROOT_PART" | head -1)"
     DATA_DEV=""
     for _ in $(seq 1 60); do
-      DATA_DEV=$(lsblk -dnp -o NAME,MOUNTPOINT,TYPE | awk '$3 == "disk" && $2 == "" {print $1; exit}')
-      [ -n "$DATA_DEV" ] && break
+      for dev in $(lsblk -dnp -o NAME,TYPE | awk '$2 == "disk" {print $1}'); do
+        if [ "$dev" != "$ROOT_DISK" ]; then
+          DATA_DEV=$dev
+          break 2
+        fi
+      done
       sleep 2
     done
 

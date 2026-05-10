@@ -180,11 +180,19 @@ resource "aws_instance" "monitor" {
     apt-get install -y tailscale
 
     # Find + format + mount the data EBS for Prometheus tsdb. Same
-    # discovery pattern as tape-host.
+    # discovery pattern as tape-host: probe for the first non-root
+    # "disk" device. The earlier awk-on-MOUNTPOINT approach silently
+    # missed every disk on Ubuntu 24.04 — see commit history.
+    ROOT_PART=$(findmnt -no SOURCE /)
+    ROOT_DISK="/dev/$(lsblk -no PKNAME "$ROOT_PART" | head -1)"
     DATA_DEV=""
     for _ in $(seq 1 60); do
-      DATA_DEV=$(lsblk -dnp -o NAME,MOUNTPOINT,TYPE | awk '$3 == "disk" && $2 == "" {print $1; exit}')
-      [ -n "$DATA_DEV" ] && break
+      for dev in $(lsblk -dnp -o NAME,TYPE | awk '$2 == "disk" {print $1}'); do
+        if [ "$dev" != "$ROOT_DISK" ]; then
+          DATA_DEV=$dev
+          break 2
+        fi
+      done
       sleep 2
     done
     if [ -n "$DATA_DEV" ]; then
