@@ -1,9 +1,6 @@
 #include "md_gateway/app/md_gateway_app.h"
 
-#include "md_gateway/adapter/binance/binance_md_adapter.h"
-#include "md_gateway/adapter/deribit/deribit_md_adapter.h"
-#include "md_gateway/adapter/hyperliquid/hyperliquid_md_adapter.h"
-#include "md_gateway/adapter/okx/okx_md_adapter.h"
+#include "md_gateway/adapter/common/md_adapter_factory.h"
 
 #include <messages/ExchangeRegistry.h>
 #include <messages/MdSubscribeBatch.h>
@@ -39,24 +36,12 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
                 "Unknown exchange '{}' in mdgw config — not in messages/exchanges.yaml",
                 a_cfg.exchange));
         }
-        std::shared_ptr<adapter::IAdapter> adapter;
-        switch (*exch_id) {
-            case bpt::messages::ExchangeId::BINANCE:
-                adapter = std::make_shared<adapter::BinanceMdAdapter<messaging::MdPublisher>>(a_cfg, md_pub_);
-                break;
-            case bpt::messages::ExchangeId::OKX:
-                adapter = std::make_shared<adapter::OkxMdAdapter<messaging::MdPublisher>>(a_cfg, md_pub_);
-                break;
-            case bpt::messages::ExchangeId::HYPERLIQUID:
-                adapter = std::make_shared<adapter::HyperliquidMdAdapter<messaging::MdPublisher>>(a_cfg, md_pub_);
-                break;
-            case bpt::messages::ExchangeId::DERIBIT:
-                adapter = std::make_shared<adapter::DeribitMdAdapter<messaging::MdPublisher>>(a_cfg, md_pub_);
-                break;
-            default:
-                throw std::runtime_error(fmt::format(
-                    "Exchange '{}' is in the registry but mdgw has no adapter implementation for it",
-                    a_cfg.exchange));
+        auto adapter = adapter::make_md_adapter<messaging::MdPublisher>(
+            *exch_id, a_cfg, md_pub_);
+        if (!adapter) {
+            throw std::runtime_error(fmt::format(
+                "Exchange '{}' is in the registry but mdgw has no adapter implementation for it",
+                a_cfg.exchange));
         }
 
         adapter->on_funding_rate = [this](const messaging::FundingRateUpdate& fr) {

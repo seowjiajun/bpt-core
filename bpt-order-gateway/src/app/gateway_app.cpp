@@ -1,9 +1,6 @@
 #include "order_gateway/app/gateway_app.h"
 
-#include "order_gateway/adapter/binance/binance_order_adapter.h"
-#include "order_gateway/adapter/deribit/deribit_order_adapter.h"
-#include "order_gateway/adapter/hyperliquid/hyperliquid_order_adapter.h"
-#include "order_gateway/adapter/okx/okx_order_adapter.h"
+#include "order_gateway/adapter/common/order_adapter_factory.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExchangeRegistry.h>
@@ -67,24 +64,11 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
                 "Unknown exchange '{}' in order-gateway config — not in messages/exchanges.yaml",
                 a_cfg.exchange));
         }
-        std::shared_ptr<adapter::IOrderAdapter> adapter;
-        switch (*exch_id) {
-            case bpt::messages::ExchangeId::BINANCE:
-                adapter = std::make_shared<adapter::BinanceOrderAdapter>(a_cfg, exchange_creds);
-                break;
-            case bpt::messages::ExchangeId::OKX:
-                adapter = std::make_shared<adapter::OKXOrderAdapter>(a_cfg, exchange_creds);
-                break;
-            case bpt::messages::ExchangeId::DERIBIT:
-                adapter = std::make_shared<adapter::DeribitOrderAdapter>(a_cfg, exchange_creds);
-                break;
-            case bpt::messages::ExchangeId::HYPERLIQUID:
-                adapter = std::make_shared<adapter::HyperliquidOrderAdapter>(a_cfg, exchange_creds);
-                break;
-            default:
-                throw std::runtime_error(fmt::format(
-                    "Exchange '{}' is in the registry but order-gateway has no adapter implementation for it",
-                    a_cfg.exchange));
+        auto adapter = adapter::make_order_adapter(*exch_id, a_cfg, exchange_creds);
+        if (!adapter) {
+            throw std::runtime_error(fmt::format(
+                "Exchange '{}' is in the registry but order-gateway has no adapter implementation for it",
+                a_cfg.exchange));
         }
 
         adapter->set_disconnect_breaker_config(disc_cfg);
@@ -193,22 +177,7 @@ void OrderGatewayApp::run() {
             for (const auto& a : adapters_) {
                 const bool connected = a->is_connected();
                 if (connected) {
-                    switch (a->exchange_id()) {
-                        case ExchangeId::BINANCE:
-                            exchange_status |= 0x01;
-                            break;
-                        case ExchangeId::OKX:
-                            exchange_status |= 0x02;
-                            break;
-                        case ExchangeId::HYPERLIQUID:
-                            exchange_status |= 0x04;
-                            break;
-                        case ExchangeId::DERIBIT:
-                            exchange_status |= 0x08;
-                            break;
-                        default:
-                            break;
-                    }
+                    exchange_status |= adapter::exchange_status_bit(a->exchange_id());
                 }
                 // Only emit a gauge for adapters actually configured in this
                 // process — prevents phantom "disconnected" alerts for
