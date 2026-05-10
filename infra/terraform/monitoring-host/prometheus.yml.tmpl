@@ -1,0 +1,64 @@
+# Prometheus config for the monitor-host deployment.
+#
+# Differs from monitoring/prometheus.yml (the laptop dev variant) in
+# scrape targets — this version uses VPC-private IPs since both the
+# monitor host and its scrape targets live in the same VPC.
+#
+# Templated by bootstrap.sh: the literal {{TAPE_HOST_PRIVATE_IP}} below
+# is sed-substituted with the value of `terraform output
+# tape_host_private_ip` before docker compose starts Prometheus.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: bpt-prod
+    env: prod
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  - job_name: bpt-tape
+    # Recorder's metrics endpoint, scraped over the VPC private network.
+    # Recorder binds 127.0.0.1:9111 in its config — for in-VPC scraping
+    # we need it bound on 0.0.0.0:9111 (or the private IP). Bootstrap
+    # docs walk through that change as part of cutover.
+    static_configs:
+      - targets: ['{{TAPE_HOST_PRIVATE_IP}}:9111']
+        labels:
+          service: tape
+          venue: hyperliquid
+          host: tape-hl-tokyo-01
+
+  - job_name: tape-host
+    # node-exporter on the tape recorder. Same reachability story.
+    static_configs:
+      - targets: ['{{TAPE_HOST_PRIVATE_IP}}:9100']
+        labels:
+          service: host
+          host: tape-hl-tokyo-01
+
+  - job_name: monitor-host
+    # Self-scrape — node-exporter on this monitoring host. Tells us when
+    # the box itself is in trouble (high CPU, disk full, network, etc).
+    # localhost works because node-exporter runs on the same machine
+    # in the same docker network.
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+        labels:
+          service: host
+          host: bpt-monitor-tokyo-01
