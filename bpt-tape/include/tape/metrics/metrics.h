@@ -20,7 +20,7 @@
 ///   bpt_tape_ws_reconnects_total              (re)connect counter per venue
 ///   bpt_tape_subscriptions                    subscribed-instrument count per venue
 
-#include "bpt_common/recorder/tape.h"
+#include "tape/io/tape.h"
 
 #include <memory>
 #include <prometheus/counter.h>
@@ -53,7 +53,7 @@ public:
     /// Lambdas inside the returned bundle resolve labeled metric
     /// references once (via Family::Add); hot-path callers pay only a
     /// virtual + atomic increment per frame.
-    bpt::common::recorder::Tape::MetricsHooks hooks_for(const std::string& venue);
+    bpt::tape::io::Tape::MetricsHooks hooks_for(const std::string& venue);
 
     /// \brief Mark `venue`'s WS as connected, incrementing the reconnect
     ///        counter (which includes the bootstrap connect; the +1 is

@@ -4,7 +4,7 @@
 #include "tape/app/recorder_service.h"
 
 #include "tape/adapter/recording_mdgw_adapters.h"
-#include "bpt_common/recorder/tape.h"
+#include "tape/io/tape.h"
 #include "md_gateway/md/md_types.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 #include <messages/ExchangeRegistry.h>
@@ -67,10 +67,10 @@ void RecorderService::setup_metrics() {
                            settings_.base.metrics_port);
 }
 
-std::shared_ptr<bpt::common::recorder::Tape>
+std::shared_ptr<bpt::tape::io::Tape>
 RecorderService::make_tape(const std::string& venue_tag) {
-    return std::make_shared<bpt::common::recorder::Tape>(
-        bpt::common::recorder::Tape::Config{
+    return std::make_shared<bpt::tape::io::Tape>(
+        bpt::tape::io::Tape::Config{
             .root_dir = settings_.recording.output_dir,
             .venue_tag = venue_tag,
             .rotate_interval_seconds = settings_.recording.rotate_interval_seconds,
@@ -79,13 +79,13 @@ RecorderService::make_tape(const std::string& venue_tag) {
                 static_cast<uint64_t>(settings_.recording.fsync_interval_ms) *
                 1'000'000ULL,
             .metrics = metrics_ ? metrics_->hooks_for(venue_tag)
-                                : bpt::common::recorder::Tape::MetricsHooks{},
+                                : bpt::tape::io::Tape::MetricsHooks{},
         });
 }
 
 void RecorderService::wire_connection_markers(
     std::shared_ptr<bpt::md_gateway::adapter::IAdapter> adapter,
-    std::shared_ptr<bpt::common::recorder::Tape> tape,
+    std::shared_ptr<bpt::tape::io::Tape> tape,
     const std::string& venue_tag) {
     // ConnState shared via shared_ptr so both lambdas see the same
     // counter + "have we ever disconnected" flag. metrics_ raw pointer

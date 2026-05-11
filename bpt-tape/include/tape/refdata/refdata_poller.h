@@ -17,7 +17,7 @@
 /// immediately. An in-flight request can't be cancelled; shutdown
 /// latency is bounded by the HTTP timeout (~30 s).
 
-#include "bpt_common/recorder/tape.h"
+#include "tape/io/tape.h"
 #include "tape/http/recording_rest_client.h"
 
 #include <atomic>
@@ -56,7 +56,7 @@ struct EndpointSpec {
 class RefdataPoller {
 public:
     RefdataPoller(std::string venue_tag,
-                  std::shared_ptr<::bpt::common::recorder::Tape> tape,
+                  std::shared_ptr<::bpt::tape::io::Tape> tape,
                   std::vector<EndpointSpec> endpoints);
 
     ~RefdataPoller();
@@ -85,7 +85,7 @@ private:
     void run_loop();
 
     std::string venue_tag_;
-    std::shared_ptr<::bpt::common::recorder::Tape> tape_;
+    std::shared_ptr<::bpt::tape::io::Tape> tape_;
     std::vector<EndpointState> endpoints_;
 
     std::thread thread_;

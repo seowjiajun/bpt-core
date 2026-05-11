@@ -11,6 +11,7 @@ cc_library(
     srcs = [
         "src/app/recorder_service.cpp",
         "src/config/loader.cpp",
+        "src/io/tape.cpp",
         "src/metrics/metrics.cpp",
         "src/refdata/refdata_poller.cpp",
     ],

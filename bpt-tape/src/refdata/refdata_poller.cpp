@@ -23,7 +23,7 @@ std::string to_upper(std::string s) {
 }  // namespace
 
 RefdataPoller::RefdataPoller(std::string venue_tag,
-                             std::shared_ptr<::bpt::common::recorder::Tape> tape,
+                             std::shared_ptr<::bpt::tape::io::Tape> tape,
                              std::vector<EndpointSpec> endpoints)
     : venue_tag_(std::move(venue_tag)),
       tape_(std::move(tape)) {

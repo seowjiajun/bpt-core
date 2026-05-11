@@ -24,7 +24,7 @@
 /// the header bytes — no second length field needed. Keeps the format
 /// binary-safe (no JSON escaping of binary response bodies).
 
-#include "bpt_common/recorder/tape.h"
+#include "tape/io/tape.h"
 #include "bpt_common/util/tsc_clock.h"
 #include "refdata/http/rest_client.h"
 
@@ -48,7 +48,7 @@ public:
     RecordingRestClient(std::string host,
                         std::string port,
                         bool use_tls,
-                        std::shared_ptr<::bpt::common::recorder::Tape> tape)
+                        std::shared_ptr<::bpt::tape::io::Tape> tape)
         : RestClient(std::move(host), std::move(port), use_tls),
           tape_(std::move(tape)) {}
 
@@ -99,7 +99,7 @@ private:
         tape_->flush();
     }
 
-    std::shared_ptr<::bpt::common::recorder::Tape> tape_;
+    std::shared_ptr<::bpt::tape::io::Tape> tape_;
 };
 
 }  // namespace bpt::tape::http

@@ -1,4 +1,4 @@
-#include "bpt_common/recorder/tape.h"
+#include "tape/io/tape.h"
 
 #include "bpt_common/logging.h"
 #include "bpt_common/util/tsc_clock.h"
@@ -10,7 +10,7 @@
 #include <ctime>
 #include <filesystem>
 
-namespace bpt::common::recorder {
+namespace bpt::tape::io {
 
 namespace fs = std::filesystem;
 
@@ -196,4 +196,4 @@ void Tape::flush() {
     last_flush_ns_ = WallClock::now_ns();
 }
 
-}  // namespace bpt::common::recorder
+}  // namespace bpt::tape::io

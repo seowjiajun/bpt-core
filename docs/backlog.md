@@ -171,7 +171,7 @@ projections, and alert thresholds. Diff the two builds' recording paths and
 config to identify which.
 
 **Relevant code / paths:**
-- `bpt-common/src/recorder/tape.cpp` — Tape open/rotate/write paths
+- `bpt-tape/src/io/tape.cpp` — Tape open/rotate/write paths
 - `scripts/sync_tape_to_s3.sh` — sync script (uses `rclone copy`)
 - `deploy/env/prod-recorder.env.example` — references uninstalled heartbeat
 - `infra/terraform/tape-{host,storage,iam}/` — design that prod has drifted from
@@ -262,7 +262,7 @@ compatibility for the archive we're now treating as authoritative.
 
 **Relevant code:**
 - `bpt-tape/src/main.cpp` — SESSION_START payload construction
-- `bpt-common/include/bpt_common/recorder/tape.h` — RecordType enum
+- `bpt-common/include/bpt_common/recorder/wslog_format.h` — RecordType enum
   (also: the unused `CHECKPOINT` value here — write it or remove it)
 
 ### bpt-tape cosmetic cleanups (small, batch as one PR)

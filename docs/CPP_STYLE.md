@@ -99,7 +99,7 @@ enum class RecordType : uint8_t {
 
 ## Examples in the codebase
 
-- `bpt-common/include/bpt_common/recorder/tape.h` — file header +
+- `bpt-tape/include/tape/io/tape.h` — file header +
   per-method `\brief`.
 - `bpt-app/include/bpt_app/app.h` — file header explaining the lifecycle
   contract.

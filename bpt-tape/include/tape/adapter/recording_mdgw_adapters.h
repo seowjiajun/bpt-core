@@ -17,7 +17,7 @@
 /// Templated on Pub so bpt-tape can instantiate with NoopMdPublisher
 /// and have the publish() chain dead-code-eliminated by the optimizer.
 
-#include "bpt_common/recorder/tape.h"
+#include "tape/io/tape.h"
 #include "md_gateway/adapter/binance/binance_md_adapter.h"
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "md_gateway/adapter/deribit/deribit_md_adapter.h"
@@ -43,7 +43,7 @@ namespace bpt::tape::adapter {
     template <class Pub>                                                                      \
     class Class : public ::bpt::md_gateway::adapter::BaseClass<Pub> {                         \
     public:                                                                                   \
-        Class(std::shared_ptr<::bpt::common::recorder::Tape> tape,                       \
+        Class(std::shared_ptr<::bpt::tape::io::Tape> tape,                       \
               const ::bpt::md_gateway::config::AdapterConfig& cfg,                            \
               std::shared_ptr<Pub> md_pub)                                                    \
             : ::bpt::md_gateway::adapter::BaseClass<Pub>(cfg, std::move(md_pub)),             \
@@ -64,7 +64,7 @@ namespace bpt::tape::adapter {
         }                                                                                     \
                                                                                               \
     private:                                                                                  \
-        std::shared_ptr<::bpt::common::recorder::Tape> tape_;                            \
+        std::shared_ptr<::bpt::tape::io::Tape> tape_;                            \
     };
 
 BPT_DECLARE_RECORDING_ADAPTER(RecordingBinanceMdAdapter,     BinanceMdAdapter)
@@ -85,7 +85,7 @@ template <class Pub>
 inline std::shared_ptr<::bpt::md_gateway::adapter::IAdapter>
 make_recording_adapter(
     bpt::messages::ExchangeId::Value exch_id,
-    std::shared_ptr<::bpt::common::recorder::Tape> tape,
+    std::shared_ptr<::bpt::tape::io::Tape> tape,
     const ::bpt::md_gateway::config::AdapterConfig& cfg,
     std::shared_ptr<Pub> md_pub) {
     using namespace bpt::messages;

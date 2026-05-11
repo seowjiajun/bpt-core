@@ -11,7 +11,7 @@
 /// what keeps DataLoader on CMake). Reader is single-threaded,
 /// synchronous, no buffering beyond what stdio provides.
 
-#include "bpt_common/recorder/tape.h"
+#include "bpt_common/recorder/wslog_format.h"
 
 #include <cstdint>
 #include <cstdio>

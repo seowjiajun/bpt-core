@@ -8,17 +8,8 @@
 /// through the backtester / converter goes through the same parser code
 /// as live, so any parser drift surfaces in test rather than production.
 ///
-/// File format (little-endian):
-///
-///   struct RecordHeader {
-///       uint64_t recv_ts_ns;   // wall-clock ns since Unix epoch
-///       uint8_t  record_type;  // see RecordType
-///       uint32_t length;       // bytes of payload that follow
-///   };
-///   uint8_t payload[length];
-///
-/// File layout: {root}/{venue_tag}/YYYY-MM-DD/{venue_tag}-HHMMSS.wslog
-/// Hourly rotation by default. One Tape per writer thread — no contention.
+/// On-disk format lives in `bpt_common/recorder/wslog_format.h` — that
+/// header is the contract shared with consumers (WslogReader, converters).
 ///
 /// Thread model: callers own the Tape from a single thread (the IO thread
 /// that produces the bytes); the Tape buffers in userspace and flushes to
@@ -29,6 +20,8 @@
 /// which under disk stall would backpressure the producer thread. For
 /// prod-grade recording, wrap with a writer-thread ring buffer (TODO).
 
+#include "bpt_common/recorder/wslog_format.h"
+
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
@@ -37,24 +30,9 @@
 #include <string_view>
 #include <vector>
 
-namespace bpt::common::recorder {
+namespace bpt::tape::io {
 
-/// \brief Record-type tag stamped on every entry written to the tape.
-enum class RecordType : uint8_t {
-    WS_FRAME      = 0,  ///< raw venue frame (JSON / FIX / etc.)
-    SESSION_START = 1,  ///< recorder process started; payload = config snapshot JSON
-    SESSION_STOP  = 2,  ///< recorder process stopping cleanly; payload = exit reason JSON
-    CHECKPOINT    = 3,  ///< periodic heartbeat; payload = JSON {frames, bytes, uptime_s}
-    WS_DISCONNECT = 4,  ///< unexpected WS connection loss; payload = JSON {reason, attempt}
-    WS_RECONNECT  = 5,  ///< WS reconnect succeeded after a prior disconnect; payload = JSON {attempt}
-    /// REST response body captured from a refdata poll (bpt-tape only).
-    /// Payload envelope (little-endian):
-    ///   u8  method  (0=GET, 1=POST)
-    ///   u16 target_len
-    ///   char target[target_len]
-    ///   char body[remainder]
-    REST_RESPONSE = 6,
-};
+using ::bpt::common::recorder::RecordType;
 
 /// \brief Single-writer append-only tape that emits the .wslog binary format.
 ///
@@ -65,8 +43,8 @@ class Tape {
 public:
     /// \brief Optional metrics callbacks. All fields default to no-op; if any
     /// is set, Tape calls it at the corresponding event. Using
-    /// std::function (not concrete prometheus types) so bpt-common doesn't
-    /// depend on prometheus-cpp — wiring lives in the consumer (bpt-tape).
+    /// std::function (not concrete prometheus types) so this header doesn't
+    /// pull in prometheus-cpp — wiring lives in the consumer (TapeMetrics).
     struct MetricsHooks {
         /// Called after a successful write_record(). recv_ts_ns is the
         /// payload timestamp (used to populate last-write gauges);
@@ -144,4 +122,4 @@ private:
     std::atomic<uint64_t> bytes_written_{0};
 };
 
-}  // namespace bpt::common::recorder
+}  // namespace bpt::tape::io

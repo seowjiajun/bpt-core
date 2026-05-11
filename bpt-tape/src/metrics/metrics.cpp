@@ -94,7 +94,7 @@ void TapeMetrics::set_subscriptions(const std::string& venue, std::size_t count)
     subscriptions_fam_->Add({{"venue", venue}}).Set(static_cast<double>(count));
 }
 
-bpt::common::recorder::Tape::MetricsHooks
+bpt::tape::io::Tape::MetricsHooks
 TapeMetrics::hooks_for(const std::string& venue) {
     // Resolve labeled metric refs once. Family::Add() returns refs that
     // outlive the returned hooks because TapeMetrics outlives every
@@ -109,7 +109,7 @@ TapeMetrics::hooks_for(const std::string& venue) {
     // value to outlive `this` invocation.
     auto* failures_fam = wslog_rotation_failures_total_fam_;
 
-    return bpt::common::recorder::Tape::MetricsHooks{
+    return bpt::tape::io::Tape::MetricsHooks{
         .on_write_success = [&last_write, &frames, &bytes](
                                 uint64_t recv_ts_ns, std::size_t total_bytes) {
             last_write.Set(static_cast<double>(recv_ts_ns) / 1e9);
