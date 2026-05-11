@@ -1,3 +1,6 @@
+/// \file
+/// \brief TapeMetrics implementation — see header for contract.
+
 #include "tape/metrics/metrics.h"
 
 #include <prometheus/counter.h>
@@ -12,7 +15,6 @@ TapeMetrics::TapeMetrics(const std::string& host, uint16_t port) {
     exposer_ = std::make_unique<prometheus::Exposer>(host + ":" + std::to_string(port));
     exposer_->RegisterCollectable(registry_);
 
-    // Liveness — single unlabeled gauge, set once.
     auto& h = prometheus::BuildGauge()
                   .Name("bpt_tape_healthy")
                   .Help("1 if bpt-tape is running; 0 on clean shutdown")
@@ -25,7 +27,7 @@ TapeMetrics::TapeMetrics(const std::string& host, uint16_t port) {
              .Name("bpt_tape_last_wslog_write_unix_seconds")
              .Help("Unix-epoch seconds of the last successful wslog write per venue. "
                    "Compare against time() in Alertmanager — staleness > 5min means "
-                   "the writer is silently broken (the 2026-05-09 incident).")
+                   "the writer is silently broken.")
              .Register(*registry_);
 
     frames_written_total_fam_ =
@@ -43,7 +45,7 @@ TapeMetrics::TapeMetrics(const std::string& host, uint16_t port) {
     wslog_rotations_total_fam_ =
         &prometheus::BuildCounter()
              .Name("bpt_tape_wslog_rotations_total")
-             .Help("Number of successful wslog file rotations per venue (hourly under default config).")
+             .Help("Successful wslog file rotations per venue (hourly under default config).")
              .Register(*registry_);
 
     wslog_rotation_failures_total_fam_ =
@@ -57,40 +59,30 @@ TapeMetrics::TapeMetrics(const std::string& host, uint16_t port) {
     ws_connected_fam_ =
         &prometheus::BuildGauge()
              .Name("bpt_tape_ws_connected")
-             .Help("1 if the venue WebSocket is currently connected, 0 otherwise. "
-                   "Per-venue. Compared against ws_reconnects_total to distinguish "
-                   "'flapping' from 'down right now'.")
+             .Help("1 if the venue WebSocket is currently connected, 0 otherwise.")
              .Register(*registry_);
 
     ws_reconnects_total_fam_ =
         &prometheus::BuildCounter()
              .Name("bpt_tape_ws_reconnects_total")
-             .Help("Cumulative WebSocket reconnect count per venue. Increments on "
-                   "every successful reconnect after a prior disconnect. A high "
-                   "rate (rate(ws_reconnects[5m]) > N) means the venue is flapping; "
-                   "alert TapeWsFlapping fires on this.")
+             .Help("Cumulative (re)connect count per venue. Includes the bootstrap "
+                   "connect; alert TapeWsFlapping keys on rate() over a 5m window.")
              .Register(*registry_);
 
     subscriptions_fam_ =
         &prometheus::BuildGauge()
              .Name("bpt_tape_subscriptions")
              .Help("Count of currently-subscribed instruments per venue. Set once "
-                   "after the universe loads at startup. A sudden drop from N to "
-                   "1 is the universe-config-broke signal — would have caught the "
-                   "earlier 'tape was only on 11 of 230 perps' surprise.")
+                   "after universe load; alert TapeSubscriptionsLow fires below 50.")
              .Register(*registry_);
 }
 
 void TapeMetrics::on_ws_connect(const std::string& venue) {
     ws_connected_fam_->Add({{"venue", venue}}).Set(1.0);
-    // Counter ticks on every successful connect, including the initial
-    // bootstrap at process start. Steady-state value is therefore
-    // (reconnects + 1); the +1 noise is one-shot, washes out under
-    // rate() / increase() over any practical window. Distinguishing
-    // "first connect" from "reconnect" without extra per-venue state
-    // requires either a mutex-protected set or an extra gauge — not
-    // worth the complexity for a metric whose primary use case is
-    // alerting on rate() spikes.
+    // Counter ticks on every connect including bootstrap; the +1 offset
+    // washes out under rate(). Distinguishing first-vs-reconnect without
+    // extra per-venue state isn't worth the complexity for an alert
+    // that keys on rate spikes, not absolute count.
     ws_reconnects_total_fam_->Add({{"venue", venue}}).Increment();
 }
 
@@ -104,19 +96,17 @@ void TapeMetrics::set_subscriptions(const std::string& venue, std::size_t count)
 
 bpt::common::recorder::RawSpool::MetricsHooks
 TapeMetrics::hooks_for(const std::string& venue) {
-    // Resolve the labeled metric pointers once. References returned by
-    // Family::Add() stay valid as long as the family lives — and the
-    // family lives as long as TapeMetrics, which outlives every spool by
-    // construction (TapeMetrics is built before any spool, destroyed
-    // after). Capturing by reference in the lambdas is safe.
+    // Resolve labeled metric refs once. Family::Add() returns refs that
+    // outlive the returned hooks because TapeMetrics outlives every
+    // spool — capturing by reference is safe.
     auto& last_write = last_wslog_write_unix_seconds_fam_->Add({{"venue", venue}});
     auto& frames     = frames_written_total_fam_->Add({{"venue", venue}});
     auto& bytes      = bytes_written_total_fam_->Add({{"venue", venue}});
     auto& rotations  = wslog_rotations_total_fam_->Add({{"venue", venue}});
 
-    // rotation_failure is rare and labeled with a cause, so the labeled
-    // lookup happens lazily. Capture this + venue by value so the hook
-    // outlives the local string.
+    // Rotation failures are rare and labeled with `cause`, so resolve
+    // lazily inside the hook. Capture the family pointer + venue by
+    // value to outlive `this` invocation.
     auto* failures_fam = wslog_rotation_failures_total_fam_;
 
     return bpt::common::recorder::RawSpool::MetricsHooks{

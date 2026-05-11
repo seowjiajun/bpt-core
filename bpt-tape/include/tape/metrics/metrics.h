@@ -1,25 +1,24 @@
 #pragma once
 
-/// @file
-/// Prometheus metrics exposed by bpt-tape on metrics_host:metrics_port.
+/// \file
+/// \brief Prometheus metrics exposed by bpt-tape.
 ///
 /// Mirrors the StrategyMetrics / OrderGatewayMetrics shape: registry +
 /// exposer + cached metric pointers, no per-call allocation on the hot
-/// path. RawSpool gets venue-labeled hook lambdas via hooks_for() so the
-/// recording library (bpt-common) stays free of any prometheus-cpp
-/// dependency.
+/// path. RawSpool integration is via std::function hooks installed
+/// through hooks_for(), so bpt-common stays free of any prometheus-cpp
+/// dependency — wiring lives in the consumer.
 ///
-/// Why these specific metrics:
-///   bpt_tape_last_wslog_write_unix_seconds  the alert that would have
-///       caught the 2026-05-09 ENOSPC incident at minute zero. Set on
-///       every successful write_record(); compare against time() in
-///       Alertmanager.
-///   bpt_tape_frames_written_total           the "is data flowing" counter.
-///   bpt_tape_bytes_written_total            data-rate panel input. Catches
-///       the May-8 6× regression (T87) had it existed.
-///   bpt_tape_wslog_rotations_total          counts hourly file roll-overs.
-///   bpt_tape_wslog_rotation_failures_total  first-class signal for the
-///       silent-failure mode RawSpool now logs+aborts on.
+/// Metric surface:
+///   bpt_tape_healthy                          1 = running, 0 = clean shutdown
+///   bpt_tape_last_wslog_write_unix_seconds    freshness gauge per venue
+///   bpt_tape_frames_written_total             write counter per venue
+///   bpt_tape_bytes_written_total              byte counter per venue
+///   bpt_tape_wslog_rotations_total            file rotations per venue
+///   bpt_tape_wslog_rotation_failures_total    rotation errors per (venue, cause)
+///   bpt_tape_ws_connected                     current WS state per venue
+///   bpt_tape_ws_reconnects_total              (re)connect counter per venue
+///   bpt_tape_subscriptions                    subscribed-instrument count per venue
 
 #include "bpt_common/recorder/raw_spool.h"
 
@@ -33,44 +32,54 @@
 
 namespace bpt::tape::metrics {
 
+/// \brief Owns the Prometheus registry + HTTP exposer for bpt-tape.
+///
+/// Constructed once at startup, lives for the process lifetime. Caches
+/// raw pointers into prometheus-cpp Family objects so hot-path writes
+/// from spool hooks avoid the per-call hash lookup; the registry owns
+/// the underlying metric objects.
 class TapeMetrics {
 public:
-    /// Binds an HTTP exposer at host:port. host=0.0.0.0 in prod so the
-    /// in-VPC monitor host can scrape; the tape-host SG restricts which
-    /// peer can actually reach the port.
+    /// \brief Bind the HTTP exposer at host:port.
+    ///
+    /// In prod, host=0.0.0.0 so the in-VPC monitor host can scrape over
+    /// the recorder's private IP; the tape-host security group is the
+    /// access control. Use 127.0.0.1 in environments where there's no
+    /// in-VPC peer (laptop dev with an SSH tunnel).
     TapeMetrics(const std::string& host, uint16_t port);
 
-    /// Hook bundle for a single RawSpool. Lambdas capture the labeled
-    /// metric refs once (resolved via Family::Add()) so the hot path
-    /// is a single virtual call + atomic increment, not a hash lookup.
-    /// Caller installs these into RawSpool::Config::metrics.
+    /// \brief Build a RawSpool::MetricsHooks bundle tagged to `venue`.
+    ///
+    /// Lambdas inside the returned bundle resolve labeled metric
+    /// references once (via Family::Add); hot-path callers pay only a
+    /// virtual + atomic increment per frame.
     bpt::common::recorder::RawSpool::MetricsHooks hooks_for(const std::string& venue);
 
-    /// WebSocket connection state callbacks for the recording mdgw
-    /// adapter's on_connect/on_disconnect lambdas. ws_connected is a
-    /// gauge (current state); ws_reconnects_total is a counter (how
-    /// often it has flapped). Together they distinguish "down right
-    /// now" from "down 4x in the last hour."
+    /// \brief Mark `venue`'s WS as connected, incrementing the reconnect
+    ///        counter (which includes the bootstrap connect; the +1 is
+    ///        one-shot and washes out under rate()).
     void on_ws_connect(const std::string& venue);
+
+    /// \brief Mark `venue`'s WS as disconnected.
     void on_ws_disconnect(const std::string& venue);
 
-    /// Set the count of currently-subscribed instruments per venue.
-    /// Called once after the universe loads at startup. Catches the
-    /// "did the universe shrink unexpectedly" failure class.
+    /// \brief Set the current count of subscribed instruments for `venue`.
+    ///
+    /// Called once after the universe loads. A subsequent drop visible
+    /// on the dashboard signals a config regression or mapping shrink.
     void set_subscriptions(const std::string& venue, std::size_t count);
 
-    /// Flip the healthy gauge to 0 on shutdown so dashboards can
-    /// distinguish "process down" from "process up but stale".
+    /// \brief Set healthy=0 so dashboards distinguish a clean stop from
+    ///        a scrape-just-vanished crash.
     void shutdown();
 
 private:
     std::shared_ptr<prometheus::Registry> registry_;
     std::unique_ptr<prometheus::Exposer> exposer_;
 
-    // Liveness / state
-    prometheus::Gauge* healthy_{};
+    prometheus::Gauge* healthy_{};  ///< unlabeled liveness gauge
 
-    // Per-venue families. Lookups happen once per spool at construct time.
+    // Per-venue Families. Cached as raw pointers — owned by registry_.
     prometheus::Family<prometheus::Gauge>*   last_wslog_write_unix_seconds_fam_{};
     prometheus::Family<prometheus::Counter>* frames_written_total_fam_{};
     prometheus::Family<prometheus::Counter>* bytes_written_total_fam_{};
