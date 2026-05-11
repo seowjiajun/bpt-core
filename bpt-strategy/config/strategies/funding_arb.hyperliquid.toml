@@ -1,0 +1,69 @@
+# Hyperliquid testnet — funding arb on PURR/USDC spot + PURR perp.
+#
+# Plumbing-validation config: thresholds + sizing tuned so the strategy
+# attempts entry frequently rather than profitably. Testnet liquidity is
+# synthetic; results don't transfer to mainnet. Goal here is to verify
+# the lifecycle (both legs subscribe, BBO flows, funding rate read,
+# entry attempted, fills land, position reconciles, exit cycle works).
+
+[fenrir.strategy]
+type = "FundingArbStrategy"
+enabled = true
+
+# SPOT leg quote = USDC (real ERC-20 token on HL spot).
+# PERP leg quote = USD (HL's synthetic USD-margined perp).
+# CanonicalResolver matches each leg independently; pair-up happens by
+# base_asset name.
+instruments = ["PURR/USDC:SPOT", "PURR/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.venue_exec.HYPERLIQUID]
+enabled = true
+# HL testnet round-trip is ~200 ms (vs ~5 ms for CEX REST). The strategy's
+# evaluate_pair is latency-insensitive — this number is only checked
+# against md.staleness inside the gate, not against tick→order timing.
+latency_budget_us = 20000
+order_type = "LIMIT"
+tif = "IOC"
+max_retries = 3
+
+[fenrir.strategy.risk]
+# Testnet sizing — wallet expected to be funded with ~$200 USDC + ~$200
+# PURR via the testnet faucet.
+max_position_usd = 200.0
+max_order_size_usd = 100.0
+max_daily_loss_usd = 100.0
+max_open_orders = 8
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 5000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.params]
+base_assets = ["PURR"]
+
+# ── Funding rate thresholds ──────────────────────────────────────────
+# Aggressive thresholds to trigger entry quickly on testnet, where
+# funding rates are synthetic and may sit near zero for long stretches.
+# Production sizing would use 5-20 bps.
+min_funding_rate_bps = 1
+exit_funding_rate_bps = 1
+min_stable_periods = 1
+min_time_before_funding_min = 0
+
+# ── Position sizing ──────────────────────────────────────────────────
+target_notional_usd = 50.0
+
+# ── Risk ─────────────────────────────────────────────────────────────
+# Wide tolerance — we want to observe the lifecycle, not bail on the
+# testnet's noisy basis.
+max_basis_loss_bps = 500.0
+
+# ── Execution ────────────────────────────────────────────────────────
+# Fast eval + heavy aggress so IOC orders cross the (thin) testnet
+# book on first attempt.
+eval_interval_s = 10
+order_timeout_s = 30
+aggress_bps = 50.0
