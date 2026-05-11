@@ -77,8 +77,10 @@ resource "aws_route_table_association" "trading" {
 
 // ── Security group ─────────────────────────────────────────────────────────
 // Inbound: SSH from operator IP (bootstrap; drop once Tailscale verified).
-// Egress: all (venue WS/REST, S3 mapping fetch, apt mirrors, github clone,
-//         Tailscale coordination).
+// Egress: all (venue WS/REST, apt mirrors, github clone, Tailscale).
+// Notably NOT S3: the trading stack loads instrument_mapping from the
+// cloned repo on local disk, not from S3 — a runtime S3 fetch would make
+// startup brittle against credential / region / network glitches.
 resource "aws_security_group" "trading" {
   name        = "bpt-trading-sg"
   description = "Trading host: SSH inbound from operator, full egress."

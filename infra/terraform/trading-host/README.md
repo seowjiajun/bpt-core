@@ -95,7 +95,12 @@ systemctl --user restart bpt-stack.target
 
 ## What's NOT in this module (intentional)
 
-- **IAM role for S3 access** — add later if the stack needs to pull instrument mappings from S3. Today it reads from the repo's `config/instruments/`.
+- **IAM role for any runtime AWS fetch** — instrument mapping is loaded from
+  `config/instruments/` in the cloned repo. Pulling it from S3 at startup
+  would introduce a hard dependency on S3 reachability + correct IAM, and
+  break service startup on any cross-region / credential glitch. The repo
+  is the source of truth; S3 archives are for backup/distribution of
+  derived artifacts (recordings, snapshots), not for the live load path.
 - **CloudWatch agent** — Prometheus on the monitor host already scrapes; CW would duplicate cost without value.
 - **VPC peering to the Tokyo tape VPC** — cross-region metrics scrape goes over Tailscale, no peering needed.
 - **AMI baking** — for faster repeated provisioning, snapshot the instance after bootstrap (`aws ec2 create-image`) and parameterize `ami_name_pattern` to your snapshot. Worth doing once you're tearing down/recreating regularly.
