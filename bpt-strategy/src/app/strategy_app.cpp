@@ -66,7 +66,7 @@ void StrategyApp::run() {
     // surprise other services that wouldn't know what to do with it.
     bpt::common::signal::install_flatten_handler();
 
-    bpt::common::log::info("Polling... waiting for RefDataReady before subscribing (Ctrl+C to exit)");
+    bpt::common::log::info("Polling... waiting for RefDataReady before subscribing");
     bpt::common::log::info("Emergency flatten: `kill -USR1 {}` (or systemctl --user kill --signal=SIGUSR1 bpt-strategy)",
                    ::getpid());
 

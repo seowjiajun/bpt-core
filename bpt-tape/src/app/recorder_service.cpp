@@ -240,11 +240,11 @@ void RecorderService::setup_refdata_pollers() {
 }
 
 void RecorderService::run() {
-    bpt::common::log::info("bpt-tape running — Ctrl-C to stop");
+    bpt::common::log::info("bpt-tape running");
     while (bpt::common::signal::is_running()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-    bpt::common::log::info("bpt-tape: signal received, stopping");
+    bpt::common::log::info("bpt-tape: stop signal received");
 }
 
 void RecorderService::stop() {
