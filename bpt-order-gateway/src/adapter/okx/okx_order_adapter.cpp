@@ -13,11 +13,13 @@
 #include <boost/json.hpp>
 #include <chrono>
 #include <string>
+#include <bpt_common/util/strings.h>
 #include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter {
 
 using bpt::common::util::WallClock;
+using bpt::common::util::hex8;
 
 namespace json = boost::json;
 
@@ -29,10 +31,7 @@ OKXOrderAdapter::OKXOrderAdapter(const config::AdapterConfig& cfg, const Exchang
       https_client_(cfg_, creds),
       instruments_(https_client_),
       ws_client_(ioc_, ssl_ctx_, cfg_) {
-    uint32_t epoch_s = static_cast<uint32_t>(WallClock::now_s());
-    char buf[9];
-    std::snprintf(buf, sizeof(buf), "%08x", epoch_s);
-    session_prefix_ = std::string(buf, 8);
+    session_prefix_ = hex8(static_cast<uint32_t>(WallClock::now_s()));
 
     decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))

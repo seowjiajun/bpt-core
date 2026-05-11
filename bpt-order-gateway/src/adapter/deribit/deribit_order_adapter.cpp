@@ -12,11 +12,14 @@
 #include <boost/json.hpp>
 #include <chrono>
 #include <string>
+#include <bpt_common/util/strings.h>
 #include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter {
 
 namespace json = boost::json;
+
+using bpt::common::util::hex8;
 
 using bpt::common::util::WallClock;
 
@@ -25,10 +28,7 @@ DeribitOrderAdapter::DeribitOrderAdapter(const config::AdapterConfig& cfg, const
       client_id_(creds.client_id),
       client_secret_(creds.client_secret),
       ws_client_(ioc_, ssl_ctx_, cfg_) {
-    uint32_t epoch_s = static_cast<uint32_t>(WallClock::now_s());
-    char buf[9];
-    std::snprintf(buf, sizeof(buf), "%08x", epoch_s);
-    session_prefix_ = std::string(buf, 8);
+    session_prefix_ = hex8(static_cast<uint32_t>(WallClock::now_s()));
 
     decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))

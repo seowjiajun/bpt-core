@@ -12,10 +12,23 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <cstdio>
 #include <string>
 #include <string_view>
 
 namespace bpt::common::util {
+
+/// \brief Format a uint32_t as a fixed-width 8-char lowercase hex string.
+///
+/// Used by order-gateway venue adapters to derive a per-process session
+/// prefix from `epoch_s` for client-order-id namespacing — ensures cloids
+/// are unique across process restarts without any persistent state.
+[[nodiscard]] inline std::string hex8(uint32_t v) noexcept {
+    char buf[9];
+    std::snprintf(buf, sizeof(buf), "%08x", v);
+    return std::string(buf, 8);
+}
 
 [[nodiscard]] inline std::string to_lower(std::string_view s) {
     std::string out{s};
