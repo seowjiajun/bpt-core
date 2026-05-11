@@ -1,27 +1,28 @@
 #pragma once
 
-/// @file
-/// Recording subclass of bpt::refdata::http::RestClient. Overrides get/post
-/// to call the parent transport, then tees the response body to a shared
-/// RawSpool tagged REST_RESPONSE before returning the body unchanged to the
-/// caller. The bpt-refdata service binary imports the base class only;
-/// recording lives entirely in bpt-tape — same split as the mdgw side.
+/// \file
+/// \brief Recording REST client — tees each response body into the spool.
 ///
-/// Thread model: one client per poll thread. RawSpool is single-writer, so
-/// every client wired to a given spool MUST be driven by the same thread.
-/// The bpt-tape RefdataPoller enforces this (one std::thread per venue).
+/// Overrides RestClient::get/post to call the parent transport, then
+/// tees the response into a RawSpool tagged REST_RESPONSE before
+/// returning the body unchanged. The bpt-refdata service uses the
+/// base class only; recording lives entirely in bpt-tape (same split
+/// as the mdgw recording adapters).
 ///
-/// Envelope written to the spool (little-endian, framed inside the RawSpool
-/// record's `length` bytes):
+/// Thread model: one client per poll thread. RawSpool is single-writer,
+/// so every client wired to a given spool MUST be driven by the same
+/// thread — bpt-tape's RefdataPoller enforces one std::thread per venue.
 ///
-///   uint8_t  method      // 0=GET, 1=POST
-///   uint16_t target_len
-///   char     target[target_len]
-///   char     body[remainder]
+/// On-disk envelope (little-endian, inside the RawSpool record):
 ///
-/// `remainder` falls out of the outer RawSpool length minus the header
-/// bytes — no second length field needed. Keeps the format binary-safe
-/// (no JSON escaping of binary response bodies).
+///     uint8_t  method        // 0=GET, 1=POST
+///     uint16_t target_len
+///     char     target[target_len]
+///     char     body[remainder]
+///
+/// `remainder` is derived from the outer RawSpool record length minus
+/// the header bytes — no second length field needed. Keeps the format
+/// binary-safe (no JSON escaping of binary response bodies).
 
 #include "bpt_common/recorder/raw_spool.h"
 #include "refdata/http/rest_client.h"
@@ -37,8 +38,13 @@
 
 namespace bpt::tape::http {
 
+/// \brief RestClient that tees each response into a RawSpool.
 class RecordingRestClient : public ::bpt::refdata::http::RestClient {
 public:
+    /// \param host     remote host, e.g. "api.hyperliquid.xyz"
+    /// \param port     remote port (as string — Boost.Asio resolver shape)
+    /// \param use_tls  true → https, false → http
+    /// \param spool    where to tee response bodies; nullptr disables recording
     RecordingRestClient(std::string host,
                         std::string port,
                         bool use_tls,
@@ -68,6 +74,9 @@ private:
                 std::chrono::system_clock::now().time_since_epoch()).count());
     }
 
+    /// Build the on-disk envelope and write it as one RawSpool record.
+    /// Aborts on spool failure so systemd recycles us — silent drops
+    /// were the failure mode this guards against.
     void record_response(uint8_t method_byte,
                          std::string_view target,
                          std::string_view body) const {
@@ -88,12 +97,11 @@ private:
             std::fflush(stderr);
             std::abort();
         }
-        // Force the record to disk. RawSpool's auto-flush runs INSIDE
-        // write_record and only fires when a subsequent record is written —
-        // for an hourly REST poller, the buffer would otherwise sit unflushed
-        // for an entire interval (mdgw doesn't have this problem because the
-        // tick stream re-enters write_record continuously). Cost is one
-        // fwrite + fflush per response, acceptable for a poll cadence.
+        // Force flush — RawSpool's auto-flush only fires on the NEXT
+        // write_record call, and an hourly REST poller would otherwise
+        // leave each response sitting unflushed for an entire interval.
+        // mdgw doesn't need this since its tick stream re-enters
+        // write_record continuously.
         spool_->flush();
     }
 

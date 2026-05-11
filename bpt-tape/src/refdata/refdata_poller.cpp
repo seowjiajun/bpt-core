@@ -1,3 +1,6 @@
+/// \file
+/// \brief RefdataPoller implementation — see header for contract.
+
 #include "tape/refdata/refdata_poller.h"
 
 #include <algorithm>
@@ -30,9 +33,9 @@ RefdataPoller::RefdataPoller(std::string venue_tag,
                              std::vector<EndpointSpec> endpoints)
     : venue_tag_(std::move(venue_tag)),
       spool_(std::move(spool)) {
-    // One RecordingRestClient per (host,port,use_tls) tuple — shared across
-    // endpoints that hit the same origin. Avoids reloading the SSL context
-    // and CA bundle on every call.
+    // De-dupe clients by (host, port, use_tls) so endpoints hitting the
+    // same origin share an SSL context + CA bundle rather than reloading
+    // per-call.
     struct ClientKey {
         std::string host;
         std::string port;
@@ -88,14 +91,13 @@ void RefdataPoller::run_loop() {
     using clock = std::chrono::steady_clock;
     const auto now = clock::now();
     for (auto& es : endpoints_)
-        es.next_due = now;  // fire each endpoint immediately on startup
+        es.next_due = now;  // every endpoint fires on the first iteration
 
     while (running_.load(std::memory_order_acquire)) {
         const auto loop_start = clock::now();
 
-        // Find the earliest-due endpoint at or before now and call it.
-        // Endpoints are independent — call them one at a time so the spool
-        // sees one writer.
+        // Drive endpoints sequentially so the spool sees a single writer
+        // (RawSpool's invariant). RestClient is otherwise reentrant.
         for (auto& es : endpoints_) {
             if (!running_.load(std::memory_order_acquire)) break;
             if (es.next_due > loop_start) continue;
@@ -112,9 +114,9 @@ void RefdataPoller::run_loop() {
                         venue_tag_, es.spec.method, es.spec.path);
                 }
             } catch (const std::exception& e) {
-                // RestClient already retried up to 3x with backoff; log and
-                // move on to the next scheduled tick. Don't tear down the
-                // poller for a single bad request.
+                // RestClient retries internally; this catch is the
+                // outer guard so one bad endpoint doesn't take down
+                // the poll loop. Move on to the next scheduled tick.
                 bpt::common::log::warn(
                     "bpt-tape: refdata poller [{}] {} {} failed: {}",
                     venue_tag_, es.spec.method, es.spec.path, e.what());
@@ -123,7 +125,8 @@ void RefdataPoller::run_loop() {
                           std::chrono::seconds(es.spec.interval_seconds);
         }
 
-        // Sleep until the soonest next_due, or until stop() pokes us.
+        // Sleep on the soonest due time; stop() flips running_ and
+        // notifies cv_ to wake us early.
         auto next = clock::time_point::max();
         for (const auto& es : endpoints_)
             next = std::min(next, es.next_due);

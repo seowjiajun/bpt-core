@@ -1,15 +1,16 @@
-/// bpt-tape — "the tape": captures venue WS frames + REST refdata bodies
-/// to disk by importing bpt-md-gateway's adapter library and substituting
-/// recording subclasses that tee raw bytes via bpt::common::recorder::RawSpool.
+/// \file
+/// \brief bpt-tape entry point — captures venue WS frames + REST bodies
+///        to disk via RawSpool.
 ///
-/// mdgw and refdata service binaries are unchanged; this process owns the
-/// recording feature in full. No Aeron data publication; a no-op publisher
-/// satisfies the adapter's Pub template parameter so parsing still runs
-/// (cheap on the recording host) and the wire pipeline behaves identically
-/// to live trading at every layer except the disk tap.
+/// Imports bpt-md-gateway's adapter library and substitutes recording
+/// subclasses that tee raw bytes through bpt::common::recorder::RawSpool.
+/// The mdgw and refdata service binaries are unchanged — this process
+/// owns the recording feature in full. No Aeron data publication; a
+/// NoopMdPublisher fills the adapter's Pub template slot so parsing
+/// still runs identically to live trading.
 ///
-/// All wiring lives in bpt::tape::app::RecorderService — main.cpp is just
-/// the entry point.
+/// All wiring lives in bpt::tape::app::RecorderService — main.cpp is
+/// just the CLI front and the bpt::app::run handoff.
 
 #include "tape/app/recorder_service.h"
 #include "tape/config/settings.h"
@@ -26,19 +27,16 @@ int main(int argc, char* argv[]) {
                                     "bpt-tape",
                                     "venue WS-frame recorder");
 
-    // Bootstrap logger so config::load failures land in the same sink
-    // any later log line would. bpt::app::run reinitializes with the
-    // loaded LogConfig later — Quill's create_or_get_logger is
-    // idempotent on the same name.
+    // Bootstrap logger so pre-run failures (config load, etc.) land in
+    // the same sink as later lines. bpt::app::run reinitializes with
+    // the loaded LogConfig — Quill's create_or_get_logger is idempotent.
     bpt::common::logging::init("bpt-tape");
 
     try {
         auto cfg = bpt::tape::config::load(args.config_path);
-        // Recording host runs no Aeron consumers — venue WS frames go
-        // straight to disk via RawSpool, no SBE published, no refdata
-        // catalog subscription (universe loaded directly from JSON).
-        // Skip the MediaDriver connect; the recording host needs zero
-        // Aeron infrastructure.
+        // connect_aeron=false: the recording host runs zero Aeron
+        // infrastructure (no MediaDriver, no SBE publish, no refdata
+        // subscription — the universe loads directly from JSON).
         return bpt::app::run("bpt-tape", std::move(cfg),
             [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 return std::make_unique<bpt::tape::app::RecorderService>(

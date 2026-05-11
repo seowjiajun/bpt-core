@@ -1,3 +1,6 @@
+/// \file
+/// \brief TOML → Settings loader for bpt-tape.
+
 #include "tape/config/settings.h"
 
 #include <fmt/format.h>
@@ -12,11 +15,10 @@ namespace bpt::tape::config {
 
 namespace {
 
-// Fill an AdapterConfig from a TOML table, mirroring the subset of fields
-// bpt-md-gateway's loader populates. Recorder doesn't need every knob;
-// keep this in sync with what AdapterBase + each venue adapter actually
-// reads. Validation/breaker fields are left at defaults — recorder
-// instances don't enforce price-deviation checks.
+// Subset of mdgw's AdapterConfig that the recorder actually reads.
+// Validation/breaker fields stay at defaults — recorder doesn't
+// enforce price-deviation checks. Keep in sync with what
+// AdapterBase + each venue adapter consume.
 bpt::md_gateway::config::AdapterConfig parse_adapter(const toml::table& t) {
     bpt::md_gateway::config::AdapterConfig ac;
     if (auto v = t["exchange"].value<std::string>()) ac.exchange = *v;
@@ -51,7 +53,10 @@ Settings load(const std::string& path) {
 
     bpt::common::log::info("Environment: {}", bpt::app::to_string(s.base.environment));
 
-    // Adapter list: either inline [[adapters]] or via exchange_config indirection.
+    // Adapter list comes from either inline [[adapters]] tables or
+    // from a shared exchange_config TOML file referenced by path —
+    // operators use the latter when multiple binaries on a host share
+    // venue configs.
     toml::array adapters_arr;
     if (auto v = root["exchange_config"].value<std::string>()) {
         toml::table exchange = toml::parse_file(*v);
@@ -63,7 +68,9 @@ Settings load(const std::string& path) {
         throw std::runtime_error("bpt-tape config: missing [adapters] or exchange_config");
     }
 
-    // Filter by recording_universe_venues if non-empty.
+    // Optional per-venue allowlist — operators use this to keep a
+    // recording host single-purpose to one venue while reusing the
+    // multi-venue exchange_config file.
     std::unordered_set<std::string> venue_filter;
     if (auto* arr = root["recording_universe_venues"].as_array()) {
         for (auto& elem : *arr)
@@ -139,8 +146,8 @@ Settings load(const std::string& path) {
                 throw std::runtime_error(
                     "bpt-tape config: [[refdata_endpoints]] entry missing exchange/host/path");
             }
-            // Honour recording_universe_venues if it's set — keeps the
-            // recorder host single-purpose to a venue subset.
+            // Same venue allowlist applied to REST endpoints — keeps a
+            // single-venue recorder from polling unrelated origins.
             if (!venue_filter.empty() && !venue_filter.count(ep.exchange))
                 continue;
             s.refdata_endpoints.push_back(std::move(ep));

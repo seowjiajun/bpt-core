@@ -1,5 +1,13 @@
 #pragma once
 
+/// \file
+/// \brief Strongly-typed view of the bpt-tape TOML config.
+///
+/// Mirrors the structure of the .hl.toml file the operator edits. The
+/// loader in config/loader.cpp populates these structs and surfaces any
+/// validation errors at boot — runtime code reads only the populated
+/// structs and never re-parses TOML.
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -9,26 +17,31 @@
 
 namespace bpt::tape::config {
 
-// Universe filter — what to record from the instrument-mapping JSON.
-// Operator declares high-level criteria; bpt-tape iterates the loaded
-// mapping for each venue, applies these filters, and calls subscribe()
-// per surviving entry. Replaces the per-symbol [[universe]] hand-curation.
+/// \brief Operator-declared filter over the instrument-mapping universe.
+///
+/// At boot bpt-tape walks the canonical mapping for each venue,
+/// applies these filters, and subscribes to every survivor. Replaces
+/// the per-symbol hand-curation that the earlier `[[universe]]`
+/// TOML shape required.
 struct UniverseFilter {
-    // Instrument types to include (empty = accept all). Matches
-    // InstrumentInfo::type, e.g. "PERP", "SPOT", "FUTURE".
+    /// Instrument types to include (empty = accept all). Matches
+    /// `InstrumentInfo::type`, e.g. "PERP", "SPOT", "FUTURE".
     std::vector<std::string> inst_types;
-    // Symbols (canonical base) to drop even if they pass the type filter.
-    // E.g. exclude BTC because spread is too tight for AS to clear fees.
+
+    /// Canonical bases to drop even if they pass the type filter
+    /// (e.g. "BTC" when its spread is too tight for the strategy in use).
     std::vector<std::string> exclude_bases;
-    // Default subscription depth applied to every entry that survives
-    // the filters. 0 = top-of-book bbo only; 5 = depth-5 ladder.
+
+    /// Subscription depth applied per surviving entry.
+    /// 0 = top-of-book BBO only, 5 = depth-5 ladder.
     uint8_t default_depth{5};
 };
 
-// Recording knobs — one set per spool flavour. WS frames go under
-// {output_dir}/{venue}/...; refdata REST bodies under
-// {output_dir}/{venue}-rest/... — same RawSpool format, distinct path so
-// the WS converter doesn't have to filter them out.
+/// \brief Recording-side knobs shared between WS and REST spools.
+///
+/// WS frames land under `{output_dir}/{venue}/...`, REST bodies under
+/// `{output_dir}/{venue}-rest/...` — same wslog format, distinct paths
+/// so the WS converter never sees REST records.
 struct RecordingConfig {
     std::string output_dir{"/opt/bpt/data/raw"};
     uint32_t rotate_interval_seconds{3600};
@@ -36,55 +49,58 @@ struct RecordingConfig {
     uint32_t buffer_bytes{1u << 20};
 };
 
-// One configured REST endpoint to poll. bpt-tape pulls these on a timer
-// and tees the response bodies to a `{venue}-rest` spool. Operator
-// declares the URL shape — bpt-tape doesn't introspect bpt-refdata's
-// adapter code, on purpose: the refdata service can grow new endpoints
-// without changing the recorder, and vice versa.
+/// \brief A single REST endpoint to poll + record.
+///
+/// Operator declares the URL shape directly; bpt-tape doesn't
+/// introspect bpt-refdata's adapter code so the refdata service can
+/// grow new endpoints without recorder changes (and vice versa).
 struct RefdataEndpoint {
-    std::string exchange;            ///< "HYPERLIQUID" — picks the spool
+    std::string exchange;            ///< venue tag, picks the spool
     std::string host;                ///< e.g. "api.hyperliquid.xyz"
     std::string port{"443"};
     bool use_tls{true};
-    std::string method{"GET"};       ///< "GET" | "POST"
+    std::string method{"GET"};       ///< "GET" or "POST"
     std::string path;                ///< e.g. "/info"
     std::string body;                ///< POST body; ignored for GET
     uint32_t interval_seconds{3600}; ///< per-endpoint poll cadence
 };
 
+/// \brief Top-level bpt-tape settings, populated by load().
 struct Settings {
     bpt::app::BaseSettings base;
 
-    // Reuses bpt-md-gateway's per-venue WS adapter config (host, ports,
-    // ping cadence, validation knobs). The recorder constructs the same
-    // adapter classes with these configs, just wrapped in recording
-    // subclasses that tee bytes to disk.
+    /// Per-venue WS adapter config — reuses bpt-md-gateway's shape so
+    /// the recorder can construct the same adapter classes (just
+    /// wrapped in Recording* subclasses that tee bytes to disk).
     std::vector<bpt::md_gateway::config::AdapterConfig> mdgw_adapters;
 
-    // Path to the canonical instrument_mapping.json (the same file
-    // bpt-refdata reads on the trading host). bpt-tape loads this
-    // at boot, iterates by venue, applies UniverseFilter, calls
-    // subscribe() per surviving entry. Hot-reloadable on a periodic
-    // tick if the operator wants new listings to land mid-session.
+    /// Path to the canonical instrument-mapping JSON. Same file
+    /// bpt-refdata reads on the trading host; bpt-tape walks it at
+    /// boot, applies universe_filter, and subscribes per survivor.
     std::string instrument_mapping_path{"config/instruments/instrument_mapping.json"};
 
-    // Universe filter applied against the loaded mapping.
+    /// Filter applied against the loaded mapping.
     UniverseFilter universe_filter;
 
-    // Per-venue allowlist applied against the adapter list — drops adapters
-    // whose exchange isn't in this set. Empty = accept all.
+    /// Per-venue allowlist — drops adapters whose exchange isn't in
+    /// the set. Empty = accept all configured adapters.
     std::vector<std::string> recording_universe_venues;
 
     RecordingConfig recording;
 
-    // Operator-declared REST endpoints to poll + capture. Empty = refdata
-    // recording disabled (the existing WS-only deploy).
+    /// REST endpoints to poll + capture. Empty disables refdata
+    /// recording (the WS-only deploy shape).
     std::vector<RefdataEndpoint> refdata_endpoints;
 
-    // Prometheus metrics bind host. Port comes from base.metrics_port.
+    /// Prometheus metrics bind host. Port comes from base.metrics_port.
+    /// 0.0.0.0 in prod (in-VPC scraping); 127.0.0.1 in dev (SSH tunnel).
     std::string metrics_host{"127.0.0.1"};
 };
 
+/// \brief Parse `path` as TOML and return a populated Settings.
+/// \throws std::runtime_error on missing required fields or malformed
+///         TOML — the loader is strict at the config boundary so
+///         silent misconfiguration can't reach runtime.
 Settings load(const std::string& path);
 
 }  // namespace bpt::tape::config
