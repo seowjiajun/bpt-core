@@ -288,7 +288,7 @@ groups:
         annotations:
           summary: "bpt-tape rotation failure on {{ $labels.venue }} (cause={{ $labels.cause }})"
           description: |
-            RawSpool::ensure_file_open() failed with cause={{ $labels.cause }}.
+            Tape::ensure_file_open() failed with cause={{ $labels.cause }}.
             The recorder will abort + restart; investigate why mkdir/fopen
             failed. ENOSPC, EACCES, EROFS are the usual suspects. The
             journal will have the errno in the [E] log line.

@@ -8,7 +8,7 @@
 /// the call. Returned bodies are discarded; bpt-tape doesn't decode
 /// refdata, the bytes are already on disk.
 ///
-/// Threading: single thread per spool keeps RawSpool's single-writer
+/// Threading: single thread per tape keeps Tape's single-writer
 /// invariant without locks. Endpoints sharing the same
 /// (host, port, use_tls) tuple share one client instance — avoids
 /// reloading the SSL context per call.
@@ -17,7 +17,7 @@
 /// immediately. An in-flight request can't be cancelled; shutdown
 /// latency is bounded by the HTTP timeout (~30 s).
 
-#include "bpt_common/recorder/raw_spool.h"
+#include "bpt_common/recorder/tape.h"
 #include "tape/http/recording_rest_client.h"
 
 #include <atomic>
@@ -38,7 +38,7 @@ namespace bpt::tape::refdata {
 /// so bpt-tape can construct the same client without depending on
 /// the refdata service's adapter code.
 struct EndpointSpec {
-    std::string exchange;            ///< venue tag, picks the spool
+    std::string exchange;            ///< venue tag, picks the tape
     std::string host;                ///< e.g. "api.hyperliquid.xyz"
     std::string port{"443"};
     bool use_tls{true};
@@ -50,13 +50,13 @@ struct EndpointSpec {
 
 /// \brief Drives one venue's poll loop.
 ///
-/// Owns the spool, a single worker thread, and one client per
+/// Owns the tape, a single worker thread, and one client per
 /// (host,port,use_tls) tuple shared across endpoints. Lifecycle:
 /// start() spawns, stop() joins, destructor calls stop() defensively.
 class RefdataPoller {
 public:
     RefdataPoller(std::string venue_tag,
-                  std::shared_ptr<::bpt::common::recorder::RawSpool> spool,
+                  std::shared_ptr<::bpt::common::recorder::Tape> tape,
                   std::vector<EndpointSpec> endpoints);
 
     ~RefdataPoller();
@@ -87,7 +87,7 @@ private:
     static uint64_t wall_now_ns();
 
     std::string venue_tag_;
-    std::shared_ptr<::bpt::common::recorder::RawSpool> spool_;
+    std::shared_ptr<::bpt::common::recorder::Tape> tape_;
     std::vector<EndpointState> endpoints_;
 
     std::thread thread_;

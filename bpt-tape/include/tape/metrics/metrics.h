@@ -5,7 +5,7 @@
 ///
 /// Mirrors the StrategyMetrics / OrderGatewayMetrics shape: registry +
 /// exposer + cached metric pointers, no per-call allocation on the hot
-/// path. RawSpool integration is via std::function hooks installed
+/// path. Tape integration is via std::function hooks installed
 /// through hooks_for(), so bpt-common stays free of any prometheus-cpp
 /// dependency — wiring lives in the consumer.
 ///
@@ -20,7 +20,7 @@
 ///   bpt_tape_ws_reconnects_total              (re)connect counter per venue
 ///   bpt_tape_subscriptions                    subscribed-instrument count per venue
 
-#include "bpt_common/recorder/raw_spool.h"
+#include "bpt_common/recorder/tape.h"
 
 #include <memory>
 #include <prometheus/counter.h>
@@ -36,7 +36,7 @@ namespace bpt::tape::metrics {
 ///
 /// Constructed once at startup, lives for the process lifetime. Caches
 /// raw pointers into prometheus-cpp Family objects so hot-path writes
-/// from spool hooks avoid the per-call hash lookup; the registry owns
+/// from tape hooks avoid the per-call hash lookup; the registry owns
 /// the underlying metric objects.
 class TapeMetrics {
 public:
@@ -48,12 +48,12 @@ public:
     /// in-VPC peer (laptop dev with an SSH tunnel).
     TapeMetrics(const std::string& host, uint16_t port);
 
-    /// \brief Build a RawSpool::MetricsHooks bundle tagged to `venue`.
+    /// \brief Build a Tape::MetricsHooks bundle tagged to `venue`.
     ///
     /// Lambdas inside the returned bundle resolve labeled metric
     /// references once (via Family::Add); hot-path callers pay only a
     /// virtual + atomic increment per frame.
-    bpt::common::recorder::RawSpool::MetricsHooks hooks_for(const std::string& venue);
+    bpt::common::recorder::Tape::MetricsHooks hooks_for(const std::string& venue);
 
     /// \brief Mark `venue`'s WS as connected, incrementing the reconnect
     ///        counter (which includes the bootstrap connect; the +1 is

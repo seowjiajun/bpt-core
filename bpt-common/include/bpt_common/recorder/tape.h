@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file
-/// \brief Append-only raw-frame spool used by the recording host.
+/// \brief Append-only tape — the recording medium written by bpt-tape.
 ///
 /// Captures venue payloads (WS frames from md-gateway adapters, REST
 /// response bodies from refdata adapters) in their native bytes. Replay
@@ -18,10 +18,10 @@
 ///   uint8_t payload[length];
 ///
 /// File layout: {root}/{venue_tag}/YYYY-MM-DD/{venue_tag}-HHMMSS.wslog
-/// Hourly rotation by default. One spool per writer thread — no contention.
+/// Hourly rotation by default. One Tape per writer thread — no contention.
 ///
-/// Thread model: callers own the spool from a single thread (the IO thread
-/// that produces the bytes); the spool buffers in userspace and flushes to
+/// Thread model: callers own the Tape from a single thread (the IO thread
+/// that produces the bytes); the Tape buffers in userspace and flushes to
 /// fwrite on buffer-full or on flush(). NOT thread-safe — single writer.
 ///
 /// Disk-on-hot-path note: write_frame() does an in-memory memcpy in the
@@ -39,7 +39,7 @@
 
 namespace bpt::common::recorder {
 
-/// \brief Record-type tag stamped on every entry written to the spool.
+/// \brief Record-type tag stamped on every entry written to the tape.
 enum class RecordType : uint8_t {
     WS_FRAME      = 0,  ///< raw venue frame (JSON / FIX / etc.)
     SESSION_START = 1,  ///< recorder process started; payload = config snapshot JSON
@@ -56,15 +56,15 @@ enum class RecordType : uint8_t {
     REST_RESPONSE = 6,
 };
 
-/// \brief Single-writer append-only spool that emits the .wslog binary format.
+/// \brief Single-writer append-only tape that emits the .wslog binary format.
 ///
-/// Owned by the IO thread that produces bytes (one spool per writer). NOT
+/// Owned by the IO thread that produces bytes (one Tape per writer). NOT
 /// thread-safe — counter accessors (frames_written / bytes_written) are
 /// the only methods that may be called from another thread.
-class RawSpool {
+class Tape {
 public:
     /// \brief Optional metrics callbacks. All fields default to no-op; if any
-    /// is set, RawSpool calls it at the corresponding event. Using
+    /// is set, Tape calls it at the corresponding event. Using
     /// std::function (not concrete prometheus types) so bpt-common doesn't
     /// depend on prometheus-cpp — wiring lives in the consumer (bpt-tape).
     struct MetricsHooks {
@@ -95,11 +95,11 @@ public:
         MetricsHooks metrics{};
     };
 
-    explicit RawSpool(Config cfg);
-    ~RawSpool();
+    explicit Tape(Config cfg);
+    ~Tape();
 
-    RawSpool(const RawSpool&) = delete;
-    RawSpool& operator=(const RawSpool&) = delete;
+    Tape(const Tape&) = delete;
+    Tape& operator=(const Tape&) = delete;
 
     /// \brief Append a raw venue frame.
     /// \return false on file open / rotation / write failure (rare; logs error).
@@ -107,7 +107,7 @@ public:
 
     /// \brief Append a structured marker (SESSION_START/STOP/CHECKPOINT/etc).
     ///
-    /// The payload is opaque to the spool — caller is responsible for any
+    /// The payload is opaque to the Tape — caller is responsible for any
     /// structure (typically JSON). Used for non-frame events recorded
     /// alongside the data stream.
     bool write_marker(uint64_t recv_ts_ns, RecordType type, std::string_view payload);

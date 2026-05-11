@@ -28,7 +28,7 @@ recording_universe_venues = ["HYPERLIQUID"]
 instrument_mapping_path = "/opt/bpt/current/share/instruments/instrument_mapping.hyperliquid.json"
 
 # No [aeron] block — bpt-tape passes connect_aeron=false to bpt::app::run
-# (see main.cpp). Venue WS frames go straight to disk via RawSpool; nothing
+# (see main.cpp). Venue WS frames go straight to disk via Tape; nothing
 # publishes SBE; the recording host runs zero Aeron infrastructure.
 
 # Inline adapter list (bpt-tape accepts either [[adapters]] inline or
@@ -79,10 +79,10 @@ dir = "logs"
 flush_level = "warn"
 flush_interval_ms = 1000
 
-# Refdata REST capture. One spool per exchange (path:
-# /opt/bpt/data/raw/hyperliquid-rest/...) — separate from the WS spool so
+# Refdata REST capture. One tape per exchange (path:
+# /opt/bpt/data/raw/hyperliquid-rest/...) — separate from the WS tape so
 # the WS converter never sees these records. Body envelope is
-# `u8 method | u16 target_len | target | body` (see RawSpool::RecordType
+# `u8 method | u16 target_len | target | body` (see Tape::RecordType
 # REST_RESPONSE). HL uses POST /info with a JSON body discriminator;
 # enumerated explicitly here so the recorder's surface is decoupled from
 # bpt-refdata's adapter code.

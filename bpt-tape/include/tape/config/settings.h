@@ -37,7 +37,7 @@ struct UniverseFilter {
     uint8_t default_depth{5};
 };
 
-/// \brief Recording-side knobs shared between WS and REST spools.
+/// \brief Recording-side knobs shared between WS and REST tapes.
 ///
 /// WS frames land under `{output_dir}/{venue}/...`, REST bodies under
 /// `{output_dir}/{venue}-rest/...` — same wslog format, distinct paths
@@ -55,7 +55,7 @@ struct RecordingConfig {
 /// introspect bpt-refdata's adapter code so the refdata service can
 /// grow new endpoints without recorder changes (and vice versa).
 struct RefdataEndpoint {
-    std::string exchange;            ///< venue tag, picks the spool
+    std::string exchange;            ///< venue tag, picks the tape
     std::string host;                ///< e.g. "api.hyperliquid.xyz"
     std::string port{"443"};
     bool use_tls{true};

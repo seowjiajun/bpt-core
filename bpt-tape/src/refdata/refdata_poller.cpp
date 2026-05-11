@@ -29,10 +29,10 @@ uint64_t RefdataPoller::wall_now_ns() {
 }
 
 RefdataPoller::RefdataPoller(std::string venue_tag,
-                             std::shared_ptr<::bpt::common::recorder::RawSpool> spool,
+                             std::shared_ptr<::bpt::common::recorder::Tape> tape,
                              std::vector<EndpointSpec> endpoints)
     : venue_tag_(std::move(venue_tag)),
-      spool_(std::move(spool)) {
+      tape_(std::move(tape)) {
     // De-dupe clients by (host, port, use_tls) so endpoints hitting the
     // same origin share an SSL context + CA bundle rather than reloading
     // per-call.
@@ -55,7 +55,7 @@ RefdataPoller::RefdataPoller(std::string venue_tag,
         }
         if (!client) {
             client = std::make_shared<http::RecordingRestClient>(
-                key.host, key.port, key.use_tls, spool_);
+                key.host, key.port, key.use_tls, tape_);
             clients.emplace_back(std::move(key), client);
         }
         endpoints_.push_back(EndpointState{std::move(e), std::move(client), {}});
@@ -96,8 +96,8 @@ void RefdataPoller::run_loop() {
     while (running_.load(std::memory_order_acquire)) {
         const auto loop_start = clock::now();
 
-        // Drive endpoints sequentially so the spool sees a single writer
-        // (RawSpool's invariant). RestClient is otherwise reentrant.
+        // Drive endpoints sequentially so the tape sees a single writer
+        // (Tape's invariant). RestClient is otherwise reentrant.
         for (auto& es : endpoints_) {
             if (!running_.load(std::memory_order_acquire)) break;
             if (es.next_due > loop_start) continue;

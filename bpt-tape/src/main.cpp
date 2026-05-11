@@ -1,9 +1,9 @@
 /// \file
 /// \brief bpt-tape entry point — captures venue WS frames + REST bodies
-///        to disk via RawSpool.
+///        to disk via Tape.
 ///
 /// Imports bpt-md-gateway's adapter library and substitutes recording
-/// subclasses that tee raw bytes through bpt::common::recorder::RawSpool.
+/// subclasses that tee raw bytes through bpt::common::recorder::Tape.
 /// The mdgw and refdata service binaries are unchanged — this process
 /// owns the recording feature in full. No Aeron data publication; a
 /// NoopMdPublisher fills the adapter's Pub template slot so parsing

@@ -76,7 +76,7 @@ A Hyperliquid `l2Book` update arrives at the `bpt-md-gateway` adapter:
 8. **Risk gate** — `bpt-order-gateway`'s `RiskChecker` runs position cap, daily-loss latch, max-order-size, max-orders-per-second, duplicate-id checks. Pass → `OrderProcessor::on_new_order()` ships to the venue.
 9. **Exec report** — venue WS exec response parsed by venue-specific `ExecDecoder`, normalised, published on the exec stream. Strategy + analytics see it.
 
-End-to-end latency budget on this path is **single-digit microseconds**. The tape ([bpt-tape](services/tape.md)) sits off this path entirely — it taps the WS frame *before* the adapter's parse, so capture overhead is one extra `RawSpool::write_frame()` call per frame.
+End-to-end latency budget on this path is **single-digit microseconds**. The tape ([bpt-tape](services/tape.md)) sits off this path entirely — it taps the WS frame *before* the adapter's parse, so capture overhead is one extra `Tape::write_frame()` call per frame.
 
 ## Hosts
 

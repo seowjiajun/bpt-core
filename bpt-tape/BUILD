@@ -3,9 +3,8 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
 # bpt-tape — venue WS-frame recorder ("the tape"). Imports bpt-md-gateway's
 # adapter library and substitutes recording subclasses that tee raw bytes
-# to disk via bpt::common::recorder::RawSpool. mdgw + refdata service
-# binaries are untouched; recording lives entirely in this process.
-# Refdata REST snapshot capture is a planned extension via the same RawSpool.
+# to disk via bpt::common::recorder::Tape. mdgw + refdata service binaries
+# are untouched; recording lives entirely in this process.
 
 cc_library(
     name = "tape_lib",

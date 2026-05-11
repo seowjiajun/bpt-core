@@ -11,11 +11,11 @@
 ///
 /// Threading: built and destroyed from the main thread; adapter and
 /// poller threads are owned by their respective objects, joined by
-/// stop(). TapeMetrics is constructed before any spool and destroyed
-/// after — spool metrics-hook lambdas capture refs into its prometheus
+/// stop(). TapeMetrics is constructed before any tape and destroyed
+/// after — tape metrics-hook lambdas capture refs into its prometheus
 /// families, so member declaration order is load-bearing.
 
-#include "bpt_common/recorder/raw_spool.h"
+#include "bpt_common/recorder/tape.h"
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "tape/config/settings.h"
 #include "tape/metrics/metrics.h"
@@ -52,7 +52,7 @@ public:
     void stop() override;
 
 private:
-    /// \brief Per-spool state shared between on_connect / on_disconnect
+    /// \brief Per-tape state shared between on_connect / on_disconnect
     ///        so the first connect can be skipped (covered by SESSION_START
     ///        already) and reconnects get a numbered WS_RECONNECT marker.
     struct ConnState {
@@ -66,34 +66,34 @@ private:
     void setup_universe();
     void setup_refdata_pollers();
 
-    /// \brief Build a RawSpool from settings_.recording, wiring per-venue
+    /// \brief Build a Tape from settings_.recording, wiring per-venue
     ///        metrics hooks if metrics_ is live.
-    std::shared_ptr<bpt::common::recorder::RawSpool> make_spool(
+    std::shared_ptr<bpt::common::recorder::Tape> make_tape(
         const std::string& venue_tag);
 
     /// \brief Install on_connect / on_disconnect callbacks on the adapter
-    ///        that (1) emit WS_RECONNECT / WS_DISCONNECT spool markers,
+    ///        that (1) emit WS_RECONNECT / WS_DISCONNECT tape markers,
     ///        (2) drive ws_connected + ws_reconnects_total metrics.
     void wire_connection_markers(
         std::shared_ptr<bpt::md_gateway::adapter::IAdapter> adapter,
-        std::shared_ptr<bpt::common::recorder::RawSpool> spool,
+        std::shared_ptr<bpt::common::recorder::Tape> tape,
         const std::string& venue_tag);
 
     config::Settings settings_;
     const bpt::common::util::Topology& topology_;
 
-    /// Built before any spool, destroyed after every spool — the
-    /// metrics-hook lambdas captured by spools hold references into
+    /// Built before any tape, destroyed after every tape — the
+    /// metrics-hook lambdas captured by tapes hold references into
     /// TapeMetrics-owned prometheus families.
     std::unique_ptr<metrics::TapeMetrics> metrics_;
 
-    std::vector<std::shared_ptr<bpt::common::recorder::RawSpool>> spools_;
+    std::vector<std::shared_ptr<bpt::common::recorder::Tape>> tapes_;
     std::vector<std::shared_ptr<bpt::md_gateway::adapter::IAdapter>> adapters_;
     std::unordered_map<std::string,
                        std::shared_ptr<bpt::md_gateway::adapter::IAdapter>>
         adapters_per_venue_;
 
-    std::vector<std::shared_ptr<bpt::common::recorder::RawSpool>> refdata_spools_;
+    std::vector<std::shared_ptr<bpt::common::recorder::Tape>> refdata_tapes_;
     std::vector<std::unique_ptr<refdata::RefdataPoller>> refdata_pollers_;
 };
 

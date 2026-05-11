@@ -1,4 +1,4 @@
-#include "bpt_common/recorder/raw_spool.h"
+#include "bpt_common/recorder/tape.h"
 
 #include "bpt_common/logging.h"
 
@@ -26,7 +26,7 @@ uint64_t wall_now_ns() {
 
 }  // namespace
 
-RawSpool::RawSpool(Config cfg) : cfg_(std::move(cfg)) {
+Tape::Tape(Config cfg) : cfg_(std::move(cfg)) {
     if (cfg_.buffer_bytes == 0)
         cfg_.buffer_bytes = 1u << 20;
     if (cfg_.rotate_interval_seconds == 0)
@@ -34,7 +34,7 @@ RawSpool::RawSpool(Config cfg) : cfg_(std::move(cfg)) {
     buffer_.resize(cfg_.buffer_bytes);
 }
 
-RawSpool::~RawSpool() {
+Tape::~Tape() {
     // Best-effort SESSION_STOP marker. Caller should also call write_marker
     // explicitly with a structured exit reason; this is just the safety net.
     if (fp_ != nullptr) {
@@ -44,7 +44,7 @@ RawSpool::~RawSpool() {
     }
 }
 
-std::string RawSpool::build_path(uint64_t recv_ts_ns) const {
+std::string Tape::build_path(uint64_t recv_ts_ns) const {
     const std::time_t t = static_cast<std::time_t>(recv_ts_ns / 1'000'000'000ULL);
     std::tm tm{};
     gmtime_r(&t, &tm);
@@ -56,7 +56,7 @@ std::string RawSpool::build_path(uint64_t recv_ts_ns) const {
         tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
-bool RawSpool::ensure_file_open(uint64_t recv_ts_ns) {
+bool Tape::ensure_file_open(uint64_t recv_ts_ns) {
     const uint64_t rotate_ns =
         static_cast<uint64_t>(cfg_.rotate_interval_seconds) * 1'000'000'000ULL;
     const bool need_rotate =
@@ -75,7 +75,7 @@ bool RawSpool::ensure_file_open(uint64_t recv_ts_ns) {
         // the bool-return seam. The 2026-05-09 incident burned 36 hours
         // because this path was silent. See docs/backlog.md.
         bpt::common::log::error(
-            "RawSpool: create_directories({}) failed: {} ({})",
+            "Tape: create_directories({}) failed: {} ({})",
             fs::path(path).parent_path().string(),
             ec.message(), ec.value());
         if (cfg_.metrics.on_rotation_failure)
@@ -86,7 +86,7 @@ bool RawSpool::ensure_file_open(uint64_t recv_ts_ns) {
     fp_ = std::fopen(path.c_str(), "ab");
     if (fp_ == nullptr) {
         bpt::common::log::error(
-            "RawSpool: fopen({}, \"ab\") failed: {} (errno={})",
+            "Tape: fopen({}, \"ab\") failed: {} (errno={})",
             path, std::strerror(errno), errno);
         if (cfg_.metrics.on_rotation_failure)
             cfg_.metrics.on_rotation_failure("fopen");
@@ -100,7 +100,7 @@ bool RawSpool::ensure_file_open(uint64_t recv_ts_ns) {
     return true;
 }
 
-void RawSpool::close_current(uint64_t /*recv_ts_ns*/) {
+void Tape::close_current(uint64_t /*recv_ts_ns*/) {
     if (fp_ == nullptr)
         return;
     if (buffer_pos_ > 0) {
@@ -113,7 +113,7 @@ void RawSpool::close_current(uint64_t /*recv_ts_ns*/) {
     current_path_.clear();
 }
 
-bool RawSpool::write_record(uint64_t recv_ts_ns, RecordType type, std::string_view payload) {
+bool Tape::write_record(uint64_t recv_ts_ns, RecordType type, std::string_view payload) {
     if (!ensure_file_open(recv_ts_ns))
         return false;
 
@@ -126,7 +126,7 @@ bool RawSpool::write_record(uint64_t recv_ts_ns, RecordType type, std::string_vi
         if (buffer_pos_ > 0) {
             if (std::fwrite(buffer_.data(), 1, buffer_pos_, fp_) != buffer_pos_) {
                 bpt::common::log::error(
-                    "RawSpool: fwrite(buffer={} B) to {} failed: {} (errno={})",
+                    "Tape: fwrite(buffer={} B) to {} failed: {} (errno={})",
                     buffer_pos_, current_path_, std::strerror(errno), errno);
                 return false;
             }
@@ -136,7 +136,7 @@ bool RawSpool::write_record(uint64_t recv_ts_ns, RecordType type, std::string_vi
         if (total > buffer_.size()) {
             const auto fail = [&](const char* what) {
                 bpt::common::log::error(
-                    "RawSpool: fwrite({} direct, {} B) to {} failed: {} (errno={})",
+                    "Tape: fwrite({} direct, {} B) to {} failed: {} (errno={})",
                     what, total, current_path_, std::strerror(errno), errno);
                 return false;
             };
@@ -181,15 +181,15 @@ bool RawSpool::write_record(uint64_t recv_ts_ns, RecordType type, std::string_vi
     return true;
 }
 
-bool RawSpool::write_frame(uint64_t recv_ts_ns, std::string_view payload) {
+bool Tape::write_frame(uint64_t recv_ts_ns, std::string_view payload) {
     return write_record(recv_ts_ns, RecordType::WS_FRAME, payload);
 }
 
-bool RawSpool::write_marker(uint64_t recv_ts_ns, RecordType type, std::string_view payload) {
+bool Tape::write_marker(uint64_t recv_ts_ns, RecordType type, std::string_view payload) {
     return write_record(recv_ts_ns, type, payload);
 }
 
-void RawSpool::flush() {
+void Tape::flush() {
     if (fp_ == nullptr)
         return;
     if (buffer_pos_ > 0) {

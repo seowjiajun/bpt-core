@@ -4,7 +4,7 @@
 #include "tape/app/recorder_service.h"
 
 #include "tape/adapter/recording_mdgw_adapters.h"
-#include "bpt_common/recorder/raw_spool.h"
+#include "bpt_common/recorder/tape.h"
 #include "md_gateway/md/md_types.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 #include <messages/ExchangeRegistry.h>
@@ -70,10 +70,10 @@ void RecorderService::setup_metrics() {
                            settings_.base.metrics_port);
 }
 
-std::shared_ptr<bpt::common::recorder::RawSpool>
-RecorderService::make_spool(const std::string& venue_tag) {
-    return std::make_shared<bpt::common::recorder::RawSpool>(
-        bpt::common::recorder::RawSpool::Config{
+std::shared_ptr<bpt::common::recorder::Tape>
+RecorderService::make_tape(const std::string& venue_tag) {
+    return std::make_shared<bpt::common::recorder::Tape>(
+        bpt::common::recorder::Tape::Config{
             .root_dir = settings_.recording.output_dir,
             .venue_tag = venue_tag,
             .rotate_interval_seconds = settings_.recording.rotate_interval_seconds,
@@ -82,13 +82,13 @@ RecorderService::make_spool(const std::string& venue_tag) {
                 static_cast<uint64_t>(settings_.recording.fsync_interval_ms) *
                 1'000'000ULL,
             .metrics = metrics_ ? metrics_->hooks_for(venue_tag)
-                                : bpt::common::recorder::RawSpool::MetricsHooks{},
+                                : bpt::common::recorder::Tape::MetricsHooks{},
         });
 }
 
 void RecorderService::wire_connection_markers(
     std::shared_ptr<bpt::md_gateway::adapter::IAdapter> adapter,
-    std::shared_ptr<bpt::common::recorder::RawSpool> spool,
+    std::shared_ptr<bpt::common::recorder::Tape> tape,
     const std::string& venue_tag) {
     // ConnState shared via shared_ptr so both lambdas see the same
     // counter + "have we ever disconnected" flag. metrics_ raw pointer
@@ -96,23 +96,23 @@ void RecorderService::wire_connection_markers(
     auto state = std::make_shared<ConnState>();
     auto* metrics = metrics_.get();
 
-    adapter->on_connect = [spool, state, metrics, venue_tag]() {
+    adapter->on_connect = [tape, state, metrics, venue_tag]() {
         if (metrics) metrics->on_ws_connect(venue_tag);
         if (!state->was_disconnected) return;  // initial connect — SESSION_START covers it
         ++state->reconnect_count;
-        spool->write_marker(wall_now_ns(),
+        tape->write_marker(wall_now_ns(),
                             bpt::common::recorder::RecordType::WS_RECONNECT,
                             fmt::format(R"({{"attempt":{}}})", state->reconnect_count));
-        spool->flush();
+        tape->flush();
         state->was_disconnected = false;
     };
-    adapter->on_disconnect = [spool, state, metrics, venue_tag]() {
+    adapter->on_disconnect = [tape, state, metrics, venue_tag]() {
         if (metrics) metrics->on_ws_disconnect(venue_tag);
-        spool->write_marker(wall_now_ns(),
+        tape->write_marker(wall_now_ns(),
                             bpt::common::recorder::RecordType::WS_DISCONNECT,
                             fmt::format(R"({{"attempt":{}}})",
                                         state->reconnect_count + 1));
-        spool->flush();
+        tape->flush();
         state->was_disconnected = true;
     };
 }
@@ -122,15 +122,15 @@ void RecorderService::setup_mdgw_recording() {
 
     for (const auto& a_cfg : settings_.mdgw_adapters) {
         const std::string venue_tag = lowercase_venue(a_cfg.exchange);
-        auto spool = make_spool(venue_tag);
+        auto tape = make_tape(venue_tag);
 
-        spool->write_marker(wall_now_ns(),
+        tape->write_marker(wall_now_ns(),
                             bpt::common::recorder::RecordType::SESSION_START,
                             fmt::format(R"({{"pid":{},"exchange":"{}","ws":"{}://{}:{}{}"}})",
                                         ::getpid(), a_cfg.exchange,
                                         a_cfg.use_tls ? "wss" : "ws",
                                         a_cfg.ws_host, a_cfg.ws_port, a_cfg.ws_path));
-        spool->flush();
+        tape->flush();
 
         const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a_cfg.exchange);
         if (!exch_id) {
@@ -139,22 +139,22 @@ void RecorderService::setup_mdgw_recording() {
                 a_cfg.exchange));
         }
         auto adapter = adapter::make_recording_adapter<NoopMdPublisher>(
-            *exch_id, spool, a_cfg, pub);
+            *exch_id, tape, a_cfg, pub);
         if (!adapter) {
             throw std::runtime_error(fmt::format(
                 "Exchange '{}' is in the registry but bpt-tape has no recording adapter for it",
                 a_cfg.exchange));
         }
 
-        wire_connection_markers(adapter, spool, venue_tag);
+        wire_connection_markers(adapter, tape, venue_tag);
 
         adapter->set_topology(topology_);
         adapter->start();
-        spools_.push_back(spool);
+        tapes_.push_back(tape);
         adapters_per_venue_[a_cfg.exchange] = adapter;
         adapters_.push_back(std::move(adapter));
         bpt::common::log::info("bpt-tape: started recording adapter for {} → {}",
-                               a_cfg.exchange, spool->current_path());
+                               a_cfg.exchange, tape->current_path());
     }
 }
 
@@ -209,7 +209,7 @@ void RecorderService::setup_universe() {
 }
 
 void RecorderService::setup_refdata_pollers() {
-    // Group by venue so each gets its own spool + single-writer thread.
+    // Group by venue so each gets its own tape + single-writer thread.
     // Spool path suffix `-rest` keeps these records out of the WS
     // converter's input.
     std::unordered_map<std::string, std::vector<refdata::EndpointSpec>>
@@ -228,16 +228,16 @@ void RecorderService::setup_refdata_pollers() {
     }
     for (auto& [venue_name, eps] : endpoints_per_venue) {
         const std::string venue_tag = lowercase_venue(venue_name) + "-rest";
-        auto spool = make_spool(venue_tag);
-        spool->write_marker(wall_now_ns(),
+        auto tape = make_tape(venue_tag);
+        tape->write_marker(wall_now_ns(),
                             bpt::common::recorder::RecordType::SESSION_START,
                             fmt::format(R"({{"pid":{},"exchange":"{}","kind":"refdata","endpoints":{}}})",
                                         ::getpid(), venue_name, eps.size()));
-        spool->flush();
+        tape->flush();
         auto poller = std::make_unique<refdata::RefdataPoller>(
-            venue_tag, spool, std::move(eps));
+            venue_tag, tape, std::move(eps));
         poller->start();
-        refdata_spools_.push_back(spool);
+        refdata_tapes_.push_back(tape);
         refdata_pollers_.push_back(std::move(poller));
     }
 }
@@ -251,17 +251,17 @@ void RecorderService::run() {
 }
 
 void RecorderService::stop() {
-    // Stop the IO thread (sole spool writer) BEFORE touching the spool
+    // Stop the IO thread (sole tape writer) BEFORE touching the tape
     // from this thread — otherwise SESSION_STOP races with a frame write.
     for (auto& a : adapters_) a->stop();
-    for (auto& s : spools_) {
+    for (auto& s : tapes_) {
         s->write_marker(wall_now_ns(),
                         bpt::common::recorder::RecordType::SESSION_STOP,
                         R"({"reason":"stop"})");
         s->flush();
     }
     for (auto& p : refdata_pollers_) p->stop();
-    for (auto& s : refdata_spools_) {
+    for (auto& s : refdata_tapes_) {
         s->write_marker(wall_now_ns(),
                         bpt::common::recorder::RecordType::SESSION_STOP,
                         R"({"reason":"stop"})");

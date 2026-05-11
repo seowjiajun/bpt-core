@@ -7,7 +7,7 @@ are unchanged — recording lives entirely in this process.
 
 > Renamed from `bpt-md-recorder` on 2026-05-03 to reflect the planned scope
 > expansion to refdata REST snapshot capture (instrument list, fee schedules,
-> listing events). RawSpool already supports REST bodies on the design side; the
+> listing events). Tape already supports REST bodies on the design side; the
 > per-adapter recording subclass on the refdata side is the remaining work.
 
 ## Why a separate binary
@@ -38,14 +38,14 @@ venue WS  →  HyperliquidMdAdapter (mdgw)  ─┐
                   ┌────────────────────────┴──────────────────┐
                   │                                            │
                   ▼                                            ▼
-       RawSpool::write_frame()              [parent's on_frame() — parses
+       Tape::write_frame()                  [parent's on_frame() — parses
        → /opt/bpt/data/raw/<venue>/         + would publish, but the publisher
          <UTC-date>/<venue>-HHMMSS.wslog    is NoopMdPublisher, so the SBE
                                             chain compiles down to dead code
                                             the optimiser drops]
 ```
 
-The recording subclass calls `RawSpool::write_frame(recv_ns, payload)` *before*
+The recording subclass calls `Tape::write_frame(recv_ns, payload)` *before*
 the parent's `on_frame()` — preserves the existing parse pipeline (so latency
 metrics still work and any parser drift is visible) but adds a disk tap.
 
@@ -147,7 +147,7 @@ Adding/removing recording symbols is an edit to the mapping JSON (which
 ([commit c46b390](https://github.com/bishanparktrading/bpt-core/commit/c46b390))
 that `bpt-tape` uses. No MediaDriver, no `/dev/shm/aeron-*` directory, no
 transport service. The recording host runs zero Aeron infrastructure — venue
-WS frames go straight from kernel sockets to disk via `RawSpool`.
+WS frames go straight from kernel sockets to disk via `Tape`.
 
 This collapses the recording host's process tree to **one** `systemd` unit:
 `bpt-tape.service`. Plus the `bpt-recording-rotate.timer` and

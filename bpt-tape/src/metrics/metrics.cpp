@@ -52,7 +52,7 @@ TapeMetrics::TapeMetrics(const std::string& host, uint16_t port) {
         &prometheus::BuildCounter()
              .Name("bpt_tape_wslog_rotation_failures_total")
              .Help("Rotation-open failures per (venue, cause). cause is one of "
-                   "'create_directories' or 'fopen' — see RawSpool::ensure_file_open. "
+                   "'create_directories' or 'fopen' — see Tape::ensure_file_open. "
                    "A non-zero value here means the writer aborted (Restart=always recycles).")
              .Register(*registry_);
 
@@ -94,11 +94,11 @@ void TapeMetrics::set_subscriptions(const std::string& venue, std::size_t count)
     subscriptions_fam_->Add({{"venue", venue}}).Set(static_cast<double>(count));
 }
 
-bpt::common::recorder::RawSpool::MetricsHooks
+bpt::common::recorder::Tape::MetricsHooks
 TapeMetrics::hooks_for(const std::string& venue) {
     // Resolve labeled metric refs once. Family::Add() returns refs that
     // outlive the returned hooks because TapeMetrics outlives every
-    // spool — capturing by reference is safe.
+    // tape — capturing by reference is safe.
     auto& last_write = last_wslog_write_unix_seconds_fam_->Add({{"venue", venue}});
     auto& frames     = frames_written_total_fam_->Add({{"venue", venue}});
     auto& bytes      = bytes_written_total_fam_->Add({{"venue", venue}});
@@ -109,7 +109,7 @@ TapeMetrics::hooks_for(const std::string& venue) {
     // value to outlive `this` invocation.
     auto* failures_fam = wslog_rotation_failures_total_fam_;
 
-    return bpt::common::recorder::RawSpool::MetricsHooks{
+    return bpt::common::recorder::Tape::MetricsHooks{
         .on_write_success = [&last_write, &frames, &bytes](
                                 uint64_t recv_ts_ns, std::size_t total_bytes) {
             last_write.Set(static_cast<double>(recv_ts_ns) / 1e9);

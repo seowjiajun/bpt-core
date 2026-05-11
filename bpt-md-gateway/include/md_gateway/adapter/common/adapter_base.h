@@ -174,7 +174,7 @@ protected:
     ///
     /// Default implementation enqueues onto the SPSC frame queue for the
     /// publisher thread (push_frame). bpt-tape overrides this to tee
-    /// the raw bytes into a RawSpool before enqueueing — keeps the
+    /// the raw bytes into a Tape before enqueueing — keeps the
     /// recording tap out of the main mdgw source.
     virtual void handle_frame(std::string_view payload, uint64_t recv_ns) noexcept {
         push_frame(payload, recv_ns);

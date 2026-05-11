@@ -422,7 +422,7 @@ EOF
 # ── bpt-tape.service + recording rotate timer ──────────────────────────────
 # bpt-tape ("the tape") is a dedicated binary that imports bpt-md-gateway's
 # adapter library and substitutes recording-aware subclasses (override
-# on_frame to tee raw WS bytes to disk via RawSpool). Trading-stack
+# on_frame to tee raw WS bytes to disk via Tape). Trading-stack
 # mdgw + refdata services have no recording code — recording lives
 # entirely in this process. Designed for a recording-only VPS that
 # just sits there capturing.

@@ -2,7 +2,7 @@
 
 /// @file
 /// WslogReader — minimal sequential reader for the .wslog binary
-/// format owned by `bpt::common::recorder::RawSpool`. Each record is
+/// format owned by `bpt::common::recorder::Tape`. Each record is
 /// a fixed 13-byte header (recv_ts_ns u64 | record_type u8 | length u32)
 /// followed by `length` payload bytes.
 ///
@@ -11,7 +11,7 @@
 /// what keeps DataLoader on CMake). Reader is single-threaded,
 /// synchronous, no buffering beyond what stdio provides.
 
-#include "bpt_common/recorder/raw_spool.h"
+#include "bpt_common/recorder/tape.h"
 
 #include <cstdint>
 #include <cstdio>

@@ -171,7 +171,7 @@ projections, and alert thresholds. Diff the two builds' recording paths and
 config to identify which.
 
 **Relevant code / paths:**
-- `bpt-tape/src/` — RawSpool open/rotate/write paths
+- `bpt-common/src/recorder/tape.cpp` — Tape open/rotate/write paths
 - `scripts/sync_tape_to_s3.sh` — sync script (uses `rclone copy`)
 - `deploy/env/prod-recorder.env.example` — references uninstalled heartbeat
 - `infra/terraform/tape-{host,storage,iam}/` — design that prod has drifted from
@@ -219,7 +219,7 @@ Three tests would cover the highest-risk paths:
 - `test_refdata_poller.cpp` — schedule logic (next_due math), error
   recovery (one bad endpoint doesn't take down siblings), stop()
   responsiveness while a poll is in-flight.
-- `test_raw_spool_rotation.cpp` — date-rollover at UTC midnight (the
+- `test_tape_rotation.cpp` — date-rollover at UTC midnight (the
   exact failure mode from 2026-05-09); ENOSPC simulation via a fake fopen
   that returns `nullptr` once, asserting the new metrics hook fires and
   the bool return is false; also death-test the abort path in the
@@ -242,13 +242,13 @@ panels stay blank. Two cheap fixes:
    closures — surface it via the metrics struct so connection flapping
    is visible on the dashboard rather than buried in journal lines.
 
-Both fit in TapeMetrics with no API change to RawSpool. Adding a
+Both fit in TapeMetrics with no API change to Tape. Adding a
 `DiskUsageRollupAlertRule` would close out the disk side of the alert
 matrix once the gauge exists.
 
 ### wslog file format has no version stamp
 
-`RawSpool::SESSION_START` writes a JSON payload `{"pid":N,"exchange":...,"ws":...}`
+`Tape`'s `SESSION_START` marker writes a JSON payload `{"pid":N,"exchange":...,"ws":...}`
 but no format-version field. If the binary record header
 (`uint64 ts | uint8 type | uint32 length | payload`) ever changes —
 e.g., adding a venue tag, switching to varint length — old wslogs
@@ -262,7 +262,7 @@ compatibility for the archive we're now treating as authoritative.
 
 **Relevant code:**
 - `bpt-tape/src/main.cpp` — SESSION_START payload construction
-- `bpt-common/include/bpt_common/recorder/raw_spool.h` — RecordType enum
+- `bpt-common/include/bpt_common/recorder/tape.h` — RecordType enum
   (also: the unused `CHECKPOINT` value here — write it or remove it)
 
 ### bpt-tape cosmetic cleanups (small, batch as one PR)
@@ -274,12 +274,12 @@ Low-priority but worth picking up next time the file is open:
   `02e7ab7`). Drop the future-tense paragraph.
 - Four copies of `wall_now_ns()` — `main.cpp:49`,
   `refdata_poller.cpp:22`, `recording_rest_client.h:63`, and inside
-  the anonymous namespace of `raw_spool.cpp`. Move to a shared
+  the anonymous namespace of `tape.cpp`. Move to a shared
   `bpt-common/util/clock.h` (single inline function).
 - Two ad-hoc string-case helpers (`lowercase_venue` in main.cpp,
   `to_upper` in refdata_poller.cpp) — same shape, different files.
   Pull into `bpt-common/util/strings.h`.
-- `RawSpool::RecordType::CHECKPOINT` enum value (`raw_spool.h:46`) has
+- `RecordType::CHECKPOINT` enum value (`tape.h:46`) has
   no producer in the codebase. Either implement the periodic-heartbeat
   write the comment promises, or remove the enum value so readers
   don't think they're missing something.
