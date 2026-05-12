@@ -41,6 +41,70 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
+# Coherence check: every BPT_*_CONFIG picked by the env file should reference
+# the same deployment profile. A mismatch means the stack would boot with
+# services on different exchanges or environments — the exact failure mode
+# the profile registry was introduced to prevent.
+REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
+
+# Map env var → directory each service's WorkingDirectory uses to resolve its
+# BPT_*_CONFIG path. Bridge runs from the repo root (config path is already
+# repo-relative); every other service runs from its own bpt-<svc>/ dir.
+declare -A SERVICE_DIR=(
+    [BPT_REFDATA_CONFIG]=bpt-refdata
+    [BPT_MD_GATEWAY_CONFIG]=bpt-md-gateway
+    [BPT_ORDER_GATEWAY_CONFIG]=bpt-order-gateway
+    [BPT_STRATEGY_CONFIG]=bpt-strategy
+    [BPT_ANALYTICS_CONFIG]=bpt-analytics
+    [BPT_BOOK_CONFIG]=bpt-book
+    [BPT_PRICER_CONFIG]=bpt-pricer
+    [BPT_BRIDGE_CONFIG]=.
+)
+
+declare -A SEEN_PROFILES
+while IFS='=' read -r key val; do
+    case "$key" in
+        BPT_*_CONFIG) ;;
+        *) continue ;;
+    esac
+    [ -n "$val" ] || continue
+    val="${val%%#*}"; val="${val//\"/}"; val="${val// /}"
+    [ -n "$val" ] || continue
+    svc_dir="${SERVICE_DIR[$key]:-.}"
+    toml_path="$REPO_ROOT/$svc_dir/$val"
+    [ -f "$toml_path" ] || { echo "WARN: $key points at $svc_dir/$val (not found, skipping coherence check)" >&2; continue; }
+    prof_line="$(grep -E '^profile_config[[:space:]]*=' "$toml_path" | head -1 || true)"
+    if [ -z "$prof_line" ]; then
+        # Bridge intentionally has no profile_config in TOML (uses --profile CLI).
+        case "$key" in BPT_BRIDGE_CONFIG) continue ;; esac
+        echo "WARN: $svc_dir/$val has no profile_config line (skipping coherence check)" >&2
+        continue
+    fi
+    prof_path="$(echo "$prof_line" | sed -E 's/^profile_config[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
+    SEEN_PROFILES["$(basename "$prof_path")"]+="${key},"
+done < "$ENV_FILE"
+
+# Bridge's --profile path participates too — fold it in by basename.
+bridge_prof="$(grep -E '^BPT_BRIDGE_PROFILE=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+bridge_prof="${bridge_prof%%#*}"; bridge_prof="${bridge_prof//\"/}"; bridge_prof="${bridge_prof// /}"
+if [ -n "$bridge_prof" ]; then
+    SEEN_PROFILES["$(basename "$bridge_prof")"]+="BPT_BRIDGE_PROFILE,"
+fi
+
+if [ "${#SEEN_PROFILES[@]}" -gt 1 ]; then
+    echo "ERROR: $ENV_FILE points at configs that disagree on profile_config:" >&2
+    for bn in "${!SEEN_PROFILES[@]}"; do
+        echo "  $bn — used by: ${SEEN_PROFILES[$bn]%,}" >&2
+    done
+    echo "Refusing to activate — fix the env file so every service uses the same profile." >&2
+    exit 1
+fi
+if [ "${#SEEN_PROFILES[@]}" -eq 1 ]; then
+    for bn in "${!SEEN_PROFILES[@]}"; do
+        echo "Coherence check: all services agree on profile=$bn"
+    done
+fi
+
 # Safety check for prod environments
 if [[ "$ENV_NAME" == prod-* ]]; then
     echo
