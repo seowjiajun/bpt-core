@@ -61,7 +61,7 @@ Prerequisites:
 - Linux (systemd-user for the deploy scripts; macOS works for dev with manual launch)
 
 ```bash
-git clone https://github.com/jseow/bpt-core.git
+git clone https://github.com/seowjiajun/bpt-core.git
 cd bpt-core
 bazel build //...                                # ~5 min cold
 bazel test //...                                 # ~30 s
@@ -128,4 +128,4 @@ The interesting bits are less the strategies themselves (mostly textbook) and mo
 
 ---
 
-Built by [Jia Jun Seow](https://github.com/jseow). Questions / interview interest: open an issue or DM.
+Built by [Jia Jun Seow](https://github.com/seowjiajun). Questions / interview interest: open an issue or DM.
