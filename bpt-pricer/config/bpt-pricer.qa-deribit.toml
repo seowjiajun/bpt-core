@@ -6,33 +6,10 @@ risk_free_rate = 0.05
 newton_max_iterations = 100
 newton_tolerance = 1.0e-8
 
+# Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+aeron_config = "../deploy/config/aeron/streams.toml"
+
 [aeron]
+# Fallback only — shared file wins when present.
 media_driver_dir = "/dev/shm/aeron-bpt"
 
-# Read market data from bpt-md-gateway (passive — no subscription request needed)
-[md_input]
-channel = "aeron:ipc"
-stream_id = 2002
-
-# Read refdata from Sindri (to discover option instruments)
-[refdata.snapshot]
-channel = "aeron:ipc"
-stream_id = 1001
-
-[refdata.delta]
-channel = "aeron:ipc"
-stream_id = 1002
-
-[refdata.control]
-channel = "aeron:ipc"
-stream_id = 1003
-
-# Publish vol surface to Fenrir
-[vol_surface]
-channel = "aeron:ipc"
-stream_id = 4001
-
-# Publish heartbeat + ready signal
-[status]
-channel = "aeron:ipc"
-stream_id = 4002

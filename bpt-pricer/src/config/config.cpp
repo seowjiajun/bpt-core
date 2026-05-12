@@ -1,41 +1,33 @@
 #include "pricer/config/settings.h"
 
 #include <bpt_app/base_settings.h>
+#include <bpt_common/aeron/streams_map.h>
+#include <bpt_common/logging.h>
 #include <toml++/toml.hpp>
 
 namespace bpt::pricer::config {
-
-namespace {
-
-bpt::common::config::StreamConfig load_stream(const toml::table* t,
-                                              std::string default_channel,
-                                              int32_t default_stream_id) {
-    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
-    if (!t)
-        return s;
-    if (auto v = (*t)["channel"].value<std::string>())
-        s.channel = *v;
-    if (auto v = (*t)["stream_id"].value<int64_t>())
-        s.stream_id = static_cast<int32_t>(*v);
-    return s;
-}
-
-}  // namespace
 
 Settings load(const std::string& path) {
     Settings s;
     toml::table root = toml::parse_file(path);
     bpt::app::load_base_settings(root, s.base);
 
-    s.md_input = load_stream(root["md_input"].as_table(), "aeron:ipc", 2002);
-    s.vol_surface = load_stream(root["vol_surface"].as_table(), "aeron:ipc", 4001);
-    s.status = load_stream(root["status"].as_table(), "aeron:ipc", 4002);
-
-    if (auto* rd = root["refdata"].as_table()) {
-        s.refdata_snapshot = load_stream((*rd)["snapshot"].as_table(), "aeron:ipc", 1001);
-        s.refdata_delta = load_stream((*rd)["delta"].as_table(), "aeron:ipc", 1002);
-        s.refdata_control = load_stream((*rd)["control"].as_table(), "aeron:ipc", 1003);
+    bpt::common::config::AeronStreamMap shared_streams;
+    if (auto v = root["aeron_config"].value<std::string>()) {
+        shared_streams = bpt::common::config::load_shared_streams(*v);
+        bpt::common::log::info("Loaded shared aeron stream map from {} ({} streams)",
+                               *v, shared_streams.stream_ids.size());
+        if (!shared_streams.media_driver_dir.empty())
+            s.base.media_driver_dir = shared_streams.media_driver_dir;
     }
+
+    using bpt::common::config::resolve_stream;
+    s.md_data          = resolve_stream(shared_streams, "md_data",          2002);
+    s.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
+    s.refdata_delta    = resolve_stream(shared_streams, "refdata_delta",    1002);
+    s.refdata_control  = resolve_stream(shared_streams, "refdata_control",  1003);
+    s.vol_surface      = resolve_stream(shared_streams, "vol_surface",      4001);
+    s.pricer_status    = resolve_stream(shared_streams, "pricer_status",    4002);
 
     if (auto* arr = root["exchanges"].as_array())
         for (auto& elem : *arr)

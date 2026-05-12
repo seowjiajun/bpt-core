@@ -13,10 +13,10 @@ struct Settings {
     // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
     bpt::app::BaseSettings base;
 
-    // MD input (reads from MdGateway stream 2002)
-    bpt::common::config::StreamConfig md_input;
+    // MD input (reads from MdGateway stream 2002 = md_data)
+    bpt::common::config::StreamConfig md_data;
 
-    // Refdata input (reads from Sindri streams 1001-1002)
+    // Refdata input (reads from Sindri streams 1001-1003)
     bpt::common::config::StreamConfig refdata_snapshot;
     bpt::common::config::StreamConfig refdata_delta;
     bpt::common::config::StreamConfig refdata_control;  // Strategy → Sindri (we reuse for our subscription)
@@ -24,8 +24,8 @@ struct Settings {
     // Vol surface output (Pricer → Strategy stream 4001)
     bpt::common::config::StreamConfig vol_surface;
 
-    // Status output (Pricer → Strategy stream 4002)
-    bpt::common::config::StreamConfig status;
+    // Heartbeat + ready output (Pricer → Strategy stream 4002 = pricer_status)
+    bpt::common::config::StreamConfig pricer_status;
 
     // Exchanges to track options on
     std::vector<std::string> exchanges;
