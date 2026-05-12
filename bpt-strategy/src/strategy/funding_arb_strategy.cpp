@@ -10,6 +10,8 @@
 #include <messages/RejectSource.h>
 #include <messages/TimeInForce.h>
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -664,6 +666,74 @@ void FundingArbStrategy::handle_terminal(ArbPair& pair, LegState& leg, bpt::mess
         default:
             break;
     }
+}
+
+// ── Dashboard strategy-state JSON ───────────────────────────────────────────
+//
+// One snapshot per call. FundingArb manages N independent (base_asset → pair)
+// arbs; the dashboard panel currently shows one, so emit the first non-IDLE
+// pair when there is one, else the first pair we've got. Multi-pair display
+// is a later panel evolution.
+
+std::string FundingArbStrategy::get_strategy_state_json() {
+    if (pairs_.empty())
+        return {};
+
+    // Prefer a pair that's actually trading; fall back to the first one.
+    const ArbPair* p = nullptr;
+    for (const auto& [_, pair] : pairs_) {
+        if (pair.state != PairState::IDLE) {
+            p = &pair;
+            break;
+        }
+    }
+    if (!p)
+        p = &pairs_.begin()->second;
+
+    auto leg_status_str = [](PairState s) -> std::string {
+        switch (s) {
+            case PairState::IDLE:                return "flat";
+            case PairState::ENTERING_FIRST_LEG:
+            case PairState::ENTERING_SECOND_LEG: return "entering";
+            case PairState::ACTIVE:              return "open";
+            case PairState::EXITING_FIRST_LEG:
+            case PairState::EXITING_SECOND_LEG:
+            case PairState::UNWINDING:           return "exiting";
+        }
+        return "flat";
+    };
+
+    const double spot_mid = (p->spot.bid + p->spot.ask) * 0.5;
+    const double perp_mid = (p->perp.bid + p->perp.ask) * 0.5;
+    const double basis_bps = (spot_mid > 0) ? (perp_mid - spot_mid) / spot_mid * 1e4 : 0.0;
+    const double funding_rate = p->last_funding_rate_bps / 1e4;  // bps → decimal
+    // Hyperliquid funding is hourly (24/day, 8760/year). OKX is 8-hourly
+    // (3/day, 1095/year). Strategy doesn't track which schedule; use the
+    // conservative 8-hourly assumption for now. Refinement: include the
+    // schedule in the JSON so the panel can label correctly.
+    constexpr double kFundingPeriodsPerYear = 1095.0;
+    const double funding_apr = funding_rate * kFundingPeriodsPerYear;
+    // Position size in base units. Filled qty is 1e5 fixed-point.
+    const double spot_qty = static_cast<double>(p->spot_filled_qty) / 1e5;
+    const double perp_qty = static_cast<double>(p->perp_filled_qty) / 1e5;
+
+    nlohmann::json j;
+    j["type"] = "strategyState";
+    j["kind"] = "FundingArb";
+    // base_asset is the natural symbol for the dashboard (BTC, ETH, …); the
+    // top-bar already shows the configured BPT_BRIDGE_SYMBOL separately.
+    j["symbol"] = p->base_asset;
+    j["exchange"] = p->perp.exchange;  // perp leg's venue carries the funding
+    j["spotPx"] = spot_mid;
+    j["perpPx"] = perp_mid;
+    j["basisBps"] = basis_bps;
+    j["fundingRate"] = funding_rate;
+    j["fundingApr"] = funding_apr;
+    j["spotQty"] = spot_qty;
+    j["perpQty"] = perp_qty;
+    j["hedgedDelta"] = spot_qty + perp_qty;
+    j["legStatus"] = leg_status_str(p->state);
+    return j.dump();
 }
 
 }  // namespace bpt::strategy::strategy

@@ -49,6 +49,7 @@ public:
     void on_bbo(const bpt::messages::MdMarketData& tick) override;
     void on_trade(const bpt::messages::MdTrade& tick) override;
     void on_exec_report(const bpt::messages::ExecutionReport& rpt) override;
+    std::string get_strategy_state_json() override;
 
 private:
     enum class PairState : uint8_t {
