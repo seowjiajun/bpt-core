@@ -1,8 +1,8 @@
 # Instance config — QA environment (demo trading, testnet endpoints).
 # Switch to bpt-md-gateway.prod.toml for live trading.
-environment = "dev"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["OKX"]
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-okx.toml"
+
 subscription_heartbeat_interval_ms = 5000
 service_heartbeat_interval_ms = 5000
 

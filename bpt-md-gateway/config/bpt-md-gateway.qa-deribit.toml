@@ -1,7 +1,7 @@
 # Instance config — QA environment, Deribit testnet.
-environment = "qa"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["DERIBIT"]
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-deribit.toml"
+
 subscription_heartbeat_interval_ms = 5000
 service_heartbeat_interval_ms = 5000
 

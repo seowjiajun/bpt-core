@@ -1,7 +1,7 @@
 # Instance config — QA environment, Hyperliquid testnet.
-environment = "dev"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["HYPERLIQUID"]
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-hyperliquid.toml"
+
 subscription_heartbeat_interval_ms = 5000
 service_heartbeat_interval_ms = 5000
 

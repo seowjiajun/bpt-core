@@ -1,9 +1,10 @@
 # Instance config — BACKTEST mode
 # bpt-md-gateway connects to bpt-backtester's local WS servers instead of real exchanges.
 # Aeron config is identical to QA — Fenrir still subscribes via Aeron as normal.
-environment    = "dev"
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/backtest-multi.toml"
 exchange_config = "config/exchanges/backtest.toml"
-exchanges      = ["BINANCE", "OKX", "HYPERLIQUID"]
+
 subscription_heartbeat_interval_ms = 5000
 service_heartbeat_interval_ms      = 5000
 
