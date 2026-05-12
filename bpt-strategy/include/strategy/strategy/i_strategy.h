@@ -128,6 +128,18 @@ public:
     // Strategy state snapshot for the dashboard strategy-state panel.
     // Published as JSON on the dashboard snapshot stream alongside
     // portfolio state. Default returns empty string (no state to publish).
+    //
+    // Schema convention:
+    //   {
+    //     "type": "strategyState",   // routed by dashboard ws/client.ts
+    //     "kind": "AS",              // discriminator → frontend picks the
+    //                                // matching panel from panels/index.ts
+    //                                // (one entry per strategy class)
+    //     ...strategy-specific fields
+    //   }
+    // The dashboard's GenericStrategyPanel renders unknown `kind`s as a
+    // JSON dump so adding a new strategy is non-fatal — operators still
+    // see something while the dedicated panel is being built.
     virtual std::string get_strategy_state_json() { return {}; }
 
     // Called by StrategyApp on graceful shutdown (SIGTERM/SIGINT) after

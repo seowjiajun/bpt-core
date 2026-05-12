@@ -1612,6 +1612,10 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
 
     nlohmann::json j;
     j["type"] = "strategyState";
+    // Discriminator for the dashboard's panel registry. Every strategy
+    // that implements get_strategy_state_json() must set `kind`; the
+    // frontend picks the matching panel component (panels/index.ts).
+    j["kind"] = "AS";
     j["symbol"] = st.symbol;
     j["exchange"] = st.exchange;
 
