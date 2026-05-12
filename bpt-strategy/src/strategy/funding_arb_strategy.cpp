@@ -705,7 +705,14 @@ std::string FundingArbStrategy::get_strategy_state_json() {
 
     const double spot_mid = (p->spot.bid + p->spot.ask) * 0.5;
     const double perp_mid = (p->perp.bid + p->perp.ask) * 0.5;
-    const double basis_bps = (spot_mid > 0) ? (perp_mid - spot_mid) / spot_mid * 1e4 : 0.0;
+    // Basis is only meaningful when BOTH legs have a real mid. On HL
+    // testnet the perp side often has ask=0 (filtered upstream by
+    // MdValidator), leaving perp_mid=0 — emitting (0 - spot)/spot then
+    // gives a nonsense -10000 bps that pollutes the dashboard. Show 0
+    // until both legs warm up; the dashboard differentiates by the
+    // perp_mid being 0.
+    const double basis_bps =
+        (spot_mid > 0 && perp_mid > 0) ? (perp_mid - spot_mid) / spot_mid * 1e4 : 0.0;
     const double funding_rate = p->last_funding_rate_bps / 1e4;  // bps → decimal
     // Hyperliquid funding is hourly (24/day, 8760/year). OKX is 8-hourly
     // (3/day, 1095/year). Strategy doesn't track which schedule; use the
