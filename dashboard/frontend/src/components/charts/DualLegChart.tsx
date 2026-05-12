@@ -84,15 +84,23 @@ export function DualLegChart() {
         horzLine: { color: CHART_THEME.crosshair, width: 1, style: 3 },
       },
     })
+    // Default to 6 dp — FundingArb is typically used on long-tail tokens
+    // priced under $1 (PURR ~$0.07, with basis ~$0.0002). The data-update
+    // effect below upgrades precision once the first spot frame arrives,
+    // but starting at 6 dp avoids the brief window where lightweight-
+    // charts' default of 2 dp would flatten both lines onto each other.
+    const initialFmt = { type: 'price' as const, precision: 6, minMove: 0.000001 }
     spotRef.current = chart.addSeries(LineSeries, {
       color: CHART_THEME.spot,
       lineWidth: 2,
       title: 'spot',
+      priceFormat: initialFmt,
     })
     perpRef.current = chart.addSeries(LineSeries, {
       color: CHART_THEME.perp,
       lineWidth: 2,
       title: 'perp',
+      priceFormat: initialFmt,
     })
     chartRef.current = chart
 
