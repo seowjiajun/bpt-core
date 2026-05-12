@@ -53,11 +53,16 @@ int main(int argc, char** argv) {
                 "Wired through the systemd env file so bridge labels its env from the active stack.");
         });
 
+    // Initialise logging before config::load so the profile / aeron stream
+    // map info lines surface in the journal. Re-inits with the role-qualified
+    // service name once settings.exchange is known (same pattern as refdata
+    // / md-gateway / order-gateway).
+    bpt::common::logging::init("bpt-bridge");
+
     bridge::config::Settings settings;
     try {
         settings = bridge::config::load(args.config_path, profile_override);
     } catch (const std::exception& e) {
-        bpt::common::logging::init("bridge");
         bpt::common::log::error("Failed to load config: {}", e.what());
         return 1;
     }
@@ -77,6 +82,7 @@ int main(int argc, char** argv) {
         settings.instrument_id = instrument_id_override;
 
     const std::string service_name = derive_service_name(settings.exchange);
+    bpt::common::logging::init(service_name);
 
     try {
         return bpt::app::run(service_name,
