@@ -5,6 +5,12 @@ build-cmake/
 # Bazel convenience symlinks (output dirs, not sources)
 bazel-*
 
+# Per-service bin/ output dirs (populated by deploy scripts that copy
+# binaries out of bazel-bin/ for systemd unit ExecStart paths). Build
+# artefact, not source.
+bpt-*/bin/
+dashboard/bridge/bin/
+
 # CMake
 CMakeCache.txt
 CMakeFiles/
