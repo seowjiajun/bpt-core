@@ -287,7 +287,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 LICENSE_EOF
 
-# ── 6. README.public.md → README.md ───────────────────────────────────────
+# ── 7. README.public.md → README.md ───────────────────────────────────────
 # The public mirror ships its own README pitched at recruiters. If the
 # template exists alongside this script, use it; otherwise leave the
 # existing README in place.
@@ -298,6 +298,19 @@ if [ -f "$PUBLIC_README_TEMPLATE" ]; then
         -e "s|@@PUBLIC_AUTHOR_HANDLE@@|${PUBLIC_AUTHOR_HANDLE}|g" \
         -e "s|@@PUBLIC_YEAR@@|${PUBLIC_YEAR}|g" \
         "$PUBLIC_README_TEMPLATE" > "$OUT_DIR/README.md"
+fi
+
+# ── 8. GitHub Actions: install public-only workflow ───────────────────────
+# The private repo's CI is multi-workflow (ops, mapping, release, etc.)
+# and depends on AWS/GHCR secrets that don't belong in the public mirror.
+# Wipe everything under .github/ and install a single self-contained
+# workflow that only builds + tests + lints. No secrets required.
+PUBLIC_CI_TEMPLATE="$REPO_ROOT/scripts/public-mirror/ci.yml.tmpl"
+if [ -f "$PUBLIC_CI_TEMPLATE" ]; then
+    echo "── Installing public CI workflow ──"
+    rm -rf "$OUT_DIR/.github"
+    mkdir -p "$OUT_DIR/.github/workflows"
+    cp "$PUBLIC_CI_TEMPLATE" "$OUT_DIR/.github/workflows/ci.yml"
 fi
 
 echo
