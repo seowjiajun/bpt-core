@@ -3,9 +3,11 @@
 # Used when AS-on-OKX-BTC-USDT backtest (testnet has only
 # 4 coins). Pulls reference data from HL mainnet REST — read-only, no orders.
 
-environment = "dev"
+# Deployment profile (env + exchange filter). Backtest profile omits
+# exchange_config because each service has its own backtest endpoint file.
+profile_config = "../deploy/config/profile/backtest-okx.toml"
 exchange_config = "config/exchanges/backtest-okx-mainnet.toml"
-exchanges = ["OKX"]
+
 instrument_poll_interval_s = 3600
 
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.

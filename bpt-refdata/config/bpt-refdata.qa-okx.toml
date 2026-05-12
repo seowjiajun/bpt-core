@@ -1,8 +1,8 @@
 # Instance config — QA environment (demo trading, testnet endpoints).
 # Switch to bpt-refdata.prod.toml for live trading.
-environment = "dev"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["OKX"]
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-okx.toml"
+
 instrument_poll_interval_s = 3600
 
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.

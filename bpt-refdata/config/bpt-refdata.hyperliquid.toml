@@ -4,9 +4,9 @@
 # "bpt/prod/HYPERLIQUID" (systemd-creds in deployed mode, or
 # ~/.bpt-secrets/ locally — see bpt-refdata/config/exchanges/testnet.toml
 # header comment for the local loading convention).
-environment = "live"
-exchange_config = "config/exchanges/live.toml"
-exchanges = ["HYPERLIQUID"]
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/live-hyperliquid.toml"
+
 instrument_poll_interval_s = 3600
 
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.

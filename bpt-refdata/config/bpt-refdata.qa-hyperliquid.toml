@@ -1,7 +1,7 @@
 # Instance config — QA environment, Hyperliquid testnet.
-environment = "dev"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["HYPERLIQUID"]
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-hyperliquid.toml"
+
 instrument_poll_interval_s = 3600
 
 # Shared aeron stream registry. Single source of truth for stream IDs +

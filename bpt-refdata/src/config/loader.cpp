@@ -2,6 +2,7 @@
 
 #include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/streams_map.h>
+#include <bpt_common/config/profile_config.h>
 #include <bpt_common/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -16,12 +17,31 @@ Settings load(const std::string& path) {
 
     toml::table root = toml::parse_file(path);
 
+    // Deployment profile: shared file with environment/exchanges/exchange_config
+    // that every service in the stack reads. Per-TOML fields below still win
+    // when present — operators can override for one-off runs.
+    bpt::common::config::ProfileConfig profile;
+    bool have_profile = false;
+    if (auto v = root["profile_config"].value<std::string>()) {
+        profile = bpt::common::config::load_profile_config(*v);
+        have_profile = true;
+        bpt::common::log::info("Loaded deployment profile from {} (env={}, exchanges=[{}])",
+                               *v,
+                               bpt::common::to_string(profile.environment),
+                               fmt::join(profile.exchanges, ", "));
+        // load_base_settings reads `environment` from the toml::table — inject
+        // the profile value if the per-TOML doesn't supply one.
+        if (!root.contains("environment"))
+            root.insert("environment", std::string(bpt::common::to_string(profile.environment)));
+    }
+
     // Load raw adapter list from exchange config file, falling back to inline.
-    std::string exchange_config_path;
-    toml::array adapters_arr;
-    if (auto v = root["exchange_config"].value<std::string>()) {
+    std::string exchange_config_path = profile.exchange_config;
+    if (auto v = root["exchange_config"].value<std::string>())
         exchange_config_path = *v;
-        toml::table exchange = toml::parse_file(*v);
+    toml::array adapters_arr;
+    if (!exchange_config_path.empty()) {
+        toml::table exchange = toml::parse_file(exchange_config_path);
         if (auto* arr = exchange["adapters"].as_array())
             adapters_arr = *arr;
     } else if (auto* arr = root["adapters"].as_array()) {
@@ -47,15 +67,20 @@ Settings load(const std::string& path) {
 
     bpt::common::log::info("Environment: {}", bpt::app::to_string(settings.base.environment));
 
-    // Read the exchanges filter from the instance config.
+    // Read the exchanges filter — per-TOML override wins over profile.
     std::unordered_set<std::string> exchange_filter;
     if (auto* arr = root["exchanges"].as_array()) {
         for (auto& elem : *arr)
             if (auto v = elem.value<std::string>())
                 exchange_filter.insert(*v);
         settings.exchanges = {exchange_filter.begin(), exchange_filter.end()};
-        bpt::common::log::info("Exchange filter: [{}]", fmt::join(settings.exchanges, ", "));
+    } else if (have_profile) {
+        for (const auto& ex : profile.exchanges)
+            exchange_filter.insert(ex);
+        settings.exchanges = profile.exchanges;
     }
+    if (!settings.exchanges.empty())
+        bpt::common::log::info("Exchange filter: [{}]", fmt::join(settings.exchanges, ", "));
 
     // Layer 1: shared aeron stream registry. If aeron_config points at a
     // streams.toml, every stream comes from there; otherwise we fall back

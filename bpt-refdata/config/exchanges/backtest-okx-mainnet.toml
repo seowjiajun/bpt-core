@@ -1,0 +1,12 @@
+# Refdata exchange config for backtest mode — OKX mainnet (read-only).
+# No secret_name: refdata only reads /api/v5/public/instruments, no
+# signed actions. Mirrors backtest-hl-mainnet.toml's pattern.
+
+[[adapters]]
+exchange    = "OKX"
+secret_name = ""
+rest_host   = "www.okx.com"
+rest_port   = "443"
+ws_host     = "ws.okx.com"
+ws_port     = "8443"
+use_tls     = true
