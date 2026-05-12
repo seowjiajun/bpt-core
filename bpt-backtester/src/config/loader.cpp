@@ -1,9 +1,31 @@
 #include "backtester/config/settings.h"
 
+#include "backtester/calendar/session_calendar.h"
+
+#include <algorithm>
+#include <stdexcept>
 #include <toml++/toml.hpp>
 #include <bpt_app/base_settings.h>
+#include <bpt_common/logging.h>
 
 namespace bpt::backtester::config {
+
+namespace {
+
+VenueLatencySpec parse_venue_spec(const toml::table& t) {
+    VenueLatencySpec s{};
+    if (auto v = t["submit_to_match_base_ns"].value<int64_t>())
+        s.submit_to_match_base_ns = static_cast<uint64_t>(*v);
+    if (auto v = t["submit_to_match_jitter_ns"].value<int64_t>())
+        s.submit_to_match_jitter_ns = static_cast<uint64_t>(*v);
+    if (auto v = t["match_to_report_base_ns"].value<int64_t>())
+        s.match_to_report_base_ns = static_cast<uint64_t>(*v);
+    if (auto v = t["match_to_report_jitter_ns"].value<int64_t>())
+        s.match_to_report_jitter_ns = static_cast<uint64_t>(*v);
+    return s;
+}
+
+}  // namespace
 
 Settings load(const std::string& path) {
     toml::table root = toml::parse_file(path);
@@ -12,22 +34,127 @@ Settings load(const std::string& path) {
     bpt::app::load_base_settings(root, s.base);
 
     if (auto* sim = root["simulation"].as_table()) {
-        if (auto v = (*sim)["start"].value<std::string>())
-            s.simulation.start = *v;
-        if (auto v = (*sim)["end"].value<std::string>())
-            s.simulation.end = *v;
+        auto top_start  = (*sim)["start"].value<std::string>();
+        auto top_end    = (*sim)["end"].value<std::string>();
+        auto* win_arr   = (*sim)["windows"].as_array();
+        auto* sess_arr  = (*sim)["sessions"].as_array();
+
+        const bool has_top  = top_start.has_value() || top_end.has_value();
+        const bool has_arr  = win_arr != nullptr;
+        const bool has_sess = sess_arr != nullptr;
+
+        const int set_count = (has_top ? 1 : 0) + (has_arr ? 1 : 0) + (has_sess ? 1 : 0);
+        if (set_count > 1)
+            throw std::runtime_error(
+                "simulation: pick exactly one of top-level start/end, "
+                "[[simulation.windows]], or [[simulation.sessions]]");
+
+        if (has_arr) {
+            for (auto& elem : *win_arr) {
+                auto* t = elem.as_table();
+                if (!t)
+                    continue;
+                TimeWindow w;
+                if (auto v = (*t)["start"].value<std::string>()) w.start = *v;
+                if (auto v = (*t)["end"].value<std::string>())   w.end   = *v;
+                if (w.start.empty() || w.end.empty())
+                    throw std::runtime_error(
+                        "simulation.windows: every entry must have non-empty start and end");
+                s.simulation.windows.push_back(std::move(w));
+            }
+            if (s.simulation.windows.empty())
+                throw std::runtime_error("simulation.windows: array is empty");
+        } else if (has_sess) {
+            const auto cal = bpt::backtester::calendar::SessionCalendar::with_crypto_defaults();
+            for (auto& elem : *sess_arr) {
+                auto* t = elem.as_table();
+                if (!t)
+                    continue;
+                auto name = (*t)["name"].value<std::string>();
+                auto* dates = (*t)["dates"].as_array();
+                if (!name || !dates)
+                    throw std::runtime_error(
+                        "simulation.sessions: each entry needs name and dates[]");
+                std::vector<std::string> dlist;
+                for (auto& dv : *dates)
+                    if (auto sv = dv.value<std::string>())
+                        dlist.push_back(*sv);
+                for (const auto& w : cal.resolve(*name, dlist))
+                    s.simulation.windows.push_back(TimeWindow{w.start, w.end});
+            }
+            if (s.simulation.windows.empty())
+                throw std::runtime_error("simulation.sessions: produced no windows");
+        } else if (top_start && top_end) {
+            s.simulation.windows.push_back(TimeWindow{*top_start, *top_end});
+        } else {
+            throw std::runtime_error(
+                "simulation: must specify top-level start/end, "
+                "[[simulation.windows]], or [[simulation.sessions]]");
+        }
+
+        // Sort by start so .start / .end (back-compat scalars) describe the
+        // span correctly. Sorting is stable so user-supplied order is
+        // preserved between equal starts.
+        std::stable_sort(s.simulation.windows.begin(), s.simulation.windows.end(),
+                         [](const TimeWindow& a, const TimeWindow& b) {
+                             return a.start < b.start;
+                         });
+        s.simulation.start = s.simulation.windows.front().start;
+        s.simulation.end   = s.simulation.windows.back().end;
+
         if (auto v = (*sim)["allow_partial_data"].value<bool>())
             s.simulation.allow_partial_data = *v;
         if (auto v = (*sim)["subscriber_wait_timeout_s"].value<int64_t>())
             s.simulation.subscriber_wait_timeout_s = static_cast<uint32_t>(*v);
 
         if (auto* lat = (*sim)["latency"].as_table()) {
-            if (auto v = (*lat)["cex_base_ms"].value<int64_t>())
-                s.simulation.latency.cex_base_ms = static_cast<uint32_t>(*v);
-            if (auto v = (*lat)["hyperliquid_base_ms"].value<int64_t>())
-                s.simulation.latency.hyperliquid_base_ms = static_cast<uint32_t>(*v);
-            if (auto v = (*lat)["hyperliquid_jitter_ms"].value<int64_t>())
-                s.simulation.latency.hyperliquid_jitter_ms = static_cast<uint32_t>(*v);
+            if (auto v = (*lat)["seed"].value<int64_t>())
+                s.simulation.latency.seed = static_cast<uint64_t>(*v);
+
+            if (auto* d = (*lat)["default"].as_table())
+                s.simulation.latency.default_spec = parse_venue_spec(*d);
+
+            for (const char* venue : {"BINANCE", "OKX", "HYPERLIQUID", "DERIBIT"}) {
+                if (auto* vt = (*lat)[venue].as_table())
+                    s.simulation.latency.per_venue[venue] = parse_venue_spec(*vt);
+            }
+
+            // Back-compat for cex_base_ms / hyperliquid_base_ms / hyperliquid_jitter_ms.
+            // Pre-Phase-3 these fields existed but no consumer ever read them; users
+            // expecting latency to be applied got zero. We translate them onto the
+            // new per-venue submit_to_match leg so configs that *had* these set
+            // start actually feeling the latency they always thought they had.
+            // match_to_report stays at zero from the legacy form — the legacy
+            // schema didn't expose that leg.
+            bool legacy_used = false;
+            auto fill_if_unset = [&](const char* venue, uint64_t base_ns, uint64_t jitter_ns) {
+                auto& spec = s.simulation.latency.per_venue[venue];
+                if (spec.submit_to_match_base_ns == 0 && base_ns > 0)
+                    spec.submit_to_match_base_ns = base_ns;
+                if (spec.submit_to_match_jitter_ns == 0 && jitter_ns > 0)
+                    spec.submit_to_match_jitter_ns = jitter_ns;
+            };
+            if (auto v = (*lat)["cex_base_ms"].value<int64_t>()) {
+                legacy_used = true;
+                const uint64_t ns = static_cast<uint64_t>(*v) * 1'000'000ULL;
+                fill_if_unset("BINANCE", ns, 0);
+                fill_if_unset("OKX", ns, 0);
+                fill_if_unset("DERIBIT", ns, 0);
+            }
+            if (auto v = (*lat)["hyperliquid_base_ms"].value<int64_t>()) {
+                legacy_used = true;
+                fill_if_unset("HYPERLIQUID", static_cast<uint64_t>(*v) * 1'000'000ULL, 0);
+            }
+            if (auto v = (*lat)["hyperliquid_jitter_ms"].value<int64_t>()) {
+                legacy_used = true;
+                fill_if_unset("HYPERLIQUID", 0, static_cast<uint64_t>(*v) * 1'000'000ULL);
+            }
+            if (legacy_used) {
+                bpt::common::log::warn(
+                    "[config] simulation.latency: legacy ms fields are deprecated. "
+                    "Use [simulation.latency.<VENUE>] submit_to_match_base_ns / _jitter_ns / "
+                    "match_to_report_base_ns / _jitter_ns instead.");
+            }
         }
     }
 

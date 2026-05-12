@@ -21,9 +21,9 @@
 #include "md_gateway/md/validation_drop_breaker.h"
 
 #include <atomic>
-#include <cstdint>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cstdint>
 
 namespace bpt::md_gateway::md {
 
@@ -40,8 +40,7 @@ namespace bpt::md_gateway::md {
 template <class Inner>
 class ValidatingPublisher {
 public:
-    ValidatingPublisher(Inner& inner, MdValidator& validator,
-                        const char* adapter_name = "unknown")
+    ValidatingPublisher(Inner& inner, MdValidator& validator, const char* adapter_name = "unknown")
         : inner_(inner),
           validator_(validator),
           adapter_name_(adapter_name),
@@ -51,9 +50,7 @@ public:
     ///
     /// Safe to call before start. Re-entry after start is not supported
     /// — breaker state is not atomic-reset.
-    void set_drop_breaker_config(ValidationDropBreaker::Config cfg) {
-        breaker_ = ValidationDropBreaker(cfg);
-    }
+    void set_drop_breaker_config(ValidationDropBreaker::Config cfg) { breaker_ = ValidationDropBreaker(cfg); }
 
     void publish(const MdBbo& bbo) { forward(bbo); }
     void publish(const MdTrade& trade) { forward(trade); }
@@ -64,9 +61,7 @@ public:
     /// Layered semantic: a subscriber reading this port sees every
     /// message that failed to reach the wire, regardless of which
     /// layer rejected it.
-    [[nodiscard]] uint64_t drop_count() const {
-        return inner_.drop_count() + drops_.load(std::memory_order_relaxed);
-    }
+    [[nodiscard]] uint64_t drop_count() const { return inner_.drop_count() + drops_.load(std::memory_order_relaxed); }
 
     [[nodiscard]] uint64_t published() const noexcept { return published_.load(std::memory_order_relaxed); }
     [[nodiscard]] uint64_t drops() const noexcept { return drops_.load(std::memory_order_relaxed); }

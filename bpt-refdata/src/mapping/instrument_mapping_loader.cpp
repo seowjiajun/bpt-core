@@ -1,11 +1,11 @@
 #include "refdata/mapping/instrument_mapping_loader.h"
 
+#include <bpt_common/logging.h>
 #include <fstream>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <shared_mutex>
 #include <stdexcept>
-#include <bpt_common/logging.h>
 
 namespace bpt::refdata::mapping {
 
@@ -71,7 +71,9 @@ std::optional<uint32_t> InstrumentMappingLoader::try_resolve_canonical_id(uint8_
 uint32_t InstrumentMappingLoader::resolve_canonical_id(uint8_t exchange_id, const std::string& exchange_symbol) const {
     auto result = try_resolve_canonical_id(exchange_id, exchange_symbol);
     if (!result) {
-        bpt::common::log::warn("[InstrumentMapping] No canonical ID for exchange={} symbol={}", exchange_id, exchange_symbol);
+        bpt::common::log::warn("[InstrumentMapping] No canonical ID for exchange={} symbol={}",
+                               exchange_id,
+                               exchange_symbol);
         return UNKNOWN_INSTRUMENT;
     }
     return *result;
@@ -86,7 +88,9 @@ std::string InstrumentMappingLoader::resolve_symbol(uint32_t canonical_id, uint8
     }
     auto sit = it->second.exchanges.find(exchange_id);
     if (sit == it->second.exchanges.end()) {
-        bpt::common::log::warn("[InstrumentMapping] No symbol for canonical_id={} exchange={}", canonical_id, exchange_id);
+        bpt::common::log::warn("[InstrumentMapping] No symbol for canonical_id={} exchange={}",
+                               canonical_id,
+                               exchange_id);
         return {};
     }
     return sit->second;
@@ -115,9 +119,9 @@ std::vector<InstrumentEntry> InstrumentMappingLoader::instruments_for_venue(uint
             continue;
         out.push_back(InstrumentEntry{
             .canonical_id = cid,
-            .exchange_id  = exchange_id,
+            .exchange_id = exchange_id,
             .venue_symbol = it->second,
-            .info         = entry.info,
+            .info = entry.info,
         });
     }
     return out;

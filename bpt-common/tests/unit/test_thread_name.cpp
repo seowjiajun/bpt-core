@@ -3,10 +3,8 @@
 // that what we asked for is actually what the kernel stored.
 
 #include <bpt_common/util/thread_name.h>
-
-#include <gtest/gtest.h>
-
 #include <fstream>
+#include <gtest/gtest.h>
 #include <pthread.h>
 #include <sstream>
 #include <string>

@@ -54,8 +54,8 @@ TEST(FloatToWireTest, FullPrecision) {
 // parse_universe_meta from the live API response.
 // ---------------------------------------------------------------------------
 
-constexpr AssetMeta kBtcMeta{/*asset_idx=*/3,   /*sz_decimals=*/5, /*max_px_decimals=*/1};
-constexpr AssetMeta kEthMeta{/*asset_idx=*/4,   /*sz_decimals=*/4, /*max_px_decimals=*/2};
+constexpr AssetMeta kBtcMeta{/*asset_idx=*/3, /*sz_decimals=*/5, /*max_px_decimals=*/1};
+constexpr AssetMeta kEthMeta{/*asset_idx=*/4, /*sz_decimals=*/4, /*max_px_decimals=*/2};
 constexpr AssetMeta kXmrMeta{/*asset_idx=*/202, /*sz_decimals=*/2, /*max_px_decimals=*/4};
 
 // ---------------------------------------------------------------------------
@@ -121,12 +121,12 @@ TEST(ParseSpotUniverseMetaTest, BasicExtract) {
     ASSERT_EQ(table.size(), 2u);
 
     const auto& purr = table.at("PURR/USDC");
-    EXPECT_EQ(purr.asset_idx, 10000);          // 10000 + 0
-    EXPECT_EQ(purr.sz_decimals, 0);            // PURR base szDecimals
-    EXPECT_EQ(purr.max_px_decimals, 8);        // 8 - 0 (spot rule)
+    EXPECT_EQ(purr.asset_idx, 10000);    // 10000 + 0
+    EXPECT_EQ(purr.sz_decimals, 0);      // PURR base szDecimals
+    EXPECT_EQ(purr.max_px_decimals, 8);  // 8 - 0 (spot rule)
 
     const auto& hfun = table.at("HFUN/USDC");
-    EXPECT_EQ(hfun.asset_idx, 10002);          // 10000 + 2 — gap in index space
+    EXPECT_EQ(hfun.asset_idx, 10002);  // 10000 + 2 — gap in index space
     EXPECT_EQ(hfun.sz_decimals, 2);
     EXPECT_EQ(hfun.max_px_decimals, 6);
 }
@@ -199,7 +199,7 @@ TEST(BuildOrderActionTest, BasicBuyOrder) {
     ASSERT_EQ(orders.size(), 1u);
     const auto& o = orders[0].as_object();
 
-    EXPECT_EQ(o.at("a").as_int64(), 3);   // BTC asset_idx
+    EXPECT_EQ(o.at("a").as_int64(), 3);    // BTC asset_idx
     EXPECT_EQ(o.at("b").as_bool(), true);  // is_buy
     // Price rounded to integer for BTC at ~$72k — 5 sigfigs dominates.
     EXPECT_EQ(std::string(o.at("p").as_string()), "72199");

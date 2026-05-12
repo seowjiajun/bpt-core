@@ -15,7 +15,8 @@ OrderGatewayMetrics::OrderGatewayMetrics(uint16_t port) {
         exposer->RegisterCollectable(registry);
     }
 
-    auto& h = prometheus::BuildGauge().Name("order_gateway_healthy").Help("1 if OrderGateway is running").Register(*registry);
+    auto& h =
+        prometheus::BuildGauge().Name("order_gateway_healthy").Help("1 if OrderGateway is running").Register(*registry);
     healthy = &h.Add({});
     healthy->Set(1.0);
 

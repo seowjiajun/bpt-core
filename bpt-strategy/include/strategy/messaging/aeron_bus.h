@@ -31,7 +31,9 @@
 #include <memory>
 
 namespace bpt::strategy {
-namespace config { struct AppConfig; }
+namespace config {
+struct AppConfig;
+}
 
 namespace messaging {
 
@@ -62,8 +64,7 @@ public:
     /// Build every concrete pub/sub the strategy needs from a single
     /// Aeron client + the parsed config. Sole place that calls into
     /// `<Aeron.h>` from the application layer.
-    static StrategyBus build(std::shared_ptr<aeron::Aeron> aeron,
-                             const config::AppConfig& cfg);
+    static StrategyBus build(std::shared_ptr<aeron::Aeron> aeron, const config::AppConfig& cfg);
 };
 
 }  // namespace messaging

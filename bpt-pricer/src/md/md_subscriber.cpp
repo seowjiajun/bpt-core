@@ -8,15 +8,15 @@
 
 namespace bpt::pricer::md {
 
-MdSubscriber::MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                           const std::string& channel,
-                           int32_t stream_id) {
+MdSubscriber::MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
     sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        std::move(aeron), channel, stream_id,
-        [this](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset,
-               ::aeron::util::index_t length, ::aeron::Header& hdr) {
-            on_fragment(buf, offset, length, hdr);
-        });
+        std::move(aeron),
+        channel,
+        stream_id,
+        [this](::aeron::AtomicBuffer& buf,
+               ::aeron::util::index_t offset,
+               ::aeron::util::index_t length,
+               ::aeron::Header& hdr) { on_fragment(buf, offset, length, hdr); });
     bpt::common::log::info("[MdSubscriber] Subscription ready on {} stream {}", channel, stream_id);
 }
 
@@ -42,14 +42,12 @@ void MdSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
 
     if (template_id == MdMarketData::sbeTemplateId()) {
         MdMarketData md;
-        md.wrapForDecode(data, hdr_len, hdr.blockLength(), hdr.version(),
-                         static_cast<uint64_t>(length));
+        md.wrapForDecode(data, hdr_len, hdr.blockLength(), hdr.version(), static_cast<uint64_t>(length));
         if (on_bbo_)
             on_bbo_(md.instrumentId(), md.bidPrice(), md.askPrice(), md.timestampNs());
     } else if (template_id == MdTrade::sbeTemplateId()) {
         MdTrade trade;
-        trade.wrapForDecode(data, hdr_len, hdr.blockLength(), hdr.version(),
-                            static_cast<uint64_t>(length));
+        trade.wrapForDecode(data, hdr_len, hdr.blockLength(), hdr.version(), static_cast<uint64_t>(length));
         if (on_trade_)
             on_trade_(trade.instrumentId(), trade.price(), trade.qty(), trade.timestampNs());
     }

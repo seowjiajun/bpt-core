@@ -54,8 +54,8 @@ private:
     uint16_t port_;
     std::string snapshot_path_;
     double starting_capital_;
-    std::string meta_response_body_;       // verbatim {"type":"meta"} response
-    std::string meta_ctxs_response_body_;  // {"type":"metaAndAssetCtxs"} response (same as meta + ctxs)
+    std::string meta_response_body_;           // verbatim {"type":"meta"} response
+    std::string meta_ctxs_response_body_;      // {"type":"metaAndAssetCtxs"} response (same as meta + ctxs)
     std::string clearinghouse_response_body_;  // synthesized clearinghouseState JSON
     std::vector<std::string> asset_universe_;
 

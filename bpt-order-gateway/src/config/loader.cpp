@@ -1,18 +1,20 @@
 #include "order_gateway/config/settings.h"
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::config {
 
 namespace {
 
-bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+bpt::common::config::StreamConfig load_stream(const toml::table* t,
+                                              std::string default_channel,
+                                              int32_t default_stream_id) {
     bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
@@ -51,13 +53,14 @@ Settings load(const std::string& path) {
         // order-gateway is the worst place to be uncertain about where
         // orders go).
         if (s.base.is_prod() && path_has_testnet)
-            throw std::runtime_error(fmt::format(
-                "environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
-                "refusing to start", exchange_config_path));
+            throw std::runtime_error(
+                fmt::format("environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
+                            "refusing to start",
+                            exchange_config_path));
         if (!s.base.is_prod() && path_has_live)
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
-                           bpt::app::to_string(s.base.environment),
-                           exchange_config_path);
+                                   bpt::app::to_string(s.base.environment),
+                                   exchange_config_path);
     }
 
     bpt::common::log::info("Environment: {}", bpt::app::to_string(s.base.environment));
@@ -168,16 +171,16 @@ Settings load(const std::string& path) {
         // (snapshot fetch at minimum). Hyperliquid's action codec uses
         // ws_path, OKX/Binance/Deribit also do.
         if (ac.rest_host.empty() || ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty())
-            throw std::runtime_error(fmt::format(
-                "Adapter {} missing required rest_host/ws_host/ws_port/ws_path", exchange_name));
+            throw std::runtime_error(
+                fmt::format("Adapter {} missing required rest_host/ws_host/ws_port/ws_path", exchange_name));
 
         // Fatal: prod environment with testnet adapters. Order-gateway
         // is the worst place for a flag mismatch — testnet=true in prod
         // means live trades go to the testnet venue.
         if (s.base.is_prod() && ac.testnet)
-            throw std::runtime_error(fmt::format(
-                "environment = \"prod\" but adapter {} has testnet = true — refusing to start",
-                exchange_name));
+            throw std::runtime_error(
+                fmt::format("environment = \"prod\" but adapter {} has testnet = true — refusing to start",
+                            exchange_name));
 
         s.gateway.adapters.push_back(std::move(ac));
     }

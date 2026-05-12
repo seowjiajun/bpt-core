@@ -8,6 +8,7 @@
 #include "md_gateway/messaging/funding_rate_publisher.h"
 
 #include <messages/ExchangeId.h>
+
 #include <gtest/gtest.h>
 #include <optional>
 
@@ -22,7 +23,9 @@ struct HLFundingFixture {
     messaging::FundingRateCallback fr_cb;
 
     HLFundingFixture() {
-        fr_cb = [this](const messaging::FundingRateUpdate& fr) { last_fr = fr; };
+        fr_cb = [this](const messaging::FundingRateUpdate& fr) {
+            last_fr = fr;
+        };
     }
 
     void inject(const char* msg, uint64_t recv_ns = 0) { parser.decode(msg, recv_ns, pub, fr_cb); }

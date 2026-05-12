@@ -5,11 +5,11 @@
 #include <messages/RefDataSnapshot.h>
 #include <messages/RefDataSubscriptionRequest.h>
 
-#include <cstring>
-#include <thread>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cstring>
+#include <thread>
 
 namespace bpt::order_gateway::refdata {
 
@@ -20,26 +20,30 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
                              int control_stream,
                              int snapshot_stream,
                              int delta_stream) {
-    ctrl_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-        aeron, channel, control_stream,
-        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+    ctrl_pub_ =
+        std::make_unique<bpt::common::aeron::Publisher>(aeron,
+                                                        channel,
+                                                        control_stream,
+                                                        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
     snap_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, snapshot_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        snapshot_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_snapshot_fragment(buf, offset, length, hdr);
         });
     delta_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, delta_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        delta_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_delta_fragment(buf, offset, length, hdr);
         });
 
     bpt::common::log::info("RefdataClient connected: ctrl={} snap={} delta={}",
-                   control_stream,
-                   snapshot_stream,
-                   delta_stream);
+                           control_stream,
+                           snapshot_stream,
+                           delta_stream);
 }
 
 void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilter> filters) {
@@ -56,9 +60,7 @@ void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilt
     std::vector<char> buf(buf_size, '\0');
 
     RefDataSubscriptionRequest req;
-    req.wrapAndApplyHeader(buf.data(), 0, buf_size)
-        .correlationId(correlation_id)
-        .timestampNs(WallClock::now_ns());
+    req.wrapAndApplyHeader(buf.data(), 0, buf_size).correlationId(correlation_id).timestampNs(WallClock::now_ns());
 
     req.instrumentsCount(0);
 

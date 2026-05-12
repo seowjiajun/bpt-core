@@ -1,4 +1,5 @@
 #include "strategy/strategy/regime_detector.h"
+
 #include "strategy/strategy/hurst_estimator.h"
 
 #include <algorithm>
@@ -61,20 +62,28 @@ RegimeDetector::Regime RegimeDetector::classify(double hurst) const {
 
 double RegimeDetector::gamma_multiplier() const {
     switch (regime_) {
-        case Regime::MEAN_REVERT: return cfg_.gamma_mult_mean_revert;
-        case Regime::TRENDING:    return cfg_.gamma_mult_trending;
-        case Regime::NEUTRAL:     return cfg_.gamma_mult_neutral;
-        case Regime::WARMING_UP:  return cfg_.gamma_mult_neutral;
+        case Regime::MEAN_REVERT:
+            return cfg_.gamma_mult_mean_revert;
+        case Regime::TRENDING:
+            return cfg_.gamma_mult_trending;
+        case Regime::NEUTRAL:
+            return cfg_.gamma_mult_neutral;
+        case Regime::WARMING_UP:
+            return cfg_.gamma_mult_neutral;
     }
     return 1.0;
 }
 
 const char* RegimeDetector::name(Regime r) {
     switch (r) {
-        case Regime::WARMING_UP:  return "WARMING_UP";
-        case Regime::MEAN_REVERT: return "MEAN_REVERT";
-        case Regime::NEUTRAL:     return "NEUTRAL";
-        case Regime::TRENDING:    return "TRENDING";
+        case Regime::WARMING_UP:
+            return "WARMING_UP";
+        case Regime::MEAN_REVERT:
+            return "MEAN_REVERT";
+        case Regime::NEUTRAL:
+            return "NEUTRAL";
+        case Regime::TRENDING:
+            return "TRENDING";
     }
     return "UNKNOWN";
 }
@@ -99,8 +108,7 @@ void RegimeDetector::restore_state(const StateSnapshot& snap) {
     // most recent samples since older samples have already aged out
     // of the Hurst estimator's consideration anyway.
     returns_.clear();
-    const std::size_t start =
-        snap.returns.size() > cfg_.hurst_window ? snap.returns.size() - cfg_.hurst_window : 0;
+    const std::size_t start = snap.returns.size() > cfg_.hurst_window ? snap.returns.size() - cfg_.hurst_window : 0;
     for (std::size_t i = start; i < snap.returns.size(); ++i)
         returns_.push_back(snap.returns[i]);
 }

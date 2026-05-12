@@ -26,7 +26,8 @@ std::optional<CanonicalResolver::ParsedSymbol> CanonicalResolver::parse(const st
     const auto colon = canonical.find(':');
 
     if (slash == std::string::npos || colon == std::string::npos || colon <= slash) {
-        bpt::common::log::warn("[CanonicalResolver] Malformed canonical symbol '{}' — expected BASE/QUOTE:TYPE", canonical);
+        bpt::common::log::warn("[CanonicalResolver] Malformed canonical symbol '{}' — expected BASE/QUOTE:TYPE",
+                               canonical);
         return std::nullopt;
     }
 

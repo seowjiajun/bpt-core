@@ -1,9 +1,9 @@
 #include "order_gateway/adapter/okx/okx_instruments_service.h"
 
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <string>
 #include <vector>
-#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter::okx {
 
@@ -34,9 +34,8 @@ void OKXInstrumentsService::fetch() {
                     continue;
 
                 std::string inst_id = std::string(id_it->value().as_string());
-                int64_t code = code_it->value().is_int64()
-                                   ? code_it->value().as_int64()
-                                   : std::stoll(std::string(code_it->value().as_string()));
+                int64_t code = code_it->value().is_int64() ? code_it->value().as_int64()
+                                                           : std::stoll(std::string(code_it->value().as_string()));
                 inst_id_codes_[inst_id] = code;
 
                 // ctVal: base currency per contract for SWAP/FUTURES.
@@ -57,8 +56,8 @@ void OKXInstrumentsService::fetch() {
         }
     }
     bpt::common::log::info("OKXInstrumentsService: loaded {} instIdCodes, {} contract sizes from REST",
-                   inst_id_codes_.size(),
-                   contract_sizes_.size());
+                           inst_id_codes_.size(),
+                           contract_sizes_.size());
 }
 
 }  // namespace bpt::order_gateway::adapter::okx

@@ -17,37 +17,62 @@ std::string MatchingEngine::key(const std::string& exchange, const std::string& 
     return exchange + ':' + symbol;
 }
 
+int64_t MatchingEngine::price_key(double price) {
+    // Scaled to nanos-of-quote-unit. 1e9 covers crypto tick sizes (HL APE
+    // = 1e-5, OKX BTC swap = 1e-1, Binance options = 1e-1) with margin.
+    return static_cast<int64_t>(std::llround(price * 1.0e9));
+}
+
 void MatchingEngine::set_fill_callback(FillCallback cb) {
     std::lock_guard lock(mutex_);
     fill_cb_ = std::move(cb);
 }
 
+void MatchingEngine::set_latency_model(latency::LatencyModel* model) {
+    std::lock_guard lock(mutex_);
+    latency_ = model;
+}
+
 // ── Market event ──────────────────────────────────────────────────────────────
 
 void MatchingEngine::on_market_event(const data::MarketEvent& event) {
-    std::vector<FillReport> fills;
+    std::vector<FillReport> deliveries;
 
     {
         std::lock_guard lock(mutex_);
+        const uint64_t event_ts = (event.type == data::MarketEvent::Type::ORDER_BOOK)
+                                      ? std::get<data::OrderBookRecord>(event.payload).timestamp_ns
+                                      : std::get<data::TradeRecord>(event.payload).timestamp_ns;
+
+        // Drain any pending submits whose scheduled match time has arrived.
+        // This must run before the book update so the order matches against
+        // the book as it stood between this event and the previous one — the
+        // exchange's latency-affected view, not the post-event view.
+        drain_pending_submits(event_ts);
+
+        std::vector<FillReport> fills;
         if (event.type == data::MarketEvent::Type::ORDER_BOOK) {
             const auto& ob = std::get<data::OrderBookRecord>(event.payload);
             current_ts_ = ob.timestamp_ns;
-            books_[key(ob.exchange, ob.symbol)] = ob;
-            // Backstop path for orders whose queue_ahead couldn't be
-            // seeded (deeper than L5, or pre-book-snapshot). These
-            // still fill on book cross — over-optimistic but rare.
-            fill_crossing_limits(key(ob.exchange, ob.symbol), fills);
+            const std::string book_key = key(ob.exchange, ob.symbol);
+            // Phase 5: regen queue_ahead on resting orders before the book
+            // is overwritten. This lets us see the *previous* level sizes
+            // alongside the new ones to attribute the delta to cancels.
+            apply_queue_regen(book_key, ob);
+            books_[book_key] = ob;
+            fill_crossing_limits(book_key, fills);
         } else {
             const auto& t = std::get<data::TradeRecord>(event.payload);
             current_ts_ = t.timestamp_ns;
-            // Primary fill path: trade prints drain queue_ahead first,
-            // then fill us. This is the queue-aware model. The legacy
-            // book-cross path above remains as a backstop only.
             fill_against_trade(t, fills);
         }
+        for (auto& f : fills)
+            schedule_fill(std::move(f));
+
+        drain_pending_fills(current_ts_, deliveries);
     }
 
-    for (auto& fill : fills)
+    for (auto& fill : deliveries)
         if (fill_cb_)
             fill_cb_(fill);
 }
@@ -55,90 +80,59 @@ void MatchingEngine::on_market_event(const data::MarketEvent& event) {
 // ── Order submission ──────────────────────────────────────────────────────────
 
 OpenOrder MatchingEngine::submit_order(OpenOrder order) {
-    std::vector<FillReport> fills;
+    std::vector<FillReport> deliveries;
 
     {
-        std::lock_guard lock(mutex_);
-        order.submitted_ts = current_ts_;
+    std::lock_guard lock(mutex_);
+    order.submitted_ts = current_ts_;
 
-        if (order.type == OrderType::MARKET) {
-            auto it = books_.find(key(order.exchange, order.symbol));
-            if (it != books_.end()) {
-                fill_market(order, it->second, fills);
-            } else {
-                bpt::common::log::warn("[MatchingEngine] No book for {}/{} — market order unfilled",
-                               order.exchange,
-                               order.symbol);
-            }
-        } else {
-            auto it = books_.find(key(order.exchange, order.symbol));
-            if (it != books_.end()) {
-                const auto& book = it->second;
-
-                const bool crosses =
-                    (order.side == OrderSide::BUY  && book.ask_px[0] > 0.0 && order.price >= book.ask_px[0] - 1e-9) ||
-                    (order.side == OrderSide::SELL && book.bid_px[0] > 0.0 && order.price <= book.bid_px[0] + 1e-9);
-
-                // POST_ONLY: the venue rejects a crossing order at
-                // submit (HL Alo, OKX post_only, Binance LIMIT_MAKER
-                // semantics). Never fills as TAKER, never enters
-                // pending_. Caller checks order.rejected and emits
-                // a venue-format error.
-                if (order.type == OrderType::POST_ONLY && crosses) {
-                    order.rejected = true;
-                    bpt::common::log::debug(
-                        "[MatchingEngine] POST_ONLY rejected (would cross): {} {} {} @ {} touch=({:.6f}/{:.6f})",
-                        order.symbol,
-                        (order.side == OrderSide::BUY ? "BUY" : "SELL"),
-                        order.quantity,
-                        order.price,
-                        book.bid_px[0],
-                        book.ask_px[0]);
-                } else {
-                    // Crossing-LIMIT path: if our price is at or through
-                    // the touch, the crossing portion fills as TAKER at
-                    // book level prices (NOT at our limit). This mirrors
-                    // real exchange semantics — submitting a BUY at a
-                    // price >= best ask immediately consumes the ask side
-                    // and pays taker fees. Without this, AS's
-                    // inventory-skew quotes (which intentionally cross to
-                    // unwind position) get phantom-filled at the limit
-                    // price, biasing backtest P&L by tens of bps per fill.
-                    if (crosses && order.type == OrderType::LIMIT) {
-                        fill_book_until(order, book, order.price, OrderType::LIMIT, fills);
-                    }
-
-                    // Residual (or non-crossing fully) rests in pending_
-                    // with queue_ahead seeded from the book. POST_ONLY
-                    // that didn't cross also rests here as a passive
-                    // maker quote.
-                    if (order.filled_qty < order.quantity - 1e-12) {
-                        order.queue_ahead = book_qty_at_price(book, order.side, order.price);
-                        order.queue_seeded = true;
-                        pending_[key(order.exchange, order.symbol)].push_back(order);
-                        bpt::common::log::debug("[MatchingEngine] Queued LIMIT {} {} {} @ {} queue_ahead={:.4f} cross_filled={:.4f}",
-                                        order.symbol,
-                                        (order.side == OrderSide::BUY ? "BUY" : "SELL"),
-                                        order.quantity - order.filled_qty,
-                                        order.price,
-                                        order.queue_ahead,
-                                        order.filled_qty);
-                    }
-                }
-            } else {
-                // No book yet. POST_ONLY can't be evaluated without a
-                // book, but in practice the AS strategy doesn't quote
-                // until it has BBO, so this branch shouldn't fire for
-                // POST_ONLY. If it does, queue defensively — once the
-                // book arrives, the legacy fill_crossing_limits path
-                // would (incorrectly for POST_ONLY) fill as MAKER, but
-                // that's no worse than the pre-POST_ONLY state.
-                pending_[key(order.exchange, order.symbol)].push_back(order);
+    // Synchronous POST_ONLY-cross rejection: real exchanges return this
+    // in the ack frame (HL Alo, OKX post_only, Binance LIMIT_MAKER), so
+    // the order server's HTTP response can carry the error string. The
+    // check uses the current book — slightly optimistic vs. checking at
+    // scheduled_match_ts, but POST_ONLY-cross is rare in normal AS
+    // quoting and the synchronous-ack contract is more important.
+    if (order.type == OrderType::POST_ONLY) {
+        auto it = books_.find(key(order.exchange, order.symbol));
+        if (it != books_.end()) {
+            const auto& book = it->second;
+            const bool crosses =
+                (order.side == OrderSide::BUY  && book.ask_px[0] > 0.0 && order.price >= book.ask_px[0] - 1e-9) ||
+                (order.side == OrderSide::SELL && book.bid_px[0] > 0.0 && order.price <= book.bid_px[0] + 1e-9);
+            if (crosses) {
+                order.rejected = true;
+                bpt::common::log::debug(
+                    "[MatchingEngine] POST_ONLY rejected (would cross): {} {} {} @ {} touch=({:.6f}/{:.6f})",
+                    order.symbol,
+                    (order.side == OrderSide::BUY ? "BUY" : "SELL"),
+                    order.quantity, order.price, book.bid_px[0], book.ask_px[0]);
+                return order;
             }
         }
     }
 
-    for (auto& fill : fills)
+    // Defer the actual match by submit_to_match latency. If no model is
+    // installed, scheduled_match_ts == current_ts_ and the order will drain
+    // on the very next on_market_event, preserving pre-Phase-3 timing.
+    uint64_t latency_ns = 0;
+    if (latency_)
+        latency_ns = latency_->draw(order.exchange, latency::LatencyLeg::SUBMIT_TO_MATCH);
+
+    PendingSubmit ps;
+    ps.order = order;
+    ps.scheduled_match_ts = current_ts_ + latency_ns;
+    pending_submits_.push_back(std::move(ps));
+
+    // Drain any submits / fills whose scheduled times are already ≤ current_ts_.
+    // With a null latency model (or zero latency for this venue) this fires the
+    // just-queued order's match synchronously, preserving pre-Phase-3 semantics
+    // where submit_order's fill_cb fired before return. With non-zero latency
+    // this is a no-op — the order waits for a market event to advance time.
+    drain_pending_submits(current_ts_);
+    drain_pending_fills(current_ts_, deliveries);
+    }  // unlock
+
+    for (auto& fill : deliveries)
         if (fill_cb_)
             fill_cb_(fill);
 
@@ -147,16 +141,201 @@ OpenOrder MatchingEngine::submit_order(OpenOrder order) {
 
 bool MatchingEngine::cancel_order(const std::string& exchange, const std::string& symbol, const std::string& order_id) {
     std::lock_guard lock(mutex_);
-    auto it = pending_.find(key(exchange, symbol));
-    if (it == pending_.end())
-        return false;
 
-    auto& v = it->second;
-    auto pos = std::find_if(v.begin(), v.end(), [&](const OpenOrder& o) { return o.order_id == order_id; });
-    if (pos == v.end())
-        return false;
-    v.erase(pos);
-    return true;
+    // Resting orders.
+    if (auto it = pending_.find(key(exchange, symbol)); it != pending_.end()) {
+        auto& v = it->second;
+        auto pos = std::find_if(v.begin(), v.end(),
+                                [&](const OpenOrder& o) { return o.order_id == order_id; });
+        if (pos != v.end()) {
+            v.erase(pos);
+            return true;
+        }
+    }
+
+    // Orders still in the submit-to-match latency window.
+    auto it = std::find_if(pending_submits_.begin(), pending_submits_.end(),
+                           [&](const PendingSubmit& ps) {
+                               return ps.order.exchange == exchange &&
+                                      ps.order.symbol == symbol &&
+                                      ps.order.order_id == order_id;
+                           });
+    if (it != pending_submits_.end()) {
+        pending_submits_.erase(it);
+        return true;
+    }
+
+    return false;
+}
+
+// ── Pending-submit / pending-fill machinery ──────────────────────────────────
+
+void MatchingEngine::drain_pending_submits(uint64_t upto_ts) {
+    if (pending_submits_.empty())
+        return;
+
+    // Sort by scheduled_match_ts; stable to preserve submission order
+    // among orders with identical scheduled times.
+    std::stable_sort(pending_submits_.begin(), pending_submits_.end(),
+                     [](const PendingSubmit& a, const PendingSubmit& b) {
+                         return a.scheduled_match_ts < b.scheduled_match_ts;
+                     });
+
+    std::vector<FillReport> fills;
+    auto it = pending_submits_.begin();
+    for (; it != pending_submits_.end(); ++it) {
+        if (it->scheduled_match_ts > upto_ts)
+            break;
+        // Advance current_ts_ to the order's effective arrival time so
+        // queue_ahead seeding and emitted fill timestamps reflect when
+        // the match actually happened.
+        if (it->scheduled_match_ts > current_ts_)
+            current_ts_ = it->scheduled_match_ts;
+        process_pending_submit(*it, fills);
+    }
+    pending_submits_.erase(pending_submits_.begin(), it);
+
+    for (auto& f : fills)
+        schedule_fill(std::move(f));
+}
+
+void MatchingEngine::process_pending_submit(PendingSubmit& ps, std::vector<FillReport>& out) {
+    OpenOrder& order = ps.order;
+
+    if (order.type == OrderType::MARKET) {
+        auto it = books_.find(key(order.exchange, order.symbol));
+        if (it != books_.end()) {
+            fill_market(order, it->second, out);
+        } else {
+            bpt::common::log::warn("[MatchingEngine] No book for {}/{} — market order unfilled",
+                           order.exchange, order.symbol);
+        }
+        return;
+    }
+
+    auto it = books_.find(key(order.exchange, order.symbol));
+    if (it == books_.end()) {
+        // Defensive: queue without seeding. fill_crossing_limits will pick
+        // it up once a book arrives.
+        pending_[key(order.exchange, order.symbol)].push_back(order);
+        return;
+    }
+    const auto& book = it->second;
+
+    const bool crosses =
+        (order.side == OrderSide::BUY  && book.ask_px[0] > 0.0 && order.price >= book.ask_px[0] - 1e-9) ||
+        (order.side == OrderSide::SELL && book.bid_px[0] > 0.0 && order.price <= book.bid_px[0] + 1e-9);
+
+    // Crossing-LIMIT: TAKER fill against the book at scheduled_match_ts.
+    // Note: a POST_ONLY that wasn't synchronously rejected at submit time
+    // (because the book at submit time wasn't crossing) but now crosses
+    // at match time would technically be rejected here. We simplify and
+    // just queue it — the case is rare in AS quoting and the alternative
+    // requires a deferred-rejection exec-report path.
+    if (crosses && order.type == OrderType::LIMIT) {
+        fill_book_until(order, book, order.price, OrderType::LIMIT, out);
+    }
+
+    if (order.filled_qty < order.quantity - 1e-12) {
+        order.queue_ahead = book_qty_at_price(book, order.side, order.price);
+        order.queue_seeded = true;
+        pending_[key(order.exchange, order.symbol)].push_back(order);
+        bpt::common::log::debug("[MatchingEngine] Queued LIMIT {} {} {} @ {} queue_ahead={:.4f} cross_filled={:.4f}",
+                        order.symbol,
+                        (order.side == OrderSide::BUY ? "BUY" : "SELL"),
+                        order.quantity - order.filled_qty,
+                        order.price,
+                        order.queue_ahead,
+                        order.filled_qty);
+    }
+}
+
+void MatchingEngine::schedule_fill(FillReport fill) {
+    uint64_t latency_ns = 0;
+    if (latency_)
+        latency_ns = latency_->draw(fill.exchange, latency::LatencyLeg::MATCH_TO_REPORT);
+    PendingFill pf;
+    pf.scheduled_report_ts = fill.simulation_ts + latency_ns;
+    pf.fill = std::move(fill);
+    pending_fills_.push_back(std::move(pf));
+}
+
+void MatchingEngine::apply_queue_regen(const std::string& book_key,
+                                       const data::OrderBookRecord& new_book) {
+    // First book event for this instrument — nothing to compare against.
+    auto old_it = books_.find(book_key);
+    if (old_it == books_.end()) {
+        traded_since_book_[book_key].clear();
+        return;
+    }
+    const data::OrderBookRecord& old_book = old_it->second;
+
+    auto pending_it = pending_.find(book_key);
+    if (pending_it == pending_.end()) {
+        traded_since_book_[book_key].clear();
+        return;
+    }
+
+    const auto trades_at_it = traded_since_book_.find(book_key);
+    const std::unordered_map<int64_t, double>* trades_at =
+        (trades_at_it != traded_since_book_.end()) ? &trades_at_it->second : nullptr;
+
+    for (auto& order : pending_it->second) {
+        // Only queue-seeded orders carry meaningful queue_ahead. Backstop
+        // orders (deeper than L5, or pre-book) fill via fill_crossing_limits.
+        if (!order.queue_seeded)
+            continue;
+
+        const double old_size = book_qty_at_price(old_book, order.side, order.price);
+        const double new_size = book_qty_at_price(new_book, order.side, order.price);
+        // Level not visible in either snapshot — can't reason about cancels.
+        // (Conservative: leaving queue_ahead alone here under-credits regen
+        // when our level briefly drops off L5; a later book update with the
+        // level back in view will resume normal accounting.)
+        if (old_size <= 0.0 || new_size <= 0.0)
+            continue;
+
+        const double decrease = old_size - new_size;
+        if (decrease <= 0.0)
+            continue;  // level grew or unchanged; no cancels to attribute
+
+        double traded_at_price = 0.0;
+        if (trades_at) {
+            const auto t_it = trades_at->find(price_key(order.price));
+            if (t_it != trades_at->end())
+                traded_at_price = t_it->second;
+        }
+        const double cancels_at_price = std::max(0.0, decrease - traded_at_price);
+        if (cancels_at_price <= 0.0)
+            continue;
+
+        // Uniform-cancel attribution: under the assumption each unit on the
+        // queue is equally likely to cancel, the expected number of cancels
+        // ahead of us is queue_ahead × (cancels / level_size). Real micro-
+        // structure is more nuanced — late-arriving size cancels less often,
+        // and large icebergs reload — but uniform is the standard first cut
+        // and the unbiased prior in the absence of per-order data.
+        const double cancel_share = order.queue_ahead * (cancels_at_price / old_size);
+        order.queue_ahead = std::max(0.0, order.queue_ahead - cancel_share);
+    }
+
+    traded_since_book_[book_key].clear();
+}
+
+void MatchingEngine::drain_pending_fills(uint64_t upto_ts, std::vector<FillReport>& out) {
+    if (pending_fills_.empty())
+        return;
+    std::stable_sort(pending_fills_.begin(), pending_fills_.end(),
+                     [](const PendingFill& a, const PendingFill& b) {
+                         return a.scheduled_report_ts < b.scheduled_report_ts;
+                     });
+    auto it = pending_fills_.begin();
+    for (; it != pending_fills_.end(); ++it) {
+        if (it->scheduled_report_ts > upto_ts)
+            break;
+        out.push_back(std::move(it->fill));
+    }
+    pending_fills_.erase(pending_fills_.begin(), it);
 }
 
 // ── Matching logic ────────────────────────────────────────────────────────────
@@ -333,6 +512,13 @@ double MatchingEngine::book_qty_at_price(const data::OrderBookRecord& book,
 
 void MatchingEngine::fill_against_trade(const data::TradeRecord& trade,
                                         std::vector<FillReport>& out) {
+    // Phase 5: accumulate trade volume by level. apply_queue_regen reads
+    // this on each book update to subtract trade-attributable size before
+    // attributing the rest of the level decrease to cancels. Tracked
+    // unconditionally — even when we currently hold no orders, a later
+    // order at this level benefits from the partial accounting.
+    traded_since_book_[key(trade.exchange, trade.symbol)][price_key(trade.price)] += trade.quantity;
+
     auto pit = pending_.find(key(trade.exchange, trade.symbol));
     if (pit == pending_.end())
         return;

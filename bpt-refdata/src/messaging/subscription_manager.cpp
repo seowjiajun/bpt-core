@@ -14,8 +14,8 @@ void SubscriptionManager::upsert(const RefdataRequest& request) {
 
     if (is_new) {
         bpt::common::log::info("New subscription: correlation_id={} filters={}",
-                       request.correlation_id,
-                       request.instruments.size());
+                               request.correlation_id,
+                               request.instruments.size());
     } else {
         bpt::common::log::debug("Refreshed subscription: correlation_id={}", request.correlation_id);
     }

@@ -16,7 +16,9 @@
 #include <memory>
 
 namespace bpt::analytics {
-namespace config { struct Settings; }
+namespace config {
+struct Settings;
+}
 
 namespace messaging {
 
@@ -30,8 +32,7 @@ class AnalyticsAeronBus {
 public:
     /// Build every Aeron-touching object analytics needs. Sole place
     /// that calls into `<Aeron.h>` from the application layer.
-    static AnalyticsBus build(std::shared_ptr<aeron::Aeron> aeron,
-                              const config::Settings& settings);
+    static AnalyticsBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace messaging

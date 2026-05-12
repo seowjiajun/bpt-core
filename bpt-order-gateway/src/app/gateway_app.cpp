@@ -60,15 +60,15 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
 
         const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a_cfg.exchange);
         if (!exch_id) {
-            throw std::runtime_error(fmt::format(
-                "Unknown exchange '{}' in order-gateway config — not in messages/exchanges.yaml",
-                a_cfg.exchange));
+            throw std::runtime_error(
+                fmt::format("Unknown exchange '{}' in order-gateway config — not in messages/exchanges.yaml",
+                            a_cfg.exchange));
         }
         auto adapter = adapter::make_order_adapter(*exch_id, a_cfg, exchange_creds);
         if (!adapter) {
-            throw std::runtime_error(fmt::format(
-                "Exchange '{}' is in the registry but order-gateway has no adapter implementation for it",
-                a_cfg.exchange));
+            throw std::runtime_error(
+                fmt::format("Exchange '{}' is in the registry but order-gateway has no adapter implementation for it",
+                            a_cfg.exchange));
         }
 
         adapter->set_disconnect_breaker_config(disc_cfg);

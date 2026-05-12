@@ -7,9 +7,9 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <cmath>
 #include <string>
-#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter {
 

@@ -67,7 +67,7 @@ private:
     struct MarkOut {
         double fill_price{0.0};
         uint64_t fill_ns{0};
-        int side_sign{0};        // +1 for BUY/LONG, -1 for SELL/SHORT
+        int side_sign{0};  // +1 for BUY/LONG, -1 for SELL/SHORT
         uint64_t order_id{0};
         // True when this fill opened a position, false when it closed one
         // (stop/target/signal-flip/time-stop). Without this flag all exit
@@ -116,7 +116,8 @@ private:
         VolatilityGate vol_gate;
 
         explicit InstrumentState(OFICalculator::Config ofi_cfg, VolatilityGate::Config vol_cfg)
-            : ofi(ofi_cfg), vol_gate(vol_cfg) {}
+            : ofi(ofi_cfg),
+              vol_gate(vol_cfg) {}
     };
 
     void try_enter(InstrumentState& st, double ofi_value, uint64_t now_ns);

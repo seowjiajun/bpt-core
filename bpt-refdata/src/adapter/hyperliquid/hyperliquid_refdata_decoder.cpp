@@ -3,10 +3,10 @@
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
 
+#include <bpt_common/logging.h>
 #include <cmath>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
-#include <bpt_common/logging.h>
 
 using json = nlohmann::json;
 
@@ -15,7 +15,8 @@ namespace bpt::refdata::adapter {
 HyperliquidRefdataDecoder::HyperliquidRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
     : mapping_(std::move(mapping)) {}
 
-std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_meta(const std::string& body, uint64_t collected_ts) const {
+std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_meta(const std::string& body,
+                                                                       uint64_t collected_ts) const {
     auto j = json::parse(body);
     const auto& universe = j.value("universe", json::array());
 
@@ -56,27 +57,31 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_meta(const std
         result.push_back(std::move(inst));
     }
 
-    bpt::common::log::info("[HyperliquidRefdataDecoder] Parsed {} perpetual instruments from /info meta", result.size());
+    bpt::common::log::info("[HyperliquidRefdataDecoder] Parsed {} perpetual instruments from /info meta",
+                           result.size());
     return result;
 }
 
-std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(const std::string& body, uint64_t collected_ts) const {
+std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(const std::string& body,
+                                                                            uint64_t collected_ts) const {
     auto j = json::parse(body);
-    const auto& tokens   = j.value("tokens",   json::array());
+    const auto& tokens = j.value("tokens", json::array());
     const auto& universe = j.value("universe", json::array());
 
     // Index tokens by their `index` field — universe entries reference
     // them by this index, not by array position (defensive: HL has
     // historically left gaps when delisting).
-    struct TokenInfo { std::string name; int sz_decimals; };
+    struct TokenInfo {
+        std::string name;
+        int sz_decimals;
+    };
     std::unordered_map<int, TokenInfo> token_by_idx;
     token_by_idx.reserve(tokens.size());
     for (const auto& t : tokens) {
         const int idx = t.value("index", -1);
         if (idx < 0)
             continue;
-        token_by_idx.emplace(idx, TokenInfo{t.value("name", std::string{}),
-                                            t.value("szDecimals", 0)});
+        token_by_idx.emplace(idx, TokenInfo{t.value("name", std::string{}), t.value("szDecimals", 0)});
     }
 
     std::vector<refdata::Instrument> result;
@@ -94,10 +99,10 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(cons
         const auto& token_pair = pair.value("tokens", json::array());
         if (token_pair.size() < 2)
             continue;
-        const int base_idx  = token_pair[0].get<int>();
+        const int base_idx = token_pair[0].get<int>();
         const int quote_idx = token_pair[1].get<int>();
 
-        auto base_it  = token_by_idx.find(base_idx);
+        auto base_it = token_by_idx.find(base_idx);
         auto quote_it = token_by_idx.find(quote_idx);
         if (base_it == token_by_idx.end() || quote_it == token_by_idx.end())
             continue;
@@ -133,7 +138,7 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(cons
 }
 
 std::vector<refdata::FeeScheduleState> HyperliquidRefdataDecoder::parse_user_fees(const std::string& body,
-                                                                          uint64_t collected_ts) const {
+                                                                                  uint64_t collected_ts) const {
     auto j = json::parse(body);
     const auto& sched = j.value("feeSchedule", json{});
     if (sched.is_null() || !sched.is_object()) {

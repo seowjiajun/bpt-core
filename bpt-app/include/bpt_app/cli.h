@@ -22,7 +22,9 @@
 #include <string>
 #include <string_view>
 
-namespace CLI { class App; }
+namespace CLI {
+class App;
+}
 
 namespace bpt::app {
 
@@ -40,7 +42,8 @@ struct CliArgs {
 /// `extra` runs against the CLI::App after the standard flags are
 /// declared but before parse(), so per-binary options can be added
 /// without forking the wrapper. Pass {} for the common case.
-CliArgs parse_cli(int argc, char** argv,
+CliArgs parse_cli(int argc,
+                  char** argv,
                   std::string_view program,
                   std::string_view description,
                   std::function<void(CLI::App&)> extra = {});

@@ -13,9 +13,7 @@
 
 namespace bpt::common::aeron {
 
-using FragmentHandler = std::function<void(::aeron::AtomicBuffer&,
-                                           ::aeron::util::index_t,
-                                           ::aeron::util::index_t,
-                                           ::aeron::Header&)>;
+using FragmentHandler =
+    std::function<void(::aeron::AtomicBuffer&, ::aeron::util::index_t, ::aeron::util::index_t, ::aeron::Header&)>;
 
 }  // namespace bpt::common::aeron

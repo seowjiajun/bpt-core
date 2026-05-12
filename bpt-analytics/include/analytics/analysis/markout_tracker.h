@@ -22,16 +22,16 @@ public:
         uint64_t horizon_1_ns{1'000'000'000ULL};   // 1s
         uint64_t horizon_2_ns{5'000'000'000ULL};   // 5s
         uint64_t horizon_3_ns{30'000'000'000ULL};  // 30s
-        std::size_t max_pending{64};                // cap to prevent unbounded growth
+        std::size_t max_pending{64};               // cap to prevent unbounded growth
     };
 
     // A completed markout observation ready for the toxicity scorer.
     struct Observation {
         uint64_t instrument_id;
         uint64_t fill_ts_ns;
-        int side_sign;             // +1 for BUY, -1 for SELL
+        int side_sign;  // +1 for BUY, -1 for SELL
         double fill_price;
-        double fill_mid;           // mid at fill time
+        double fill_mid;  // mid at fill time
         double markout_1s_bps;
         double markout_5s_bps;
         double markout_30s_bps;
@@ -41,8 +41,7 @@ public:
     explicit MarkoutTracker(Config cfg);
 
     // Record a new fill to track.
-    void on_fill(uint64_t instrument_id, int side_sign, double fill_price,
-                 double current_mid, uint64_t fill_ts_ns);
+    void on_fill(uint64_t instrument_id, int side_sign, double fill_price, double current_mid, uint64_t fill_ts_ns);
 
     // Feed a BBO tick. Checks all pending fills against the three
     // horizons. Returns the number of newly completed observations

@@ -1,9 +1,8 @@
 #include "strategy/strategy/fair_value_estimator.h"
 #include "strategy/strategy/order_book_state.h"
 
-#include <gtest/gtest.h>
-
 #include <cmath>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -123,9 +122,7 @@ TEST(FairValueEstimatorTest, MicroCappedNoEffectWhenBelowCap) {
 // ---------------------------------------------------------------------------
 
 TEST(FairValueEstimatorTest, L2WeightedSingleLevelEqualsMicro) {
-    FairValueEstimator fv{{.mode = Mode::kL2WeightedMicro,
-                           .ladder_depth = 5,
-                           .ladder_decay = 0.5}};
+    FairValueEstimator fv{{.mode = Mode::kL2WeightedMicro, .ladder_depth = 5, .ladder_decay = 0.5}};
     auto book = make_book(100.0, 10.0, 102.0, 10.0);
     EXPECT_DOUBLE_EQ(fv.estimate(book), 101.0);
 }
@@ -139,13 +136,9 @@ TEST(FairValueEstimatorTest, L2WeightedDecayWeightedHandComputed) {
     // result = (100*18.75 + 101*27.5) / (27.5+18.75)
     //        = (1875 + 2777.5) / 46.25
     //        = 100.594594...
-    FairValueEstimator fv{{.mode = Mode::kL2WeightedMicro,
-                           .ladder_depth = 3,
-                           .ladder_decay = 0.5}};
+    FairValueEstimator fv{{.mode = Mode::kL2WeightedMicro, .ladder_depth = 3, .ladder_decay = 0.5}};
     OrderBookState book;
-    book.apply({{100.0, 10.0}, {99.0, 20.0}, {98.0, 30.0}},
-               {{101.0, 5.0}, {102.0, 15.0}, {103.0, 25.0}},
-               1, 1000);
+    book.apply({{100.0, 10.0}, {99.0, 20.0}, {98.0, 30.0}}, {{101.0, 5.0}, {102.0, 15.0}, {103.0, 25.0}}, 1, 1000);
     EXPECT_NEAR(fv.estimate(book), 100.594594594, 1e-6);
     // Sanity: more bid-weighted qty → tilt toward ask (above mid 100.5).
     EXPECT_GT(fv.last_estimate(), 100.5);
@@ -231,21 +224,18 @@ TEST(FairValueEstimatorTest, TobOverloadMicroMatchesBookOverload) {
 
 TEST(FairValueEstimatorTest, TobOverloadRejectsCrossedQuote) {
     FairValueEstimator fv{{.mode = Mode::kMicro}};
-    EXPECT_TRUE(std::isnan(fv.estimate(102.0, 100.0, 10.0, 10.0)));   // crossed
-    EXPECT_TRUE(std::isnan(fv.estimate(100.0, 100.0, 10.0, 10.0)));   // locked
-    EXPECT_TRUE(std::isnan(fv.estimate(0.0, 102.0, 10.0, 10.0)));     // missing bid
-    EXPECT_TRUE(std::isnan(fv.estimate(100.0, 0.0, 10.0, 10.0)));     // missing ask
+    EXPECT_TRUE(std::isnan(fv.estimate(102.0, 100.0, 10.0, 10.0)));  // crossed
+    EXPECT_TRUE(std::isnan(fv.estimate(100.0, 100.0, 10.0, 10.0)));  // locked
+    EXPECT_TRUE(std::isnan(fv.estimate(0.0, 102.0, 10.0, 10.0)));    // missing bid
+    EXPECT_TRUE(std::isnan(fv.estimate(100.0, 0.0, 10.0, 10.0)));    // missing ask
 }
 
 TEST(FairValueEstimatorTest, TobOverloadL2ModeDegradesToPlainMicro) {
     // L2 weighting needs the ladder; via TOB overload it must fall back
     // to plain micro rather than producing garbage.
-    FairValueEstimator l2{{.mode = Mode::kL2WeightedMicro,
-                           .ladder_depth = 5,
-                           .ladder_decay = 0.5}};
+    FairValueEstimator l2{{.mode = Mode::kL2WeightedMicro, .ladder_depth = 5, .ladder_decay = 0.5}};
     FairValueEstimator m{{.mode = Mode::kMicro}};
-    EXPECT_DOUBLE_EQ(l2.estimate(100.0, 102.0, 20.0, 5.0),
-                     m.estimate(100.0, 102.0, 20.0, 5.0));
+    EXPECT_DOUBLE_EQ(l2.estimate(100.0, 102.0, 20.0, 5.0), m.estimate(100.0, 102.0, 20.0, 5.0));
 }
 
 }  // namespace

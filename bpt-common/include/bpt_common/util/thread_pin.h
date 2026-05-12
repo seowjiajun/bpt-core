@@ -17,10 +17,10 @@
 // Both log the outcome so operators can grep for "pinned to CPU" in
 // startup logs and verify the topology took effect.
 
-#include <pthread.h>
-#include <string>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/topology.h>
+#include <pthread.h>
+#include <string>
 
 namespace bpt::common::util {
 
@@ -49,13 +49,10 @@ inline void pin_thread_to_cpu(int cpu_id, const char* thread_name) {
 // Unassigned role → unpinned (INFO log, no warning). Thread_name is used
 // purely for log formatting so the operator can correlate "role=X
 // pinned to CPU Y on thread T". Returns true if a pin took effect.
-inline bool pin_thread_by_role(const Topology& topology,
-                               const std::string& role,
-                               const char* thread_name) {
+inline bool pin_thread_by_role(const Topology& topology, const std::string& role, const char* thread_name) {
     const auto core = topology.core_for(role);
     if (!core) {
-        bpt::common::log::info("{}: role='{}' not in topology — running unpinned",
-                               thread_name, role);
+        bpt::common::log::info("{}: role='{}' not in topology — running unpinned", thread_name, role);
         return false;
     }
     pin_thread_to_cpu(*core, thread_name);

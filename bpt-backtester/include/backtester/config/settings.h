@@ -33,16 +33,49 @@ struct EndpointConfig {
     uint16_t hyperliquid_info_port{9114};
 };
 
-// Simulated fill latency per venue.
+// Per-venue, per-leg simulated latency. base_ns is the floor; jitter_ns
+// adds a uniform [0, jitter_ns) draw on top, seeded once per run for
+// reproducibility (see SimLatencyConfig::seed).
+struct VenueLatencySpec {
+    uint64_t submit_to_match_base_ns{0};
+    uint64_t submit_to_match_jitter_ns{0};
+    uint64_t match_to_report_base_ns{0};
+    uint64_t match_to_report_jitter_ns{0};
+};
+
 struct SimLatencyConfig {
-    uint32_t cex_base_ms{2};             // Binance, OKX, Deribit
-    uint32_t hyperliquid_base_ms{200};   // On-chain latency floor
-    uint32_t hyperliquid_jitter_ms{50};  // Random jitter added on top
+    // Per-venue overrides keyed by exchange string (BINANCE, OKX, HYPERLIQUID,
+    // DERIBIT). Venues with no entry fall back to default_spec.
+    std::unordered_map<std::string, VenueLatencySpec> per_venue;
+    VenueLatencySpec default_spec;
+
+    // Single seed for all latency draws. A fixed value (e.g., 1) gives
+    // run-to-run reproducibility; rotate it to generate independent
+    // realisations for sweep ensembles.
+    uint64_t seed{1};
+};
+
+// One half-open replay window. Multiple windows can be unioned via
+// [[simulation.windows]] — useful for "every Asian open", "all FOMC ±30s",
+// or stitched walk-forward slices.
+struct TimeWindow {
+    std::string start;  // ISO8601: "YYYY-MM-DD" | "...THH:MM:SSZ" | "...THH:MM:SS.fffffffffZ"
+    std::string end;
 };
 
 struct SimulationConfig {
-    std::string start;  // ISO8601 e.g. "2026-01-01T00:00:00Z"
-    std::string end;    // ISO8601 e.g. "2026-01-31T23:59:59Z"
+    // Canonical list of replay windows. Always non-empty after config load.
+    // Single-window configs (top-level start/end) auto-populate this with one
+    // entry. The DataLoader emits events whose ts falls in ∪ windows.
+    std::vector<TimeWindow> windows;
+
+    // Back-compat scalar view. Pre-multi-window callers (logging, results-dir
+    // tagging, summary.json metadata) read these. After load they hold the
+    // span of the windows: start = front().start, end = back().end (windows
+    // are sorted by start in the loader).
+    std::string start;
+    std::string end;
+
     bool allow_partial_data{false};
     uint32_t subscriber_wait_timeout_s{60};  // Wait up to N seconds for MdGateway to connect
     SimLatencyConfig latency;

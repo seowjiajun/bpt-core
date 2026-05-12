@@ -53,8 +53,7 @@ public:
     virtual ~IMdClient() = default;
 
     /// Send a full-replace subscription batch.
-    virtual void subscribe(uint64_t correlation_id,
-                           const std::vector<InstrumentDesc>& instruments) = 0;
+    virtual void subscribe(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) = 0;
 
     /// Poll both data and ack/hb streams. Returns total fragment count.
     /// Backtest impls return 0 (no polling needed; events are pushed).

@@ -4,9 +4,9 @@
 #include "book/config/settings.h"
 #include "book/messaging/aeron_bus.h"
 
+#include <bpt_app/app.h>
 #include <memory>
 #include <vector>
-#include <bpt_app/app.h>
 
 namespace bpt::book {
 

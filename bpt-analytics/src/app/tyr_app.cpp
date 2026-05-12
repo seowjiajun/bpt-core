@@ -1,20 +1,22 @@
 #include "analytics/app/tyr_app.h"
+
 #include "analytics/messaging/toxicity_update.h"
 
 #include <messages/ExecStatus.h>
 #include <messages/ExecutionReport.h>
 #include <messages/OrderSide.h>
 
-#include <chrono>
 #include <bpt_common/logging.h>
 #include <bpt_common/signal.h>
+#include <chrono>
 
 namespace bpt::analytics {
 
 using namespace bpt::messages;
 
 AnalyticsApp::AnalyticsApp(config::Settings settings, messaging::AnalyticsBus bus)
-    : settings_(std::move(settings)), bus_(std::move(bus)) {
+    : settings_(std::move(settings)),
+      bus_(std::move(bus)) {
     // Configure analysis components
     mt_cfg_ = {
         .horizon_1_ns = 1'000'000'000ULL,
@@ -31,17 +33,22 @@ AnalyticsApp::AnalyticsApp(config::Settings settings, messaging::AnalyticsBus bu
         .window_size = settings_.scorer_window_size,  // same window as scorer
     };
 
-    bus_.exec_sub->on_report = [this](const ExecutionReport& rpt) { on_exec_report(rpt); };
+    bus_.exec_sub->on_report = [this](const ExecutionReport& rpt) {
+        on_exec_report(rpt);
+    };
     bus_.md_sub->on_bbo = [this](uint64_t instrument_id, double bid, double ask, uint64_t ts_ns) {
         on_bbo(instrument_id, bid, ask, ts_ns);
     };
 
     bpt::common::log::info("Exec report subscription ready: {} stream {}",
-                   settings_.exec_report.channel, settings_.exec_report.stream_id);
+                           settings_.exec_report.channel,
+                           settings_.exec_report.stream_id);
     bpt::common::log::info("MD subscription ready: {} stream {}",
-                   settings_.md_data.channel, settings_.md_data.stream_id);
+                           settings_.md_data.channel,
+                           settings_.md_data.stream_id);
     bpt::common::log::info("Toxicity publication ready: {} stream {}",
-                   settings_.toxicity.channel, settings_.toxicity.stream_id);
+                           settings_.toxicity.channel,
+                           settings_.toxicity.stream_id);
 }
 
 AnalyticsApp::InstrumentState& AnalyticsApp::get_or_create(uint64_t instrument_id) {
@@ -67,12 +74,12 @@ void AnalyticsApp::on_bbo(uint64_t instrument_id, double bid, double ask, uint64
         for (const auto& obs : observations) {
             st.scorer.add(obs);
             bpt::common::log::info("Markout inst={} side={} fill_px={:.2f} 1s={:.1f}bps 5s={:.1f}bps 30s={:.1f}bps",
-                           obs.instrument_id,
-                           obs.side_sign > 0 ? "BUY" : "SELL",
-                           obs.fill_price,
-                           obs.markout_1s_bps,
-                           obs.markout_5s_bps,
-                           obs.markout_30s_bps);
+                                   obs.instrument_id,
+                                   obs.side_sign > 0 ? "BUY" : "SELL",
+                                   obs.fill_price,
+                                   obs.markout_1s_bps,
+                                   obs.markout_5s_bps,
+                                   obs.markout_30s_bps);
         }
     }
 }
@@ -91,17 +98,16 @@ void AnalyticsApp::on_exec_fill(uint64_t instrument_id, int side_sign, double fi
     auto& st = get_or_create(instrument_id == 0 && !state_.empty() ? state_.begin()->first : instrument_id);
     st.tracker.on_fill(st.last_mid > 0 ? instrument_id : 0, side_sign, fill_price, st.last_mid, timestamp_ns);
     bpt::common::log::info("Fill recorded: inst={} side={} px={:.2f} mid={:.2f}",
-                    instrument_id,
-                    side_sign > 0 ? "BUY" : "SELL",
-                    fill_price,
-                    st.last_mid);
+                           instrument_id,
+                           side_sign > 0 ? "BUY" : "SELL",
+                           fill_price,
+                           st.last_mid);
 }
 
 void AnalyticsApp::on_exec_report(const ExecutionReport& rpt) {
     const auto status = rpt.status();
     const int side_sign = (rpt.side() == OrderSide::BUY) ? +1 : -1;
-    const uint64_t now_ns = static_cast<uint64_t>(
-        std::chrono::steady_clock::now().time_since_epoch().count());
+    const uint64_t now_ns = static_cast<uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count());
     const uint64_t order_id = rpt.orderId();
 
     // Route instrument_id=0 to the first tracked instrument
@@ -146,8 +152,7 @@ void AnalyticsApp::maybe_publish(uint64_t now_ns) {
         update.ask_ttf_ms = ask_fr.mean_ttf_ms;
 
         // Only publish if we have data on at least one side
-        if (update.bid_sample_count == 0 && update.ask_sample_count == 0
-            && bid_fr.total == 0 && ask_fr.total == 0)
+        if (update.bid_sample_count == 0 && update.ask_sample_count == 0 && bid_fr.total == 0 && ask_fr.total == 0)
             continue;
 
         const bool sent = bus_.tox_pub->publish(update);
@@ -164,27 +169,38 @@ void AnalyticsApp::maybe_publish(uint64_t now_ns) {
             double a_fr = update.ask_fill_rate;
             double b_ttf = update.bid_ttf_ms;
             double a_ttf = update.ask_ttf_ms;
-            bpt::common::log::info("Published inst={} bid={:.1f}bps(n={}) ask={:.1f}bps(n={}) "
-                           "tox={:.2f}/{:.2f} fill_rate={:.0f}%/{:.0f}% ttf={:.0f}/{:.0f}ms",
-                           instrument_id, bid_m, bid_n, ask_m, ask_n,
-                           bid_t, ask_t, b_fr * 100, a_fr * 100, b_ttf, a_ttf);
+            bpt::common::log::info(
+                "Published inst={} bid={:.1f}bps(n={}) ask={:.1f}bps(n={}) "
+                "tox={:.2f}/{:.2f} fill_rate={:.0f}%/{:.0f}% ttf={:.0f}/{:.0f}ms",
+                instrument_id,
+                bid_m,
+                bid_n,
+                ask_m,
+                ask_n,
+                bid_t,
+                ask_t,
+                b_fr * 100,
+                a_fr * 100,
+                b_ttf,
+                a_ttf);
         }
     }
 }
 
 void AnalyticsApp::run() {
     bpt::common::log::info("Starting main loop (publish every {}ms, window={} fills, min_samples={})",
-                   settings_.publish_interval_ms,
-                   settings_.scorer_window_size,
-                   settings_.scorer_min_samples);
+                           settings_.publish_interval_ms,
+                           settings_.scorer_window_size,
+                           settings_.scorer_min_samples);
 
     while (bpt::common::signal::is_running()) {
         int frags = 0;
-        if (bus_.exec_sub) frags += bus_.exec_sub->poll(10);
-        if (bus_.md_sub)   frags += bus_.md_sub->poll(10);
+        if (bus_.exec_sub)
+            frags += bus_.exec_sub->poll(10);
+        if (bus_.md_sub)
+            frags += bus_.md_sub->poll(10);
 
-        const uint64_t now_ns = static_cast<uint64_t>(
-            std::chrono::steady_clock::now().time_since_epoch().count());
+        const uint64_t now_ns = static_cast<uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count());
         maybe_publish(now_ns);
 
         // Pause hint when idle — relinquishes pipeline resources to the SMT

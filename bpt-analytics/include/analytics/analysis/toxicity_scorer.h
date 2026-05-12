@@ -16,9 +16,9 @@ namespace bpt::analytics::analysis {
 class ToxicityScorer {
 public:
     struct Config {
-        std::size_t window_size{50};       // max observations in window
-        uint64_t window_duration_ns{0};    // 0 = size-based only
-        std::size_t min_samples{5};        // min fills per side before reporting
+        std::size_t window_size{50};     // max observations in window
+        uint64_t window_duration_ns{0};  // 0 = size-based only
+        std::size_t min_samples{5};      // min fills per side before reporting
     };
 
     ToxicityScorer() : cfg_{} {}

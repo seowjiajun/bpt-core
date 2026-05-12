@@ -2,9 +2,9 @@
 
 #include <boost/beast/core.hpp>
 #include <boost/json.hpp>
-#include <chrono>
 #include <bpt_common/logging.h>
 #include <bpt_common/ws/ws_connect.h>
+#include <chrono>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
@@ -33,8 +33,9 @@ void HyperliquidWsClient::set_user_fills_handler(UserFillsHandler h) {
 
 void HyperliquidWsClient::on_handshake_complete() {
     if (wallet_address_.empty()) {
-        bpt::common::log::warn("HyperliquidWsClient: wallet_address empty — "
-                       "skipping userFills subscribe. WS will idle-close.");
+        bpt::common::log::warn(
+            "HyperliquidWsClient: wallet_address empty — "
+            "skipping userFills subscribe. WS will idle-close.");
         return;
     }
     json::object sub_detail;
@@ -49,12 +50,12 @@ void HyperliquidWsClient::on_handshake_complete() {
         return a.size() > 10 ? a.substr(0, 6) + "…" + a.substr(a.size() - 4) : std::string{"<short>"};
     };
     if (!send(json::serialize(sub_msg))) {
-        bpt::common::log::warn("HyperliquidWsClient: userFills subscribe send failed "
-                       "(not connected). WS will idle-close.");
+        bpt::common::log::warn(
+            "HyperliquidWsClient: userFills subscribe send failed "
+            "(not connected). WS will idle-close.");
         return;
     }
-    bpt::common::log::info("HyperliquidWsClient: subscribed userFills for {}",
-                   truncate(wallet_address_));
+    bpt::common::log::info("HyperliquidWsClient: subscribed userFills for {}", truncate(wallet_address_));
 }
 
 void HyperliquidWsClient::on_frame(std::string_view payload, uint64_t recv_ns) {
@@ -79,7 +80,8 @@ std::optional<bpt::common::ws::PingConfig> HyperliquidWsClient::ping_config() co
 void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*recv_ns*/) {
     // Cheap early-outs for small frames HL sends (pong, subscription
     // acks, etc.) — skip the full JSON parse.
-    if (payload.size() < 16) return;
+    if (payload.size() < 16)
+        return;
 
     json::value root;
     try {
@@ -87,13 +89,16 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
     } catch (const std::exception&) {
         return;
     }
-    if (!root.is_object()) return;
+    if (!root.is_object())
+        return;
     const auto& obj = root.as_object();
 
     auto channel_it = obj.find("channel");
     auto data_it = obj.find("data");
-    if (channel_it == obj.end() || data_it == obj.end()) return;
-    if (!channel_it->value().is_string()) return;
+    if (channel_it == obj.end() || data_it == obj.end())
+        return;
+    if (!channel_it->value().is_string())
+        return;
 
     const std::string_view channel(channel_it->value().as_string());
 
@@ -103,8 +108,10 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
         // longer publishes). A mismatch here silently drops every fill.
         const auto& data = data_it->value().as_object();
         auto fills_it = data.find("fills");
-        if (fills_it == data.end()) return;
-        if (user_fills_handler_) user_fills_handler_(fills_it->value().as_array(), /*recv_ns=*/0);
+        if (fills_it == data.end())
+            return;
+        if (user_fills_handler_)
+            user_fills_handler_(fills_it->value().as_array(), /*recv_ns=*/0);
         return;
     }
 
@@ -124,19 +131,21 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
         }
         const std::size_t full_len = err.size();
         constexpr std::size_t kMaxErrChars = 80;
-        if (err.size() > kMaxErrChars) err.resize(kMaxErrChars);
-        bpt::common::log::warn("HyperliquidWsClient: HL WS channel=error (bytes={}) prefix={}",
-                       full_len, err);
+        if (err.size() > kMaxErrChars)
+            err.resize(kMaxErrChars);
+        bpt::common::log::warn("HyperliquidWsClient: HL WS channel=error (bytes={}) prefix={}", full_len, err);
         fail_pending_posts("HL WS error: " + err);
         return;
     }
 
     if (channel == "post") {
-        if (!data_it->value().is_object()) return;
+        if (!data_it->value().is_object())
+            return;
         const auto& data = data_it->value().as_object();
 
         auto id_it = data.find("id");
-        if (id_it == data.end() || !id_it->value().is_int64()) return;
+        if (id_it == data.end() || !id_it->value().is_int64())
+            return;
         const uint64_t id = static_cast<uint64_t>(id_it->value().as_int64());
 
         // Serialize response.payload (or error string) — caller parses
@@ -147,8 +156,7 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
             const auto& resp = response_it->value().as_object();
             auto type_it = resp.find("type");
             auto payload_it = resp.find("payload");
-            if (type_it != resp.end() && payload_it != resp.end() &&
-                type_it->value().is_string()) {
+            if (type_it != resp.end() && payload_it != resp.end() && type_it->value().is_string()) {
                 const std::string_view t(type_it->value().as_string());
                 if (t == "action") {
                     body = json::serialize(payload_it->value());
@@ -163,7 +171,8 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
 
         std::lock_guard<std::mutex> lock(pending_posts_mutex_);
         auto it = pending_posts_.find(id);
-        if (it == pending_posts_.end()) return;  // stale response
+        if (it == pending_posts_.end())
+            return;  // stale response
         try {
             it->second.set_value(std::move(body));
         } catch (const std::future_error&) {
@@ -173,9 +182,7 @@ void HyperliquidWsClient::handle_frame(const std::string& payload, uint64_t /*re
     }
 }
 
-std::string HyperliquidWsClient::post_action(const json::value& action,
-                                              uint64_t nonce,
-                                              const SignedTransaction& sig) {
+std::string HyperliquidWsClient::post_action(const json::value& action, uint64_t nonce, const SignedTransaction& sig) {
     const uint64_t id = next_post_id_.fetch_add(1, std::memory_order_relaxed);
 
     json::object signature;
@@ -246,20 +253,29 @@ void HyperliquidWsClient::fail_pending_posts(const std::string& reason) {
 
 void HyperliquidWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected) {
     bpt::common::log::info("HyperliquidWsClient connecting WS {}:{}{}{}",
-                   host_, port_, path_, use_tls_ ? "" : " (plain)");
+                           host_,
+                           port_,
+                           path_,
+                           use_tls_ ? "" : " (plain)");
 
-    bpt::common::ws::AnyWsStream ws = use_tls_
-        ? bpt::common::ws::AnyWsStream(
-              bpt::common::ws::ws_connect(ioc_, ssl_ctx_, host_, port_, path_,
-                                          /*so_rcvbuf_bytes=*/0,
-                                          /*connect_timeout_ms=*/30000,
-                                          /*user_agent=*/"bpt-order-gateway/0.1",
-                                          pinned_tls_sha256_))
-        : bpt::common::ws::AnyWsStream(
-              bpt::common::ws::ws_connect_plain(ioc_, host_, port_, path_,
-                                                /*so_rcvbuf_bytes=*/0,
-                                                /*connect_timeout_ms=*/30000,
-                                                /*user_agent=*/"bpt-order-gateway/0.1"));
+    bpt::common::ws::AnyWsStream ws =
+        use_tls_
+            ? bpt::common::ws::AnyWsStream(bpt::common::ws::ws_connect(ioc_,
+                                                                       ssl_ctx_,
+                                                                       host_,
+                                                                       port_,
+                                                                       path_,
+                                                                       /*so_rcvbuf_bytes=*/0,
+                                                                       /*connect_timeout_ms=*/30000,
+                                                                       /*user_agent=*/"bpt-order-gateway/0.1",
+                                                                       pinned_tls_sha256_))
+            : bpt::common::ws::AnyWsStream(bpt::common::ws::ws_connect_plain(ioc_,
+                                                                             host_,
+                                                                             port_,
+                                                                             path_,
+                                                                             /*so_rcvbuf_bytes=*/0,
+                                                                             /*connect_timeout_ms=*/30000,
+                                                                             /*user_agent=*/"bpt-order-gateway/0.1"));
 
     // Fail any in-flight posts on exit, whether clean or exceptional.
     // RunLoop's own SendGuard clears its internal stream pointer so

@@ -19,11 +19,11 @@
 #include <messages/AckStatus.h>
 #include <messages/TradeSide.h>
 
+#include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/subscriber.h>
 #include <memory>
 #include <string>
 #include <utility>
-#include <bpt_common/aeron/publisher.h>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bpt::strategy::md {
 
@@ -35,8 +35,7 @@ public:
                   int data_stream,
                   int ack_hb_stream);
 
-    void subscribe(uint64_t correlation_id,
-                   const std::vector<InstrumentDesc>& instruments) override;
+    void subscribe(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) override;
 
     int poll(int fragment_limit = 10) override;
 

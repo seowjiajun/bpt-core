@@ -19,8 +19,8 @@ namespace bpt::md_gateway::md {
 
 /// \brief Outcome of one validation call.
 enum class ValidationResult {
-    OK,    ///< message passes all checks; safe to publish
-    DROP   ///< at least one check failed; caller MUST NOT publish
+    OK,   ///< message passes all checks; safe to publish
+    DROP  ///< at least one check failed; caller MUST NOT publish
 };
 
 /// \brief Validates normalised MD structs before SBE encoding.

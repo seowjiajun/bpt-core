@@ -4,17 +4,14 @@
 
 namespace {
 
+using bpt::messages::OrderSide;
 using bpt::strategy::strategy::OrderBookState;
 using bpt::strategy::strategy::QueueTracker;
-using bpt::messages::OrderSide;
 
 // Helper: build a book with a simple bid/ask ladder.
 OrderBookState make_book() {
     OrderBookState book;
-    book.apply({{100.0, 5.0}, {99.9, 10.0}, {99.8, 15.0}},
-               {{100.1, 5.0}, {100.2, 10.0}, {100.3, 15.0}},
-               1,
-               1000);
+    book.apply({{100.0, 5.0}, {99.9, 10.0}, {99.8, 15.0}}, {{100.1, 5.0}, {100.2, 10.0}, {100.3, 15.0}}, 1, 1000);
     return book;
 }
 

@@ -23,7 +23,9 @@
 #include <memory>
 
 namespace bpt::pricer {
-namespace config { struct Settings; }
+namespace config {
+struct Settings;
+}
 
 namespace messaging {
 
@@ -38,8 +40,7 @@ class PricerAeronBus {
 public:
     /// Build every Aeron-touching object the pricer needs. Sole place
     /// that calls into `<Aeron.h>` from the application layer.
-    static PricerBus build(std::shared_ptr<aeron::Aeron> aeron,
-                           const config::Settings& settings);
+    static PricerBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace messaging

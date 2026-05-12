@@ -8,12 +8,12 @@
 /// validation errors at boot — runtime code reads only the populated
 /// structs and never re-parses TOML.
 
-#include <cstdint>
-#include <string>
-#include <vector>
 #include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
+#include <cstdint>
 #include <md_gateway/config/settings.h>
+#include <string>
+#include <vector>
 
 namespace bpt::tape::config {
 
@@ -59,14 +59,14 @@ struct RecordingConfig {
 /// as `EndpointSpec`) — the runtime poller consumes the config schema
 /// as-is, no translation layer.
 struct RefdataEndpoint {
-    std::string exchange;            ///< venue tag, picks the tape
-    std::string host;                ///< e.g. "api.hyperliquid.xyz"
+    std::string exchange;  ///< venue tag, picks the tape
+    std::string host;      ///< e.g. "api.hyperliquid.xyz"
     std::string port{"443"};
     bool use_tls{true};
-    std::string method{"GET"};       ///< "GET" or "POST" (case-insensitive)
-    std::string path;                ///< e.g. "/info"
-    std::string body;                ///< POST body (ignored for GET)
-    uint32_t interval_seconds{3600}; ///< per-endpoint poll cadence
+    std::string method{"GET"};        ///< "GET" or "POST" (case-insensitive)
+    std::string path;                 ///< e.g. "/info"
+    std::string body;                 ///< POST body (ignored for GET)
+    uint32_t interval_seconds{3600};  ///< per-endpoint poll cadence
 };
 
 /// \brief Top-level bpt-tape settings, populated by load().

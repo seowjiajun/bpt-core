@@ -67,6 +67,7 @@ private:
     strategy::RefdataStaleGate refdata_stale_gate_;
     uint64_t startup_anchor_ns_{0};   // steady_clock @ run() entry — feeds startup timeout
     uint64_t last_refdata_check_ns_{0};  // 1Hz rate limit for check_refdata_watchdog
+    bool refdata_stale_logged_{false};   // edge-trigger for the GoneStale WARN log
 
     // Latency histograms — T0 = bpt-md-gateway receipt timestamp in MD message (TSC ns).
     // tick_lat: every MD tick, T0 → strategy callback returns.

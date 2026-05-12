@@ -8,11 +8,11 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <deque>
 #include <format>
 #include <set>
 #include <string>
-#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;

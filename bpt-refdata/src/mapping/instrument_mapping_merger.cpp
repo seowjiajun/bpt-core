@@ -1,10 +1,10 @@
 #include "refdata/mapping/instrument_mapping_merger.h"
 
+#include <bpt_common/logging.h>
 #include <cstdio>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <sstream>
-#include <bpt_common/logging.h>
 
 namespace bpt::refdata::mapping {
 
@@ -70,13 +70,17 @@ bool InstrumentMappingMerger::merge(const std::string& local_path) const {
             parsed = json::parse(body);
         } catch (const json::exception& e) {
             bpt::common::log::error("[InstrumentMappingMerger] JSON parse error for {} ({}): {}",
-                            exchange_name, src_path, e.what());
+                                    exchange_name,
+                                    src_path,
+                                    e.what());
             return false;
         }
 
         merge_into(merged, parsed);
         bpt::common::log::info("[InstrumentMappingMerger] Loaded {} from {} ({} bytes)",
-                       exchange_name, src_path, body.size());
+                               exchange_name,
+                               src_path,
+                               body.size());
     }
 
     merged["instrument_count"] = merged["reverse"].size();
@@ -103,7 +107,10 @@ bool InstrumentMappingMerger::merge(const std::string& local_path) const {
     }
 
     bpt::common::log::info("[InstrumentMappingMerger] Merged {} exchange(s) → {} ({} instruments, {} bytes)",
-                   cfg_.sources.size(), local_path, merged["reverse"].size(), serialised.size());
+                           cfg_.sources.size(),
+                           local_path,
+                           merged["reverse"].size(),
+                           serialised.size());
     return true;
 }
 

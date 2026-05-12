@@ -40,8 +40,7 @@ HyperliquidReconciler::Candidate make_candidate() {
     };
 }
 
-json::object open_order(const char* coin, const char* side, const char* sz,
-                        const char* px, uint64_t oid) {
+json::object open_order(const char* coin, const char* side, const char* sz, const char* px, uint64_t oid) {
     json::object o;
     o["coin"] = coin;
     o["side"] = side;
@@ -51,8 +50,12 @@ json::object open_order(const char* coin, const char* side, const char* sz,
     return o;
 }
 
-json::object user_fill(const char* coin, const char* side, const char* sz,
-                       const char* px, const char* fee, uint64_t oid,
+json::object user_fill(const char* coin,
+                       const char* side,
+                       const char* sz,
+                       const char* px,
+                       const char* fee,
+                       uint64_t oid,
                        int64_t time_ms = 1'700'000'000'000LL) {
     json::object o;
     o["coin"] = coin;
@@ -155,7 +158,12 @@ TEST(HLReconcilerMatch, IgnoresStaleFillsBeforeSend) {
     // clock-skew window) — must not be attributed to us.
     auto c = make_candidate();  // sent_ns = 1700000000000ms
     json::array fills;
-    fills.push_back(user_fill("BTC", "B", "0.0001", "72198.0", "0.05", 999,
+    fills.push_back(user_fill("BTC",
+                              "B",
+                              "0.0001",
+                              "72198.0",
+                              "0.05",
+                              999,
                               /*time_ms=*/1'699'999'998'000LL));  // 2s earlier
     auto r = HyperliquidReconciler::try_match(c, {}, fills, kTick);
     EXPECT_EQ(r.kind, MK::None);
@@ -166,7 +174,12 @@ TEST(HLReconcilerMatch, AcceptsFillWithinClockSkewWindow) {
     // clock vs our wall clock), should still match.
     auto c = make_candidate();
     json::array fills;
-    fills.push_back(user_fill("BTC", "B", "0.0001", "72198.0", "0.05", 999,
+    fills.push_back(user_fill("BTC",
+                              "B",
+                              "0.0001",
+                              "72198.0",
+                              "0.05",
+                              999,
                               /*time_ms=*/1'699'999'999'500LL));
     auto r = HyperliquidReconciler::try_match(c, {}, fills, kTick);
     EXPECT_EQ(r.kind, MK::UserFill);
@@ -195,8 +208,7 @@ protected:
     HyperliquidReconciler::MatchResult captured_r{};
 
     HyperliquidReconciler::OnTerminal on_terminal() {
-        return [this](const HyperliquidReconciler::Candidate& c,
-                      const HyperliquidReconciler::MatchResult& r) {
+        return [this](const HyperliquidReconciler::Candidate& c, const HyperliquidReconciler::MatchResult& r) {
             std::lock_guard<std::mutex> lock(mu);
             captured_c = c;
             captured_r = r;
@@ -212,11 +224,10 @@ protected:
 };
 
 TEST_F(HLReconcilerWorkerFixture, FiresRejectedWhenPollerReturnsEmpty) {
-    HyperliquidReconciler reconciler(
-        [] { return std::make_pair(json::array{}, json::array{}); },
-        on_terminal(),
-        std::chrono::milliseconds(50),
-        kTick);
+    HyperliquidReconciler reconciler([] { return std::make_pair(json::array{}, json::array{}); },
+                                     on_terminal(),
+                                     std::chrono::milliseconds(50),
+                                     kTick);
     reconciler.reconcile_async(make_candidate());
     ASSERT_TRUE(wait_for_terminal(std::chrono::seconds(2)));
     EXPECT_EQ(captured_r.kind, MK::None);
@@ -261,9 +272,7 @@ TEST_F(HLReconcilerWorkerFixture, RejectedOnPollerException) {
     // falls through to the "no match" path rather than leaving the
     // candidate in limbo forever.
     HyperliquidReconciler reconciler(
-        []() -> std::pair<json::array, json::array> {
-            throw std::runtime_error("simulated REST failure");
-        },
+        []() -> std::pair<json::array, json::array> { throw std::runtime_error("simulated REST failure"); },
         on_terminal(),
         std::chrono::milliseconds(50),
         kTick);

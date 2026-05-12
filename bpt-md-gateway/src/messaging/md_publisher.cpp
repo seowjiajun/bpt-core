@@ -61,8 +61,7 @@ void MdPublisher::publish(const md::MdOrderBook& book) {
     std::size_t len = md::MdEncoder::encode(book, seq_.fetch_add(1, std::memory_order_relaxed) + 1, buf, sizeof(buf));
     if (len == 0)
         return;
-    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf),
-                             static_cast<::aeron::util::index_t>(len));
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), static_cast<::aeron::util::index_t>(len));
     if (!publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(len)))
         record_drop(book.instrument_id, "OrderBook");
 }

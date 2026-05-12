@@ -4,9 +4,9 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <fstream>
 #include <sstream>
-#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -60,8 +60,8 @@ std::string clearinghouse_state_response(double starting_capital) {
     root["crossMaintenanceMarginUsed"] = "0";
     root["assetPositions"] = json::array{};
     root["time"] = static_cast<int64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count());
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count());
     return json::serialize(root);
 }
 
@@ -87,10 +87,9 @@ public:
 private:
     void do_read() {
         req_ = {};
-        http::async_read(socket_, buf_, req_,
-                         [self = shared_from_this()](beast::error_code ec, std::size_t) {
-                             self->on_read(ec);
-                         });
+        http::async_read(socket_, buf_, req_, [self = shared_from_this()](beast::error_code ec, std::size_t) {
+            self->on_read(ec);
+        });
     }
 
     void on_read(beast::error_code ec) {
@@ -154,12 +153,11 @@ private:
         }
 
         res_.prepare_payload();
-        http::async_write(socket_, res_,
-                          [self = shared_from_this()](beast::error_code ec2, std::size_t) {
-                              self->closed_ = true;
-                              if (ec2)
-                                  return;
-                          });
+        http::async_write(socket_, res_, [self = shared_from_this()](beast::error_code ec2, std::size_t) {
+            self->closed_ = true;
+            if (ec2)
+                return;
+        });
     }
 
     tcp::socket socket_;
@@ -174,9 +172,7 @@ private:
 
 // ── HyperliquidInfoServer ─────────────────────────────────────────────────────
 
-HyperliquidInfoServer::HyperliquidInfoServer(uint16_t port,
-                                             std::string snapshot_path,
-                                             double starting_capital)
+HyperliquidInfoServer::HyperliquidInfoServer(uint16_t port, std::string snapshot_path, double starting_capital)
     : port_(port),
       snapshot_path_(std::move(snapshot_path)),
       starting_capital_(starting_capital),
@@ -243,7 +239,8 @@ void HyperliquidInfoServer::load_snapshot() {
     }
 
     bpt::common::log::info("[HyperliquidInfoServer] loaded snapshot: {} bytes, {} assets",
-                           body.size(), asset_universe_.size());
+                           body.size(),
+                           asset_universe_.size());
 }
 
 void HyperliquidInfoServer::start() {
@@ -268,14 +265,12 @@ void HyperliquidInfoServer::do_accept() {
     acceptor_.async_accept([this](beast::error_code ec, tcp::socket socket) {
         if (!ec) {
             sessions_.erase(
-                std::remove_if(sessions_.begin(), sessions_.end(),
-                               [](const auto& s) { return s->closed(); }),
+                std::remove_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return s->closed(); }),
                 sessions_.end());
-            auto session = std::make_shared<HyperliquidInfoSession>(
-                std::move(socket),
-                meta_response_body_,
-                meta_ctxs_response_body_,
-                clearinghouse_response_body_);
+            auto session = std::make_shared<HyperliquidInfoSession>(std::move(socket),
+                                                                    meta_response_body_,
+                                                                    meta_ctxs_response_body_,
+                                                                    clearinghouse_response_body_);
             sessions_.push_back(session);
             session->run();
         }

@@ -4,7 +4,6 @@
 #include "pricer/pricing/forward_curve.h"
 #include "pricer/pricing/iv_solver.h"
 
-
 namespace bpt::pricer::surface {
 
 SurfaceBuilder::SurfaceBuilder(double risk_free_rate, uint32_t newton_max_iter, double newton_tol)

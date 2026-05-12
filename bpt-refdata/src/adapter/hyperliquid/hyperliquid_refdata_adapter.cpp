@@ -2,8 +2,8 @@
 
 #include <messages/DeltaUpdateType.h>
 
-#include <nlohmann/json.hpp>
 #include <bpt_common/util/tsc_clock.h>
+#include <nlohmann/json.hpp>
 
 namespace bpt::refdata::adapter {
 
@@ -68,7 +68,8 @@ void HyperliquidRefDataAdapter::fetchSnapshot() {
     }
 
     ready_.store(true, std::memory_order_release);
-    bpt::common::log::info("[HyperliquidRefData] Snapshot complete. Registry has {} instruments.", registry_->getAll().size());
+    bpt::common::log::info("[HyperliquidRefData] Snapshot complete. Registry has {} instruments.",
+                           registry_->getAll().size());
 }
 
 void HyperliquidRefDataAdapter::fetchInstrumentListing() {

@@ -6,11 +6,11 @@
 #include <messages/InstrumentType.h>
 
 #include <algorithm>
+#include <bpt_common/logging.h>
 #include <cstring>
 #include <ctime>
 #include <refdata/refdata/instrument.h>
 #include <x86intrin.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::refdata::messaging {
 

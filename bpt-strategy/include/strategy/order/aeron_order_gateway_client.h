@@ -11,10 +11,10 @@
 #include <messages/ModifyOrder.h>
 #include <messages/NewOrder.h>
 
-#include <memory>
-#include <string>
 #include <bpt_common/aeron/publisher.h>
 #include <bpt_common/aeron/subscriber.h>
+#include <memory>
+#include <string>
 
 namespace bpt::strategy::order {
 
@@ -41,12 +41,9 @@ public:
                                       uint8_t exec_inst,
                                       const std::string& exchange_symbol) override;
 
-    void send_cancel(uint64_t order_id,
-                     bpt::messages::ExchangeId::Value exchange_id,
-                     uint64_t instrument_id) override;
+    void send_cancel(uint64_t order_id, bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) override;
 
-    void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id,
-                         uint64_t instrument_id) override;
+    void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) override;
 
     void send_modify(uint64_t order_id,
                      bpt::messages::ExchangeId::Value exchange_id,
@@ -54,8 +51,7 @@ public:
                      int64_t new_price,
                      uint64_t new_quantity) override;
 
-    void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
-                                        uint64_t correlation_id) override;
+    void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id, uint64_t correlation_id) override;
 
     int poll(int fragment_limit = 10) override;
 

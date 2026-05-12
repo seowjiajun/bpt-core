@@ -52,8 +52,8 @@ VwapReversionStrategy::VwapReversionStrategy(uint64_t correlation_id,
         stop_threshold_ * 100.0,
         cooldown_ns_ / 1'000'000ULL);
     bpt::common::log::info("[VwapReversion] risk: max_position_usd={} max_order_size_usd={}",
-                   cfg.risk.max_position_usd,
-                   cfg.risk.max_order_size_usd);
+                           cfg.risk.max_position_usd,
+                           cfg.risk.max_order_size_usd);
     for (const auto& s : instruments_)
         bpt::common::log::info("[VwapReversion] instrument: {}", s);
 }
@@ -283,26 +283,26 @@ void VwapReversionStrategy::on_exec_report(const bpt::messages::ExecutionReport&
         const bool gateway_reject = (src == RejectSource::GATEWAY || src == RejectSource::RISK);
         if (gateway_reject)
             bpt::common::log::error("[VwapReversion] ExecReport order_id={} {} {} REJECTED reason={} source={}",
-                            order_id,
-                            st.symbol,
-                            st.exchange,
-                            bpt::messages::RejectReason::c_str(rpt.rejectReason()),
-                            bpt::messages::RejectSource::c_str(src));
+                                    order_id,
+                                    st.symbol,
+                                    st.exchange,
+                                    bpt::messages::RejectReason::c_str(rpt.rejectReason()),
+                                    bpt::messages::RejectSource::c_str(src));
         else
             bpt::common::log::warn("[VwapReversion] ExecReport order_id={} {} {} REJECTED reason={} source={}",
-                           order_id,
-                           st.symbol,
-                           st.exchange,
-                           bpt::messages::RejectReason::c_str(rpt.rejectReason()),
-                           bpt::messages::RejectSource::c_str(src));
+                                   order_id,
+                                   st.symbol,
+                                   st.exchange,
+                                   bpt::messages::RejectReason::c_str(rpt.rejectReason()),
+                                   bpt::messages::RejectSource::c_str(src));
     } else {
         bpt::common::log::info("[VwapReversion] ExecReport order_id={} {} {} status={} filled={:.6f} price={:.2f}",
-                       order_id,
-                       st.symbol,
-                       st.exchange,
-                       bpt::messages::ExecStatus::c_str(status),
-                       static_cast<double>(rpt.filledQty()) / 1e8,
-                       static_cast<double>(rpt.price()) / 1e8);
+                               order_id,
+                               st.symbol,
+                               st.exchange,
+                               bpt::messages::ExecStatus::c_str(status),
+                               static_cast<double>(rpt.filledQty()) / 1e8,
+                               static_cast<double>(rpt.price()) / 1e8);
     }
 
     if (status == ExecStatus::FILLED || status == ExecStatus::PARTIAL) {
@@ -310,11 +310,11 @@ void VwapReversionStrategy::on_exec_report(const bpt::messages::ExecutionReport&
 
         if (const auto pos = positions_.get(canonical_id, st.exchange_id)) {
             bpt::common::log::info("[VwapReversion] Position {} @ {}  net_qty={}  avg_price={:.6f}  rpnl={:.4f}",
-                           st.symbol,
-                           st.exchange,
-                           pos->net_qty,
-                           pos->avg_price,
-                           pos->realized_pnl);
+                                   st.symbol,
+                                   st.exchange,
+                                   pos->net_qty,
+                                   pos->avg_price,
+                                   pos->realized_pnl);
         }
     }
 
@@ -358,23 +358,23 @@ void VwapReversionStrategy::send_order(uint64_t instrument_id,
 
     if (!order_mgr_) {
         bpt::common::log::info("[VwapReversion] {} {} {} @ {} mid={:.6f} vwap={:.6f} (no gateway)",
-                       reason,
-                       (side == OrderSide::BUY ? "BUY" : "SELL"),
-                       st.symbol,
-                       st.exchange,
-                       mid,
-                       vwap);
+                               reason,
+                               (side == OrderSide::BUY ? "BUY" : "SELL"),
+                               st.symbol,
+                               st.exchange,
+                               mid,
+                               vwap);
         return;
     }
 
     bpt::common::log::debug("[VwapReversion] {} {} {} @ {} mid={:.6f} vwap={:.6f} dev={:+.4f}%",
-                    reason,
-                    (side == OrderSide::BUY ? "BUY" : "SELL"),
-                    st.symbol,
-                    st.exchange,
-                    mid,
-                    vwap,
-                    ((mid - vwap) / vwap) * 100.0);
+                            reason,
+                            (side == OrderSide::BUY ? "BUY" : "SELL"),
+                            st.symbol,
+                            st.exchange,
+                            mid,
+                            vwap,
+                            ((mid - vwap) / vwap) * 100.0);
 
     const uint64_t order_id =
         order_mgr_->place_order(instrument_id, st.exchange_id, side, order_type, tif, price_f, quantity);

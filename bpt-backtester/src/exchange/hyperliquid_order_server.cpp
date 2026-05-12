@@ -6,10 +6,10 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <deque>
 #include <format>
 #include <string>
-#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;
@@ -85,9 +85,7 @@ private:
     }
 
     void do_read() {
-        ws_.async_read(buf_, [self = shared_from_this()](beast::error_code ec, std::size_t) {
-            self->on_read(ec);
-        });
+        ws_.async_read(buf_, [self = shared_from_this()](beast::error_code ec, std::size_t) { self->on_read(ec); });
     }
 
     // HL message envelopes:
@@ -192,16 +190,15 @@ private:
 
             // Asset index → coin via universe lookup; fall back to universe[0]
             // when out of range (single-symbol backtest case).
-            std::string coin =
-                (asset_idx < asset_universe_.size()) ? asset_universe_[asset_idx]
-                : (asset_universe_.empty() ? std::string{"UNKNOWN"} : asset_universe_[0]);
+            std::string coin = (asset_idx < asset_universe_.size())
+                                   ? asset_universe_[asset_idx]
+                                   : (asset_universe_.empty() ? std::string{"UNKNOWN"} : asset_universe_[0]);
 
             // Pull tif from t.limit.tif if present.
             std::string tif = "Gtc";
             if (auto t_it = o.find("t"); t_it != o.end() && t_it->value().is_object()) {
                 const auto& t_obj = t_it->value().as_object();
-                if (auto limit_it = t_obj.find("limit");
-                    limit_it != t_obj.end() && limit_it->value().is_object()) {
+                if (auto limit_it = t_obj.find("limit"); limit_it != t_obj.end() && limit_it->value().is_object()) {
                     const auto& limit_obj = limit_it->value().as_object();
                     if (auto tif_it = limit_obj.find("tif"); tif_it != limit_obj.end())
                         tif = std::string(tif_it->value().as_string());
@@ -218,8 +215,7 @@ private:
             order.client_order_id = std::to_string(oid);
             order.order_id = std::to_string(oid);
             // HL signals POST_ONLY via tif="Alo" (Add Liquidity Only).
-            order.type = (tif == "Alo") ? matching::OrderType::POST_ONLY
-                                        : matching::OrderType::LIMIT;
+            order.type = (tif == "Alo") ? matching::OrderType::POST_ONLY : matching::OrderType::LIMIT;
             order.side = is_buy ? matching::OrderSide::BUY : matching::OrderSide::SELL;
             order.quantity = std::stod(sz);
             order.price = std::stod(px);
@@ -232,8 +228,7 @@ private:
                 // Specific phrasing matches HL's "Order would immediately
                 // match" error so the OGW decoder routes it to a REJECTED
                 // ExecReport instead of an ACK.
-                status["error"] =
-                    "Order would immediately match and was rejected because POST_ONLY (Alo) was set.";
+                status["error"] = "Order would immediately match and was rejected because POST_ONLY (Alo) was set.";
             } else {
                 json::object resting;
                 resting["oid"] = static_cast<int64_t>(oid);
@@ -254,9 +249,9 @@ private:
             const auto& c = jv.as_object();
             uint64_t asset_idx = c.at("a").to_number<uint64_t>();
             uint64_t oid = c.at("o").to_number<uint64_t>();
-            std::string coin =
-                (asset_idx < asset_universe_.size()) ? asset_universe_[asset_idx]
-                : (asset_universe_.empty() ? std::string{"UNKNOWN"} : asset_universe_[0]);
+            std::string coin = (asset_idx < asset_universe_.size())
+                                   ? asset_universe_[asset_idx]
+                                   : (asset_universe_.empty() ? std::string{"UNKNOWN"} : asset_universe_[0]);
             bool ok = engine_.cancel_order("HYPERLIQUID", coin, std::to_string(oid));
             statuses.push_back(json::value(ok ? "success" : "Order not found"));
         }
@@ -324,11 +319,10 @@ void HyperliquidOrderServer::do_accept() {
     acceptor_.async_accept([this](beast::error_code ec, tcp::socket socket) {
         if (!ec) {
             sessions_.erase(
-                std::remove_if(sessions_.begin(), sessions_.end(),
-                               [](const auto& s) { return s->closed(); }),
+                std::remove_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return s->closed(); }),
                 sessions_.end());
-            auto session = std::make_shared<HyperliquidOrderSession>(
-                std::move(socket), engine_, order_id_seq_, asset_universe_);
+            auto session =
+                std::make_shared<HyperliquidOrderSession>(std::move(socket), engine_, order_id_seq_, asset_universe_);
             sessions_.push_back(session);
             session->run();
         }
@@ -357,8 +351,7 @@ void HyperliquidOrderServer::push_fill(const matching::FillReport& fill) {
     auto msg = std::make_shared<std::string>(json::serialize(root));
 
     net::post(ioc_, [this, msg]() {
-        sessions_.erase(std::remove_if(sessions_.begin(), sessions_.end(),
-                                       [](const auto& s) { return s->closed(); }),
+        sessions_.erase(std::remove_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return s->closed(); }),
                         sessions_.end());
         for (const auto& s : sessions_)
             s->send(msg);

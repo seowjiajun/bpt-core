@@ -23,17 +23,17 @@
 #include <atomic>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ssl/context.hpp>
-#include <chrono>
-#include <memory>
-#include <string>
-#include <thread>
-#include <utility>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/spsc_queue.h>
 #include <bpt_common/util/strings.h>
 #include <bpt_common/util/thread_name.h>
 #include <bpt_common/util/thread_pin.h>
 #include <bpt_common/ws/ws_connect.h>
+#include <chrono>
+#include <memory>
+#include <string>
+#include <thread>
+#include <utility>
 
 namespace bpt::md_gateway::adapter {
 
@@ -95,8 +95,7 @@ public:
         ssl_ctx_.set_default_verify_paths();
         ssl_ctx_.set_verify_mode(boost::asio::ssl::verify_peer);
         // Enforce TLS 1.2 minimum — disable weak protocol versions.
-        ssl_ctx_.set_options(boost::asio::ssl::context::no_tlsv1 |
-                             boost::asio::ssl::context::no_tlsv1_1);
+        ssl_ctx_.set_options(boost::asio::ssl::context::no_tlsv1 | boost::asio::ssl::context::no_tlsv1_1);
 
         // Apply validation-drop breaker config from the adapter's TOML block.
         // Default-constructed Config is disabled, so adapters that don't set
@@ -115,9 +114,7 @@ public:
         subs_.subscribe(instrument_id, std::move(symbol), depth);
     }
 
-    void unsubscribe(uint64_t instrument_id) override {
-        subs_.unsubscribe(instrument_id);
-    }
+    void unsubscribe(uint64_t instrument_id) override { subs_.unsubscribe(instrument_id); }
 
     void start() override {
         pub_thread_ = std::thread([this]() { publish_loop(); });
@@ -143,9 +140,7 @@ public:
 
 protected:
     /// \brief Backoff before the next reconnect attempt. Default 1 s.
-    virtual std::chrono::milliseconds reconnect_delay() const {
-        return std::chrono::seconds(1);
-    }
+    virtual std::chrono::milliseconds reconnect_delay() const { return std::chrono::seconds(1); }
 
     /// \brief Open the WebSocket and send all initial subscribe frames.
     /// \return nullptr if no subscriptions exist yet — run() retries in 100 ms.
@@ -168,9 +163,7 @@ protected:
     /// publisher thread (push_frame). bpt-tape overrides this to tee
     /// the raw bytes into a Tape before enqueueing — keeps the
     /// recording tap out of the main mdgw source.
-    virtual void handle_frame(std::string_view payload, uint64_t recv_ns) noexcept {
-        push_frame(payload, recv_ns);
-    }
+    virtual void handle_frame(std::string_view payload, uint64_t recv_ns) noexcept { push_frame(payload, recv_ns); }
 
     /// \brief Push a raw WS frame onto the SPSC queue. IO-thread only.
     ///
@@ -182,7 +175,8 @@ protected:
             // Log at most once every 1000 drops to avoid flooding on sustained backpressure.
             if (dropped_frames_ == 1 || dropped_frames_ % 1000 == 0) {
                 bpt::common::log::warn("{}: frame queue full or oversized — dropped frames: {}",
-                                        this->exchange_name(), dropped_frames_);
+                                       this->exchange_name(),
+                                       dropped_frames_);
             }
         }
     }
@@ -218,8 +212,9 @@ private:
         // configs that haven't migrated. Both unset = unpinned.
         bool pinned_via_topology = false;
         if (topology_)
-            pinned_via_topology = bpt::common::util::pin_thread_by_role(
-                *topology_, detail::io_role(this->exchange_name()), this->exchange_name());
+            pinned_via_topology = bpt::common::util::pin_thread_by_role(*topology_,
+                                                                        detail::io_role(this->exchange_name()),
+                                                                        this->exchange_name());
         if (!pinned_via_topology)
             bpt::common::util::pin_thread_to_cpu(cfg_.io_thread_cpu, this->exchange_name());
         while (!stop_flag_.load(std::memory_order_relaxed)) {
@@ -239,9 +234,9 @@ private:
                     if (this->on_disconnect)
                         this->on_disconnect();
                     bpt::common::log::error("{} error: {}, reconnecting in {}ms",
-                                    this->exchange_name(),
-                                    e.what(),
-                                    reconnect_delay().count());
+                                            this->exchange_name(),
+                                            e.what(),
+                                            reconnect_delay().count());
                     std::this_thread::sleep_for(reconnect_delay());
                 }
             }
@@ -261,8 +256,8 @@ private:
         constexpr int kSpinBudget = 1000;
         int empty_iters = 0;
         while (!stop_flag_.load(std::memory_order_relaxed)) {
-            const bool processed =
-                frame_queue_.try_pop([this](uint64_t recv_ns, std::string_view payload) { parse_frame(payload, recv_ns); });
+            const bool processed = frame_queue_.try_pop(
+                [this](uint64_t recv_ns, std::string_view payload) { parse_frame(payload, recv_ns); });
             if (processed) {
                 empty_iters = 0;
                 continue;
@@ -279,8 +274,8 @@ private:
             }
         }
         // Drain any frames queued between the IO thread stopping and publish_loop waking.
-        while (
-            frame_queue_.try_pop([this](uint64_t recv_ns, std::string_view payload) { parse_frame(payload, recv_ns); })) {
+        while (frame_queue_.try_pop(
+            [this](uint64_t recv_ns, std::string_view payload) { parse_frame(payload, recv_ns); })) {
         }
     }
 

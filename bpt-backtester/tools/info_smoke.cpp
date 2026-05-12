@@ -13,7 +13,6 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-
 #include <chrono>
 #include <cstdio>
 #include <string>
@@ -46,7 +45,8 @@ bool one_post(uint16_t port, const std::string& body) {
         http::read(stream, buf, res);
 
         std::printf("    status=%u, body_size=%zu, body_head=%.80s\n",
-                    static_cast<unsigned>(res.result_int()), res.body().size(),
+                    static_cast<unsigned>(res.result_int()),
+                    res.body().size(),
                     res.body().c_str());
 
         beast::error_code ec;

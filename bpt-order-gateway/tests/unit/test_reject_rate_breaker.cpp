@@ -69,8 +69,10 @@ TEST(RejectRateBreakerTest, AtThresholdDoesNotTrip) {
 TEST(RejectRateBreakerTest, AboveThresholdTrips) {
     RejectRateBreaker b(make_cfg(/*threshold_pct=*/20.0, /*min_events=*/10));
     // 21 rejects / 100 total = 21% > 20%. All events within 10s < 60s window.
-    for (int i = 0; i < 21; ++i)   b.record(true,  i * kTick);
-    for (int i = 21; i < 100; ++i) b.record(false, i * kTick);
+    for (int i = 0; i < 21; ++i)
+        b.record(true, i * kTick);
+    for (int i = 21; i < 100; ++i)
+        b.record(false, i * kTick);
     EXPECT_TRUE(b.tripped());
 }
 
@@ -79,8 +81,10 @@ TEST(RejectRateBreakerTest, LatchesAfterTrip) {
     // rate well below threshold) must still report tripped() — same
     // "restart required" semantics as the daily-loss kill switch.
     RejectRateBreaker b(make_cfg(/*threshold_pct=*/20.0, /*min_events=*/10));
-    for (int i = 0; i < 21; ++i)   b.record(true,  i * kTick);
-    for (int i = 21; i < 100; ++i) b.record(false, i * kTick);
+    for (int i = 0; i < 21; ++i)
+        b.record(true, i * kTick);
+    for (int i = 21; i < 100; ++i)
+        b.record(false, i * kTick);
     ASSERT_TRUE(b.tripped());
 
     // Advance far past the window and feed only non-rejects.
@@ -97,11 +101,13 @@ TEST(RejectRateBreakerTest, WindowEvictionRemovesStaleEvents) {
     const uint64_t window_ns = 10 * kSec;
     RejectRateBreaker b(make_cfg(/*threshold_pct=*/20.0, /*min_events=*/100, window_ns));
 
-    for (int i = 0; i < 50; ++i) b.record(true, i * kSec);  // 0..49s
+    for (int i = 0; i < 50; ++i)
+        b.record(true, i * kSec);  // 0..49s
 
     // Jump to 100s: eviction cutoff = 100 - 10 = 90s, so everything
     // before 90s is discarded as each new event lands.
-    for (int i = 100; i < 105; ++i) b.record(false, i * kSec);
+    for (int i = 100; i < 105; ++i)
+        b.record(false, i * kSec);
     EXPECT_EQ(b.total_in_window(), 5u);
     EXPECT_EQ(b.rejects_in_window(), 0u);
     EXPECT_FALSE(b.tripped());

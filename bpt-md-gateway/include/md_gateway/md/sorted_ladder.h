@@ -56,9 +56,9 @@ public:
     /// qty == 0 removes the level (no-op if not present); qty > 0
     /// inserts a new level or updates the qty of an existing one.
     void apply(double price, double qty) {
-        auto it = std::lower_bound(
-            data_.begin(), data_.end(), price,
-            [](const Level& lvl, double px) { return Compare{}(lvl.first, px); });
+        auto it = std::lower_bound(data_.begin(), data_.end(), price, [](const Level& lvl, double px) {
+            return Compare{}(lvl.first, px);
+        });
         const bool found = (it != data_.end() && it->first == price);
         if (qty == 0.0) {
             if (found)

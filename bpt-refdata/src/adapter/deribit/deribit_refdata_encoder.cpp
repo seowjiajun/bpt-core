@@ -6,9 +6,7 @@ using json = nlohmann::json;
 
 namespace bpt::refdata::adapter::deribit {
 
-std::string build_jsonrpc_body(uint64_t rpc_id,
-                               const std::string& method,
-                               const std::string& params_json) {
+std::string build_jsonrpc_body(uint64_t rpc_id, const std::string& method, const std::string& params_json) {
     json req_body;
     req_body["jsonrpc"] = "2.0";
     req_body["id"] = rpc_id;

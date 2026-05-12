@@ -10,12 +10,12 @@
 
 #include <messages/TradeSide.h>
 
-#include <cstdint>
-#include <string_view>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/latency_histogram.h>
 #include <bpt_common/util/parse_double.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cstdint>
+#include <string_view>
 
 namespace bpt::md_gateway::adapter {
 

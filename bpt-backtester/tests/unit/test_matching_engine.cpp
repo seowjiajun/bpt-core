@@ -83,7 +83,9 @@ TEST(MatchingEngineTest, MarketBuyFillsAtBestAsk) {
     EXPECT_DOUBLE_EQ(fills[0].last_fill_qty, 3.0);
     EXPECT_DOUBLE_EQ(fills[0].cumulative_fill_qty, 3.0);
     EXPECT_TRUE(fills[0].is_fully_filled);
-    EXPECT_DOUBLE_EQ(result.filled_qty, 3.0);
+    // Phase 3: submit_order returns pre-match state (ACCEPTED). Post-fill
+    // state lives in the FillReport delivered via fill_cb above.
+    EXPECT_FALSE(result.rejected);
 }
 
 TEST(MatchingEngineTest, MarketSellFillsAtBestBid) {
@@ -411,4 +413,248 @@ TEST(MatchingEngineTest, FillReportFieldsAreCorrect) {
     EXPECT_DOUBLE_EQ(captured.original_qty, 2.0);
     EXPECT_DOUBLE_EQ(captured.last_fill_price, 101.5);
     EXPECT_EQ(captured.simulation_ts, 5000u);
+}
+
+// ── Deferred match (Phase 3 / Option A) ──────────────────────────────────────
+
+#include "backtester/latency/latency_model.h"
+
+using bpt::backtester::latency::LatencyLeg;
+using bpt::backtester::latency::ParametricLatencyModel;
+
+TEST(MatchingEngineLatencyTest, MarketOrderDoesNotFillUntilSubmitToMatchElapses) {
+    MatchingEngine eng;
+    ParametricLatencyModel m(/*seed=*/1);
+    m.set_spec("BINANCE", LatencyLeg::SUBMIT_TO_MATCH, {/*base=*/50'000'000ULL, 0});  // 50ms
+    eng.set_latency_model(&m);
+
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, /*ts=*/1'000'000'000ULL));
+    eng.submit_order(make_order(OrderType::MARKET, OrderSide::BUY, 3.0));
+    EXPECT_TRUE(fills.empty()) << "submit_order must not fill synchronously when latency is non-zero";
+
+    // Event 30ms later — still inside the latency window.
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 1'030'000'000ULL));
+    EXPECT_TRUE(fills.empty());
+
+    // Event 60ms after submit — past the 50ms scheduled_match_ts.
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 1'060'000'000ULL));
+    ASSERT_EQ(fills.size(), 1u);
+    EXPECT_DOUBLE_EQ(fills[0].last_fill_qty, 3.0);
+}
+
+TEST(MatchingEngineLatencyTest, FillDeliveryDelayedByMatchToReport) {
+    MatchingEngine eng;
+    ParametricLatencyModel m(/*seed=*/1);
+    m.set_spec("BINANCE", LatencyLeg::MATCH_TO_REPORT, {/*base=*/20'000'000ULL, 0});  // 20ms
+    eng.set_latency_model(&m);
+
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 1'000'000'000ULL));
+
+    // SUBMIT_TO_MATCH defaults to 0 → match runs at submit time, but
+    // delivery is delayed by 20ms.
+    eng.submit_order(make_order(OrderType::MARKET, OrderSide::BUY, 1.0));
+    EXPECT_TRUE(fills.empty()) << "fill_cb must wait for match_to_report delivery latency";
+
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 1'010'000'000ULL));
+    EXPECT_TRUE(fills.empty()) << "10ms < 20ms — still in delivery window";
+
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 1'025'000'000ULL));
+    ASSERT_EQ(fills.size(), 1u);
+}
+
+TEST(MatchingEngineLatencyTest, CancelDuringSubmitToMatchPreventsFill) {
+    MatchingEngine eng;
+    ParametricLatencyModel m(/*seed=*/1);
+    m.set_spec("BINANCE", LatencyLeg::SUBMIT_TO_MATCH, {/*base=*/100'000'000ULL, 0});  // 100ms
+    eng.set_latency_model(&m);
+
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 1'000'000'000ULL));
+    eng.submit_order(make_order(OrderType::MARKET, OrderSide::BUY, 1.0, /*price=*/0.0, "ord-1"));
+
+    // Cancel before scheduled_match_ts.
+    EXPECT_TRUE(eng.cancel_order("BINANCE", "BTCUSDT", "ord-1"));
+
+    // Time passes well beyond the latency window — no fill should fire.
+    eng.on_market_event(make_book("BINANCE", "BTCUSDT", 100.0, 101.0, 5.0, 2'000'000'000ULL));
+    EXPECT_TRUE(fills.empty());
+}
+
+// ── Queue regen on cancels-ahead (Phase 5) ───────────────────────────────────
+
+// Build a book where level 1 sizes can be set independently. Other levels
+// follow the make_book pattern so unrelated tests work.
+static MarketEvent make_book_l1(const std::string& exchange,
+                                const std::string& symbol,
+                                double bid, double ask,
+                                double bid_sz_l1, double ask_sz_l1,
+                                uint64_t ts = 1000) {
+    OrderBookRecord ob;
+    ob.timestamp_ns = ts;
+    ob.exchange = exchange;
+    ob.symbol = symbol;
+    for (int i = 0; i < kOrderBookDepth; ++i) {
+        ob.bid_px[i] = bid - i * 0.01;
+        ob.bid_sz[i] = (i == 0) ? bid_sz_l1 : 10.0;
+        ob.ask_px[i] = ask + i * 0.01;
+        ob.ask_sz[i] = (i == 0) ? ask_sz_l1 : 10.0;
+    }
+    return MarketEvent::from_orderbook(ob);
+}
+
+// Inspect queue_ahead by attempting fills that depend on it. We use a
+// tiny print and check whether our resting order fills (queue_ahead too
+// large) or gets eaten (queue_ahead small enough). The test expectations
+// are stated in terms of trade-volume thresholds for clarity.
+TEST(MatchingEngineQueueRegenTest, AttributesPureCancellationsToQueueAhead) {
+    MatchingEngine eng;
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    // Initial book: ask level 1 has size 100 @ 101.0.
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, /*bid_sz1=*/10, /*ask_sz1=*/100));
+
+    // Resting SELL at 101 with qty 5. queue_ahead seeds to 100.
+    eng.submit_order(make_order(OrderType::LIMIT, OrderSide::SELL, 5.0, 101.0, "sell-1"));
+    EXPECT_EQ(fills.size(), 0u);
+
+    // Second book: ask size at 101.0 drops to 60. No trades intervened.
+    // 40 units of cancellation → queue_ahead expected = 100 - 100*(40/100) = 60.
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 60, /*ts=*/2000));
+
+    // Sanity-check via a trade print: a 50-unit BUY print at 101 should
+    // drain the (regenerated) queue_ahead=60 partially without filling us.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 50.0, 2500));
+    EXPECT_EQ(fills.size(), 0u) << "queue_ahead 60 > 50 print should leave us unfilled";
+    // After this print: queue_ahead = 10.
+
+    // A second 15-unit print clears the residual queue (10) and fully
+    // consumes our 5-unit order. With no regen, cumulative 105 prints
+    // would be needed before our order fills (queue_ahead would still
+    // be 100 after the book "redrew" to 60).
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 15.0, 3000));
+    ASSERT_EQ(fills.size(), 1u);
+    EXPECT_DOUBLE_EQ(fills[0].last_fill_qty, 5.0);
+}
+
+TEST(MatchingEngineQueueRegenTest, SubtractsTradeVolumeBeforeAttribution) {
+    MatchingEngine eng;
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 100));
+    eng.submit_order(make_order(OrderType::LIMIT, OrderSide::SELL, 5.0, 101.0, "sell-1"));
+
+    // 30 units traded at 101 between the two book updates.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 30.0, 1500));
+    // queue_ahead now reduced by 30 from fill_against_trade → 70
+
+    // Book drops to 50 (Δ=50). Trade-attributable=30 → cancels=20.
+    // queue_ahead expected = 70 - 70 * (20/100) = 70 - 14 = 56.
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 50, /*ts=*/2000));
+
+    // A 56-unit print at 101 should still leave us unfilled (queue_ahead just covers).
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 56.0, 2500));
+    EXPECT_EQ(fills.size(), 0u);
+
+    // One more unit pushes through.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 1.0, 3000));
+    ASSERT_EQ(fills.size(), 1u);
+}
+
+TEST(MatchingEngineQueueRegenTest, NoRegenWhenLevelGrows) {
+    MatchingEngine eng;
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 50));
+    eng.submit_order(make_order(OrderType::LIMIT, OrderSide::SELL, 5.0, 101.0, "sell-1"));
+
+    // Book grows to 80 — level got more volume. queue_ahead should stay 50.
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 80, /*ts=*/2000));
+
+    // 50-unit print just covers the original queue_ahead; does NOT fill us.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 50.0, 2500));
+    EXPECT_EQ(fills.size(), 0u);
+
+    // 1 more unit pushes through.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 1.0, 3000));
+    ASSERT_EQ(fills.size(), 1u);
+}
+
+TEST(MatchingEngineQueueRegenTest, NoRegenWhenLevelDropsOffVisibleBook) {
+    MatchingEngine eng;
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 100));
+    eng.submit_order(make_order(OrderType::LIMIT, OrderSide::SELL, 5.0, 101.0, "sell-1"));
+
+    // Spread widens — best ask is now 102.0. Our 101 is no longer at L1
+    // and the lookup at our price returns 0. queue_ahead must be left alone.
+    OrderBookRecord narrow;
+    narrow.timestamp_ns = 2000;
+    narrow.exchange = "BINANCE";
+    narrow.symbol = "BTCUSDT";
+    for (int i = 0; i < kOrderBookDepth; ++i) {
+        narrow.bid_px[i] = 100.0 - i * 0.01;
+        narrow.bid_sz[i] = 10.0;
+        narrow.ask_px[i] = 102.0 + i * 0.01;  // 101 is gone
+        narrow.ask_sz[i] = 10.0;
+    }
+    eng.on_market_event(MarketEvent::from_orderbook(narrow));
+
+    // Trade prints at 101 are no longer in the book, but if any happen,
+    // they consume queue_ahead via fill_against_trade as before. Our
+    // queue_ahead is *still* 100 (regen skipped the disappearance).
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 99.0, 2500));
+    EXPECT_EQ(fills.size(), 0u) << "queue_ahead = 100 > 99 print, no fill";
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 2.0, 3000));
+    EXPECT_EQ(fills.size(), 1u);
+}
+
+TEST(MatchingEngineQueueRegenTest, BackCompatSingleBookEventNoRegen) {
+    // Only one book event ever, so apply_queue_regen has no prior to
+    // compare against. This is the "first tick of a session" path; it
+    // must not corrupt queue_ahead.
+    MatchingEngine eng;
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 100));
+    eng.submit_order(make_order(OrderType::LIMIT, OrderSide::SELL, 5.0, 101.0, "sell-1"));
+
+    // queue_ahead must still be 100 — verify by needing 100 print volume to fill.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 99.0, 1500));
+    EXPECT_EQ(fills.size(), 0u);
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 2.0, 1600));
+    EXPECT_EQ(fills.size(), 1u);
+}
+
+TEST(MatchingEngineLatencyTest, PostOnlyRejectionStaysSynchronous) {
+    // POST_ONLY orders that would cross the *current* book are rejected
+    // synchronously in the submit_order return — real exchanges return
+    // this in the ack frame, so the order server's HTTP response can
+    // carry the error string.
+    MatchingEngine eng;
+    ParametricLatencyModel m(/*seed=*/1);
+    m.set_spec("HYPERLIQUID", LatencyLeg::SUBMIT_TO_MATCH, {500'000'000ULL, 0});
+    eng.set_latency_model(&m);
+
+    eng.on_market_event(make_book("HYPERLIQUID", "APE", 0.18, 0.181, 1000.0, 1'000'000'000ULL));
+
+    // Crossing POST_ONLY buy at 0.181 (= ask) — rejects synchronously.
+    auto crossing = make_order(OrderType::POST_ONLY, OrderSide::BUY, 100.0, 0.181);
+    crossing.exchange = "HYPERLIQUID";
+    crossing.symbol = "APE";
+    auto res = eng.submit_order(crossing);
+    EXPECT_TRUE(res.rejected);
 }

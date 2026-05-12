@@ -4,13 +4,12 @@
 
 namespace bpt::strategy::messaging {
 
-ToxicitySubscriber::ToxicitySubscriber(std::shared_ptr<aeron::Aeron> aeron,
-                                       const std::string& channel,
-                                       int stream_id)
+ToxicitySubscriber::ToxicitySubscriber(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id)
     : sub_(bpt::common::aeron::wait_for_subscription(std::move(aeron), channel, stream_id)) {}
 
 int ToxicitySubscriber::poll(int fragment_limit) {
-    if (!sub_) return 0;
+    if (!sub_)
+        return 0;
     return sub_->poll(
         [this](const aeron::concurrent::AtomicBuffer& buffer,
                aeron::util::index_t offset,
@@ -20,7 +19,8 @@ int ToxicitySubscriber::poll(int fragment_limit) {
                 return;
             bpt::analytics::messaging::ToxicityUpdate update;
             std::memcpy(&update, buffer.buffer() + offset, sizeof(update));
-            if (on_update) on_update(update);
+            if (on_update)
+                on_update(update);
         },
         fragment_limit);
 }

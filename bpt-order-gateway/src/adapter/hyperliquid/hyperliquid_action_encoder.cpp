@@ -18,11 +18,12 @@ std::string float_to_wire(double v) {
     if (dot != std::string::npos) {
         auto last = s.find_last_not_of('0');
         if (last == dot)
-            s.erase(dot);           // "50000." → "50000"
+            s.erase(dot);  // "50000." → "50000"
         else
-            s.erase(last + 1);      // "72198.05750000" → "72198.0575"
+            s.erase(last + 1);  // "72198.05750000" → "72198.0575"
     }
-    if (s == "-0") s = "0";
+    if (s == "-0")
+        s = "0";
     return s;
 }
 
@@ -49,11 +50,13 @@ AssetTable parse_spot_universe_meta(std::string_view body) {
     // so position-in-array is unreliable.
     std::unordered_map<int64_t, int> token_sz_decimals;
     for (const auto& t : tokens_p->as_array()) {
-        if (!t.is_object()) continue;
+        if (!t.is_object())
+            continue;
         const auto& to = t.as_object();
         const auto* idx = to.if_contains("index");
         const auto* sz = to.if_contains("szDecimals");
-        if (!idx || !idx->is_int64() || !sz || !sz->is_int64()) continue;
+        if (!idx || !idx->is_int64() || !sz || !sz->is_int64())
+            continue;
         token_sz_decimals.emplace(idx->as_int64(), static_cast<int>(sz->as_int64()));
     }
 
@@ -61,19 +64,22 @@ AssetTable parse_spot_universe_meta(std::string_view body) {
     const auto& uarr = universe_p->as_array();
     out.reserve(uarr.size());
     for (const auto& u : uarr) {
-        if (!u.is_object()) continue;
+        if (!u.is_object())
+            continue;
         const auto& uo = u.as_object();
         const auto* name = uo.if_contains("name");
         const auto* index = uo.if_contains("index");
         const auto* tokens_ref = uo.if_contains("tokens");
-        if (!name || !name->is_string() || !index || !index->is_int64() ||
-            !tokens_ref || !tokens_ref->is_array() || tokens_ref->as_array().empty())
+        if (!name || !name->is_string() || !index || !index->is_int64() || !tokens_ref || !tokens_ref->is_array() ||
+            tokens_ref->as_array().empty())
             continue;
         const auto& tokens_arr = tokens_ref->as_array();
-        if (!tokens_arr[0].is_int64()) continue;
+        if (!tokens_arr[0].is_int64())
+            continue;
         const int64_t base_idx = tokens_arr[0].as_int64();
         const auto it = token_sz_decimals.find(base_idx);
-        if (it == token_sz_decimals.end()) continue;
+        if (it == token_sz_decimals.end())
+            continue;
 
         AssetMeta meta;
         meta.asset_idx = 10000 + static_cast<int>(index->as_int64());
@@ -105,11 +111,13 @@ AssetTable parse_universe_meta(std::string_view meta_response_body) {
     const auto& arr = universe->as_array();
     out.reserve(arr.size());
     for (std::size_t i = 0; i < arr.size(); ++i) {
-        if (!arr[i].is_object()) continue;
+        if (!arr[i].is_object())
+            continue;
         const auto& obj = arr[i].as_object();
         const auto* name = obj.if_contains("name");
         const auto* sz = obj.if_contains("szDecimals");
-        if (!name || !name->is_string() || !sz || !sz->is_int64()) continue;
+        if (!name || !name->is_string() || !sz || !sz->is_int64())
+            continue;
         const int sz_dec = static_cast<int>(sz->as_int64());
         AssetMeta meta;
         meta.asset_idx = static_cast<int>(i);
@@ -129,7 +137,8 @@ namespace {
 // the decimal cap = 4 but at ~$385 only 2 decimals survive the 5-sigfig
 // rule. This function picks the stricter of the two caps.
 double round_price_for_asset(double price, const AssetMeta& meta) {
-    if (price <= 0.0) return price;
+    if (price <= 0.0)
+        return price;
     // 5-significant-figure cap: number of digits before the decimal.
     const int int_digits = static_cast<int>(std::floor(std::log10(price))) + 1;
     const int sigfig_decimals = std::max(0, 5 - int_digits);
@@ -161,9 +170,12 @@ json::object build_order_object(const AssetMeta& meta,
 
 const char* tif_to_string(HlTif tif) {
     switch (tif) {
-        case HlTif::Alo: return "Alo";
-        case HlTif::Ioc: return "Ioc";
-        case HlTif::Gtc: return "Gtc";
+        case HlTif::Alo:
+            return "Alo";
+        case HlTif::Ioc:
+            return "Ioc";
+        case HlTif::Gtc:
+            return "Gtc";
     }
     return "Gtc";
 }

@@ -7,12 +7,12 @@
 
 #include <messages/InstrumentType.h>
 
+#include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/subscriber.h>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-#include <bpt_common/aeron/publisher.h>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bpt::order_gateway::refdata {
 

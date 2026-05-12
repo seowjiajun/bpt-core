@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -12,7 +13,6 @@
 #include <fstream>
 #include <numeric>
 #include <stdexcept>
-#include <bpt_common/logging.h>
 
 namespace fs = std::filesystem;
 
@@ -32,8 +32,10 @@ std::string ResultsCollector::compose_run_id(const RunMetadata& m,
     // readability vs collision risk.
     std::string out;
     auto append = [&](const std::string& s) {
-        if (s.empty()) return;
-        if (!out.empty()) out += '_';
+        if (s.empty())
+            return;
+        if (!out.empty())
+            out += '_';
         out += s;
     };
     append(m.strategy_name);
@@ -44,17 +46,15 @@ std::string ResultsCollector::compose_run_id(const RunMetadata& m,
     return out.empty() ? std::string{"run"} : out;
 }
 
-ResultsCollector::ResultsCollector(double starting_capital, std::string output_dir,
+ResultsCollector::ResultsCollector(double starting_capital,
+                                   std::string output_dir,
                                    RunMetadata metadata,
-                                   std::unordered_map<std::string,
-                                                      config::ResultsConfig::FeeRates>
-                                       fees_by_venue)
+                                   std::unordered_map<std::string, config::ResultsConfig::FeeRates> fees_by_venue)
     : starting_capital_(starting_capital),
       output_dir_(std::move(output_dir)),
       metadata_(std::move(metadata)),
       wallclock_start_ns_(static_cast<uint64_t>(
-          std::chrono::duration_cast<std::chrono::nanoseconds>(
-              std::chrono::system_clock::now().time_since_epoch())
+          std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
               .count())),
       fees_by_venue_(std::move(fees_by_venue)) {
     // Seed the equity curve with the starting point (ts=0 means pre-simulation).
@@ -155,9 +155,8 @@ void ResultsCollector::on_fill(const matching::FillReport& fill) {
     double rate_bps = 0.0;
     auto fee_it = fees_by_venue_.find(fill.exchange);
     if (fee_it != fees_by_venue_.end()) {
-        rate_bps = (fill.liquidity_role == matching::LiquidityRole::TAKER)
-                       ? fee_it->second.taker_bps
-                       : fee_it->second.maker_bps;
+        rate_bps = (fill.liquidity_role == matching::LiquidityRole::TAKER) ? fee_it->second.taker_bps
+                                                                           : fee_it->second.maker_bps;
     } else if (!fees_by_venue_.empty()) {
         // Empty table = fees disabled (tests). Non-empty but missing this
         // venue = real misconfig. Warn once per venue.
@@ -176,7 +175,7 @@ void ResultsCollector::on_fill(const matching::FillReport& fill) {
 
     constexpr double kFlatTol = 1e-12;
     const bool was_flat = std::abs(pre_qty) < kFlatTol;
-    const bool is_flat  = std::abs(pos.net_qty) < kFlatTol;
+    const bool is_flat = std::abs(pos.net_qty) < kFlatTol;
     if (was_flat && !is_flat) {
         pos.open_ts_ns = fill.simulation_ts;
         open_realized_[key] = 0.0;  // start the round-trip's realized accumulator
@@ -200,9 +199,9 @@ void ResultsCollector::on_fill(const matching::FillReport& fill) {
     row.order_id = fill.order_id;
     row.client_order_id = fill.client_order_id;
     row.side = (fill.side == OrderSide::BUY) ? "BUY" : "SELL";
-    row.order_type = (fill.order_type == matching::OrderType::MARKET)    ? "MARKET"
-                   : (fill.order_type == matching::OrderType::POST_ONLY) ? "POST_ONLY"
-                                                                         : "LIMIT";
+    row.order_type = (fill.order_type == matching::OrderType::MARKET)      ? "MARKET"
+                     : (fill.order_type == matching::OrderType::POST_ONLY) ? "POST_ONLY"
+                                                                           : "LIMIT";
     row.liquidity = (fill.liquidity_role == matching::LiquidityRole::TAKER) ? "TAKER" : "MAKER";
     row.qty = fill.last_fill_qty;
     row.price = fill.last_fill_price;
@@ -238,12 +237,14 @@ void ResultsCollector::on_market_event(const data::MarketEvent& event) {
     // for a later event. Using an index into the deque rather than an
     // iterator-based erase to keep the code simple — trade volumes
     // typical for this backtester make this cheap regardless.
-    if (pending_markouts_.empty()) return;
+    if (pending_markouts_.empty())
+        return;
     std::size_t write = 0;
     for (std::size_t i = 0; i < pending_markouts_.size(); ++i) {
         const auto& p = pending_markouts_[i];
         if (event.timestamp_ns < p.target_ts_ns) {
-            if (write != i) pending_markouts_[write] = p;
+            if (write != i)
+                pending_markouts_[write] = p;
             ++write;
             continue;
         }
@@ -257,7 +258,8 @@ void ResultsCollector::on_market_event(const data::MarketEvent& event) {
         }
         const double mid = mid_it->second;
         double bps = (mid - trade.price) / trade.price * 10000.0;
-        if (trade.side == "SELL") bps = -bps;
+        if (trade.side == "SELL")
+            bps = -bps;
         trade.markouts_bps[p.horizon_idx] = bps;
         // entry resolved → not copied forward → effectively erased
     }
@@ -329,15 +331,15 @@ void ResultsCollector::write() const {
     // for sweep visualisations that label each cell by its tuned param.
     if (!metadata_.params_file.empty()) {
         try {
-            fs::copy_file(metadata_.params_file,
-                          output_dir_ + "/params.toml",
-                          fs::copy_options::overwrite_existing);
+            fs::copy_file(metadata_.params_file, output_dir_ + "/params.toml", fs::copy_options::overwrite_existing);
             bpt::common::log::info("[ResultsCollector] Copied params {} → {}/params.toml",
-                                   metadata_.params_file, output_dir_);
+                                   metadata_.params_file,
+                                   output_dir_);
         } catch (const std::exception& e) {
-            bpt::common::log::warn(
-                "[ResultsCollector] Failed to copy params {} → {}/params.toml: {}",
-                metadata_.params_file, output_dir_, e.what());
+            bpt::common::log::warn("[ResultsCollector] Failed to copy params {} → {}/params.toml: {}",
+                                   metadata_.params_file,
+                                   output_dir_,
+                                   e.what());
         }
     }
 
@@ -385,7 +387,9 @@ void ResultsCollector::write() const {
         f << "simulation_ts,equity\n";
         for (const auto& pt : equity_curve_)
             f << std::format("{},{:.10g}\n", pt.simulation_ts, pt.equity);
-        bpt::common::log::info("[ResultsCollector] Wrote {}/pnl_curve.csv ({} points)", output_dir_, equity_curve_.size());
+        bpt::common::log::info("[ResultsCollector] Wrote {}/pnl_curve.csv ({} points)",
+                               output_dir_,
+                               equity_curve_.size());
     }
 
     // ── summary.json ──────────────────────────────────────────────────────
@@ -416,13 +420,10 @@ void ResultsCollector::write() const {
         double win_rate = trades_.empty() ? 0.0 : static_cast<double>(win_trades) / trades_.size() * 100.0;
 
         const uint64_t wallclock_end_ns = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::system_clock::now().time_since_epoch())
+            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count());
         const uint64_t wallclock_duration_ms =
-            (wallclock_end_ns > wallclock_start_ns_)
-                ? (wallclock_end_ns - wallclock_start_ns_) / 1'000'000ULL
-                : 0;
+            (wallclock_end_ns > wallclock_start_ns_) ? (wallclock_end_ns - wallclock_start_ns_) / 1'000'000ULL : 0;
 
         namespace json = boost::json;
         json::object obj;
@@ -460,8 +461,10 @@ void ResultsCollector::write() const {
         int maker_fills = 0;
         int taker_fills = 0;
         for (const auto& r : trades_) {
-            if (r.liquidity == "MAKER") ++maker_fills;
-            else if (r.liquidity == "TAKER") ++taker_fills;
+            if (r.liquidity == "MAKER")
+                ++maker_fills;
+            else if (r.liquidity == "TAKER")
+                ++taker_fills;
         }
         obj["maker_fills"] = static_cast<int64_t>(maker_fills);
         obj["taker_fills"] = static_cast<int64_t>(taker_fills);
@@ -483,20 +486,30 @@ void ResultsCollector::write() const {
         // sample size can be spotted.
         json::object markouts_obj;
         for (std::size_t h = 0; h < kMarkoutHorizonsNs.size(); ++h) {
-            double sum_all = 0.0; int n_all = 0;
-            double sum_buy = 0.0; int n_buy = 0;
-            double sum_sell = 0.0; int n_sell = 0;
+            double sum_all = 0.0;
+            int n_all = 0;
+            double sum_buy = 0.0;
+            int n_buy = 0;
+            double sum_sell = 0.0;
+            int n_sell = 0;
             for (const auto& t : trades_) {
                 const double mk = t.markouts_bps[h];
-                if (mk == kUnresolved) continue;
-                sum_all += mk; ++n_all;
-                if (t.side == "BUY")  { sum_buy  += mk; ++n_buy;  }
-                else                  { sum_sell += mk; ++n_sell; }
+                if (mk == kUnresolved)
+                    continue;
+                sum_all += mk;
+                ++n_all;
+                if (t.side == "BUY") {
+                    sum_buy += mk;
+                    ++n_buy;
+                } else {
+                    sum_sell += mk;
+                    ++n_sell;
+                }
             }
             json::object horizon_obj;
             horizon_obj["resolved_fills"] = static_cast<int64_t>(n_all);
-            horizon_obj["avg_bps"]      = (n_all  > 0) ? sum_all  / n_all  : 0.0;
-            horizon_obj["avg_buy_bps"]  = (n_buy  > 0) ? sum_buy  / n_buy  : 0.0;
+            horizon_obj["avg_bps"] = (n_all > 0) ? sum_all / n_all : 0.0;
+            horizon_obj["avg_buy_bps"] = (n_buy > 0) ? sum_buy / n_buy : 0.0;
             horizon_obj["avg_sell_bps"] = (n_sell > 0) ? sum_sell / n_sell : 0.0;
             markouts_obj[kMarkoutHorizonLabels[h]] = std::move(horizon_obj);
         }
@@ -515,20 +528,20 @@ void ResultsCollector::write() const {
             double sum_pnl = 0.0;
             for (const auto& rt : round_trips_) {
                 durations.push_back(rt.close_ts_ns - rt.open_ts_ns);
-                if (rt.realized_pnl > 0.0) ++wins;
+                if (rt.realized_pnl > 0.0)
+                    ++wins;
                 sum_pnl += rt.realized_pnl;
             }
             std::sort(durations.begin(), durations.end());
-            const double avg_ns = std::accumulate(durations.begin(), durations.end(), 0.0)
-                                  / static_cast<double>(durations.size());
+            const double avg_ns =
+                std::accumulate(durations.begin(), durations.end(), 0.0) / static_cast<double>(durations.size());
             const uint64_t median_ns = durations[durations.size() / 2];
-            rt_obj["avg_holding_ms"]    = avg_ns / 1e6;
+            rt_obj["avg_holding_ms"] = avg_ns / 1e6;
             rt_obj["median_holding_ms"] = static_cast<double>(median_ns) / 1e6;
-            rt_obj["max_holding_ms"]    = static_cast<double>(durations.back()) / 1e6;
-            rt_obj["min_holding_ms"]    = static_cast<double>(durations.front()) / 1e6;
+            rt_obj["max_holding_ms"] = static_cast<double>(durations.back()) / 1e6;
+            rt_obj["min_holding_ms"] = static_cast<double>(durations.front()) / 1e6;
             rt_obj["winning_round_trips"] = static_cast<int64_t>(wins);
-            rt_obj["round_trip_win_rate_pct"] =
-                static_cast<double>(wins) / round_trips_.size() * 100.0;
+            rt_obj["round_trip_win_rate_pct"] = static_cast<double>(wins) / round_trips_.size() * 100.0;
             rt_obj["avg_round_trip_pnl"] = sum_pnl / round_trips_.size();
         }
         obj["round_trips"] = std::move(rt_obj);

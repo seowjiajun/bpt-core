@@ -17,20 +17,25 @@ std::string build_subscribe_payload(const std::string& symbol, uint8_t depth) {
         // TODO: liquidation-orders is a global SWAP channel (subscribed by
         // instType, not instId) — handle once at connect time, not per-symbol.
         const std::string index_symbol = symbol.substr(0, symbol.size() - 5);
-        return fmt::format(
-            R"({{"op":"subscribe","args":[)"
-            R"({{"channel":"{}","instId":"{}"}},)"
-            R"({{"channel":"trades","instId":"{}"}},)"
-            R"({{"channel":"funding-rate","instId":"{}"}},)"
-            R"({{"channel":"mark-price","instId":"{}"}},)"
-            R"({{"channel":"index-tickers","instId":"{}"}}]}})",
-            book_channel, symbol, symbol, symbol, symbol, index_symbol);
+        return fmt::format(R"({{"op":"subscribe","args":[)"
+                           R"({{"channel":"{}","instId":"{}"}},)"
+                           R"({{"channel":"trades","instId":"{}"}},)"
+                           R"({{"channel":"funding-rate","instId":"{}"}},)"
+                           R"({{"channel":"mark-price","instId":"{}"}},)"
+                           R"({{"channel":"index-tickers","instId":"{}"}}]}})",
+                           book_channel,
+                           symbol,
+                           symbol,
+                           symbol,
+                           symbol,
+                           index_symbol);
     }
-    return fmt::format(
-        R"({{"op":"subscribe","args":[)"
-        R"({{"channel":"{}","instId":"{}"}},)"
-        R"({{"channel":"trades","instId":"{}"}}]}})",
-        book_channel, symbol, symbol);
+    return fmt::format(R"({{"op":"subscribe","args":[)"
+                       R"({{"channel":"{}","instId":"{}"}},)"
+                       R"({{"channel":"trades","instId":"{}"}}]}})",
+                       book_channel,
+                       symbol,
+                       symbol);
 }
 
 }  // namespace bpt::md_gateway::adapter::okx

@@ -1,18 +1,17 @@
 #include "order_gateway/adapter/hyperliquid/hyperliquid_signer.h"
 
 #include <algorithm>
+#include <boost/json.hpp>
+#include <bpt_common/util/tsc_clock.h>
 #include <cstdint>
 #include <cstring>
 #include <iomanip>
+#include <secp256k1.h>
+#include <secp256k1_recovery.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#include <boost/json.hpp>
-#include <bpt_common/util/tsc_clock.h>
-#include <secp256k1.h>
-#include <secp256k1_recovery.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -26,17 +25,18 @@ namespace json = boost::json;
 namespace {
 
 const uint64_t KECCAK_RC[24] = {
-    0x0000000000000001ULL, 0x0000000000008082ULL, 0x800000000000808aULL, 0x8000000080008000ULL,
-    0x000000000000808bULL, 0x0000000080000001ULL, 0x8000000080008081ULL, 0x8000000000008009ULL,
-    0x000000000000008aULL, 0x0000000000000088ULL, 0x0000000080008009ULL, 0x000000008000000aULL,
-    0x000000008000808bULL, 0x800000000000008bULL, 0x8000000000008089ULL, 0x8000000000008003ULL,
-    0x8000000000008002ULL, 0x8000000000000080ULL, 0x000000000000800aULL, 0x800000008000000aULL,
+    0x0000000000000001ULL, 0x0000000000008082ULL, 0x800000000000808aULL, 0x8000000080008000ULL, 0x000000000000808bULL,
+    0x0000000080000001ULL, 0x8000000080008081ULL, 0x8000000000008009ULL, 0x000000000000008aULL, 0x0000000000000088ULL,
+    0x0000000080008009ULL, 0x000000008000000aULL, 0x000000008000808bULL, 0x800000000000008bULL, 0x8000000000008089ULL,
+    0x8000000000008003ULL, 0x8000000000008002ULL, 0x8000000000000080ULL, 0x000000000000800aULL, 0x800000008000000aULL,
     0x8000000080008081ULL, 0x8000000000008080ULL, 0x0000000080000001ULL, 0x8000000080008008ULL,
 };
 const int KECCAK_ROT[24] = {1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44};
-const int KECCAK_PI[24]  = {10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1};
+const int KECCAK_PI[24] = {10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1};
 
-inline uint64_t rotl64(uint64_t x, int n) { return (x << n) | (x >> (64 - n)); }
+inline uint64_t rotl64(uint64_t x, int n) {
+    return (x << n) | (x >> (64 - n));
+}
 
 void keccak_f1600(uint64_t st[25]) {
     for (int round = 0; round < 24; ++round) {
@@ -46,7 +46,8 @@ void keccak_f1600(uint64_t st[25]) {
         uint64_t t[5];
         for (int i = 0; i < 5; ++i)
             t[i] = bc[(i + 4) % 5] ^ rotl64(bc[(i + 1) % 5], 1);
-        for (int i = 0; i < 25; ++i) st[i] ^= t[i % 5];
+        for (int i = 0; i < 25; ++i)
+            st[i] ^= t[i % 5];
 
         uint64_t last = st[1];
         for (int i = 0; i < 24; ++i) {
@@ -57,7 +58,8 @@ void keccak_f1600(uint64_t st[25]) {
         }
         for (int i = 0; i < 25; i += 5) {
             uint64_t tmp[5];
-            for (int j = 0; j < 5; ++j) tmp[j] = st[i + j];
+            for (int j = 0; j < 5; ++j)
+                tmp[j] = st[i + j];
             for (int j = 0; j < 5; ++j)
                 st[i + j] = tmp[j] ^ (~tmp[(j + 1) % 5] & tmp[(j + 2) % 5]);
         }
@@ -115,7 +117,9 @@ std::array<uint8_t, 32> keccak256_arr(const uint8_t* in, std::size_t len) {
 // insertion order — matching Python dict ordering. Do NOT sort keys.
 // ──────────────────────────────────────────────────────────────────────────────
 
-void mp_append_u8(std::vector<uint8_t>& out, uint8_t b) { out.push_back(b); }
+void mp_append_u8(std::vector<uint8_t>& out, uint8_t b) {
+    out.push_back(b);
+}
 void mp_append_be(std::vector<uint8_t>& out, uint64_t v, int nbytes) {
     for (int i = nbytes - 1; i >= 0; --i)
         out.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xFF));
@@ -234,7 +238,8 @@ void mp_pack_value(std::vector<uint8_t>& out, const json::value& v) {
         case json::kind::array: {
             const auto& a = v.get_array();
             mp_pack_array_header(out, a.size());
-            for (const auto& e : a) mp_pack_value(out, e);
+            for (const auto& e : a)
+                mp_pack_value(out, e);
             return;
         }
         case json::kind::object: {
@@ -305,11 +310,9 @@ std::array<uint8_t, 32> agent_type_hash() {
 }
 
 // Struct hash for Agent{source, connectionId}
-std::array<uint8_t, 32> agent_struct_hash(const char* source,
-                                          const std::array<uint8_t, 32>& connection_id) {
+std::array<uint8_t, 32> agent_struct_hash(const char* source, const std::array<uint8_t, 32>& connection_id) {
     auto type_hash = agent_type_hash();
-    std::array<uint8_t, 32> source_hash =
-        keccak256_arr(reinterpret_cast<const uint8_t*>(source), std::strlen(source));
+    std::array<uint8_t, 32> source_hash = keccak256_arr(reinterpret_cast<const uint8_t*>(source), std::strlen(source));
 
     std::vector<uint8_t> enc;
     enc.reserve(96);
@@ -332,9 +335,12 @@ std::string bytes_to_hex(const uint8_t* data, std::size_t len) {
 }
 
 uint8_t hex_nibble(char c) {
-    if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0');
-    if (c >= 'a' && c <= 'f') return static_cast<uint8_t>(c - 'a' + 10);
-    if (c >= 'A' && c <= 'F') return static_cast<uint8_t>(c - 'A' + 10);
+    if (c >= '0' && c <= '9')
+        return static_cast<uint8_t>(c - '0');
+    if (c >= 'a' && c <= 'f')
+        return static_cast<uint8_t>(c - 'a' + 10);
+    if (c >= 'A' && c <= 'F')
+        return static_cast<uint8_t>(c - 'A' + 10);
     throw std::runtime_error("Invalid hex character");
 }
 
@@ -372,7 +378,8 @@ HyperliquidSigner::HyperliquidSigner(std::string_view hex, bool is_mainnet) : is
 
 HyperliquidSigner::~HyperliquidSigner() {
     volatile uint8_t* p = key_.data();
-    for (std::size_t i = 0; i < key_.size(); ++i) p[i] = 0;
+    for (std::size_t i = 0; i < key_.size(); ++i)
+        p[i] = 0;
 }
 
 uint64_t HyperliquidSigner::next_nonce() noexcept {

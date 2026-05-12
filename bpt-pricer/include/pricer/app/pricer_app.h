@@ -6,10 +6,10 @@
 
 #include <messages/ExchangeId.h>
 
+#include <bpt_app/app.h>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <bpt_app/app.h>
 
 namespace bpt::pricer {
 

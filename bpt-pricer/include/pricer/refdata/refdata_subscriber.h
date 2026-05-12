@@ -6,11 +6,11 @@
 
 #include <messages/ExchangeId.h>
 
+#include <bpt_common/aeron/subscriber.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bpt::pricer::refdata {
 

@@ -4,13 +4,13 @@
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
-#include <chrono>
-#include <cmath>
-#include <cstring>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/thread_name.h>
 #include <bpt_common/util/tsc_clock.h>
 #include <bpt_common/ws/ws_connect.h>
+#include <chrono>
+#include <cmath>
+#include <cstring>
 
 namespace bpt::md_gateway::adapter {
 
@@ -19,9 +19,9 @@ namespace websocket = beast::websocket;
 namespace ssl = boost::asio::ssl;
 
 BinanceFundingRateStream::BinanceFundingRateStream(const config::AdapterConfig& cfg,
-                                                    const SubscriptionMap& subs,
-                                                    messaging::FundingRateCallback& on_funding_rate,
-                                                    std::atomic<bool>& stop_flag)
+                                                   const SubscriptionMap& subs,
+                                                   messaging::FundingRateCallback& on_funding_rate,
+                                                   std::atomic<bool>& stop_flag)
     : cfg_(cfg),
       subs_(subs),
       on_funding_rate_(on_funding_rate),
@@ -54,9 +54,15 @@ void BinanceFundingRateStream::run() {
     while (!stop_flag_.load(std::memory_order_relaxed)) {
         try {
             ioc_.restart();
-            auto ws = bpt::common::ws::ws_connect(ioc_, ssl_ctx_, fr_host, fr_port, fr_path,
-                                                  cfg_.so_rcvbuf_bytes, /*connect_timeout_ms=*/30000,
-                                                  "bpt-md-gateway/0.1", cfg_.pinned_tls_sha256);
+            auto ws = bpt::common::ws::ws_connect(ioc_,
+                                                  ssl_ctx_,
+                                                  fr_host,
+                                                  fr_port,
+                                                  fr_path,
+                                                  cfg_.so_rcvbuf_bytes,
+                                                  /*connect_timeout_ms=*/30000,
+                                                  "bpt-md-gateway/0.1",
+                                                  cfg_.pinned_tls_sha256);
             bpt::common::log::info("BinanceMdAdapter funding-rate stream connected");
 
             beast::flat_buffer buf;

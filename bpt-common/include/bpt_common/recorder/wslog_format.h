@@ -26,12 +26,12 @@ namespace bpt::common::recorder {
 
 /// \brief Record-type tag stamped on every entry written to the tape.
 enum class RecordType : uint8_t {
-    WS_FRAME      = 0,  ///< raw venue frame (JSON / FIX / etc.)
+    WS_FRAME = 0,       ///< raw venue frame (JSON / FIX / etc.)
     SESSION_START = 1,  ///< recorder process started; payload = config snapshot JSON
-    SESSION_STOP  = 2,  ///< recorder process stopping cleanly; payload = exit reason JSON
-    CHECKPOINT    = 3,  ///< periodic heartbeat; payload = JSON {frames, bytes, uptime_s}
+    SESSION_STOP = 2,   ///< recorder process stopping cleanly; payload = exit reason JSON
+    CHECKPOINT = 3,     ///< periodic heartbeat; payload = JSON {frames, bytes, uptime_s}
     WS_DISCONNECT = 4,  ///< unexpected WS connection loss; payload = JSON {reason, attempt}
-    WS_RECONNECT  = 5,  ///< WS reconnect succeeded after a prior disconnect; payload = JSON {attempt}
+    WS_RECONNECT = 5,   ///< WS reconnect succeeded after a prior disconnect; payload = JSON {attempt}
     /// REST response body captured from a refdata poll (bpt-tape only).
     /// Payload envelope (little-endian):
     ///   u8  method  (0=GET, 1=POST)

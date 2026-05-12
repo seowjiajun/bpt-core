@@ -8,6 +8,7 @@
 #include "strategy/strategy/hmm_strategy.h"
 #include "strategy/strategy/momentum_strategy.h"
 #include "strategy/strategy/ofi_strategy.h"
+#include "strategy/strategy/passive_maker_strategy.h"
 #include "strategy/strategy/regime_switch_strategy.h"
 #include "strategy/strategy/short_vol_strategy.h"
 #include "strategy/strategy/vwap_reversion_strategy.h"
@@ -40,6 +41,10 @@ std::unique_ptr<IStrategy> StrategyFactory::create(const config::EngineConfig& c
 
     if (type == "AvellanedaStoikovStrategy") {
         return std::make_unique<AvellanedaStoikovStrategy>(cfg.correlation_id, cfg.strategy, refdata, md, order_mgr);
+    }
+
+    if (type == "PassiveMakerStrategy") {
+        return std::make_unique<PassiveMakerStrategy>(cfg.correlation_id, cfg.strategy, refdata, md, order_mgr);
     }
 
     if (type == "FundingArbStrategy") {

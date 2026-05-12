@@ -28,9 +28,7 @@ public:
     /// \param orders_in_flight  total open orders across all venues
     /// \param exchange_status   bitmask: bit0=BINANCE, bit1=OKX, bit2=HYPERLIQUID, bit3=DERIBIT;
     ///                          1 = connected
-    virtual void publish(uint8_t service_id,
-                         uint16_t orders_in_flight,
-                         uint8_t exchange_status) = 0;
+    virtual void publish(uint8_t service_id, uint16_t orders_in_flight, uint8_t exchange_status) = 0;
 };
 
 }  // namespace bpt::order_gateway::messaging

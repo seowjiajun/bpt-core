@@ -56,7 +56,10 @@ void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value 
     aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "delta");
 
-    bpt::common::log::debug("Published delta seq={} uid={} type={}", seq_, inst.inst_uid, DeltaUpdateType::c_str(update_type));
+    bpt::common::log::debug("Published delta seq={} uid={} type={}",
+                            seq_,
+                            inst.inst_uid,
+                            DeltaUpdateType::c_str(update_type));
 }
 
 void RefdataDeltaPublisher::publish_heartbeat() {

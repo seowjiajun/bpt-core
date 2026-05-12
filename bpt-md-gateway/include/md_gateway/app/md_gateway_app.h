@@ -27,13 +27,13 @@
 #include "md_gateway/metrics/metrics.h"
 #include "md_gateway/subscription/subscription_manager.h"
 
+#include <bpt_app/app.h>
+#include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/topology.h>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <bpt_app/app.h>
-#include <bpt_common/util/latency_histogram.h>
-#include <bpt_common/util/topology.h>
 
 namespace bpt::md_gateway {
 

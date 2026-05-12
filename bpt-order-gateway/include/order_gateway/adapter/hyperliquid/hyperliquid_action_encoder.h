@@ -49,9 +49,9 @@ namespace bpt::order_gateway::adapter::hyperliquid {
 /// mainnet + testnet + any relisting are handled without a code change
 /// — see `HyperliquidOrderAdapter::load_asset_meta()`.
 struct AssetMeta {
-    int asset_idx;       ///< HL universe index — what goes into action.orders[].a
-    int sz_decimals;     ///< used to enforce price precision rules
-    int max_px_decimals; ///< 6 - sz_decimals; max decimal places allowed in the price string
+    int asset_idx;        ///< HL universe index — what goes into action.orders[].a
+    int sz_decimals;      ///< used to enforce price precision rules
+    int max_px_decimals;  ///< 6 - sz_decimals; max decimal places allowed in the price string
 };
 
 /// \brief Map of coin symbol → AssetMeta.
@@ -107,8 +107,7 @@ enum class HlTif { Gtc, Alo, Ioc };
 ///
 /// The oid is the HL exchange order id from the original `resting`
 /// response — NOT our internal client order_id.
-[[nodiscard]] boost::json::value build_cancel_action(const AssetMeta& meta,
-                                                     uint64_t exch_oid);
+[[nodiscard]] boost::json::value build_cancel_action(const AssetMeta& meta, uint64_t exch_oid);
 
 /// \brief Build the `action` JSON for a modify.
 ///

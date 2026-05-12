@@ -7,15 +7,17 @@
 #include "bridge/settings.h"
 
 #include <Aeron.h>
-#include <memory>
+
 #include <bpt_app/app.h>
+#include <memory>
 
 namespace bridge {
 
 class BridgeApp : public bpt::app::IService {
 public:
     BridgeApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron)
-        : settings_(std::move(settings)), aeron_(std::move(aeron)) {}
+        : settings_(std::move(settings)),
+          aeron_(std::move(aeron)) {}
 
     void run() override;
 

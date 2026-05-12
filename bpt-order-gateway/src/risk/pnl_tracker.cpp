@@ -43,9 +43,7 @@ void PnlTracker::on_fill(bpt::messages::ExchangeId::Value exchange,
             // Adding to long or flat — update weighted average entry.
             const double prev_qty = static_cast<double>(pos.net_qty_e8) / kScale;
             const double new_qty = prev_qty + qty;
-            pos.avg_price_usd = (new_qty > 0.0)
-                ? (pos.avg_price_usd * prev_qty + price * qty) / new_qty
-                : 0.0;
+            pos.avg_price_usd = (new_qty > 0.0) ? (pos.avg_price_usd * prev_qty + price * qty) / new_qty : 0.0;
         } else {
             // Closing or flipping a short.
             const double short_qty = -static_cast<double>(pos.net_qty_e8) / kScale;
@@ -66,9 +64,7 @@ void PnlTracker::on_fill(bpt::messages::ExchangeId::Value exchange,
             // Adding to short or flat — update weighted average entry.
             const double prev_qty = -static_cast<double>(pos.net_qty_e8) / kScale;
             const double new_qty = prev_qty + qty;
-            pos.avg_price_usd = (new_qty > 0.0)
-                ? (pos.avg_price_usd * prev_qty + price * qty) / new_qty
-                : 0.0;
+            pos.avg_price_usd = (new_qty > 0.0) ? (pos.avg_price_usd * prev_qty + price * qty) / new_qty : 0.0;
         } else {
             // Closing or flipping a long.
             const double long_qty = static_cast<double>(pos.net_qty_e8) / kScale;
@@ -97,8 +93,7 @@ double PnlTracker::daily_realized_pnl_usd(uint64_t now_ns) {
     return daily_pnl_usd_;
 }
 
-int64_t PnlTracker::net_qty_e8(bpt::messages::ExchangeId::Value exchange,
-                                uint64_t instrument_id) const noexcept {
+int64_t PnlTracker::net_qty_e8(bpt::messages::ExchangeId::Value exchange, uint64_t instrument_id) const noexcept {
     const auto it = positions_.find(make_key(exchange, instrument_id));
     return it == positions_.end() ? 0 : it->second.net_qty_e8;
 }

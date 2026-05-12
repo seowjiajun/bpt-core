@@ -3,8 +3,8 @@
 #include <messages/MdSubscribeBatch.h>
 #include <messages/MessageHeader.h>
 
-#include <cstddef>
 #include <bpt_common/logging.h>
+#include <cstddef>
 
 namespace bpt::md_gateway::messaging {
 
@@ -12,9 +12,13 @@ MdControlSubscriber::MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                          const std::string& channel,
                                          int stream_id) {
     subscription_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        std::move(aeron), channel, stream_id,
-        [this](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset,
-               ::aeron::util::index_t length, ::aeron::Header& /*hdr*/) {
+        std::move(aeron),
+        channel,
+        stream_id,
+        [this](::aeron::AtomicBuffer& buf,
+               ::aeron::util::index_t offset,
+               ::aeron::util::index_t length,
+               ::aeron::Header& /*hdr*/) {
             using namespace bpt::messages;
 
             if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())

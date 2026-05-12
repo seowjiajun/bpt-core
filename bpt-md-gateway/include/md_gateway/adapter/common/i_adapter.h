@@ -5,11 +5,11 @@
 
 #include "md_gateway/messaging/funding_rate_publisher.h"
 
+#include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/topology.h>
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <bpt_common/util/latency_histogram.h>
-#include <bpt_common/util/topology.h>
 
 namespace bpt::md_gateway::adapter {
 

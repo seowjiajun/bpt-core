@@ -5,12 +5,13 @@
 // dashboard or strategy to be wired up yet. Useful for eyeballing
 // "does bpt-book see my actual HL balances correctly" during dev.
 
+#include <Aeron.h>
+
 #include <messages/BalanceSnapshot.h>
 #include <messages/MessageHeader.h>
 
-#include <Aeron.h>
-
 #include <atomic>
+#include <bpt_common/aeron/subscriber.h>
 #include <chrono>
 #include <csignal>
 #include <cstdint>
@@ -18,13 +19,14 @@
 #include <cstring>
 #include <string>
 #include <thread>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace {
 
 std::atomic<bool> running{true};
 
-void on_signal(int) { running = false; }
+void on_signal(int) {
+    running = false;
+}
 
 std::string rstrip_zeros(const char* s, std::size_t max_len) {
     std::size_t n = 0;
@@ -35,12 +37,18 @@ std::string rstrip_zeros(const char* s, std::size_t max_len) {
 
 const char* exchange_name(uint8_t id) {
     switch (id) {
-        case 0: return "ALL";
-        case 1: return "BINANCE";
-        case 2: return "OKX";
-        case 3: return "HYPERLIQUID";
-        case 4: return "DERIBIT";
-        default: return "UNKNOWN";
+        case 0:
+            return "ALL";
+        case 1:
+            return "BINANCE";
+        case 2:
+            return "OKX";
+        case 3:
+            return "HYPERLIQUID";
+        case 4:
+            return "DERIBIT";
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -57,9 +65,11 @@ int main() {
     const std::string channel = "aeron:ipc";
     constexpr int kStreamId = 6001;
 
-    bpt::common::aeron::Subscriber sub(aeron, channel, kStreamId,
-        [](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset,
-           ::aeron::util::index_t length, ::aeron::Header&) {
+    bpt::common::aeron::Subscriber sub(
+        aeron,
+        channel,
+        kStreamId,
+        [](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset, ::aeron::util::index_t length, ::aeron::Header&) {
             using namespace bpt::messages;
 
             auto* data = reinterpret_cast<char*>(buf.buffer() + offset);
@@ -69,8 +79,7 @@ int main() {
                 return;
 
             BalanceSnapshot msg;
-            msg.wrapForDecode(data, MessageHeader::encodedLength(), hdr.blockLength(),
-                              hdr.version(), length);
+            msg.wrapForDecode(data, MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), length);
 
             std::printf("\n=== BalanceSnapshot corr=%lu ts=%lu ===\n",
                         static_cast<unsigned long>(msg.correlationId()),
@@ -90,8 +99,7 @@ int main() {
             std::fflush(stdout);
         });
 
-    std::printf("balance_peek subscribed to %s:%d — waiting for snapshots\n",
-                channel.c_str(), kStreamId);
+    std::printf("balance_peek subscribed to %s:%d — waiting for snapshots\n", channel.c_str(), kStreamId);
 
     while (running) {
         if (sub.poll() == 0)

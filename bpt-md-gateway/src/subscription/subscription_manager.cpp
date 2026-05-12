@@ -3,9 +3,9 @@
 #include <messages/AckStatus.h>
 #include <messages/MessageHeader.h>
 
+#include <bpt_common/logging.h>
 #include <cstring>
 #include <unordered_set>
-#include <bpt_common/logging.h>
 
 namespace bpt::md_gateway::subscription {
 
@@ -57,10 +57,10 @@ void SubscriptionManager::apply_requests(uint64_t correlation_id,
             adapter->subscribe(d.instrument_id, d.symbol, d.depth);
             active_[d.instrument_id] = {d.instrument_id, d.exchange, d.symbol, d.depth};
             bpt::common::log::info("SubscriptionManager: subscribed {} ({}) on {} depth={}",
-                           d.instrument_id,
-                           d.symbol,
-                           d.exchange,
-                           d.depth);
+                                   d.instrument_id,
+                                   d.symbol,
+                                   d.exchange,
+                                   d.depth);
         }
 
         ack_pub.publish_ack(correlation_id, d.instrument_id, d.exchange.c_str(), AckStatus::OK);
@@ -73,7 +73,8 @@ void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, mess
     // full name to match the adapter registry. Remove once SBE schema is
     // widened / migrated to ExchangeId enum.
     auto canonicalize = [](std::string s) {
-        if (s == "HYPERLIQ") return std::string("HYPERLIQUID");
+        if (s == "HYPERLIQ")
+            return std::string("HYPERLIQUID");
         return s;
     };
 

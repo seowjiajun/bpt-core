@@ -5,9 +5,9 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
-#include <stdexcept>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <stdexcept>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
@@ -18,7 +18,9 @@ namespace ssl = net::ssl;
 using tcp = net::ip::tcp;
 
 HyperliquidHttpsClient::HyperliquidHttpsClient(std::string host, std::string port, bool use_tls)
-    : host_(std::move(host)), port_(std::move(port)), use_tls_(use_tls) {}
+    : host_(std::move(host)),
+      port_(std::move(port)),
+      use_tls_(use_tls) {}
 
 void HyperliquidHttpsClient::connect() {
     tcp::resolver resolver(ioc_);
@@ -84,7 +86,8 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
             const uint64_t t0 = bpt::common::util::TscClock::now_epoch_ns();
 
             const bool needed_connect = !stream_ && !plain_stream_;
-            if (needed_connect) connect();
+            if (needed_connect)
+                connect();
             const uint64_t t_conn = bpt::common::util::TscClock::now_epoch_ns();
 
             beast::flat_buffer buf;
@@ -99,28 +102,30 @@ std::string HyperliquidHttpsClient::post(const std::string& path, const std::str
             const uint64_t t_write = t_conn;  // detail timing not split per-stream
             const uint64_t t_read = bpt::common::util::TscClock::now_epoch_ns();
 
-            if (!res.keep_alive()) close();
+            if (!res.keep_alive())
+                close();
 
             // Per-request timing at DEBUG — enable to trace latency regressions.
             // `server+read` dominates on HL because each /exchange call waits
             // for block inclusion on HL's L1 (~500 ms blocks). TLS pooling
             // eliminates connect cost but HL's commit latency is upstream of
             // us. `/info` queries don't hit the chain so they're always fast.
-            bpt::common::log::debug("HyperliquidHttpsClient: post {} "
-                            "total={:.1f}ms connect={:.1f}ms write={:.2f}ms server+read={:.1f}ms reused={}",
-                            path,
-                            (t_read - t0) / 1e6,
-                            (t_conn - t0) / 1e6,
-                            (t_write - t_conn) / 1e6,
-                            (t_read - t_write) / 1e6,
-                            !needed_connect);
+            bpt::common::log::debug(
+                "HyperliquidHttpsClient: post {} "
+                "total={:.1f}ms connect={:.1f}ms write={:.2f}ms server+read={:.1f}ms reused={}",
+                path,
+                (t_read - t0) / 1e6,
+                (t_conn - t0) / 1e6,
+                (t_write - t_conn) / 1e6,
+                (t_read - t_write) / 1e6,
+                !needed_connect);
 
             return res.body();
         } catch (const std::exception& e) {
-            bpt::common::log::warn("HyperliquidHttpsClient: post attempt {} failed: {}",
-                           attempt, e.what());
+            bpt::common::log::warn("HyperliquidHttpsClient: post attempt {} failed: {}", attempt, e.what());
             close();
-            if (attempt == 1) throw;
+            if (attempt == 1)
+                throw;
         }
     }
 

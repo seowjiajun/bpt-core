@@ -1,21 +1,22 @@
 #pragma once
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <map>
 #include <string>
 #include <vector>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/aeron/stream_config.h>
 
 namespace bpt::refdata::config {
 
 // Per-exchange REST + WebSocket endpoint configuration.
 // Mirrors the pattern used by MdGateway and OrderGateway adapters.
 struct AdapterConfig {
-    std::string exchange;     // BINANCE | OKX | HYPERLIQUID
-    std::string secret_name;  // systemd-creds name (slashes normalized to '-'); e.g. "bpt/testnet/OKX" → bpt-testnet-OKX
-    bool enabled{true};       // false = adapter is declared but not initialised at startup
-    bool simulated{false};    // OKX demo trading — injects x-simulated-trading: 1
+    std::string exchange;  // BINANCE | OKX | HYPERLIQUID
+    std::string
+        secret_name;        // systemd-creds name (slashes normalized to '-'); e.g. "bpt/testnet/OKX" → bpt-testnet-OKX
+    bool enabled{true};     // false = adapter is declared but not initialised at startup
+    bool simulated{false};  // OKX demo trading — injects x-simulated-trading: 1
     std::string rest_host;
     std::string rest_port{"443"};
     std::string ws_host;

@@ -14,22 +14,20 @@ std::string build_subscribe_rpc(uint64_t rpc_id, const std::string& symbol, uint
     // For options, ticker also carries Greeks / IV; for futures, basis info.
     // TODO: for full options-surface capture, switch to markprice.options.{currency}
     // (currency-multiplexed) once we run an options strategy that needs it.
-    return fmt::format(
-        R"({{"jsonrpc":"2.0","id":{},"method":"public/subscribe","params":{{"channels":[)"
-        R"("trades.{}.100ms",)"
-        R"("ticker.{}.100ms",)"
-        R"("{}"]}}}})",
-        rpc_id,
-        symbol,
-        symbol,
-        book_channel);
+    return fmt::format(R"({{"jsonrpc":"2.0","id":{},"method":"public/subscribe","params":{{"channels":[)"
+                       R"("trades.{}.100ms",)"
+                       R"("ticker.{}.100ms",)"
+                       R"("{}"]}}}})",
+                       rpc_id,
+                       symbol,
+                       symbol,
+                       book_channel);
 }
 
 std::string build_set_heartbeat_rpc(uint64_t rpc_id, int interval_s) {
-    return fmt::format(
-        R"({{"jsonrpc":"2.0","id":{},"method":"public/set_heartbeat","params":{{"interval":{}}}}})",
-        rpc_id,
-        interval_s);
+    return fmt::format(R"({{"jsonrpc":"2.0","id":{},"method":"public/set_heartbeat","params":{{"interval":{}}}}})",
+                       rpc_id,
+                       interval_s);
 }
 
 std::string build_test_response_rpc(uint64_t rpc_id) {

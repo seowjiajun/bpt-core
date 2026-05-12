@@ -11,16 +11,20 @@ constexpr double kScale = 1e8;
 
 const char* type_str(bpt::messages::OrderType::Value t) {
     using OT = bpt::messages::OrderType;
-    if (t == OT::MARKET) return "market";
+    if (t == OT::MARKET)
+        return "market";
     return "limit";
 }
 
 const char* tif_str(bpt::messages::TimeInForce::Value tif) {
     using TIF = bpt::messages::TimeInForce;
     switch (tif) {
-        case TIF::IOC: return "immediate_or_cancel";
-        case TIF::FOK: return "fill_or_kill";
-        default:       return "good_til_cancelled";
+        case TIF::IOC:
+            return "immediate_or_cancel";
+        case TIF::FOK:
+            return "fill_or_kill";
+        default:
+            return "good_til_cancelled";
     }
 }
 
@@ -34,9 +38,7 @@ std::string serialise_rpc(std::string_view method, json::object params, uint64_t
 }
 }  // namespace
 
-std::string build_auth_msg(std::string_view client_id,
-                            std::string_view client_secret,
-                            uint64_t req_id) {
+std::string build_auth_msg(std::string_view client_id, std::string_view client_secret, uint64_t req_id) {
     json::object params;
     params["grant_type"] = "client_credentials";
     params["client_id"] = std::string(client_id);
@@ -71,9 +73,9 @@ std::string build_cancel_msg(std::string_view exchange_order_id, uint64_t req_id
 }
 
 std::string build_edit_msg(std::string_view exchange_order_id,
-                            int64_t new_price_e8,
-                            uint64_t new_quantity_e8,
-                            uint64_t req_id) {
+                           int64_t new_price_e8,
+                           uint64_t new_quantity_e8,
+                           uint64_t req_id) {
     json::object params;
     params["order_id"] = std::string(exchange_order_id);
     params["amount"] = static_cast<double>(new_quantity_e8) / kScale;
@@ -85,9 +87,7 @@ std::string build_test_response(uint64_t req_id) {
     return serialise_rpc("public/test", json::object{}, req_id);
 }
 
-std::string build_simple_rpc(std::string_view method,
-                              const std::string& params_json,
-                              uint64_t req_id) {
+std::string build_simple_rpc(std::string_view method, const std::string& params_json, uint64_t req_id) {
     json::object params;
     if (!params_json.empty()) {
         auto parsed = json::parse(params_json);

@@ -36,10 +36,10 @@ void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "fee_schedule");
 
     bpt::common::log::debug("FeeSchedule published exchange={} instrument_id={} maker={}bps taker={}bps",
-                    ExchangeId::c_str(fs.exchange_id),
-                    fs.instrument_id,
-                    fs.maker_fee_bps,
-                    fs.taker_fee_bps);
+                            ExchangeId::c_str(fs.exchange_id),
+                            fs.instrument_id,
+                            fs.maker_fee_bps,
+                            fs.taker_fee_bps);
 }
 
 }  // namespace bpt::refdata::messaging

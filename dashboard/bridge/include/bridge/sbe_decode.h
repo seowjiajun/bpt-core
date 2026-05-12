@@ -12,9 +12,9 @@
 /// strategy/aeron_order_gateway_client.cpp, vol_surface_client.cpp, and
 /// backtest_client.cpp. Lift to bpt-common/aeron/ if we sweep those too.
 
-#include <messages/MessageHeader.h>
-
 #include <Aeron.h>
+
+#include <messages/MessageHeader.h>
 
 #include <utility>
 
@@ -34,8 +34,10 @@ inline void decode_sbe_fragment(::aeron::AtomicBuffer& buffer,
     if (hdr.templateId() != SbeMessage::sbeTemplateId())
         return;
     SbeMessage msg;
-    msg.wrapForDecode(data, MessageHeader::encodedLength(),
-                      hdr.blockLength(), hdr.version(),
+    msg.wrapForDecode(data,
+                      MessageHeader::encodedLength(),
+                      hdr.blockLength(),
+                      hdr.version(),
                       static_cast<uint64_t>(length));
     std::forward<F>(on_message)(msg);
 }

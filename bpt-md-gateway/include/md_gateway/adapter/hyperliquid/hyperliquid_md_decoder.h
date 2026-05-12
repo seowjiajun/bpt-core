@@ -11,13 +11,13 @@
 #include <messages/ExchangeId.h>
 #include <messages/TradeSide.h>
 
-#include <cmath>
-#include <cstdint>
-#include <string_view>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/latency_histogram.h>
 #include <bpt_common/util/parse_double.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cmath>
+#include <cstdint>
+#include <string_view>
 
 namespace bpt::md_gateway::adapter {
 
@@ -34,10 +34,7 @@ class HyperliquidMdDecoder : public JsonDecoderBase {
 public:
     explicit HyperliquidMdDecoder(const SubscriptionMap& subs) : subs_(subs) {}
 
-    void decode(std::string_view payload,
-                uint64_t recv_ns,
-                Pub& pub,
-                messaging::FundingRateCallback& on_funding_rate) {
+    void decode(std::string_view payload, uint64_t recv_ns, Pub& pub, messaging::FundingRateCallback& on_funding_rate) {
         const uint64_t parse_start_ns = bpt::common::util::TscClock::now_mono_ns();
         pad(payload);
 
@@ -82,8 +79,7 @@ public:
             // and OFI features. HL's `l2Book` payload ships up to 20 levels
             // per side; cap at min(subscribed_depth, kMaxBookLevels).
             const uint8_t sub_depth = subs_.find_depth(instrument_id);
-            const std::size_t depth_cap = std::min<std::size_t>(
-                sub_depth > 0 ? sub_depth : 0, md::kMaxBookLevels);
+            const std::size_t depth_cap = std::min<std::size_t>(sub_depth > 0 ? sub_depth : 0, md::kMaxBookLevels);
 
             md::MdOrderBook out_book;
             out_book.timestamp_ns = recv_ns;
@@ -144,7 +140,7 @@ public:
             if (depth_cap > 0 && (!out_book.bids.empty() || !out_book.asks.empty()))
                 pub.publish(out_book);
 
-        // --- Trades ---
+            // --- Trades ---
         } else if (channel == "trades") {
             simdjson::ondemand::array trades;
             if (data_val.get_array().get(trades))
@@ -175,7 +171,7 @@ public:
                 pub.publish(trade);
             }
 
-        // --- Funding rate ---
+            // --- Funding rate ---
         } else if (channel == "activeAssetCtx") {
             if (!on_funding_rate)
                 return;

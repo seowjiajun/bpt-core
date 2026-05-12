@@ -10,14 +10,14 @@
 #include <messages/ExchangeRegistry.h>
 #include <messages/RefDataErrorType.h>
 
+#include <bpt_common/signal.h>
+#include <bpt_common/util/tsc_clock.h>
 #include <chrono>
 #include <future>
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include <bpt_common/signal.h>
-#include <bpt_common/util/tsc_clock.h>
 
 using namespace std::chrono_literals;
 
@@ -43,12 +43,12 @@ uint8_t exchange_id_to_bit(bpt::messages::ExchangeId::Value id) {
 }  // namespace
 
 RefdataApp::RefdataApp(config::Settings settings,
-                     std::unique_ptr<port::IRefdataControlSource> control_source,
-                     std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
-                     std::shared_ptr<port::IRefdataDeltaSink> delta_sink,
-                     std::shared_ptr<port::IFeeScheduleSink> fee_sink,
-                     std::shared_ptr<port::IRefdataStatusSink> status_sink,
-                     std::map<std::string, adapter::ExchangeCredentials> creds)
+                       std::unique_ptr<port::IRefdataControlSource> control_source,
+                       std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
+                       std::shared_ptr<port::IRefdataDeltaSink> delta_sink,
+                       std::shared_ptr<port::IFeeScheduleSink> fee_sink,
+                       std::shared_ptr<port::IRefdataStatusSink> status_sink,
+                       std::map<std::string, adapter::ExchangeCredentials> creds)
     : settings_(std::move(settings)),
       metrics_(settings_.base.metrics_port),
       instrument_mapping_(std::make_shared<mapping::InstrumentMappingLoader>()),
@@ -96,38 +96,45 @@ RefdataApp::RefdataApp(config::Settings settings,
         // never published, with no obvious cause beyond the log line).
         const auto exch_id = bpt::messages::ExchangeRegistry::from_name(cfg.exchange);
         if (!exch_id) {
-            throw std::runtime_error(fmt::format(
-                "Unknown exchange '{}' in refdata config — not in messages/exchanges.yaml",
-                cfg.exchange));
+            throw std::runtime_error(
+                fmt::format("Unknown exchange '{}' in refdata config — not in messages/exchanges.yaml", cfg.exchange));
         }
 
         std::unique_ptr<adapter::IExchangeRefDataAdapter> adapter;
         switch (*exch_id) {
             case bpt::messages::ExchangeId::BINANCE:
-                adapter = std::make_unique<adapter::BinanceRefDataAdapter>(
-                    cfg, exchange_creds, registry_, instrument_mapping_,
-                    make_client("api.binance.com"),
-                    make_client("fapi.binance.com"));
+                adapter = std::make_unique<adapter::BinanceRefDataAdapter>(cfg,
+                                                                           exchange_creds,
+                                                                           registry_,
+                                                                           instrument_mapping_,
+                                                                           make_client("api.binance.com"),
+                                                                           make_client("fapi.binance.com"));
                 break;
             case bpt::messages::ExchangeId::OKX:
-                adapter = std::make_unique<adapter::OKXRefDataAdapter>(
-                    cfg, exchange_creds, registry_, instrument_mapping_,
-                    make_client("www.okx.com"));
+                adapter = std::make_unique<adapter::OKXRefDataAdapter>(cfg,
+                                                                       exchange_creds,
+                                                                       registry_,
+                                                                       instrument_mapping_,
+                                                                       make_client("www.okx.com"));
                 break;
             case bpt::messages::ExchangeId::HYPERLIQUID:
-                adapter = std::make_unique<adapter::HyperliquidRefDataAdapter>(
-                    cfg, exchange_creds, registry_, instrument_mapping_,
-                    make_client("api.hyperliquid.xyz"));
+                adapter = std::make_unique<adapter::HyperliquidRefDataAdapter>(cfg,
+                                                                               exchange_creds,
+                                                                               registry_,
+                                                                               instrument_mapping_,
+                                                                               make_client("api.hyperliquid.xyz"));
                 break;
             case bpt::messages::ExchangeId::DERIBIT:
-                adapter = std::make_unique<adapter::DeribitRefDataAdapter>(
-                    cfg, exchange_creds, registry_, instrument_mapping_,
-                    make_client("test.deribit.com"));
+                adapter = std::make_unique<adapter::DeribitRefDataAdapter>(cfg,
+                                                                           exchange_creds,
+                                                                           registry_,
+                                                                           instrument_mapping_,
+                                                                           make_client("test.deribit.com"));
                 break;
             default:
-                throw std::runtime_error(fmt::format(
-                    "Exchange '{}' is in the registry but refdata has no adapter implementation for it",
-                    cfg.exchange));
+                throw std::runtime_error(
+                    fmt::format("Exchange '{}' is in the registry but refdata has no adapter implementation for it",
+                                cfg.exchange));
         }
 
         const std::string exch_name = adapter->exchange_name();
@@ -140,27 +147,21 @@ RefdataApp::RefdataApp(config::Settings settings,
                                               bpt::messages::DeltaUpdateType::Value update_type,
                                               uint64_t /*collected_ts_ns*/) {
             delta_pub_->publish_delta(update_type, inst);
-            metrics_.last_update_ns->Set(static_cast<double>(
-                bpt::common::util::WallClock::now_ns()));
+            metrics_.last_update_ns->Set(static_cast<double>(bpt::common::util::WallClock::now_ns()));
         };
 
         adapters_.push_back(std::move(adapter));
     }
 
-    bpt::common::log::info("Ready — listening on {} stream {}",
-                   settings_.control.channel,
-                   settings_.control.stream_id);
+    bpt::common::log::info("Ready — listening on {} stream {}", settings_.control.channel, settings_.control.stream_id);
 }
 
 void RefdataApp::handle_request(const messaging::RefdataRequest& request) {
-    bpt::common::log::info("Request correlation_id={} filters={}",
-                   request.correlation_id,
-                   request.instruments.size());
+    bpt::common::log::info("Request correlation_id={} filters={}", request.correlation_id, request.instruments.size());
     sub_manager_.upsert(request);
     snapshot_pub_->publish(*registry_, request, delta_pub_->current_sequence());
     metrics_.requests_served_total->Increment();
-    metrics_.last_update_ns->Set(static_cast<double>(
-        bpt::common::util::WallClock::now_ns()));
+    metrics_.last_update_ns->Set(static_cast<double>(bpt::common::util::WallClock::now_ns()));
 }
 
 void RefdataApp::run() {
@@ -223,9 +224,8 @@ void RefdataApp::run() {
     auto last_mapping_refresh = std::chrono::steady_clock::now();
 
     while (bpt::common::signal::is_running()) {
-        int fragments = control_sub_->poll([this](const messaging::RefdataRequest& request) {
-            handle_request(request);
-        });
+        int fragments =
+            control_sub_->poll([this](const messaging::RefdataRequest& request) { handle_request(request); });
 
         auto now = std::chrono::steady_clock::now();
 
@@ -248,8 +248,7 @@ void RefdataApp::run() {
         if (now - last_snapshot_republish >= snapshot_republish_interval) {
             messaging::RefdataRequest empty_req{};
             snapshot_pub_->publish(*registry_, empty_req, delta_pub_->current_sequence());
-            metrics_.last_update_ns->Set(static_cast<double>(
-                bpt::common::util::WallClock::now_ns()));
+            metrics_.last_update_ns->Set(static_cast<double>(bpt::common::util::WallClock::now_ns()));
             bpt::common::log::info("Periodic snapshot republish: {} instruments", registry_->count());
             last_snapshot_republish = now;
         }
@@ -281,8 +280,8 @@ void RefdataApp::run() {
                     metrics_.listing_refresh(adapter->exchange_name()).Increment();
                 } catch (const std::exception& e) {
                     bpt::common::log::error("Instrument listing refresh failed for {}: {}",
-                                    adapter->exchange_name(),
-                                    e.what());
+                                            adapter->exchange_name(),
+                                            e.what());
                     status_pub_->publish_error(bpt::messages::RefDataErrorType::SNAPSHOT_FAILED,
                                                adapter->exchange_id());
                 }

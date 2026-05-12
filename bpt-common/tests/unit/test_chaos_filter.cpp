@@ -7,15 +7,13 @@
 // expected rate". Subscriber wiring is exercised by service-level
 // tests + live runs.
 
-#include <bpt_common/aeron/chaos_config.h>
-#include <bpt_common/aeron/chaos_filter.h>
-
-#include <gtest/gtest.h>
-
 #include <Aeron.h>
 
 #include <atomic>
+#include <bpt_common/aeron/chaos_config.h>
+#include <bpt_common/aeron/chaos_filter.h>
 #include <cstring>
+#include <gtest/gtest.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -44,10 +42,10 @@ protected:
 TEST_F(ChaosFilterTest, NoConfigIsIdentity) {
     // No set_global call → wrap returns the inner handler unchanged.
     std::atomic<int> calls{0};
-    FragmentHandler inner = [&calls](::aeron::AtomicBuffer&,
-                                     ::aeron::util::index_t,
-                                     ::aeron::util::index_t,
-                                     ::aeron::Header&) { calls.fetch_add(1); };
+    FragmentHandler inner =
+        [&calls](::aeron::AtomicBuffer&, ::aeron::util::index_t, ::aeron::util::index_t, ::aeron::Header&) {
+            calls.fetch_add(1);
+        };
 
     auto wrapped = ChaosRegistry::wrap(/*stream_id=*/1003, std::move(inner));
     EXPECT_EQ(0.0, ChaosRegistry::drop_prob_for_testing(1003));
@@ -68,10 +66,10 @@ TEST_F(ChaosFilterTest, FullDropEverythingDropped) {
     ChaosRegistry::set_global(cfg);
 
     std::atomic<int> calls{0};
-    FragmentHandler inner = [&calls](::aeron::AtomicBuffer&,
-                                     ::aeron::util::index_t,
-                                     ::aeron::util::index_t,
-                                     ::aeron::Header&) { calls.fetch_add(1); };
+    FragmentHandler inner =
+        [&calls](::aeron::AtomicBuffer&, ::aeron::util::index_t, ::aeron::util::index_t, ::aeron::Header&) {
+            calls.fetch_add(1);
+        };
     auto wrapped = ChaosRegistry::wrap(1003, std::move(inner));
 
     FakeFragment frag;
@@ -88,10 +86,10 @@ TEST_F(ChaosFilterTest, PartialDropMatchesExpectedRate) {
     ChaosRegistry::set_global(cfg);
 
     std::atomic<int> calls{0};
-    FragmentHandler inner = [&calls](::aeron::AtomicBuffer&,
-                                     ::aeron::util::index_t,
-                                     ::aeron::util::index_t,
-                                     ::aeron::Header&) { calls.fetch_add(1); };
+    FragmentHandler inner =
+        [&calls](::aeron::AtomicBuffer&, ::aeron::util::index_t, ::aeron::util::index_t, ::aeron::Header&) {
+            calls.fetch_add(1);
+        };
     auto wrapped = ChaosRegistry::wrap(1003, std::move(inner));
 
     FakeFragment frag;

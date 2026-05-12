@@ -8,12 +8,12 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <deque>
 #include <format>
 #include <future>
 #include <set>
 #include <string>
-#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;
@@ -73,8 +73,7 @@ std::string format_l2book(const data::OrderBookRecord& ob) {
     json::object data;
     data["coin"] = ob.symbol;
     data["time"] = static_cast<int64_t>(ob.timestamp_ns / 1'000'000);
-    data["levels"] = json::array{build_levels(ob.bid_px, ob.bid_sz),
-                                  build_levels(ob.ask_px, ob.ask_sz)};
+    data["levels"] = json::array{build_levels(ob.bid_px, ob.bid_sz), build_levels(ob.ask_px, ob.ask_sz)};
 
     json::object root;
     root["channel"] = "l2Book";
@@ -118,9 +117,7 @@ private:
     }
 
     void do_read() {
-        ws_.async_read(buf_, [self = shared_from_this()](beast::error_code ec, std::size_t) {
-            self->on_read(ec);
-        });
+        ws_.async_read(buf_, [self = shared_from_this()](beast::error_code ec, std::size_t) { self->on_read(ec); });
     }
 
     // HL subscribe wire format:
@@ -185,9 +182,7 @@ private:
         if (write_queue_.empty() || closed_)
             return;
         ws_.async_write(net::buffer(*write_queue_.front()),
-                        [self = shared_from_this()](beast::error_code ec, std::size_t) {
-                            self->on_write(ec);
-                        });
+                        [self = shared_from_this()](beast::error_code ec, std::size_t) { self->on_write(ec); });
     }
 
     void on_write(beast::error_code ec) {
@@ -238,8 +233,7 @@ void HyperliquidMdServer::do_accept() {
             bpt::common::log::info("[HyperliquidMdServer] New connection");
             auto session = std::make_shared<HyperliquidMdSession>(std::move(socket));
             sessions_.erase(
-                std::remove_if(sessions_.begin(), sessions_.end(),
-                               [](const auto& s) { return s->closed(); }),
+                std::remove_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return s->closed(); }),
                 sessions_.end());
             sessions_.push_back(session);
             session->run();
@@ -253,8 +247,7 @@ std::size_t HyperliquidMdServer::session_count() {
     std::promise<std::size_t> p;
     auto fut = p.get_future();
     net::post(ioc_, [this, &p]() {
-        auto count = std::count_if(sessions_.begin(), sessions_.end(),
-                                   [](const auto& s) { return !s->closed(); });
+        auto count = std::count_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return !s->closed(); });
         p.set_value(static_cast<std::size_t>(count));
     });
     return fut.get();
@@ -262,8 +255,7 @@ std::size_t HyperliquidMdServer::session_count() {
 
 void HyperliquidMdServer::push(const data::MarketEvent& event) {
     net::post(ioc_, [this, event]() {
-        sessions_.erase(std::remove_if(sessions_.begin(), sessions_.end(),
-                                       [](const auto& s) { return s->closed(); }),
+        sessions_.erase(std::remove_if(sessions_.begin(), sessions_.end(), [](const auto& s) { return s->closed(); }),
                         sessions_.end());
         if (sessions_.empty())
             return;
@@ -281,7 +273,9 @@ void HyperliquidMdServer::push(const data::MarketEvent& event) {
             static thread_local int t_count = 0;
             if (++t_count <= 3 || t_count % 1000 == 0)
                 bpt::common::log::info("[HyperliquidMdServer] push trade {} matched={}/{}",
-                                       t.symbol, matched, sessions_.size());
+                                       t.symbol,
+                                       matched,
+                                       sessions_.size());
         } else {
             const auto& ob = std::get<data::OrderBookRecord>(event.payload);
             auto msg = std::make_shared<std::string>(format_l2book(ob));
@@ -295,7 +289,9 @@ void HyperliquidMdServer::push(const data::MarketEvent& event) {
             static thread_local int b_count = 0;
             if (++b_count <= 3 || b_count % 1000 == 0)
                 bpt::common::log::info("[HyperliquidMdServer] push l2Book {} matched={}/{}",
-                                       ob.symbol, matched, sessions_.size());
+                                       ob.symbol,
+                                       matched,
+                                       sessions_.size());
         }
     });
 }

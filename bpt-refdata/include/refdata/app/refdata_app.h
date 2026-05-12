@@ -14,25 +14,25 @@
 #include "refdata/port/i_refdata_status_sink.h"
 #include "refdata/registry/instrument_registry.h"
 
+#include <bpt_app/app.h>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
-#include <bpt_app/app.h>
 
 namespace bpt::refdata {
 
 class RefdataApp : public bpt::app::IService {
 public:
     RefdataApp(config::Settings settings,
-              std::unique_ptr<port::IRefdataControlSource> control_source,
-              std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
-              std::shared_ptr<port::IRefdataDeltaSink> delta_sink,
-              std::shared_ptr<port::IFeeScheduleSink> fee_sink,
-              std::shared_ptr<port::IRefdataStatusSink> status_sink,
-              std::map<std::string, adapter::ExchangeCredentials> creds);
+               std::unique_ptr<port::IRefdataControlSource> control_source,
+               std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
+               std::shared_ptr<port::IRefdataDeltaSink> delta_sink,
+               std::shared_ptr<port::IFeeScheduleSink> fee_sink,
+               std::shared_ptr<port::IRefdataStatusSink> status_sink,
+               std::map<std::string, adapter::ExchangeCredentials> creds);
     void run() override;
     void stop() override;
 

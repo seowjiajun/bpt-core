@@ -16,12 +16,10 @@
 #include <messages/OrderType.h>
 #include <messages/RejectReason.h>
 
-#include <string>
-
+#include <bpt_common/util/topology.h>
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <bpt_common/util/topology.h>
 
 namespace bpt::order_gateway::adapter {
 

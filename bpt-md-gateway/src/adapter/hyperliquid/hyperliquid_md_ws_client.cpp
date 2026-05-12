@@ -3,7 +3,6 @@
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_encoder.h"
 
 #include <bpt_common/logging.h>
-
 #include <chrono>
 
 namespace bpt::md_gateway::adapter {

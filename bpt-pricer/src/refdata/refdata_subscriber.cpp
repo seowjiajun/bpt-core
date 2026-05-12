@@ -9,15 +9,14 @@
 #include <messages/RefDataSnapshot.h>
 #include <messages/RefDataSubscriptionRequest.h>
 
-#include <x86intrin.h>
 #include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
-
 #include <chrono>
 #include <cstring>
 #include <string>
 #include <thread>
-#include <bpt_common/logging.h>
+#include <x86intrin.h>
 
 namespace bpt::pricer::refdata {
 
@@ -50,17 +49,21 @@ RefdataSubscriber::RefdataSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                      const std::string& control_channel,
                                      int32_t control_stream_id) {
     snapshot_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, snapshot_channel, snapshot_stream_id,
-        [this](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset,
-               ::aeron::util::index_t length, ::aeron::Header& hdr) {
-            on_snapshot_fragment(buf, offset, length, hdr);
-        });
+        aeron,
+        snapshot_channel,
+        snapshot_stream_id,
+        [this](::aeron::AtomicBuffer& buf,
+               ::aeron::util::index_t offset,
+               ::aeron::util::index_t length,
+               ::aeron::Header& hdr) { on_snapshot_fragment(buf, offset, length, hdr); });
     delta_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, delta_channel, delta_stream_id,
-        [this](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset,
-               ::aeron::util::index_t length, ::aeron::Header& hdr) {
-            on_delta_fragment(buf, offset, length, hdr);
-        });
+        aeron,
+        delta_channel,
+        delta_stream_id,
+        [this](::aeron::AtomicBuffer& buf,
+               ::aeron::util::index_t offset,
+               ::aeron::util::index_t length,
+               ::aeron::Header& hdr) { on_delta_fragment(buf, offset, length, hdr); });
     if (control_stream_id != 0)
         ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, control_channel, control_stream_id);
 
@@ -100,7 +103,8 @@ void RefdataSubscriber::send_subscription_request(uint64_t correlation_id) {
     long result = 0;
     while ((result = ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size))) < 0) {
         if (std::chrono::steady_clock::now() > deadline) {
-            bpt::common::log::error("[RefdataSubscriber] subscription request offer timed out (last result={})", result);
+            bpt::common::log::error("[RefdataSubscriber] subscription request offer timed out (last result={})",
+                                    result);
             return;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -111,8 +115,10 @@ void RefdataSubscriber::send_subscription_request(uint64_t correlation_id) {
 
 int RefdataSubscriber::poll(int fragment_limit) {
     int total = 0;
-    if (snapshot_sub_) total += snapshot_sub_->poll(fragment_limit);
-    if (delta_sub_)    total += delta_sub_->poll(fragment_limit);
+    if (snapshot_sub_)
+        total += snapshot_sub_->poll(fragment_limit);
+    if (delta_sub_)
+        total += delta_sub_->poll(fragment_limit);
     return total;
 }
 
@@ -157,9 +163,9 @@ void RefdataSubscriber::on_snapshot_fragment(::aeron::AtomicBuffer& buffer,
                 .exchange_id = exchange_from_string(exchange_str),
             };
             bpt::common::log::info("[RefdataSubscriber] Perp instrument: {} id={} exchange={}",
-                           underlying_str,
-                           instruments.instrumentId(),
-                           exchange_str);
+                                   underlying_str,
+                                   instruments.instrumentId(),
+                                   exchange_str);
             if (on_perp_)
                 on_perp_(pi);
             continue;
@@ -167,8 +173,8 @@ void RefdataSubscriber::on_snapshot_fragment(::aeron::AtomicBuffer& buffer,
 
         if (instruments.instrumentType() != InstrumentType::OPTION) {
             bpt::common::log::info("[RefdataSubscriber] Skipping instrument type={} id={}",
-                           static_cast<int>(instruments.instrumentType()),
-                           instruments.instrumentId());
+                                   static_cast<int>(instruments.instrumentType()),
+                                   instruments.instrumentId());
             continue;
         }
         ++option_count;

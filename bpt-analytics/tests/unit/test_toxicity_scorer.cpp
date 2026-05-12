@@ -123,7 +123,7 @@ TEST(ToxicityScorerTest, WindowEvictsBySize) {
     scorer.add(make_obs(+1, -10.0, 1 * SEC));  // will be evicted
     scorer.add(make_obs(+1, 2.0, 2 * SEC));
     scorer.add(make_obs(+1, 2.0, 3 * SEC));
-    scorer.add(make_obs(+1, 2.0, 4 * SEC));    // evicts the -10
+    scorer.add(make_obs(+1, 2.0, 4 * SEC));  // evicts the -10
 
     auto update = scorer.compute(INST, 100 * SEC);
     // Should only reflect the last 3: all +2.0
@@ -138,10 +138,10 @@ TEST(ToxicityScorerTest, WindowEvictsBySize) {
 TEST(ToxicityScorerTest, WindowEvictsByDuration) {
     ToxicityScorer scorer({.window_size = 100, .window_duration_ns = 10 * SEC, .min_samples = 1});
 
-    scorer.add(make_obs(+1, -10.0, 1 * SEC));   // will expire (12 - 1 > 10)
+    scorer.add(make_obs(+1, -10.0, 1 * SEC));  // will expire (12 - 1 > 10)
     scorer.add(make_obs(+1, 2.0, 9 * SEC));
     scorer.add(make_obs(+1, 2.0, 10 * SEC));
-    scorer.add(make_obs(+1, 2.0, 12 * SEC));    // triggers eviction of t=1
+    scorer.add(make_obs(+1, 2.0, 12 * SEC));  // triggers eviction of t=1
 
     auto update = scorer.compute(INST, 100 * SEC);
     EXPECT_NEAR(update.bid_markout_5s_bps, 2.0, 0.01);

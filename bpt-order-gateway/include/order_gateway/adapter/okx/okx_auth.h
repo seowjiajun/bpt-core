@@ -28,8 +28,8 @@ namespace bpt::order_gateway::adapter::okx {
 ///
 /// Uses std::chrono::system_clock for the timestamp so the sig is fresh each call.
 [[nodiscard]] std::string build_login_msg(std::string_view api_key,
-                                           std::string_view secret_key,
-                                           std::string_view passphrase);
+                                          std::string_view secret_key,
+                                          std::string_view passphrase);
 
 /// \brief Attach OK-ACCESS-{KEY,SIGN,TIMESTAMP,PASSPHRASE} headers + user-agent + host
 ///        to a beast GET request already constructed with the target path.

@@ -35,9 +35,9 @@ void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
     publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(kBufSize));
 
     bpt::common::log::debug("FundingRate published exchange={} instrument_id={} rate={}bps",
-                    ExchangeId::c_str(fr.exchange_id),
-                    fr.instrument_id,
-                    fr.rate_bps);
+                            ExchangeId::c_str(fr.exchange_id),
+                            fr.instrument_id,
+                            fr.rate_bps);
 }
 
 }  // namespace bpt::md_gateway::messaging

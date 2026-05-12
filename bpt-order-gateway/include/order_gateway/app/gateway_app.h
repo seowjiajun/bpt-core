@@ -13,12 +13,12 @@
 #include "order_gateway/risk/pnl_tracker.h"
 #include "order_gateway/risk/risk_checker.h"
 
+#include <bpt_app/app.h>
+#include <bpt_common/util/topology.h>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include <bpt_app/app.h>
-#include <bpt_common/util/topology.h>
 
 namespace bpt::order_gateway {
 

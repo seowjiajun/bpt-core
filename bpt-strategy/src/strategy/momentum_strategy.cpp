@@ -7,7 +7,6 @@
 #include <messages/TimeInForce.h>
 
 #include <bpt_common/logging.h>
-
 #include <cmath>
 #include <string>
 #include <vector>
@@ -43,18 +42,20 @@ MomentumStrategy::MomentumStrategy(uint64_t correlation_id,
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
-    bpt::common::log::info(kLog(), "lookback={} entry_threshold={:.4f} cooldown_ms={}",
-                   lookback_,
-                   entry_threshold_,
-                   cooldown_ns_ / 1'000'000ULL);
     bpt::common::log::info(kLog(),
-        "risk: max_position_usd={} max_order_size_usd={} max_open_orders={}",
-        cfg.risk.max_position_usd,
-        cfg.risk.max_order_size_usd,
-        cfg.risk.max_open_orders);
-    bpt::common::log::info(kLog(), "schedule: require_refdata_ready={} md_staleness_threshold_ms={}",
-                   cfg.schedule.require_refdata_ready,
-                   cfg.schedule.md_staleness_threshold_ms);
+                           "lookback={} entry_threshold={:.4f} cooldown_ms={}",
+                           lookback_,
+                           entry_threshold_,
+                           cooldown_ns_ / 1'000'000ULL);
+    bpt::common::log::info(kLog(),
+                           "risk: max_position_usd={} max_order_size_usd={} max_open_orders={}",
+                           cfg.risk.max_position_usd,
+                           cfg.risk.max_order_size_usd,
+                           cfg.risk.max_open_orders);
+    bpt::common::log::info(kLog(),
+                           "schedule: require_refdata_ready={} md_staleness_threshold_ms={}",
+                           cfg.schedule.require_refdata_ready,
+                           cfg.schedule.md_staleness_threshold_ms);
 
     if (instruments_.empty()) {
         bpt::common::log::info(kLog(), "instruments: ALL (no canonical filter)");
@@ -138,8 +139,7 @@ void MomentumStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
     md_client_->subscribe(correlation_id_, subs);
 }
 
-void MomentumStrategy::on_delta(const refdata::Instrument& inst,
-                                bpt::messages::DeltaUpdateType::Value update_type) {
+void MomentumStrategy::on_delta(const refdata::Instrument& inst, bpt::messages::DeltaUpdateType::Value update_type) {
     if (update_type == bpt::messages::DeltaUpdateType::ADD) {
         // Re-run resolver for the single new instrument against our universe.
         const auto ids = CanonicalResolver::resolve(refdata_.cache(), instruments_, md_exchanges_);
@@ -210,12 +210,13 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
     const auto tif = (vex.tif == "IOC") ? TimeInForce::IOC : (vex.tif == "FOK") ? TimeInForce::FOK : TimeInForce::GTC;
 
     if (!order_mgr_) {
-        bpt::common::log::info(kLog(), "SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}% (no gateway)",
-                       (side == OrderSide::BUY ? "BUY" : "SELL"),
-                       state.symbol,
-                       state.exchange,
-                       current_mid,
-                       momentum * 100.0);
+        bpt::common::log::info(kLog(),
+                               "SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}% (no gateway)",
+                               (side == OrderSide::BUY ? "BUY" : "SELL"),
+                               state.symbol,
+                               state.exchange,
+                               current_mid,
+                               momentum * 100.0);
         return;
     }
 
@@ -227,12 +228,13 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
     // Quantity: 0.001 base currency in natural units (small size for testnet).
     static constexpr double kQty = 0.001;
 
-    bpt::common::log::info(kLog(), "SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}%",
-                   (side == OrderSide::BUY ? "BUY" : "SELL"),
-                   state.symbol,
-                   state.exchange,
-                   current_mid,
-                   momentum * 100.0);
+    bpt::common::log::info(kLog(),
+                           "SIGNAL {} {} @ {} mid={:.6f} momentum={:+.4f}%",
+                           (side == OrderSide::BUY ? "BUY" : "SELL"),
+                           state.symbol,
+                           state.exchange,
+                           current_mid,
+                           momentum * 100.0);
 
     const uint64_t order_id =
         order_mgr_->place_order(instrument_id, state.exchange_id, side, order_type, tif, price_f, kQty);

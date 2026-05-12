@@ -41,9 +41,7 @@ public:
 
     bool isReady() const override { return ready_.load(std::memory_order_acquire); }
     const char* exchange_name() const override { return "HYPERLIQUID"; }
-    bpt::messages::ExchangeId::Value exchange_id() const override {
-        return bpt::messages::ExchangeId::HYPERLIQUID;
-    }
+    bpt::messages::ExchangeId::Value exchange_id() const override { return bpt::messages::ExchangeId::HYPERLIQUID; }
 
 private:
     config::AdapterConfig cfg_;

@@ -3,8 +3,8 @@
 #include <messages/MessageHeader.h>
 #include <messages/RefDataSubscriptionRequest.h>
 
-#include <cstring>
 #include <bpt_common/logging.h>
+#include <cstring>
 
 namespace bpt::refdata::messaging {
 
@@ -12,9 +12,13 @@ RefdataControlSubscriber::RefdataControlSubscriber(std::shared_ptr<::aeron::Aero
                                                    const std::string& channel,
                                                    int stream_id) {
     subscription_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        std::move(aeron), channel, stream_id,
-        [this](::aeron::AtomicBuffer& ab, ::aeron::util::index_t offset,
-               ::aeron::util::index_t length, ::aeron::Header&) {
+        std::move(aeron),
+        channel,
+        stream_id,
+        [this](::aeron::AtomicBuffer& ab,
+               ::aeron::util::index_t offset,
+               ::aeron::util::index_t length,
+               ::aeron::Header&) {
             using namespace bpt::messages;
 
             if (static_cast<std::size_t>(length) <

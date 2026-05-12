@@ -1,10 +1,10 @@
 #include "refdata/adapter/okx/okx_refdata_auth.h"
 
+#include <bpt_common/util/openssl_helpers.h>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
-#include <bpt_common/util/openssl_helpers.h>
 
 namespace bpt::refdata::adapter {
 

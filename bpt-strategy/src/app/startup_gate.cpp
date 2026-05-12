@@ -35,7 +35,8 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
             funding_rates_loaded);
     } else {
         bpt::common::log::debug("RefDataReady (periodic): exchanges=0x{:02x} instruments={}",
-                        exchanges_loaded, instrument_count);
+                                exchanges_loaded,
+                                instrument_count);
     }
 
     // Refuse to trade with partial refdata. This guard runs every time
@@ -51,26 +52,40 @@ void StartupGate::on_refdata_ready(uint8_t exchanges_loaded,
     }
 
     refdata_ready_ = true;
-    if (exchanges_loaded & 0x01) metrics_.refdata_ready("BINANCE").Set(1.0);
-    if (exchanges_loaded & 0x02) metrics_.refdata_ready("OKX").Set(1.0);
-    if (exchanges_loaded & 0x04) metrics_.refdata_ready("HYPERLIQUID").Set(1.0);
-    if (exchanges_loaded & 0x08) metrics_.refdata_ready("DERIBIT").Set(1.0);
+    if (exchanges_loaded & 0x01)
+        metrics_.refdata_ready("BINANCE").Set(1.0);
+    if (exchanges_loaded & 0x02)
+        metrics_.refdata_ready("OKX").Set(1.0);
+    if (exchanges_loaded & 0x04)
+        metrics_.refdata_ready("HYPERLIQUID").Set(1.0);
+    if (exchanges_loaded & 0x08)
+        metrics_.refdata_ready("DERIBIT").Set(1.0);
 }
 
 void StartupGate::on_account_snapshot(ExchangeId::Value exchange) {
     uint8_t bit = 0;
     switch (exchange) {
-        case ExchangeId::BINANCE:     bit = 0x01; break;
-        case ExchangeId::OKX:         bit = 0x02; break;
-        case ExchangeId::HYPERLIQUID: bit = 0x04; break;
-        case ExchangeId::DERIBIT:     bit = 0x08; break;
-        default: break;
+        case ExchangeId::BINANCE:
+            bit = 0x01;
+            break;
+        case ExchangeId::OKX:
+            bit = 0x02;
+            break;
+        case ExchangeId::HYPERLIQUID:
+            bit = 0x04;
+            break;
+        case ExchangeId::DERIBIT:
+            bit = 0x08;
+            break;
+        default:
+            break;
     }
     accounts_ready_mask_ |= bit;
 }
 
 void StartupGate::on_refdata_snapshot_complete() {
-    if (phase_ != Phase::WaitMdSnapshot) return;
+    if (phase_ != Phase::WaitMdSnapshot)
+        return;
 
     bpt::common::log::info("Snapshot received — starting strategy MD subscriptions");
     strategy_.start();
@@ -79,7 +94,8 @@ void StartupGate::on_refdata_snapshot_complete() {
 }
 
 void StartupGate::send_account_snapshot_requests() {
-    if (!order_gw_) return;
+    if (!order_gw_)
+        return;
 
     uint64_t corr = correlation_id_;
     if (configured_mask_ & 0x01) {
@@ -114,9 +130,9 @@ void StartupGate::tick() {
 
         case Phase::WaitAccountSnapshots: {
             // If running without an order gateway, there are no accounts to wait for.
-            const bool accounts_ready =
-                !order_gw_ || (accounts_ready_mask_ & configured_mask_) == configured_mask_;
-            if (!accounts_ready) break;
+            const bool accounts_ready = !order_gw_ || (accounts_ready_mask_ & configured_mask_) == configured_mask_;
+            if (!accounts_ready)
+                break;
 
             if (!md_subscribe_sent_) {
                 bpt::common::log::info("RefDataReady + AccountSnapshot received — sending RefDataSubscriptionRequest");

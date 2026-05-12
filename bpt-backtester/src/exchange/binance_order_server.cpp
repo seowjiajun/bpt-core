@@ -7,12 +7,12 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <deque>
 #include <format>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -44,9 +44,9 @@ static std::string format_execution_report(const matching::FillReport& fill, uin
     namespace json = boost::json;
     std::string side = (fill.side == matching::OrderSide::BUY) ? "BUY" : "SELL";
     std::string status = fill.is_fully_filled ? "FILLED" : (fill.cumulative_fill_qty > 0 ? "PARTIALLY_FILLED" : "NEW");
-    std::string type = (fill.order_type == matching::OrderType::MARKET)    ? "MARKET"
-                     : (fill.order_type == matching::OrderType::POST_ONLY) ? "LIMIT_MAKER"
-                                                                            : "LIMIT";
+    std::string type = (fill.order_type == matching::OrderType::MARKET)      ? "MARKET"
+                       : (fill.order_type == matching::OrderType::POST_ONLY) ? "LIMIT_MAKER"
+                                                                             : "LIMIT";
 
     json::object obj;
     obj["e"] = "executionReport";
@@ -70,9 +70,9 @@ static std::string format_execution_report(const matching::FillReport& fill, uin
 static std::string format_order_response(const matching::OpenOrder& order, uint64_t order_id_int, uint64_t sim_ts) {
     namespace json = boost::json;
     std::string side = (order.side == matching::OrderSide::BUY) ? "BUY" : "SELL";
-    std::string type = (order.type == matching::OrderType::MARKET)    ? "MARKET"
-                     : (order.type == matching::OrderType::POST_ONLY) ? "LIMIT_MAKER"
-                                                                      : "LIMIT";
+    std::string type = (order.type == matching::OrderType::MARKET)      ? "MARKET"
+                       : (order.type == matching::OrderType::POST_ONLY) ? "LIMIT_MAKER"
+                                                                        : "LIMIT";
     std::string status =
         (order.filled_qty >= order.quantity) ? "FILLED" : (order.filled_qty > 0 ? "PARTIALLY_FILLED" : "NEW");
 
@@ -200,9 +200,12 @@ private:
         order.symbol = params.count("symbol") ? params["symbol"] : "";
         order.client_order_id = params.count("newClientOrderId") ? params["newClientOrderId"] : "";
         const std::string type_str = params.count("type") ? params["type"] : "LIMIT";
-        if (type_str == "MARKET")            order.type = matching::OrderType::MARKET;
-        else if (type_str == "LIMIT_MAKER")  order.type = matching::OrderType::POST_ONLY;
-        else                                  order.type = matching::OrderType::LIMIT;
+        if (type_str == "MARKET")
+            order.type = matching::OrderType::MARKET;
+        else if (type_str == "LIMIT_MAKER")
+            order.type = matching::OrderType::POST_ONLY;
+        else
+            order.type = matching::OrderType::LIMIT;
         order.side =
             (params.count("side") && params["side"] == "SELL") ? matching::OrderSide::SELL : matching::OrderSide::BUY;
         order.quantity = params.count("quantity") ? std::stod(params["quantity"]) : 0.0;
@@ -223,8 +226,8 @@ private:
             namespace json = boost::json;
             json::object err;
             err["code"] = -2010;
-            err["msg"]  = "Order would immediately match and take.";
-            res.body()  = json::serialize(err);
+            err["msg"] = "Order would immediately match and take.";
+            res.body() = json::serialize(err);
             return;
         }
         res.body() = format_order_response(filled, oid, filled.submitted_ts);

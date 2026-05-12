@@ -30,12 +30,17 @@ protected:
     std::vector<ExecEvent> events;
 
     void SetUp() override {
-        parser.on_exec_event = [this](const ExecEvent& ev) { events.push_back(ev); };
+        parser.on_exec_event = [this](const ExecEvent& ev) {
+            events.push_back(ev);
+        };
     }
 
     // Build a single fill JSON object matching HL's userFills shape.
-    static json::object make_fill(uint64_t oid, const char* side, const char* px,
-                                  const char* sz, const char* fee = "0.01",
+    static json::object make_fill(uint64_t oid,
+                                  const char* side,
+                                  const char* px,
+                                  const char* sz,
+                                  const char* fee = "0.01",
                                   int64_t time_ms = 1700000000000LL) {
         json::object f;
         f["oid"] = static_cast<int64_t>(oid);

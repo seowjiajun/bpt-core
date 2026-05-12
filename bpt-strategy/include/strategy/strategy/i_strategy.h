@@ -2,8 +2,6 @@
 
 #include "strategy/refdata/instrument_cache.h"
 
-#include <analytics/messaging/toxicity_update.h>
-
 #include <messages/AccountSnapshot.h>
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExecutionReport.h>
@@ -12,6 +10,7 @@
 #include <messages/MdTrade.h>
 #include <messages/VolSurface.h>
 
+#include <analytics/messaging/toxicity_update.h>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -26,13 +25,13 @@ struct PortfolioState {
         uint64_t instrument_id{0};
         std::string symbol;
         std::string underlying;
-        uint32_t expiry_date{0};        // YYYYMMDD, 0 for perps
+        uint32_t expiry_date{0};  // YYYYMMDD, 0 for perps
         double strike{0.0};
         bool is_call{true};
-        bool is_option{true};           // false for perp hedge legs
-        double qty{0.0};                // +ve = long, -ve = short
+        bool is_option{true};  // false for perp hedge legs
+        double qty{0.0};       // +ve = long, -ve = short
         double entry_price{0.0};
-        double mark_price{0.0};         // current mid
+        double mark_price{0.0};  // current mid
         double iv{0.0};
         double delta{0.0};
         double gamma{0.0};

@@ -6,9 +6,9 @@
 #include "analytics/config/settings.h"
 #include "analytics/messaging/aeron_bus.h"
 
+#include <bpt_app/app.h>
 #include <cstdint>
 #include <unordered_map>
-#include <bpt_app/app.h>
 
 namespace bpt::analytics {
 
@@ -36,7 +36,9 @@ private:
         InstrumentState(analysis::MarkoutTracker::Config mt_cfg,
                         analysis::ToxicityScorer::Config ts_cfg,
                         analysis::FillRateTracker::Config fr_cfg)
-            : tracker(mt_cfg), scorer(ts_cfg), fill_rate(fr_cfg) {}
+            : tracker(mt_cfg),
+              scorer(ts_cfg),
+              fill_rate(fr_cfg) {}
     };
 
     analysis::MarkoutTracker::Config mt_cfg_;

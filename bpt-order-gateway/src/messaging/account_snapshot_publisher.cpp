@@ -26,9 +26,8 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
     constexpr std::size_t kPositionSize = 32 + 8 + 8 + 8;
     constexpr std::size_t kMaxCurrencyBalances = 32;
     constexpr std::size_t kCurrencyBalanceSize = 8 + 8 + 8;
-    constexpr std::size_t kBufSize = MessageHeader::encodedLength() + AccountSnapshot::sbeBlockLength() +
-                                     4 + kMaxPositions * kPositionSize +
-                                     4 + kMaxCurrencyBalances * kCurrencyBalanceSize;
+    constexpr std::size_t kBufSize = MessageHeader::encodedLength() + AccountSnapshot::sbeBlockLength() + 4 +
+                                     kMaxPositions * kPositionSize + 4 + kMaxCurrencyBalances * kCurrencyBalanceSize;
 
     char buf[kBufSize]{};
 
@@ -56,10 +55,7 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
     auto& ccy_group = msg.currencyBalancesCount(static_cast<uint16_t>(n_ccy));
     for (std::size_t i = 0; i < n_ccy; ++i) {
         const auto& cb = snapshot.currency_balances[i];
-        ccy_group.next()
-            .putCcy(cb.ccy)
-            .equityE8(cb.equity_e8)
-            .availableBalanceE8(cb.available_balance_e8);
+        ccy_group.next().putCcy(cb.ccy).equityE8(cb.equity_e8).availableBalanceE8(cb.available_balance_e8);
     }
 
     const auto encoded_len = static_cast<::aeron::util::index_t>(MessageHeader::encodedLength() + msg.encodedLength());
@@ -67,13 +63,14 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
 
     if (publisher_.offer(ab, 0, encoded_len))
         bpt::common::log::info("AccountSnapshot published exchange={} balance={:.2f} positions={} ccyBalances={}",
-                       ExchangeId::c_str(snapshot.exchange_id),
-                       static_cast<double>(snapshot.available_balance_e8) / 1e8,
-                       n_pos,
-                       n_ccy);
+                               ExchangeId::c_str(snapshot.exchange_id),
+                               static_cast<double>(snapshot.available_balance_e8) / 1e8,
+                               n_pos,
+                               n_ccy);
     else
         bpt::common::log::warn("AccountSnapshot dropped — no subscriber on {}:{}",
-                       publisher_.channel(), publisher_.stream_id());
+                               publisher_.channel(),
+                               publisher_.stream_id());
 }
 
 }  // namespace bpt::order_gateway::messaging

@@ -1,24 +1,28 @@
 #include "strategy/dashboard/portfolio_snapshot_publisher.h"
 
-#include <nlohmann/json.hpp>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
+#include <nlohmann/json.hpp>
 
 namespace bpt::strategy::dashboard {
 
 PortfolioSnapshotPublisher::PortfolioSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                                        const std::string& channel,
                                                        int32_t stream_id) {
-    if (channel.empty() || stream_id == 0) return;
+    if (channel.empty() || stream_id == 0)
+        return;
 
     pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
     bpt::common::log::info("Dashboard snapshot publication ready on stream {}", stream_id);
 }
 
 void PortfolioSnapshotPublisher::publish_if_due(const strategy::PortfolioState& state, uint64_t now_ns) {
-    if (!pub_) return;
-    if (now_ns - last_publish_ns_ < kIntervalNs) return;
-    if (state.legs.empty() && state.surface_points.empty()) return;
+    if (!pub_)
+        return;
+    if (now_ns - last_publish_ns_ < kIntervalNs)
+        return;
+    if (state.legs.empty() && state.surface_points.empty())
+        return;
 
     last_publish_ns_ = now_ns;
     publish(state, now_ns);

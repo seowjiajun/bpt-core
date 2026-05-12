@@ -29,10 +29,10 @@ namespace bpt::md_gateway::md {
 class ValidationDropBreaker {
 public:
     struct Config {
-        uint64_t window_ns    = 60ULL * 1'000'000'000ULL;  ///< rolling window (default 60 s)
-        double   threshold_pct = 30.0;                      ///< trip when drop ratio exceeds this (default 30 %)
-        uint32_t min_events    = 50;                        ///< don't evaluate until at least this many samples landed
-        bool     enabled       = false;                     ///< default off; opt-in per adapter once thresholds are tuned
+        uint64_t window_ns = 60ULL * 1'000'000'000ULL;  ///< rolling window (default 60 s)
+        double threshold_pct = 30.0;                    ///< trip when drop ratio exceeds this (default 30 %)
+        uint32_t min_events = 50;                       ///< don't evaluate until at least this many samples landed
+        bool enabled = false;                           ///< default off; opt-in per adapter once thresholds are tuned
     };
 
     explicit ValidationDropBreaker(Config cfg);

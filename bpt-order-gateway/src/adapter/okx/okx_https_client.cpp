@@ -8,8 +8,7 @@ namespace bpt::order_gateway::adapter::okx {
 
 namespace http = boost::beast::http;
 
-OKXHttpsClient::OKXHttpsClient(const config::AdapterConfig& cfg,
-                                const ExchangeCredentials& creds)
+OKXHttpsClient::OKXHttpsClient(const config::AdapterConfig& cfg, const ExchangeCredentials& creds)
     : cfg_(cfg),
       api_key_(creds.api_key),
       secret_key_(creds.secret_key),

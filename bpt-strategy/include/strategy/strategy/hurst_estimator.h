@@ -30,8 +30,6 @@ namespace bpt::strategy::strategy {
 // slope is the Hurst exponent — substantially more robust than the
 // single-window estimator on short series. Falls back to
 // compute_hurst() when fewer than 2 valid regression points exist.
-[[nodiscard]] double compute_hurst_multi_window(const double* returns,
-                                                  std::size_t count,
-                                                  std::size_t max_window);
+[[nodiscard]] double compute_hurst_multi_window(const double* returns, std::size_t count, std::size_t max_window);
 
 }  // namespace bpt::strategy::strategy

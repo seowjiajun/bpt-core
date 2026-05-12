@@ -26,9 +26,9 @@ struct AccountPosition {
 /// preserves the per-ccy breakdown so the dashboard can show a row per
 /// currency (USDT, USDC, SGD, USD, BTC, etc.).
 struct CurrencyBalance {
-    std::string ccy;                   ///< currency code, e.g. "USDT", "USDC", "SGD" (≤ 8 chars)
-    int64_t equity_e8{0};              ///< currency equity * 1e8 (what you hold in that ccy)
-    int64_t available_balance_e8{0};   ///< withdrawable amount in that ccy * 1e8
+    std::string ccy;                  ///< currency code, e.g. "USDT", "USDC", "SGD" (≤ 8 chars)
+    int64_t equity_e8{0};             ///< currency equity * 1e8 (what you hold in that ccy)
+    int64_t available_balance_e8{0};  ///< withdrawable amount in that ccy * 1e8
 };
 
 struct AccountSnapshotData {

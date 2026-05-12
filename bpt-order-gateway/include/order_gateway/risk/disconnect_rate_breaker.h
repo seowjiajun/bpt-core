@@ -33,7 +33,7 @@ public:
     struct Config {
         uint64_t window_ns = 60ULL * 1'000'000'000ULL;  // 60 s
         uint32_t threshold = 5;                         // 5 disconnects / window
-        bool     enabled = false;                       // default off
+        bool enabled = false;                           // default off
     };
 
     explicit DisconnectRateBreaker(Config cfg);
@@ -52,14 +52,10 @@ public:
     // Latched: returns true once the threshold has been crossed, and
     // stays true for the lifetime of the object. Safe to call from
     // any thread (loads an atomic).
-    [[nodiscard]] bool tripped() const noexcept {
-        return tripped_.load(std::memory_order_acquire);
-    }
+    [[nodiscard]] bool tripped() const noexcept { return tripped_.load(std::memory_order_acquire); }
 
     // Test observability.
-    [[nodiscard]] uint32_t count_in_window() const noexcept {
-        return static_cast<uint32_t>(events_.size());
-    }
+    [[nodiscard]] uint32_t count_in_window() const noexcept { return static_cast<uint32_t>(events_.size()); }
     [[nodiscard]] const Config& config() const noexcept { return cfg_; }
 
 private:

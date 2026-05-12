@@ -4,9 +4,9 @@
 
 namespace {
 
-using bpt::order_gateway::risk::PnlTracker;
 using bpt::messages::ExchangeId;
 using bpt::messages::OrderSide;
+using bpt::order_gateway::risk::PnlTracker;
 
 constexpr uint64_t kInst = 42;
 constexpr int64_t kScale = 100'000'000;  // 1e8 (matches PnlTracker::kScale)

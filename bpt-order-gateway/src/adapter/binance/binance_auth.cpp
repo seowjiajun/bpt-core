@@ -5,9 +5,9 @@
 
 namespace bpt::order_gateway::adapter::binance {
 
-using bpt::common::util::WallClock;
 using bpt::common::util::hex_encode;
 using bpt::common::util::hmac_sha256;
+using bpt::common::util::WallClock;
 
 std::string hmac_sha256_hex(std::string_view key, std::string_view data) {
     return hex_encode(hmac_sha256(key, data));

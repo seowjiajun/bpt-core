@@ -10,6 +10,7 @@
 /// would explode under any non-trivial universe — so the granular
 /// dimension on every gauge/counter is `exchange`.
 
+#include <bpt_common/util/latency_histogram.h>
 #include <memory>
 #include <prometheus/counter.h>
 #include <prometheus/exposer.h>
@@ -17,7 +18,6 @@
 #include <prometheus/gauge.h>
 #include <prometheus/registry.h>
 #include <string>
-#include <bpt_common/util/latency_histogram.h>
 
 namespace bpt::md_gateway::metrics {
 
@@ -26,7 +26,7 @@ struct MdGatewayMetrics {
     std::shared_ptr<prometheus::Registry> registry;
     std::unique_ptr<prometheus::Exposer> exposer;
 
-    prometheus::Gauge* healthy{};                    ///< 1 while the app is running, set to 0 by `shutdown()`
+    prometheus::Gauge* healthy{};  ///< 1 while the app is running, set to 0 by `shutdown()`
     prometheus::Counter* subscription_batches_total{};
     prometheus::Counter* service_heartbeats_total{};
 
@@ -35,10 +35,12 @@ struct MdGatewayMetrics {
 
     /// \name Per-exchange families
     /// @{
-    prometheus::Family<prometheus::Gauge>* exchange_connected_fam{};         ///< 1 if WS connected, 0 otherwise
-    prometheus::Family<prometheus::Counter>* adapter_disconnects_fam{};      ///< monotonic disconnect count
-    prometheus::Family<prometheus::Gauge>* md_messages_published_fam{};      ///< messages that passed validation and were sent to Aeron
-    prometheus::Family<prometheus::Gauge>* md_validation_drops_fam{};        ///< messages dropped by MdValidator (bad prices, crossed book, …)
+    prometheus::Family<prometheus::Gauge>* exchange_connected_fam{};     ///< 1 if WS connected, 0 otherwise
+    prometheus::Family<prometheus::Counter>* adapter_disconnects_fam{};  ///< monotonic disconnect count
+    prometheus::Family<prometheus::Gauge>*
+        md_messages_published_fam{};  ///< messages that passed validation and were sent to Aeron
+    prometheus::Family<prometheus::Gauge>*
+        md_validation_drops_fam{};  ///< messages dropped by MdValidator (bad prices, crossed book, …)
     /// \brief Per-adapter ValidationDropBreaker latch.
     ///
     /// 1 if the drop ratio exceeded the configured threshold and the

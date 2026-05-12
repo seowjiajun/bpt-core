@@ -13,9 +13,11 @@
 
 namespace bpt::md_gateway::messaging {
 
-constexpr int MD_CONTROL_STREAM_ID = 2001;   ///< Strategy → MdGateway: MdSubscribeBatch
-constexpr int MD_DATA_STREAM_ID = 2002;      ///< MdGateway → Strategy: MdMarketData / MdTrade / MdOrderBook
-constexpr int MD_ACK_HB_STREAM_ID = 2003;    ///< MdGateway → Strategy: MdSubscriptionAck / MdSubscriptionHeartbeat / MdServiceHeartbeat
-constexpr int FUNDING_RATE_STREAM_ID = 1005; ///< MdGateway → Strategy: FundingRate (was refdata's; same ID + wire format)
+constexpr int MD_CONTROL_STREAM_ID = 2001;  ///< Strategy → MdGateway: MdSubscribeBatch
+constexpr int MD_DATA_STREAM_ID = 2002;     ///< MdGateway → Strategy: MdMarketData / MdTrade / MdOrderBook
+constexpr int MD_ACK_HB_STREAM_ID =
+    2003;  ///< MdGateway → Strategy: MdSubscriptionAck / MdSubscriptionHeartbeat / MdServiceHeartbeat
+constexpr int FUNDING_RATE_STREAM_ID =
+    1005;  ///< MdGateway → Strategy: FundingRate (was refdata's; same ID + wire format)
 
 }  // namespace bpt::md_gateway::messaging

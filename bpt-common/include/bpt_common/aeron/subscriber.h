@@ -58,8 +58,8 @@ public:
         : channel_(std::move(channel)),
           stream_id_(stream_id),
           subscription_(wait_for_subscription(std::move(aeron), channel_, stream_id)),
-          assembler_(std::make_unique<::aeron::FragmentAssembler>(
-              ChaosRegistry::wrap(stream_id, std::move(handler)))) {}
+          assembler_(std::make_unique<::aeron::FragmentAssembler>(ChaosRegistry::wrap(stream_id, std::move(handler)))) {
+    }
 
     /// Non-copyable, non-movable.
     ///
@@ -70,22 +70,18 @@ public:
     /// Subscriber must also be non-movable; wrap in std::unique_ptr if
     /// you need movability at the owner level — the unique_ptr moves,
     /// the Subscriber object stays put.
-    Subscriber(const Subscriber&)            = delete;
+    Subscriber(const Subscriber&) = delete;
     Subscriber& operator=(const Subscriber&) = delete;
-    Subscriber(Subscriber&&)                 = delete;
-    Subscriber& operator=(Subscriber&&)      = delete;
+    Subscriber(Subscriber&&) = delete;
+    Subscriber& operator=(Subscriber&&) = delete;
 
     /// Poll up to `limit` fragments.
     ///
     /// Returns the number of fragments actually consumed — a poll
     /// returning 0 is the caller's cue to yield or sleep.
-    int poll(int limit = 16) {
-        return subscription_->poll(assembler_->handler(), limit);
-    }
+    int poll(int limit = 16) { return subscription_->poll(assembler_->handler(), limit); }
 
-    [[nodiscard]] bool is_connected() const noexcept {
-        return subscription_ && subscription_->isConnected();
-    }
+    [[nodiscard]] bool is_connected() const noexcept { return subscription_ && subscription_->isConnected(); }
     [[nodiscard]] const std::string& channel() const noexcept { return channel_; }
     [[nodiscard]] std::int32_t stream_id() const noexcept { return stream_id_; }
 

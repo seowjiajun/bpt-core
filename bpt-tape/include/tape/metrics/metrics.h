@@ -80,14 +80,14 @@ private:
     prometheus::Gauge* healthy_{};  ///< unlabeled liveness gauge
 
     // Per-venue Families. Cached as raw pointers — owned by registry_.
-    prometheus::Family<prometheus::Gauge>*   last_wslog_write_unix_seconds_fam_{};
+    prometheus::Family<prometheus::Gauge>* last_wslog_write_unix_seconds_fam_{};
     prometheus::Family<prometheus::Counter>* frames_written_total_fam_{};
     prometheus::Family<prometheus::Counter>* bytes_written_total_fam_{};
     prometheus::Family<prometheus::Counter>* wslog_rotations_total_fam_{};
     prometheus::Family<prometheus::Counter>* wslog_rotation_failures_total_fam_{};
-    prometheus::Family<prometheus::Gauge>*   ws_connected_fam_{};
+    prometheus::Family<prometheus::Gauge>* ws_connected_fam_{};
     prometheus::Family<prometheus::Counter>* ws_reconnects_total_fam_{};
-    prometheus::Family<prometheus::Gauge>*   subscriptions_fam_{};
+    prometheus::Family<prometheus::Gauge>* subscriptions_fam_{};
 };
 
 }  // namespace bpt::tape::metrics

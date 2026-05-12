@@ -61,10 +61,10 @@ public:
     };
 
     struct Config {
-        std::string root_dir;                  ///< e.g. "/opt/bpt/data/raw"
-        std::string venue_tag;                 ///< e.g. "okx" — used in path + audit log
+        std::string root_dir;   ///< e.g. "/opt/bpt/data/raw"
+        std::string venue_tag;  ///< e.g. "okx" — used in path + audit log
         uint32_t rotate_interval_seconds{3600};
-        uint32_t buffer_bytes{1u << 20};       ///< 1 MiB userspace buffer
+        uint32_t buffer_bytes{1u << 20};  ///< 1 MiB userspace buffer
         /// Auto-flush cadence. write_record() flushes if more than this many
         /// wall-clock ns have elapsed since the last flush — bounds replay-
         /// loss on crash to this interval regardless of buffer fill rate.

@@ -6,28 +6,28 @@
 #include "order_gateway/messaging/aeron_bus.h"
 
 #include <algorithm>
-#include <cctype>
-#include <map>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <sys/prctl.h>
 #include <bpt_app/app.h>
 #include <bpt_app/cli.h>
 #include <bpt_common/aeron/chaos_config.h>
 #include <bpt_common/env.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/secrets/secrets_client.h>
+#include <cctype>
 #include <fmt/format.h>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <sys/prctl.h>
 
 namespace {
 
 // Load per-adapter systemd-creds and convert to typed ExchangeCredentials.
 // Invoked from inside the bpt::app::run() build callable so logging is
 // already initialised by the time we report per-adapter load status.
-std::map<std::string, bpt::order_gateway::adapter::ExchangeCredentials>
-load_credentials(const std::vector<bpt::order_gateway::config::AdapterConfig>& adapters,
-                 bpt::common::Env env) {
+std::map<std::string, bpt::order_gateway::adapter::ExchangeCredentials> load_credentials(
+    const std::vector<bpt::order_gateway::config::AdapterConfig>& adapters,
+    bpt::common::Env env) {
     const bool strict = (env == bpt::common::Env::QA || env == bpt::common::Env::PROD);
     std::map<std::string, bpt::order_gateway::adapter::ExchangeCredentials> creds;
     for (const auto& a_cfg : adapters) {
@@ -36,12 +36,11 @@ load_credentials(const std::vector<bpt::order_gateway::config::AdapterConfig>& a
             // first authed request anyway; in qa/prod this is a deployment
             // bug, refuse to start so it's caught before any live trading.
             if (strict)
-                throw std::runtime_error(fmt::format(
-                    "env={} but adapter {} has empty secret_name — refusing to start",
-                    bpt::common::to_string(env), a_cfg.exchange));
-            bpt::common::log::warn(
-                "No secret_name for {} — adapter will have empty credentials (dev only)",
-                a_cfg.exchange);
+                throw std::runtime_error(fmt::format("env={} but adapter {} has empty secret_name — refusing to start",
+                                                     bpt::common::to_string(env),
+                                                     a_cfg.exchange));
+            bpt::common::log::warn("No secret_name for {} — adapter will have empty credentials (dev only)",
+                                   a_cfg.exchange);
             creds[a_cfg.exchange] = {};
         } else {
             const auto kv = bpt::common::secrets::fetch(a_cfg.secret_name, env);
@@ -67,8 +66,7 @@ std::string derive_service_name(const std::vector<std::string>& exchanges) {
     std::string name = "bpt-ogw";
     if (exchanges.size() == 1) {
         std::string venue = exchanges[0];
-        std::transform(venue.begin(), venue.end(), venue.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+        std::transform(venue.begin(), venue.end(), venue.begin(), [](unsigned char c) { return std::tolower(c); });
         name += "-" + venue;
     }
     return name;
@@ -81,9 +79,7 @@ int main(int argc, char* argv[]) {
     // Has to happen before any child threads could fork — do it first.
     ::prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
 
-    auto args = bpt::app::parse_cli(argc, argv,
-                                    "bpt-order-gateway",
-                                    "order routing + risk enforcement");
+    auto args = bpt::app::parse_cli(argc, argv, "bpt-order-gateway", "order routing + risk enforcement");
 
     // Bootstrap logger so pre-run failures land in the same sink.
     // Re-initialised below once derive_service_name produces the
@@ -99,24 +95,24 @@ int main(int argc, char* argv[]) {
         // Optional fault injection (dev/qa only). Must run before
         // bpt::app::run builds the AeronBus — Subscribers consult the
         // registry at ctor time.
-        bpt::common::aeron::install_chaos_from_toml(
-            args.config_path,
-            bpt::common::to_string(cfg.base.environment),
-            service_name);
+        bpt::common::aeron::install_chaos_from_toml(args.config_path,
+                                                    bpt::common::to_string(cfg.base.environment),
+                                                    service_name);
 
-        return bpt::app::run(service_name, std::move(cfg),
-            [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-                auto creds = load_credentials(settings.gateway.adapters, settings.base.environment);
-                auto bus = bpt::order_gateway::messaging::AeronBus::build(ctx.aeron, settings);
-                return std::make_unique<bpt::order_gateway::OrderGatewayApp>(
-                    std::move(settings),
-                    std::move(bus.control_source),
-                    std::move(bus.exec_sink),
-                    std::move(bus.account_snapshot_sink),
-                    std::move(bus.heartbeat_sink),
-                    std::move(creds),
-                    ctx.topology);
-            });
+        return bpt::app::run(service_name,
+                             std::move(cfg),
+                             [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
+                                 auto creds = load_credentials(settings.gateway.adapters, settings.base.environment);
+                                 auto bus = bpt::order_gateway::messaging::AeronBus::build(ctx.aeron, settings);
+                                 return std::make_unique<bpt::order_gateway::OrderGatewayApp>(
+                                     std::move(settings),
+                                     std::move(bus.control_source),
+                                     std::move(bus.exec_sink),
+                                     std::move(bus.account_snapshot_sink),
+                                     std::move(bus.heartbeat_sink),
+                                     std::move(creds),
+                                     ctx.topology);
+                             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());
         return 1;

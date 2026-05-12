@@ -17,12 +17,13 @@
 /// Templated on Pub so bpt-tape can instantiate with NoopMdPublisher
 /// and have the publish() chain dead-code-eliminated by the optimizer.
 
-#include "tape/io/tape.h"
 #include "md_gateway/adapter/binance/binance_md_adapter.h"
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "md_gateway/adapter/deribit/deribit_md_adapter.h"
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_adapter.h"
 #include "md_gateway/adapter/okx/okx_md_adapter.h"
+#include "tape/io/tape.h"
+
 #include <messages/ExchangeRegistry.h>
 
 #include <cstdio>
@@ -39,38 +40,40 @@ namespace bpt::tape::adapter {
 /// Macro because each subclass differs only in (Class, BaseClass) and
 /// the body is mechanically identical. Inheritance is the canonical
 /// way to inject behavior without modifying the mdgw adapter source.
-#define BPT_DECLARE_RECORDING_ADAPTER(Class, BaseClass)                                       \
-    template <class Pub>                                                                      \
-    class Class : public ::bpt::md_gateway::adapter::BaseClass<Pub> {                         \
-    public:                                                                                   \
-        Class(std::shared_ptr<::bpt::tape::io::Tape> tape,                       \
-              const ::bpt::md_gateway::config::AdapterConfig& cfg,                            \
-              std::shared_ptr<Pub> md_pub)                                                    \
-            : ::bpt::md_gateway::adapter::BaseClass<Pub>(cfg, std::move(md_pub)),             \
-              tape_(std::move(tape)) {}                                                     \
-                                                                                              \
-    protected:                                                                                \
-        void handle_frame(std::string_view payload, uint64_t recv_ns) noexcept override {    \
-            if (tape_ && !tape_->write_frame(recv_ns, payload)) {                           \
+#define BPT_DECLARE_RECORDING_ADAPTER(Class, BaseClass)                                   \
+    template <class Pub>                                                                  \
+    class Class : public ::bpt::md_gateway::adapter::BaseClass<Pub> {                     \
+    public:                                                                               \
+        Class(std::shared_ptr<::bpt::tape::io::Tape> tape,                                \
+              const ::bpt::md_gateway::config::AdapterConfig& cfg,                        \
+              std::shared_ptr<Pub> md_pub)                                                \
+            : ::bpt::md_gateway::adapter::BaseClass<Pub>(cfg, std::move(md_pub)),         \
+              tape_(std::move(tape)) {}                                                   \
+                                                                                          \
+    protected:                                                                            \
+        void handle_frame(std::string_view payload, uint64_t recv_ns) noexcept override { \
+            if (tape_ && !tape_->write_frame(recv_ns, payload)) {                         \
                 /* Tape already logged the cause via Quill (async). Synchronous */        \
-                /* stderr line so journald captures the fatal even if Quill hasn't  */        \
-                /* drained before abort().                                          */        \
-                std::fputs("[FATAL] bpt-tape: Tape::write_frame failed; "                 \
-                           "aborting (Restart=always recycles).\n", stderr);                  \
-                std::fflush(stderr);                                                          \
-                std::abort();                                                                 \
-            }                                                                                 \
-            ::bpt::md_gateway::adapter::BaseClass<Pub>::handle_frame(payload, recv_ns);       \
-        }                                                                                     \
-                                                                                              \
-    private:                                                                                  \
-        std::shared_ptr<::bpt::tape::io::Tape> tape_;                            \
+                /* stderr line so journald captures the fatal even if Quill hasn't  */    \
+                /* drained before abort().                                          */    \
+                std::fputs(                                                               \
+                    "[FATAL] bpt-tape: Tape::write_frame failed; "                        \
+                    "aborting (Restart=always recycles).\n",                              \
+                    stderr);                                                              \
+                std::fflush(stderr);                                                      \
+                std::abort();                                                             \
+            }                                                                             \
+            ::bpt::md_gateway::adapter::BaseClass<Pub>::handle_frame(payload, recv_ns);   \
+        }                                                                                 \
+                                                                                          \
+    private:                                                                              \
+        std::shared_ptr<::bpt::tape::io::Tape> tape_;                                     \
     };
 
-BPT_DECLARE_RECORDING_ADAPTER(RecordingBinanceMdAdapter,     BinanceMdAdapter)
-BPT_DECLARE_RECORDING_ADAPTER(RecordingOkxMdAdapter,         OkxMdAdapter)
+BPT_DECLARE_RECORDING_ADAPTER(RecordingBinanceMdAdapter, BinanceMdAdapter)
+BPT_DECLARE_RECORDING_ADAPTER(RecordingOkxMdAdapter, OkxMdAdapter)
 BPT_DECLARE_RECORDING_ADAPTER(RecordingHyperliquidMdAdapter, HyperliquidMdAdapter)
-BPT_DECLARE_RECORDING_ADAPTER(RecordingDeribitMdAdapter,     DeribitMdAdapter)
+BPT_DECLARE_RECORDING_ADAPTER(RecordingDeribitMdAdapter, DeribitMdAdapter)
 
 #undef BPT_DECLARE_RECORDING_ADAPTER
 
@@ -82,8 +85,7 @@ BPT_DECLARE_RECORDING_ADAPTER(RecordingDeribitMdAdapter,     DeribitMdAdapter)
 /// `ExchangeRegistry::from_name()` returns through its std::optional),
 /// not the wrapping struct.
 template <class Pub>
-inline std::shared_ptr<::bpt::md_gateway::adapter::IAdapter>
-make_recording_adapter(
+inline std::shared_ptr<::bpt::md_gateway::adapter::IAdapter> make_recording_adapter(
     bpt::messages::ExchangeId::Value exch_id,
     std::shared_ptr<::bpt::tape::io::Tape> tape,
     const ::bpt::md_gateway::config::AdapterConfig& cfg,

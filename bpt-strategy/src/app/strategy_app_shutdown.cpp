@@ -1,8 +1,8 @@
 #include "strategy/app/strategy_app.h"
 
+#include <bpt_common/util/tsc_clock.h>
 #include <chrono>
 #include <filesystem>
-#include <bpt_common/util/tsc_clock.h>
 
 // Shutdown-flatten orchestration. Extracted from strategy_app.cpp so
 // the top-level file stays focused on lifecycle; this is self-contained
@@ -80,8 +80,7 @@ void StrategyApp::shutdown_flatten() {
             // settle time elapsed. Tracked orders typically clear in
             // <100ms; cancel_all's orphan sweep takes 200–500ms.
             if (elapsed >= kMinDrainNs && !strategy_->has_pending_flatten()) {
-                bpt::common::log::info("shutdown drain completed cleanly in {} ms",
-                               elapsed / 1'000'000ULL);
+                bpt::common::log::info("shutdown drain completed cleanly in {} ms", elapsed / 1'000'000ULL);
                 break;
             }
             const int frags = bus_.order_gw->poll();
@@ -120,8 +119,7 @@ void StrategyApp::shutdown_flatten() {
     // a stale restart.
     const auto& ws = cfg_.strat.strategy.warm_start;
     if (!ws.state_dir.empty()) {
-        const auto path = std::filesystem::path(ws.state_dir) /
-                          (std::to_string(cfg_.strat.correlation_id) + ".json");
+        const auto path = std::filesystem::path(ws.state_dir) / (std::to_string(cfg_.strat.correlation_id) + ".json");
         try {
             strategy_->save_state(path.string());
         } catch (const std::exception& e) {

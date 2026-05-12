@@ -17,9 +17,7 @@ namespace bpt::md_gateway::adapter::deribit {
 /// \param depth  0 uses the lighter `quote.<sym>` channel; >0 uses
 ///               `book.<sym>.100ms` for full-depth ladder updates at
 ///               100 ms cadence.
-[[nodiscard]] std::string build_subscribe_rpc(uint64_t rpc_id,
-                                               const std::string& symbol,
-                                               uint8_t depth);
+[[nodiscard]] std::string build_subscribe_rpc(uint64_t rpc_id, const std::string& symbol, uint8_t depth);
 
 /// \brief public/set_heartbeat — must be sent immediately after connect.
 ///

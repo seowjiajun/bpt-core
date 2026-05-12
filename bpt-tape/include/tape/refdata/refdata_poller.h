@@ -18,8 +18,8 @@
 /// latency is bounded by the HTTP timeout (~30 s).
 
 #include "tape/config/settings.h"
-#include "tape/io/tape.h"
 #include "tape/http/recording_rest_client.h"
+#include "tape/io/tape.h"
 
 #include <atomic>
 #include <chrono>

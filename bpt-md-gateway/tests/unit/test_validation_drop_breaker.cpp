@@ -31,7 +31,8 @@ TEST(ValidationDropBreakerTest, DisabledRecordIsNoOp) {
 
 TEST(ValidationDropBreakerTest, BelowMinEventsNeverTrips) {
     ValidationDropBreaker b(make_cfg(/*threshold_pct=*/10.0, /*min_events=*/50));
-    for (int i = 0; i < 49; ++i) b.record(true, i * kTick);
+    for (int i = 0; i < 49; ++i)
+        b.record(true, i * kTick);
     EXPECT_FALSE(b.tripped());
     EXPECT_EQ(b.total_in_window(), 49u);
     EXPECT_EQ(b.drops_in_window(), 49u);
@@ -67,11 +68,13 @@ TEST(ValidationDropBreakerTest, AboveThresholdTrips) {
 TEST(ValidationDropBreakerTest, LatchesAfterTrip) {
     ValidationDropBreaker b(make_cfg(/*threshold_pct=*/30.0, /*min_events=*/10));
     // Short burst gets us above threshold fast.
-    for (int i = 0; i < 20; ++i) b.record(true, i * kTick);
+    for (int i = 0; i < 20; ++i)
+        b.record(true, i * kTick);
     ASSERT_TRUE(b.tripped());
 
     // Then a long stream of passes — window drains but latch stays.
-    for (int i = 0; i < 1000; ++i) b.record(false, (10'000 + i) * kTick);
+    for (int i = 0; i < 1000; ++i)
+        b.record(false, (10'000 + i) * kTick);
     EXPECT_TRUE(b.tripped()) << "Latch must stick; restart required";
 }
 
@@ -84,7 +87,8 @@ TEST(ValidationDropBreakerTest, WindowEvictionDrainsOldDrops) {
     ValidationDropBreaker b(make_cfg(/*threshold_pct=*/50.0, /*min_events=*/100, window_ns));
 
     // Burst of 20 drops, all within 500ms. Below min_events, no trip.
-    for (int i = 0; i < 20; ++i) b.record(true, i * 25'000'000ULL);
+    for (int i = 0; i < 20; ++i)
+        b.record(true, i * 25'000'000ULL);
     ASSERT_FALSE(b.tripped());
     EXPECT_EQ(b.drops_in_window(), 20u);
 
@@ -98,7 +102,8 @@ TEST(ValidationDropBreakerTest, WindowEvictionDrainsOldDrops) {
 
 TEST(ValidationDropBreakerTest, NtpRegressionDoesNotUnderflow) {
     ValidationDropBreaker b(make_cfg(/*threshold_pct=*/30.0, /*min_events=*/10));
-    for (int i = 0; i < 20; ++i) b.record(false, static_cast<uint64_t>(i));
+    for (int i = 0; i < 20; ++i)
+        b.record(false, static_cast<uint64_t>(i));
     EXPECT_FALSE(b.tripped());
     EXPECT_EQ(b.total_in_window(), 20u);
 }

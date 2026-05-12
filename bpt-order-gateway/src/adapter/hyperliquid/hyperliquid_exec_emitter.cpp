@@ -5,9 +5,9 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
-#include <cmath>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cmath>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
@@ -23,16 +23,16 @@ constexpr double kScale = 1e8;
 // and push.
 ExecEvent make_skeleton(const OrderContext& ctx, uint64_t now_ns) {
     ExecEvent ev{};
-    ev.order_id      = ctx.client_order_id;
-    ev.exchange_id   = bpt::messages::ExchangeId::HYPERLIQUID;
+    ev.order_id = ctx.client_order_id;
+    ev.exchange_id = bpt::messages::ExchangeId::HYPERLIQUID;
     ev.instrument_id = ctx.instrument_id;
-    ev.side          = ctx.side;
-    ev.order_type    = ctx.order_type;
-    ev.price         = ctx.price_e8;
-    ev.fee           = 0;
-    ev.fee_currency  = "USDT";
+    ev.side = ctx.side;
+    ev.order_type = ctx.order_type;
+    ev.price = ctx.price_e8;
+    ev.fee = 0;
+    ev.fee_currency = "USDT";
     ev.exchange_ts_ns = now_ns;
-    ev.local_ts_ns    = now_ns;
+    ev.local_ts_ns = now_ns;
     return ev;
 }
 
@@ -48,8 +48,7 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
                                                  const std::function<void(uint64_t)>& on_acked) {
     try {
         const auto rj = json::parse(resp).as_object();
-        const std::string status =
-            rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
+        const std::string status = rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
 
         const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
 
@@ -64,13 +63,17 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
         }
 
         // status=ok — drill into response.data.statuses[0]
-        if (!rj.contains("response")) return false;
+        if (!rj.contains("response"))
+            return false;
         const auto& response = rj.at("response").as_object();
-        if (!response.contains("data")) return false;
+        if (!response.contains("data"))
+            return false;
         const auto& data = response.at("data").as_object();
-        if (!data.contains("statuses") || !data.at("statuses").is_array()) return false;
+        if (!data.contains("statuses") || !data.at("statuses").is_array())
+            return false;
         const auto& statuses = data.at("statuses").as_array();
-        if (statuses.empty()) return false;
+        if (statuses.empty())
+            return false;
 
         const auto& s0 = statuses[0].as_object();
 
@@ -79,7 +82,8 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
             uint64_t exch_oid = 0;
             if (s0.at("resting").as_object().contains("oid"))
                 exch_oid = s0.at("resting").as_object().at("oid").to_number<uint64_t>();
-            if (exch_oid != 0 && on_acked) on_acked(exch_oid);
+            if (exch_oid != 0 && on_acked)
+                on_acked(exch_oid);
 
             ExecEvent ev = make_skeleton(ctx, now_ns);
             ev.status = ES::ACKED;
@@ -101,16 +105,16 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
             // not echo a cloid).
             const auto& f = s0.at("filled").as_object();
             const uint64_t exch_oid = f.contains("oid") ? f.at("oid").to_number<uint64_t>() : 0;
-            if (exch_oid != 0 && on_acked) on_acked(exch_oid);
-            bpt::common::log::debug(
-                "HL emitter: fill-on-placement client_id={} exch_oid={} — waiting for userFills",
-                ctx.client_order_id, exch_oid);
+            if (exch_oid != 0 && on_acked)
+                on_acked(exch_oid);
+            bpt::common::log::debug("HL emitter: fill-on-placement client_id={} exch_oid={} — waiting for userFills",
+                                    ctx.client_order_id,
+                                    exch_oid);
             return true;
         }
 
         if (s0.contains("error")) {
-            bpt::common::log::warn("HL emitter: order error: {}",
-                           std::string(s0.at("error").as_string()));
+            bpt::common::log::warn("HL emitter: order error: {}", std::string(s0.at("error").as_string()));
             ExecEvent ev = make_skeleton(ctx, now_ns);
             ev.status = ES::REJECTED;
             ev.reject_reason = RR::EXCHANGE_ERROR;
@@ -121,8 +125,7 @@ bool HyperliquidExecEmitter::emit_order_response(const std::string& resp,
 
         return false;
     } catch (const std::exception& e) {
-        bpt::common::log::warn("HL emitter: failed to parse order resp: {} resp={}",
-                       e.what(), resp);
+        bpt::common::log::warn("HL emitter: failed to parse order resp: {} resp={}", e.what(), resp);
         emit_rejected(ctx);
         return true;
     }
@@ -133,9 +136,9 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
                                                   const std::function<void()>& on_cancelled) {
     try {
         const auto rj = json::parse(resp).as_object();
-        const std::string status =
-            rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
-        if (status != "ok") return false;
+        const std::string status = rj.contains("status") ? std::string(rj.at("status").as_string()) : "";
+        if (status != "ok")
+            return false;
 
         // Parse inner statuses. HL returns status:"ok" at the top level even
         // when the specific cancel failed — the per-order result is in
@@ -167,7 +170,8 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
                                     "HL emitter: cancel id={} raced with fill "
                                     "(HL says '{}') — skipping CANCELLED emit, waiting for "
                                     "userFills to deliver the real state",
-                                    client_order_id, err);
+                                    client_order_id,
+                                    err);
                             }
                         }
                     }
@@ -192,7 +196,8 @@ bool HyperliquidExecEmitter::emit_cancel_response(const std::string& resp,
         ev.exchange_ts_ns = now_ns;
         ev.local_ts_ns = now_ns;
         push_or_log(queue_, ev, "CANCELLED");
-        if (on_cancelled) on_cancelled();
+        if (on_cancelled)
+            on_cancelled();
         return true;
     } catch (const std::exception& e) {
         bpt::common::log::warn("HL emitter: failed to parse cancel resp: {}", e.what());
@@ -222,8 +227,8 @@ void HyperliquidExecEmitter::emit_recovered_ack(const OrderContext& ctx, uint64_
 
 void HyperliquidExecEmitter::emit_recovered_fill(const OrderContext& ctx,
                                                  uint64_t exch_oid,
-                                                 int64_t  fill_price_e8,
-                                                 int64_t  fill_fee_e8,
+                                                 int64_t fill_price_e8,
+                                                 int64_t fill_fee_e8,
                                                  uint64_t fill_qty_e8,
                                                  uint64_t fill_time_ns) {
     const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();

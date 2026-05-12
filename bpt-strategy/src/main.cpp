@@ -2,13 +2,13 @@
 #include "strategy/config/config.h"
 #include "strategy/messaging/aeron_bus.h"
 
-#include <memory>
-#include <string>
 #include <bpt_app/app.h>
 #include <bpt_app/cli.h>
 #include <bpt_common/aeron/chaos_config.h>
 #include <bpt_common/env.h>
 #include <bpt_common/logging.h>
+#include <memory>
+#include <string>
 
 namespace {
 
@@ -25,22 +25,27 @@ std::string derive_service_name(const std::string& strategy_type) {
     // (e.g. AvellanedaStoikovStrategy, OFIStrategy). Map to short
     // codes that fit the 15-char comm budget.
     std::string variant;
-    if (strategy_type == "AvellanedaStoikovStrategy") variant = "as";
-    else if (strategy_type == "RegimeSwitchStrategy") variant = "rs";
-    else if (strategy_type == "OFIStrategy")          variant = "ofi";
-    else if (strategy_type == "HmmStrategy")          variant = "hmm";
-    else if (strategy_type == "MomentumStrategy")     variant = "mom";
-    else if (strategy_type == "FundingArbStrategy")   variant = "farb";
-    else                                              variant = strategy_type.substr(0, 5);
+    if (strategy_type == "AvellanedaStoikovStrategy")
+        variant = "as";
+    else if (strategy_type == "RegimeSwitchStrategy")
+        variant = "rs";
+    else if (strategy_type == "OFIStrategy")
+        variant = "ofi";
+    else if (strategy_type == "HmmStrategy")
+        variant = "hmm";
+    else if (strategy_type == "MomentumStrategy")
+        variant = "mom";
+    else if (strategy_type == "FundingArbStrategy")
+        variant = "farb";
+    else
+        variant = strategy_type.substr(0, 5);
     return "bpt-strat-" + variant;
 }
 
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    auto args = bpt::app::parse_cli(argc, argv,
-                                    "bpt-strategy",
-                                    "strategy engine");
+    auto args = bpt::app::parse_cli(argc, argv, "bpt-strategy", "strategy engine");
 
     // Bootstrap logger up-front so any pre-run() failure (config load,
     // chaos config) lands in the same sink. bpt::app::run reinits with
@@ -57,16 +62,16 @@ int main(int argc, char* argv[]) {
         // Optional fault injection (dev/qa only). Must run before
         // bpt::app::run builds the AeronBus — Subscribers consult the
         // registry at ctor time.
-        bpt::common::aeron::install_chaos_from_toml(
-            args.config_path,
-            bpt::common::to_string(app_cfg.base.environment),
-            service_name);
+        bpt::common::aeron::install_chaos_from_toml(args.config_path,
+                                                    bpt::common::to_string(app_cfg.base.environment),
+                                                    service_name);
 
-        return bpt::app::run(service_name, std::move(app_cfg),
+        return bpt::app::run(
+            service_name,
+            std::move(app_cfg),
             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                 auto bus = bpt::strategy::messaging::StrategyAeronBus::build(ctx.aeron, cfg);
-                return std::make_unique<bpt::strategy::StrategyApp>(
-                    std::move(cfg), std::move(bus), ctx.topology);
+                return std::make_unique<bpt::strategy::StrategyApp>(std::move(cfg), std::move(bus), ctx.topology);
             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

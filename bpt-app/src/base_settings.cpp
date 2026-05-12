@@ -1,7 +1,7 @@
 #include "bpt_app/base_settings.h"
 
-#include <stdexcept>
 #include <bpt_common/logging_toml.h>
+#include <stdexcept>
 
 namespace bpt::app {
 
@@ -11,8 +11,7 @@ void load_base_settings(const toml::table& root, BaseSettings& base) {
     // would otherwise skip every prod-specific guard rail we rely on.
     auto env_str = root["environment"].value<std::string>();
     if (!env_str)
-        throw std::runtime_error(
-            "Missing required top-level key: environment = \"dev\" | \"qa\" | \"prod\"");
+        throw std::runtime_error("Missing required top-level key: environment = \"dev\" | \"qa\" | \"prod\"");
     base.environment = env_from_string(*env_str);
 
     if (const auto* a = root["aeron"].as_table()) {

@@ -9,31 +9,35 @@
 #include <messages/MdTrade.h>
 #include <messages/MessageHeader.h>
 
-#include <cstring>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cstring>
 
 namespace bpt::strategy::md {
 
 AeronMdClient::AeronMdClient(std::shared_ptr<aeron::Aeron> aeron,
-                   const std::string& channel,
-                   int control_stream,
-                   int data_stream,
-                   int ack_hb_stream) {
-    ctrl_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-        aeron, channel, control_stream,
-        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+                             const std::string& channel,
+                             int control_stream,
+                             int data_stream,
+                             int ack_hb_stream) {
+    ctrl_pub_ =
+        std::make_unique<bpt::common::aeron::Publisher>(aeron,
+                                                        channel,
+                                                        control_stream,
+                                                        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
     data_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, data_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        data_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_data_fragment(buf, offset, length, hdr);
         });
     ack_hb_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, ack_hb_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        ack_hb_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_ack_hb_fragment(buf, offset, length, hdr);
         });
 
@@ -73,9 +77,9 @@ void AeronMdClient::subscribe(uint64_t correlation_id, const std::vector<Instrum
 }
 
 void AeronMdClient::handle_data_fragment(aeron::AtomicBuffer& buffer,
-                                    aeron::util::index_t offset,
-                                    aeron::util::index_t length,
-                                    aeron::Header& /*header*/) {
+                                         aeron::util::index_t offset,
+                                         aeron::util::index_t length,
+                                         aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -87,9 +91,9 @@ void AeronMdClient::handle_data_fragment(aeron::AtomicBuffer& buffer,
     static uint64_t frag_count = 0;
     if (++frag_count <= 5) {
         bpt::common::log::info("[MdClient] fragment: templateId={} expected_bbo={} length={}",
-                       hdr.templateId(),
-                       MdMarketData::sbeTemplateId(),
-                       length);
+                               hdr.templateId(),
+                               MdMarketData::sbeTemplateId(),
+                               length);
     }
 
     switch (hdr.templateId()) {
@@ -132,9 +136,9 @@ void AeronMdClient::handle_data_fragment(aeron::AtomicBuffer& buffer,
 }
 
 void AeronMdClient::handle_ack_hb_fragment(aeron::AtomicBuffer& buffer,
-                                      aeron::util::index_t offset,
-                                      aeron::util::index_t length,
-                                      aeron::Header& /*header*/) {
+                                           aeron::util::index_t offset,
+                                           aeron::util::index_t length,
+                                           aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -162,8 +166,8 @@ void AeronMdClient::handle_ack_hb_fragment(aeron::AtomicBuffer& buffer,
                           hdr.version(),
                           static_cast<std::size_t>(length));
         bpt::common::log::info("MdClient: ack instrument_id={} status={}",
-                       msg.instrumentId(),
-                       static_cast<int>(msg.ackStatus()));
+                               msg.instrumentId(),
+                               static_cast<int>(msg.ackStatus()));
     }
     // MdSubscriptionHeartbeat silently consumed — used by a watchdog if needed
 }
@@ -179,9 +183,9 @@ int AeronMdClient::poll(int fragment_limit) {
     total_data_frags += data_frags;
     if (++data_poll_count % 100000 == 0) {
         bpt::common::log::info("[MdClient] poll stats: polls={} data_frags_total={} connected={}",
-                       data_poll_count,
-                       total_data_frags,
-                       data_sub_->is_connected());
+                               data_poll_count,
+                               total_data_frags,
+                               data_sub_->is_connected());
     }
 
     total += ack_hb_sub_->poll(fragment_limit);

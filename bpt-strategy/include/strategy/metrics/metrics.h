@@ -68,8 +68,10 @@ struct StrategyMetrics {
     explicit StrategyMetrics(int port);
 
     void shutdown() {
-        if (healthy) healthy->Set(0.0);
-        if (strategy_active) strategy_active->Set(0.0);
+        if (healthy)
+            healthy->Set(0.0);
+        if (strategy_active)
+            strategy_active->Set(0.0);
     }
 
     // Accessors — these allocate on first call via prometheus-cpp's Add().
@@ -85,9 +87,7 @@ struct StrategyMetrics {
     prometheus::Histogram& tick_to_strategy_ns() {
         return tick_to_strategy_ns_fam->Add({}, kDefaultLatencyBucketsNs());
     }
-    prometheus::Histogram& tick_to_order_ns() {
-        return tick_to_order_ns_fam->Add({}, kDefaultLatencyBucketsNs());
-    }
+    prometheus::Histogram& tick_to_order_ns() { return tick_to_order_ns_fam->Add({}, kDefaultLatencyBucketsNs()); }
 
 private:
     static const prometheus::Histogram::BucketBoundaries& kDefaultLatencyBucketsNs();

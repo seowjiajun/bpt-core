@@ -1,7 +1,7 @@
 #include "md_gateway/md/md_validator.h"
 
-#include <cmath>
 #include <bpt_common/logging.h>
+#include <cmath>
 
 namespace bpt::md_gateway::md {
 
@@ -31,26 +31,29 @@ static bool should_log(std::unordered_map<uint64_t, uint32_t>& counts, uint64_t 
 ValidationResult MdValidator::validate(const MdBbo& bbo) {
     if (bbo.bid_price <= 0.0 || bbo.ask_price <= 0.0) {
         if (should_log(drop_count_, bbo.instrument_id))
-            bpt::common::log::warn(kLog(), "BBO invalid prices: bid={} ask={} id={}",
-                           bbo.bid_price,
-                           bbo.ask_price,
-                           bbo.instrument_id);
+            bpt::common::log::warn(kLog(),
+                                   "BBO invalid prices: bid={} ask={} id={}",
+                                   bbo.bid_price,
+                                   bbo.ask_price,
+                                   bbo.instrument_id);
         return ValidationResult::DROP;
     }
     if (bbo.bid_qty <= 0.0 || bbo.ask_qty <= 0.0) {
         if (should_log(drop_count_, bbo.instrument_id))
-            bpt::common::log::warn(kLog(), "BBO invalid quantities: bid_qty={} ask_qty={} id={}",
-                           bbo.bid_qty,
-                           bbo.ask_qty,
-                           bbo.instrument_id);
+            bpt::common::log::warn(kLog(),
+                                   "BBO invalid quantities: bid_qty={} ask_qty={} id={}",
+                                   bbo.bid_qty,
+                                   bbo.ask_qty,
+                                   bbo.instrument_id);
         return ValidationResult::DROP;
     }
     if (bbo.ask_price <= bbo.bid_price) {
         if (should_log(drop_count_, bbo.instrument_id))
-            bpt::common::log::warn(kLog(), "BBO crossed: bid={} ask={} id={}",
-                           bbo.bid_price,
-                           bbo.ask_price,
-                           bbo.instrument_id);
+            bpt::common::log::warn(kLog(),
+                                   "BBO crossed: bid={} ask={} id={}",
+                                   bbo.bid_price,
+                                   bbo.ask_price,
+                                   bbo.instrument_id);
         return ValidationResult::DROP;
     }
 
@@ -61,12 +64,13 @@ ValidationResult MdValidator::validate(const MdBbo& bbo) {
         double deviation = std::abs(mid - it->second) / it->second;
         if (deviation > max_deviation_ratio_) {
             if (should_log(drop_count_, bbo.instrument_id))
-                bpt::common::log::warn(kLog(), "BBO price deviation {:.2f}% > {:.2f}%: mid={} last={} id={}",
-                               deviation * 100.0,
-                               max_deviation_ratio_ * 100.0,
-                               mid,
-                               it->second,
-                               bbo.instrument_id);
+                bpt::common::log::warn(kLog(),
+                                       "BBO price deviation {:.2f}% > {:.2f}%: mid={} last={} id={}",
+                                       deviation * 100.0,
+                                       max_deviation_ratio_ * 100.0,
+                                       mid,
+                                       it->second,
+                                       bbo.instrument_id);
             return ValidationResult::DROP;
         }
         it->second = mid;
@@ -95,13 +99,13 @@ ValidationResult MdValidator::validate(const MdTrade& trade) {
         if (deviation > max_deviation_ratio_) {
             if (should_log(drop_count_, trade.instrument_id))
                 bpt::common::log::warn(kLog(),
-                    "Trade price deviation {:.2f}% > {:.2f}%: px={} last_mid={} "
-                    "id={}",
-                    deviation * 100.0,
-                    max_deviation_ratio_ * 100.0,
-                    trade.price,
-                    it->second,
-                    trade.instrument_id);
+                                       "Trade price deviation {:.2f}% > {:.2f}%: px={} last_mid={} "
+                                       "id={}",
+                                       deviation * 100.0,
+                                       max_deviation_ratio_ * 100.0,
+                                       trade.price,
+                                       it->second,
+                                       trade.instrument_id);
             return ValidationResult::DROP;
         }
     }
@@ -121,18 +125,20 @@ ValidationResult MdValidator::validate(const MdOrderBook& book) {
 
     if (best_bid <= 0.0 || best_ask <= 0.0) {
         if (should_log(drop_count_, book.instrument_id))
-            bpt::common::log::warn(kLog(), "OrderBook invalid prices: bid={} ask={} id={}",
-                           best_bid,
-                           best_ask,
-                           book.instrument_id);
+            bpt::common::log::warn(kLog(),
+                                   "OrderBook invalid prices: bid={} ask={} id={}",
+                                   best_bid,
+                                   best_ask,
+                                   book.instrument_id);
         return ValidationResult::DROP;
     }
     if (best_ask <= best_bid) {
         if (should_log(drop_count_, book.instrument_id))
-            bpt::common::log::warn(kLog(), "OrderBook crossed: bid={} ask={} id={}",
-                           best_bid,
-                           best_ask,
-                           book.instrument_id);
+            bpt::common::log::warn(kLog(),
+                                   "OrderBook crossed: bid={} ask={} id={}",
+                                   best_bid,
+                                   best_ask,
+                                   book.instrument_id);
         return ValidationResult::DROP;
     }
 
@@ -159,13 +165,13 @@ ValidationResult MdValidator::validate(const MdOrderBook& book) {
         if (deviation > max_deviation_ratio_) {
             if (should_log(drop_count_, book.instrument_id))
                 bpt::common::log::warn(kLog(),
-                    "OrderBook price deviation {:.2f}% > {:.2f}%: mid={} last={} "
-                    "id={}",
-                    deviation * 100.0,
-                    max_deviation_ratio_ * 100.0,
-                    mid,
-                    it->second,
-                    book.instrument_id);
+                                       "OrderBook price deviation {:.2f}% > {:.2f}%: mid={} last={} "
+                                       "id={}",
+                                       deviation * 100.0,
+                                       max_deviation_ratio_ * 100.0,
+                                       mid,
+                                       it->second,
+                                       book.instrument_id);
             return ValidationResult::DROP;
         }
     }

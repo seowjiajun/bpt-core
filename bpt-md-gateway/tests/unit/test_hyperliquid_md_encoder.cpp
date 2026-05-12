@@ -12,13 +12,12 @@
 
 #include <gtest/gtest.h>
 
-using bpt::md_gateway::adapter::hyperliquid::build_subscribe_payload;
 using bpt::md_gateway::adapter::hyperliquid::build_ping_payload;
+using bpt::md_gateway::adapter::hyperliquid::build_subscribe_payload;
 
 TEST(HyperliquidMdEncoder, SubscribePayloadPerpSymbol) {
     const std::string payload = build_subscribe_payload("l2Book", "BTC");
-    EXPECT_EQ(payload,
-              R"({"method":"subscribe","subscription":{"type":"l2Book","coin":"BTC"}})");
+    EXPECT_EQ(payload, R"({"method":"subscribe","subscription":{"type":"l2Book","coin":"BTC"}})");
 }
 
 TEST(HyperliquidMdEncoder, SubscribePayloadSpotPairName) {
@@ -27,14 +26,12 @@ TEST(HyperliquidMdEncoder, SubscribePayloadSpotPairName) {
     // mirrors the same string. SubscriptionMap.find_id sees "PURR/USDC"
     // both on subscribe and on every frame; no aliasing needed.
     const std::string payload = build_subscribe_payload("l2Book", "PURR/USDC");
-    EXPECT_EQ(payload,
-              R"({"method":"subscribe","subscription":{"type":"l2Book","coin":"PURR/USDC"}})");
+    EXPECT_EQ(payload, R"({"method":"subscribe","subscription":{"type":"l2Book","coin":"PURR/USDC"}})");
 }
 
 TEST(HyperliquidMdEncoder, SubscribePayloadTrades) {
     const std::string payload = build_subscribe_payload("trades", "PURR/USDC");
-    EXPECT_EQ(payload,
-              R"({"method":"subscribe","subscription":{"type":"trades","coin":"PURR/USDC"}})");
+    EXPECT_EQ(payload, R"({"method":"subscribe","subscription":{"type":"trades","coin":"PURR/USDC"}})");
 }
 
 TEST(HyperliquidMdEncoder, PingPayloadIsAppLevel) {

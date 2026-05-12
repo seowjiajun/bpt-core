@@ -11,15 +11,15 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
-#include <chrono>
-#include <string>
 #include <bpt_common/util/strings.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <chrono>
+#include <string>
 
 namespace bpt::order_gateway::adapter {
 
-using bpt::common::util::WallClock;
 using bpt::common::util::hex8;
+using bpt::common::util::WallClock;
 
 namespace json = boost::json;
 
@@ -38,8 +38,7 @@ OKXOrderAdapter::OKXOrderAdapter(const config::AdapterConfig& cfg, const Exchang
             bpt::common::log::error("[OKX] exec_queue full — dropped ExecEvent order_id={}", ev.order_id);
     };
 
-    ws_client_.set_login_msg_builder(
-        [this] { return okx::build_login_msg(api_key_, secret_key_, passphrase_); });
+    ws_client_.set_login_msg_builder([this] { return okx::build_login_msg(api_key_, secret_key_, passphrase_); });
     ws_client_.set_message_handler(
         [this](const std::string& payload, uint64_t recv_ns) { handle_message(payload, recv_ns); });
 }
@@ -157,7 +156,7 @@ void OKXOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
         rej.local_ts_ns = ts;
         rej.exchange_ts_ns = ts;
         rej.side = (order.side() == bpt::messages::OrderSide::BUY) ? bpt::messages::OrderSide::BUY
-                                                                       : bpt::messages::OrderSide::SELL;
+                                                                   : bpt::messages::OrderSide::SELL;
         rej.order_type = order.orderType();
         rej.status = bpt::messages::ExecStatus::REJECTED;
         rej.reject_reason = bpt::messages::RejectReason::EXCHANGE_ERROR;
@@ -182,8 +181,7 @@ void OKXOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
 void OKXOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel, const std::string& native_symbol) {
     const std::string cloid = session_prefix_ + "G" + std::to_string(cancel.orderId());
     const uint64_t req_id = ws_req_id_.fetch_add(1, std::memory_order_relaxed);
-    const std::string frame = json::serialize(
-        okx::build_cancel_action(native_symbol, cloid, req_id));
+    const std::string frame = json::serialize(okx::build_cancel_action(native_symbol, cloid, req_id));
 
     try {
         ws_client_.send(frame);
@@ -198,9 +196,11 @@ void OKXOrderAdapter::send_cancel_all(uint64_t instrument_id) {
 
 void OKXOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify, const std::string& native_symbol) {
     const std::string cloid = session_prefix_ + "G" + std::to_string(modify.orderId());
-    const std::string frame = json::serialize(
-        okx::build_modify_action(native_symbol, cloid, modify.newPrice(), modify.newQuantity(),
-                                 instruments_.contract_sizes()));
+    const std::string frame = json::serialize(okx::build_modify_action(native_symbol,
+                                                                       cloid,
+                                                                       modify.newPrice(),
+                                                                       modify.newQuantity(),
+                                                                       instruments_.contract_sizes()));
 
     try {
         ws_client_.send(frame);
@@ -226,7 +226,7 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
             // size only — a byte count is enough to distinguish HTML blob
             // from empty body without echoing whatever the origin returned.
             bpt::common::log::warn("OKXOrderAdapter: balance response is not a JSON object (bytes={})",
-                           bal_resp.size());
+                                   bal_resp.size());
         } else {
             const auto& root = bal_j.as_object();
             // OKX wraps errors in {code, msg, data:[]}. Surface any non-zero
@@ -236,10 +236,10 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
             // echoing signed-request metadata or upstream error envelopes.
             if (root.contains("code") && std::string(root.at("code").as_string()) != "0") {
                 bpt::common::log::warn("OKXOrderAdapter: /account/balance error code={} msg={}",
-                               std::string(root.at("code").as_string()),
-                               root.contains("msg") ? std::string(root.at("msg").as_string()) : "");
-            } else if (root.contains("data") && root.at("data").is_array() &&
-                       !root.at("data").as_array().empty() && root.at("data").as_array()[0].is_object()) {
+                                       std::string(root.at("code").as_string()),
+                                       root.contains("msg") ? std::string(root.at("msg").as_string()) : "");
+            } else if (root.contains("data") && root.at("data").is_array() && !root.at("data").as_array().empty() &&
+                       root.at("data").as_array()[0].is_object()) {
                 const auto& d = root.at("data").as_array()[0].as_object();
                 if (d.contains("totalEq"))
                     snap.total_equity_e8 =
@@ -271,16 +271,14 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
                             });
                         }
                         if (ccy == "USDT" && de.contains("availBal"))
-                            snap.available_balance_e8 =
-                                static_cast<int64_t>(std::round(avail_d * 1e8));
+                            snap.available_balance_e8 = static_cast<int64_t>(std::round(avail_d * 1e8));
                     }
                 }
                 bpt::common::log::info("OKXOrderAdapter: /account/balance totalEq={:.4f} USDT availBal={:.4f}",
-                               static_cast<double>(snap.total_equity_e8) / 1e8,
-                               static_cast<double>(snap.available_balance_e8) / 1e8);
+                                       static_cast<double>(snap.total_equity_e8) / 1e8,
+                                       static_cast<double>(snap.available_balance_e8) / 1e8);
             } else {
-                bpt::common::log::warn("OKXOrderAdapter: balance response missing data[]: {}",
-                               bal_resp.substr(0, 400));
+                bpt::common::log::warn("OKXOrderAdapter: balance response missing data[]: {}", bal_resp.substr(0, 400));
             }
         }
     } catch (const std::exception& e) {
@@ -320,8 +318,8 @@ AccountSnapshotData OKXOrderAdapter::fetch_account_snapshot(uint64_t correlation
     }
 
     bpt::common::log::info("OKXOrderAdapter: account snapshot fetched — balance={:.2f} positions={}",
-                   static_cast<double>(snap.available_balance_e8) / 1e8,
-                   snap.positions.size());
+                           static_cast<double>(snap.available_balance_e8) / 1e8,
+                           snap.positions.size());
     return snap;
 }
 
@@ -336,8 +334,8 @@ void OKXOrderAdapter::fetch_and_log_account_config() {
         auto& obj = j.as_object();
         if (obj.contains("code") && obj.at("code").as_string() != "0") {
             bpt::common::log::warn("[OKX account/config] error code={} msg={}",
-                           std::string(obj.at("code").as_string()),
-                           obj.contains("msg") ? std::string(obj.at("msg").as_string()) : "");
+                                   std::string(obj.at("code").as_string()),
+                                   obj.contains("msg") ? std::string(obj.at("msg").as_string()) : "");
             return;
         }
         if (!obj.contains("data") || !obj.at("data").is_array() || obj.at("data").as_array().empty())
@@ -369,15 +367,21 @@ void OKXOrderAdapter::fetch_and_log_account_config() {
         }
 
         bpt::common::log::info("[OKX account/config] uid={} label='{}' acctLv={} ({}) perm={} posMode={}",
-                       uid, label, acct_lv, lvl_name, perm, pos_mode);
+                               uid,
+                               label,
+                               acct_lv,
+                               lvl_name,
+                               perm,
+                               pos_mode);
 
         if (!derivatives_allowed) {
-            bpt::common::log::warn("[OKX account/config] ACCOUNT CANNOT TRADE DERIVATIVES — "
-                           "level {} is spot-only. Perp/futures/options orders will reject "
-                           "with sCode=51155 'local compliance requirements' (the real cause "
-                           "is the account level, not geo-compliance). Upgrade via OKX UI: "
-                           "Demo Trading → Account Mode → Single-currency margin or higher.",
-                           acct_lv);
+            bpt::common::log::warn(
+                "[OKX account/config] ACCOUNT CANNOT TRADE DERIVATIVES — "
+                "level {} is spot-only. Perp/futures/options orders will reject "
+                "with sCode=51155 'local compliance requirements' (the real cause "
+                "is the account level, not geo-compliance). Upgrade via OKX UI: "
+                "Demo Trading → Account Mode → Single-currency margin or higher.",
+                acct_lv);
         }
     } catch (const std::exception& e) {
         bpt::common::log::warn("[OKX account/config] fetch failed: {}", e.what());

@@ -16,10 +16,10 @@
 #include <Aeron.h>
 
 #include <atomic>
+#include <bpt_common/aeron/publisher.h>
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::md_gateway::messaging {
 

@@ -10,10 +10,10 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
-#include <chrono>
-#include <string>
 #include <bpt_common/util/strings.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <chrono>
+#include <string>
 
 namespace bpt::order_gateway::adapter {
 
@@ -36,8 +36,7 @@ DeribitOrderAdapter::DeribitOrderAdapter(const config::AdapterConfig& cfg, const
     };
 
     ws_client_.set_login_msg_builder([this] {
-        return deribit::build_auth_msg(client_id_, client_secret_,
-                                        jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
+        return deribit::build_auth_msg(client_id_, client_secret_, jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
     });
     ws_client_.set_message_handler(
         [this](const std::string& payload, uint64_t recv_ns) { handle_message(payload, recv_ns); });
@@ -66,8 +65,7 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
                 auto type_it = params_it->value().as_object().find("type");
                 if (type_it != params_it->value().as_object().end() &&
                     std::string(type_it->value().as_string()) == "test_request") {
-                    ws_client_.send(deribit::build_test_response(
-                        jsonrpc_id_.fetch_add(1, std::memory_order_relaxed)));
+                    ws_client_.send(deribit::build_test_response(jsonrpc_id_.fetch_add(1, std::memory_order_relaxed)));
                 }
             }
             return;
@@ -116,11 +114,13 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
         bpt::common::log::info("DeribitOrderAdapter: authenticated successfully");
         logged_in_.store(true, std::memory_order_release);
 
-        const auto next_id = [this] { return jsonrpc_id_.fetch_add(1, std::memory_order_relaxed); };
+        const auto next_id = [this] {
+            return jsonrpc_id_.fetch_add(1, std::memory_order_relaxed);
+        };
         ws_client_.send(deribit::build_simple_rpc("private/enable_cancel_on_disconnect", "", next_id()));
         ws_client_.send(deribit::build_simple_rpc("public/set_heartbeat", "{\"interval\":10}", next_id()));
-        ws_client_.send(deribit::build_simple_rpc(
-            "private/subscribe", "{\"channels\":[\"user.orders.any.raw\"]}", next_id()));
+        ws_client_.send(
+            deribit::build_simple_rpc("private/subscribe", "{\"channels\":[\"user.orders.any.raw\"]}", next_id()));
 
         // Drain pending sends one-at-a-time, removing each AFTER a
         // successful dispatch. If a mid-drain failure throws, we leave
@@ -137,11 +137,14 @@ void DeribitOrderAdapter::handle_message(const std::string& payload, uint64_t re
         std::lock_guard<std::mutex> lk(pending_mu_);
         while (!pending_sends_.empty()) {
             try {
-                if (!ws_client_.send(pending_sends_.front())) break;
+                if (!ws_client_.send(pending_sends_.front()))
+                    break;
             } catch (const std::exception& e) {
-                bpt::common::log::error("DeribitOrderAdapter: mid-drain send threw ({}) — "
-                                "dropping frame, {} remaining queued",
-                                e.what(), pending_sends_.size() - 1);
+                bpt::common::log::error(
+                    "DeribitOrderAdapter: mid-drain send threw ({}) — "
+                    "dropping frame, {} remaining queued",
+                    e.what(),
+                    pending_sends_.size() - 1);
                 pending_sends_.erase(pending_sends_.begin());
                 break;
             }
@@ -175,8 +178,7 @@ void DeribitOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
         order.quantity(),
         label,
     };
-    const std::string frame =
-        deribit::build_new_order_msg(spec, jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
+    const std::string frame = deribit::build_new_order_msg(spec, jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
 
     auto emit_rejection = [&]() {
         const uint64_t ts = bpt::common::util::WallClock::now_ns();
@@ -218,8 +220,7 @@ void DeribitOrderAdapter::send_new_order(const bpt::messages::NewOrder& order) {
     }
 }
 
-void DeribitOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
-                                      const std::string& /*native_symbol*/) {
+void DeribitOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel, const std::string& /*native_symbol*/) {
     // Deribit cancel uses exchange order_id, not instrument symbol.
     const std::string exch_oid = decoder_.get_exchange_order_id(cancel.orderId());
     if (exch_oid.empty()) {
@@ -230,8 +231,7 @@ void DeribitOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
         return;
     }
 
-    const std::string frame =
-        deribit::build_cancel_msg(exch_oid, jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
+    const std::string frame = deribit::build_cancel_msg(exch_oid, jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
     try {
         ws_client_.send(frame);
     } catch (const std::exception& e) {
@@ -246,8 +246,7 @@ void DeribitOrderAdapter::send_cancel_all(uint64_t instrument_id) {
         instrument_id);
 }
 
-void DeribitOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
-                                      const std::string& /*native_symbol*/) {
+void DeribitOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify, const std::string& /*native_symbol*/) {
     const std::string exch_oid = decoder_.get_exchange_order_id(modify.orderId());
     if (exch_oid.empty()) {
         bpt::common::log::warn(
@@ -257,8 +256,10 @@ void DeribitOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
         return;
     }
 
-    const std::string frame = deribit::build_edit_msg(exch_oid, modify.newPrice(), modify.newQuantity(),
-                                                        jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
+    const std::string frame = deribit::build_edit_msg(exch_oid,
+                                                      modify.newPrice(),
+                                                      modify.newQuantity(),
+                                                      jsonrpc_id_.fetch_add(1, std::memory_order_relaxed));
     try {
         ws_client_.send(frame);
     } catch (const std::exception& e) {

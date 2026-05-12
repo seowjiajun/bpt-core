@@ -11,12 +11,12 @@
 #include <messages/exec_inst.h>
 
 #include <boost/json.hpp>
+#include <bpt_common/util/tsc_clock.h>
 #include <chrono>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -33,9 +33,14 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
     : OrderAdapterBase(cfg),
       wallet_address_(creds.wallet_address) {
     https_client_ = std::make_unique<hyperliquid::HyperliquidHttpsClient>(cfg.rest_host, cfg.rest_port, cfg.use_tls);
-    ws_client_ = std::make_unique<hyperliquid::HyperliquidWsClient>(
-        ioc_, ssl_ctx_, cfg.ws_host, cfg.ws_port, cfg.ws_path, wallet_address_,
-        cfg.pinned_tls_sha256, cfg.use_tls);
+    ws_client_ = std::make_unique<hyperliquid::HyperliquidWsClient>(ioc_,
+                                                                    ssl_ctx_,
+                                                                    cfg.ws_host,
+                                                                    cfg.ws_port,
+                                                                    cfg.ws_path,
+                                                                    wallet_address_,
+                                                                    cfg.pinned_tls_sha256,
+                                                                    cfg.use_tls);
 
     decoder_.on_exec_event = [this](const ExecEvent& ev) {
         if (!exec_queue_.try_push(ev))
@@ -44,9 +49,7 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
 
     // Route userFills frames from the ws read loop into our exec parser.
     ws_client_->set_user_fills_handler(
-        [this](const boost::json::array& fills, uint64_t recv_ns) {
-            decoder_.handle_fills(fills, recv_ns);
-        });
+        [this](const boost::json::array& fills, uint64_t recv_ns) { decoder_.handle_fills(fills, recv_ns); });
 
     // Backtest mode: when the adapter is pointed at the local backtester
     // (plain TCP + 127.0.0.1) the simulator's HyperliquidOrderServer
@@ -88,16 +91,20 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
             json::object req;
             req["type"] = "userAbstraction";
             req["user"] = wallet_address_;
-            const std::string resp = https_client_->post(
-                "/info", json::serialize(json::value(req)));
+            const std::string resp = https_client_->post("/info", json::serialize(json::value(req)));
             const auto v = json::parse(resp);
             if (v.is_string()) {
                 const std::string mode_str = std::string(v.as_string());
-                if      (mode_str == "disabled")        account_mode_ = HyperliquidAccountMode::kDisabled;
-                else if (mode_str == "unifiedAccount")  account_mode_ = HyperliquidAccountMode::kUnifiedAccount;
-                else if (mode_str == "portfolioMargin") account_mode_ = HyperliquidAccountMode::kPortfolioMargin;
-                else if (mode_str == "default")         account_mode_ = HyperliquidAccountMode::kDefault;
-                else if (mode_str == "dexAbstraction")  account_mode_ = HyperliquidAccountMode::kDexAbstraction;
+                if (mode_str == "disabled")
+                    account_mode_ = HyperliquidAccountMode::kDisabled;
+                else if (mode_str == "unifiedAccount")
+                    account_mode_ = HyperliquidAccountMode::kUnifiedAccount;
+                else if (mode_str == "portfolioMargin")
+                    account_mode_ = HyperliquidAccountMode::kPortfolioMargin;
+                else if (mode_str == "default")
+                    account_mode_ = HyperliquidAccountMode::kDefault;
+                else if (mode_str == "dexAbstraction")
+                    account_mode_ = HyperliquidAccountMode::kDexAbstraction;
                 bpt::common::log::info("HyperliquidOrderAdapter: account mode = {}", mode_str);
             } else {
                 bpt::common::log::warn(
@@ -107,7 +114,8 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
         } catch (const std::exception& e) {
             bpt::common::log::warn(
                 "HyperliquidOrderAdapter: userAbstraction query failed ({}); "
-                "falling back to perp-only balance reporting", e.what());
+                "falling back to perp-only balance reporting",
+                e.what());
         }
     }
 
@@ -122,9 +130,9 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
                 json::object req_open;
                 req_open["type"] = "openOrders";
                 req_open["user"] = wallet_address_;
-                auto open_resp = json::parse(
-                    https_client_->post("/info", json::serialize(json::value(req_open))));
-                if (open_resp.is_array()) out.first = open_resp.as_array();
+                auto open_resp = json::parse(https_client_->post("/info", json::serialize(json::value(req_open))));
+                if (open_resp.is_array())
+                    out.first = open_resp.as_array();
             } catch (const std::exception& e) {
                 bpt::common::log::warn("reconciler: openOrders poll failed: {}", e.what());
             }
@@ -132,18 +140,16 @@ HyperliquidOrderAdapter::HyperliquidOrderAdapter(const config::AdapterConfig& cf
                 json::object req_fills;
                 req_fills["type"] = "userFills";
                 req_fills["user"] = wallet_address_;
-                auto fills_resp = json::parse(
-                    https_client_->post("/info", json::serialize(json::value(req_fills))));
-                if (fills_resp.is_array()) out.second = fills_resp.as_array();
+                auto fills_resp = json::parse(https_client_->post("/info", json::serialize(json::value(req_fills))));
+                if (fills_resp.is_array())
+                    out.second = fills_resp.as_array();
             } catch (const std::exception& e) {
                 bpt::common::log::warn("reconciler: userFills poll failed: {}", e.what());
             }
             return out;
         },
         [this](const hyperliquid::HyperliquidReconciler::Candidate& c,
-               const hyperliquid::HyperliquidReconciler::MatchResult& r) {
-            on_reconcile_terminal(c, r);
-        },
+               const hyperliquid::HyperliquidReconciler::MatchResult& r) { on_reconcile_terminal(c, r); },
         std::chrono::milliseconds(3000),
         static_cast<int64_t>(1.0 * 1e8));  // 1 USD tick
 
@@ -170,21 +176,23 @@ void HyperliquidOrderAdapter::load_asset_meta() {
         try {
             const std::string resp = https_client_->post("/info", body);
             asset_meta_ = hlcodec::parse_universe_meta(resp);
-            bpt::common::log::info(
-                "HyperliquidOrderAdapter: loaded {} asset(s) from /info meta (attempt {})",
-                asset_meta_.size(), attempt);
+            bpt::common::log::info("HyperliquidOrderAdapter: loaded {} asset(s) from /info meta (attempt {})",
+                                   asset_meta_.size(),
+                                   attempt);
             break;
         } catch (const std::exception& e) {
             if (attempt == kMaxAttempts) {
                 bpt::common::log::error(
                     "HyperliquidOrderAdapter: failed to load /info meta after {} attempts "
                     "— orders will be rejected until restart: {}",
-                    kMaxAttempts, e.what());
+                    kMaxAttempts,
+                    e.what());
                 return;
             }
-            bpt::common::log::warn(
-                "HyperliquidOrderAdapter: /info meta load attempt {}/{} failed ({}); retrying in 1s",
-                attempt, kMaxAttempts, e.what());
+            bpt::common::log::warn("HyperliquidOrderAdapter: /info meta load attempt {}/{} failed ({}); retrying in 1s",
+                                   attempt,
+                                   kMaxAttempts,
+                                   e.what());
             std::this_thread::sleep_for(kRetryInterval);
         }
     }
@@ -202,12 +210,12 @@ void HyperliquidOrderAdapter::load_asset_meta() {
         const std::size_t n = spot_table.size();
         for (auto& [k, v] : spot_table)
             asset_meta_.emplace(std::move(k), v);
-        bpt::common::log::info(
-            "HyperliquidOrderAdapter: loaded {} spot pair(s) from /info spotMeta", n);
+        bpt::common::log::info("HyperliquidOrderAdapter: loaded {} spot pair(s) from /info spotMeta", n);
     } catch (const std::exception& e) {
         bpt::common::log::warn(
             "HyperliquidOrderAdapter: failed to load /info spotMeta — spot orders "
-            "will be rejected: {}", e.what());
+            "will be rejected: {}",
+            e.what());
     }
 }
 
@@ -238,7 +246,7 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
     const std::string exchange_symbol = order.getExchangeSymbolAsString();
     const bool is_buy = (order.side() == OS::BUY);
     const double price_d = static_cast<double>(order.price()) / kScale;
-    const double size_d  = static_cast<double>(order.quantity()) / kScale;
+    const double size_d = static_cast<double>(order.quantity()) / kScale;
 
     // Map (OrderType, TimeInForce, execInst) onto HL's limit tif string.
     //   execInst & POST_ONLY → Alo  (HL rejects the order if it would cross — maker only)
@@ -247,7 +255,8 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
     //                 limit price with IOC semantics)
     //   everything else → Gtc
     const auto hl_tif = [&]() {
-        if (order.execInst() & bpt::messages::kExecInstPostOnly) return hlcodec::HlTif::Alo;
+        if (order.execInst() & bpt::messages::kExecInstPostOnly)
+            return hlcodec::HlTif::Alo;
         if (order.timeInForce() == TIF::IOC || order.orderType() == OT::MARKET)
             return hlcodec::HlTif::Ioc;
         return hlcodec::HlTif::Gtc;
@@ -262,8 +271,12 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
     if (meta_it == asset_meta_.end()) {
         bpt::common::log::warn("HyperliquidOrderAdapter: unknown symbol {} — rejecting", exchange_symbol);
         const hyperliquid::OrderContext ctx{
-            order.orderId(), order.instrumentId(), order.side(), order.orderType(),
-            order.price(), order.quantity(),
+            order.orderId(),
+            order.instrumentId(),
+            order.side(),
+            order.orderType(),
+            order.price(),
+            order.quantity(),
         };
         exec_emitter_.emit_rejected(ctx);
         return;
@@ -275,8 +288,7 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
         // Do NOT mutate `action` after signing — the signer msgpacks the
         // exact bytes we pass to ws_client_->post_action, so any post-sign mutation
         // desyncs the signature from the wire payload.
-        const json::value action = hlcodec::build_order_action(
-            meta, is_buy, price_d, size_d, hl_tif);
+        const json::value action = hlcodec::build_order_action(meta, is_buy, price_d, size_d, hl_tif);
 
         const uint64_t nonce = signer_->next_nonce();
         auto tx = signer_->sign_l1_action(action, nonce);
@@ -287,12 +299,12 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
         // parsing below is unchanged.
         const std::string resp = ws_client_->post_action(action, nonce, tx);
         bpt::common::log::info("HyperliquidOrderAdapter: new order id={} side={} tif={} px={} sz={} resp={}",
-                       order.orderId(),
-                       is_buy ? "BUY" : "SELL",
-                       hlcodec::tif_to_string(hl_tif),
-                       price_d,
-                       size_d,
-                       resp);
+                               order.orderId(),
+                               is_buy ? "BUY" : "SELL",
+                               hlcodec::tif_to_string(hl_tif),
+                               price_d,
+                               size_d,
+                               resp);
 
         const hyperliquid::OrderContext ctx{
             order.orderId(),
@@ -303,7 +315,8 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
             order.quantity(),
         };
         exec_emitter_.emit_order_response(
-            resp, ctx,
+            resp,
+            ctx,
             [this, client_id = order.orderId(), qty_e8 = order.quantity()](uint64_t exch_oid) {
                 client_to_exch_oid_[client_id] = exch_oid;
                 exch_oid_to_client_[exch_oid] = client_id;
@@ -324,7 +337,8 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
         bpt::common::log::warn(
             "HyperliquidOrderAdapter: send_new_order id={} threw "
             "({}) — deferring to reconciler",
-            order.orderId(), e.what());
+            order.orderId(),
+            e.what());
         reconciler_->reconcile_async(hyperliquid::HyperliquidReconciler::Candidate{
             order.orderId(),
             order.instrumentId(),
@@ -338,9 +352,8 @@ void HyperliquidOrderAdapter::send_new_order(const bpt::messages::NewOrder& orde
     }
 }
 
-void HyperliquidOrderAdapter::on_reconcile_terminal(
-    const hyperliquid::HyperliquidReconciler::Candidate& c,
-    const hyperliquid::HyperliquidReconciler::MatchResult& r) {
+void HyperliquidOrderAdapter::on_reconcile_terminal(const hyperliquid::HyperliquidReconciler::Candidate& c,
+                                                    const hyperliquid::HyperliquidReconciler::MatchResult& r) {
     // Runs on the reconciler's worker thread. By this point at least
     // the grace period (default 3 s) has elapsed since the original
     // send_new_order failed, so the OrderProcessor thread is long
@@ -355,13 +368,18 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
         bpt::common::log::info(
             "HL reconciler: client_id={} already has exch_oid={} — "
             "late response beat us; skipping recovery emit",
-            c.client_order_id, client_to_exch_oid_[c.client_order_id]);
+            c.client_order_id,
+            client_to_exch_oid_[c.client_order_id]);
         return;
     }
 
     const hyperliquid::OrderContext ctx{
-        c.client_order_id, c.instrument_id, c.side, c.order_type,
-        c.price_e8, c.quantity_e8,
+        c.client_order_id,
+        c.instrument_id,
+        c.side,
+        c.order_type,
+        c.price_e8,
+        c.quantity_e8,
     };
 
     using MK = hyperliquid::HyperliquidReconciler::MatchKind;
@@ -370,7 +388,8 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
             bpt::common::log::warn(
                 "HL reconciler: RECOVERED ACK client_id={} exch_oid={} "
                 "(order rested on HL despite lost response)",
-                c.client_order_id, r.exch_oid);
+                c.client_order_id,
+                r.exch_oid);
             client_to_exch_oid_[c.client_order_id] = r.exch_oid;
             exch_oid_to_client_[r.exch_oid] = c.client_order_id;
             decoder_.register_order(r.exch_oid, c.client_order_id, c.quantity_e8);
@@ -380,7 +399,10 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
             bpt::common::log::warn(
                 "HL reconciler: RECOVERED FILL client_id={} exch_oid={} "
                 "qty_e8={} px_e8={} (phantom fill — order matched on HL despite lost response)",
-                c.client_order_id, r.exch_oid, r.fill_qty_e8, r.fill_price_e8);
+                c.client_order_id,
+                r.exch_oid,
+                r.fill_qty_e8,
+                r.fill_price_e8);
             client_to_exch_oid_[c.client_order_id] = r.exch_oid;
             exch_oid_to_client_[r.exch_oid] = c.client_order_id;
             // Register with the original quantity — the parser needs to
@@ -388,8 +410,8 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
             // that arrive later via WS userFills resolve to FILLED at
             // the right cumulative total.
             decoder_.register_order(r.exch_oid, c.client_order_id, c.quantity_e8);
-            exec_emitter_.emit_recovered_fill(ctx, r.exch_oid, r.fill_price_e8,
-                                              r.fill_fee_e8, r.fill_qty_e8, r.fill_time_ns);
+            exec_emitter_
+                .emit_recovered_fill(ctx, r.exch_oid, r.fill_price_e8, r.fill_fee_e8, r.fill_qty_e8, r.fill_time_ns);
             return;
         case MK::None:
         case MK::Ambiguous:
@@ -403,8 +425,7 @@ void HyperliquidOrderAdapter::on_reconcile_terminal(
     }
 }
 
-void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel,
-                                          const std::string& native_symbol) {
+void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& cancel, const std::string& native_symbol) {
     if (!enabled_ || !signer_) {
         bpt::common::log::error("HyperliquidOrderAdapter: disabled, cannot cancel order");
         return;
@@ -415,8 +436,9 @@ void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& canc
     // send_new_order populated when it received the ACK.
     auto it = client_to_exch_oid_.find(cancel.orderId());
     if (it == client_to_exch_oid_.end()) {
-        bpt::common::log::warn("HyperliquidOrderAdapter: cancel id={}: no exch_oid mapping — order never ACKed or already terminal",
-                       cancel.orderId());
+        bpt::common::log::warn(
+            "HyperliquidOrderAdapter: cancel id={}: no exch_oid mapping — order never ACKed or already terminal",
+            cancel.orderId());
         return;
     }
     const uint64_t exch_oid = it->second;
@@ -424,7 +446,8 @@ void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& canc
     const auto cancel_meta_it = asset_meta_.find(native_symbol);
     if (cancel_meta_it == asset_meta_.end()) {
         bpt::common::log::warn("HyperliquidOrderAdapter: cancel id={} unknown symbol {} — skipping",
-                               cancel.orderId(), native_symbol);
+                               cancel.orderId(),
+                               native_symbol);
         return;
     }
 
@@ -435,15 +458,12 @@ void HyperliquidOrderAdapter::send_cancel(const bpt::messages::CancelOrder& canc
         auto tx = signer_->sign_l1_action(action, nonce);
 
         const std::string resp = ws_client_->post_action(action, nonce, tx);
-        bpt::common::log::info("HyperliquidOrderAdapter: cancel id={} resp={}",
-                       cancel.orderId(), resp);
+        bpt::common::log::info("HyperliquidOrderAdapter: cancel id={} resp={}", cancel.orderId(), resp);
 
-        exec_emitter_.emit_cancel_response(
-            resp, cancel.orderId(),
-            [this, client_id = cancel.orderId(), exch_oid]() {
-                client_to_exch_oid_.erase(client_id);
-                exch_oid_to_client_.erase(exch_oid);
-            });
+        exec_emitter_.emit_cancel_response(resp, cancel.orderId(), [this, client_id = cancel.orderId(), exch_oid]() {
+            client_to_exch_oid_.erase(client_id);
+            exch_oid_to_client_.erase(exch_oid);
+        });
     } catch (const std::exception& e) {
         bpt::common::log::error("HyperliquidOrderAdapter: send_cancel failed: {}", e.what());
     }
@@ -462,16 +482,16 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
         return;
     }
 
-    bpt::common::log::warn("HyperliquidOrderAdapter: send_cancel_all(instrument_id={}) "
-                   "— cancelling ALL open orders on wallet (HL bulk cancel is not per-instrument)",
-                   instrument_id);
+    bpt::common::log::warn(
+        "HyperliquidOrderAdapter: send_cancel_all(instrument_id={}) "
+        "— cancelling ALL open orders on wallet (HL bulk cancel is not per-instrument)",
+        instrument_id);
 
     try {
         json::object info_req;
         info_req["type"] = "openOrders";
         info_req["user"] = wallet_address_;
-        const std::string info_resp =
-            https_client_->post("/info", json::serialize(json::value(info_req)));
+        const std::string info_resp = https_client_->post("/info", json::serialize(json::value(info_req)));
 
         auto parsed = json::parse(info_resp);
         if (!parsed.is_array()) {
@@ -496,8 +516,7 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
 
             const auto bulk_meta_it = asset_meta_.find(coin);
             if (bulk_meta_it == asset_meta_.end()) {
-                bpt::common::log::warn("cancel_all: unknown coin {} in openOrders — skipping oid {}",
-                                       coin, oid);
+                bpt::common::log::warn("cancel_all: unknown coin {} in openOrders — skipping oid {}", coin, oid);
                 continue;
             }
             json::object c;
@@ -527,17 +546,16 @@ void HyperliquidOrderAdapter::send_cancel_all(uint64_t instrument_id) {
         sig["v"] = tx.v;
         req["signature"] = std::move(sig);
 
-        const std::string cancel_resp =
-            https_client_->post("/exchange", json::serialize(req));
+        const std::string cancel_resp = https_client_->post("/exchange", json::serialize(req));
         bpt::common::log::info("cancel_all: submitted batch cancel for {} order(s), resp={}",
-                       orders.size(), cancel_resp);
+                               orders.size(),
+                               cancel_resp);
     } catch (const std::exception& e) {
         bpt::common::log::error("send_cancel_all failed: {}", e.what());
     }
 }
 
-void HyperliquidOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify,
-                                          const std::string& native_symbol) {
+void HyperliquidOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modify, const std::string& native_symbol) {
     if (!enabled_ || !signer_) {
         bpt::common::log::error("HyperliquidOrderAdapter: disabled, cannot modify order");
         return;
@@ -546,16 +564,17 @@ void HyperliquidOrderAdapter::send_modify(const bpt::messages::ModifyOrder& modi
     const auto modify_meta_it = asset_meta_.find(native_symbol);
     if (modify_meta_it == asset_meta_.end()) {
         bpt::common::log::warn("HyperliquidOrderAdapter: modify id={} unknown symbol {} — skipping",
-                               modify.orderId(), native_symbol);
+                               modify.orderId(),
+                               native_symbol);
         return;
     }
 
     try {
         const double price_d = static_cast<double>(modify.newPrice()) / kScale;
-        const double size_d  = static_cast<double>(modify.newQuantity()) / kScale;
+        const double size_d = static_cast<double>(modify.newQuantity()) / kScale;
 
-        const json::value action = hlcodec::build_modify_action(
-            modify_meta_it->second, modify.orderId(), price_d, size_d);
+        const json::value action =
+            hlcodec::build_modify_action(modify_meta_it->second, modify.orderId(), price_d, size_d);
 
         const uint64_t nonce = signer_->next_nonce();
         auto tx = signer_->sign_l1_action(action, nonce);
@@ -669,8 +688,7 @@ AccountSnapshotData HyperliquidOrderAdapter::fetch_account_snapshot(uint64_t cor
             json::object spot_req;
             spot_req["type"] = "spotClearinghouseState";
             spot_req["user"] = wallet_address;
-            const std::string spot_resp = https_client_->post(
-                "/info", json::serialize(json::value(spot_req)));
+            const std::string spot_resp = https_client_->post("/info", json::serialize(json::value(spot_req)));
             const auto sj = json::parse(spot_resp).as_object();
             if (sj.contains("balances") && sj.at("balances").is_array()) {
                 for (const auto& bal_v : sj.at("balances").as_array()) {
@@ -680,10 +698,12 @@ AccountSnapshotData HyperliquidOrderAdapter::fetch_account_snapshot(uint64_t cor
                     if (!bal.contains("coin") || std::string(bal.at("coin").as_string()) != "USDC")
                         continue;
                     const double total = bal.contains("total") && bal.at("total").is_string()
-                        ? std::stod(std::string(bal.at("total").as_string())) : 0.0;
+                                             ? std::stod(std::string(bal.at("total").as_string()))
+                                             : 0.0;
                     const double hold = bal.contains("hold") && bal.at("hold").is_string()
-                        ? std::stod(std::string(bal.at("hold").as_string())) : 0.0;
-                    snap.total_equity_e8     = static_cast<int64_t>(std::round(total * 1e8));
+                                            ? std::stod(std::string(bal.at("hold").as_string()))
+                                            : 0.0;
+                    snap.total_equity_e8 = static_cast<int64_t>(std::round(total * 1e8));
                     snap.available_balance_e8 = static_cast<int64_t>(std::round((total - hold) * 1e8));
                     break;
                 }
@@ -691,7 +711,8 @@ AccountSnapshotData HyperliquidOrderAdapter::fetch_account_snapshot(uint64_t cor
         } catch (const std::exception& e) {
             bpt::common::log::warn(
                 "HyperliquidOrderAdapter: spotClearinghouseState fetch failed ({}); "
-                "using perp clearinghouseState fields as-is", e.what());
+                "using perp clearinghouseState fields as-is",
+                e.what());
         }
     }
 

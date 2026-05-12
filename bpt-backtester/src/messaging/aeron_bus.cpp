@@ -6,13 +6,11 @@
 
 namespace bpt::backtester::messaging {
 
-BacktesterBus BacktesterAeronBus::build(std::shared_ptr<aeron::Aeron> aeron,
-                                        const config::Settings& settings) {
+BacktesterBus BacktesterAeronBus::build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings) {
     const auto& ac = settings.aeron;
-    auto pub = bpt::common::aeron::wait_for_publication(
-        aeron, ac.backtest_control.channel, ac.backtest_control.stream_id);
-    auto sub = bpt::common::aeron::wait_for_subscription(
-        aeron, ac.backtest_ack.channel, ac.backtest_ack.stream_id);
+    auto pub =
+        bpt::common::aeron::wait_for_publication(aeron, ac.backtest_control.channel, ac.backtest_control.stream_id);
+    auto sub = bpt::common::aeron::wait_for_subscription(aeron, ac.backtest_ack.channel, ac.backtest_ack.stream_id);
 
     BacktesterBus bus;
     bus.ctrl_pub = std::make_unique<BacktestControlPublisher>(std::move(pub));

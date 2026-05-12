@@ -1,11 +1,11 @@
 #include "order_gateway/adapter/common/order_adapter_base.h"
 
-#include <string>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/strings.h>
 #include <bpt_common/util/thread_name.h>
 #include <bpt_common/util/thread_pin.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <string>
 
 namespace bpt::order_gateway::adapter {
 
@@ -66,8 +66,8 @@ void OrderAdapterBase::run() {
     // cfg_.io_cpu knob. Mirrors md-gw adapter pinning.
     bool pinned_via_topology = false;
     if (topology_)
-        pinned_via_topology = bpt::common::util::pin_thread_by_role(
-            *topology_, io_role(exchange_name()), exchange_name());
+        pinned_via_topology =
+            bpt::common::util::pin_thread_by_role(*topology_, io_role(exchange_name()), exchange_name());
     if (!pinned_via_topology)
         bpt::common::util::pin_thread_to_cpu(cfg_.io_cpu, exchange_name());
 
@@ -78,9 +78,9 @@ void OrderAdapterBase::run() {
         } catch (const std::exception& e) {
             if (!stop_flag_.load(std::memory_order_relaxed)) {
                 bpt::common::log::error("{} error: {}, reconnecting in {}ms",
-                                exchange_name(),
-                                e.what(),
-                                reconnect_delay().count());
+                                        exchange_name(),
+                                        e.what(),
+                                        reconnect_delay().count());
                 // Disconnect-rate breaker: treat every caught exception as
                 // one disconnect event. We only count on caught errors
                 // (not on clean shutdown), so the breaker won't trip at

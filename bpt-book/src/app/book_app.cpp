@@ -1,27 +1,26 @@
 #include "book/app/book_app.h"
+
 #include "book/adapter/hyperliquid_balance_adapter.h"
 
-#include <fmt/format.h>
 #include <messages/ExchangeRegistry.h>
 
-#include <chrono>
-#include <stdexcept>
-#include <thread>
 #include <bpt_common/logging.h>
 #include <bpt_common/signal.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <chrono>
+#include <fmt/format.h>
+#include <stdexcept>
+#include <thread>
 
 namespace bpt::book {
 
 namespace {
 
-std::unique_ptr<adapter::IBalanceAdapter>
-make_adapter(const config::AdapterConfig& a) {
+std::unique_ptr<adapter::IBalanceAdapter> make_adapter(const config::AdapterConfig& a) {
     const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a.exchange);
     if (!exch_id) {
-        throw std::runtime_error(fmt::format(
-            "Unknown exchange '{}' in bpt-book config — not in messages/exchanges.yaml",
-            a.exchange));
+        throw std::runtime_error(
+            fmt::format("Unknown exchange '{}' in bpt-book config — not in messages/exchanges.yaml", a.exchange));
     }
     switch (*exch_id) {
         case bpt::messages::ExchangeId::HYPERLIQUID: {
@@ -34,16 +33,15 @@ make_adapter(const config::AdapterConfig& a) {
         }
         // OKX / Binance / Deribit adapters will slot in here as they're written.
         default:
-            throw std::runtime_error(fmt::format(
-                "bpt-book has no balance adapter for {} yet",
-                a.exchange));
+            throw std::runtime_error(fmt::format("bpt-book has no balance adapter for {} yet", a.exchange));
     }
 }
 
 }  // namespace
 
 BookApp::BookApp(config::Settings settings, messaging::BookBus bus)
-    : settings_(std::move(settings)), bus_(std::move(bus)) {
+    : settings_(std::move(settings)),
+      bus_(std::move(bus)) {
     bpt::common::log::info("Balance publication ready: {} stream {}",
                            settings_.aeron.balance_snapshot.channel,
                            settings_.aeron.balance_snapshot.stream_id);
@@ -58,8 +56,7 @@ BookApp::BookApp(config::Settings settings, messaging::BookBus bus)
 
 void BookApp::run() {
     const auto interval = std::chrono::milliseconds(settings_.book.poll_interval_ms);
-    bpt::common::log::info("bpt-book poll loop starting, interval={} ms",
-                           settings_.book.poll_interval_ms);
+    bpt::common::log::info("bpt-book poll loop starting, interval={} ms", settings_.book.poll_interval_ms);
 
     while (bpt::common::signal::is_running()) {
         adapter::BalanceSnapshot snap;
@@ -76,8 +73,7 @@ void BookApp::run() {
                 // Log and continue. A single-venue failure must not take
                 // down the whole snapshot — dashboards degrade per-venue
                 // gracefully. Next tick will retry.
-                bpt::common::log::warn("{} balance fetch failed: {}",
-                                       ad->venue_name(), e.what());
+                bpt::common::log::warn("{} balance fetch failed: {}", ad->venue_name(), e.what());
             }
         }
 

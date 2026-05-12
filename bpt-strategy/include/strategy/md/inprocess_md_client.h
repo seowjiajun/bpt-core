@@ -31,8 +31,7 @@ class InProcessMdClient : public IMdClient {
 public:
     InProcessMdClient() = default;
 
-    void subscribe(uint64_t correlation_id,
-                   const std::vector<InstrumentDesc>& instruments) override {
+    void subscribe(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) override {
         last_correlation_id_ = correlation_id;
         subscribed_ = instruments;
     }
@@ -47,24 +46,26 @@ public:
     /// order gateway, which calls back into the matching engine, etc.,
     /// all inline on this thread).
     void push_bbo(const bpt::messages::MdMarketData& tick) {
-        if (on_bbo) on_bbo(tick);
+        if (on_bbo)
+            on_bbo(tick);
     }
     void push_trade(const bpt::messages::MdTrade& tick) {
-        if (on_trade) on_trade(tick);
+        if (on_trade)
+            on_trade(tick);
     }
     void push_order_book(const bpt::messages::MdOrderBook& book) {
-        if (on_order_book) on_order_book(book);
+        if (on_order_book)
+            on_order_book(book);
     }
     void push_heartbeat() {
-        if (on_service_heartbeat) on_service_heartbeat();
+        if (on_service_heartbeat)
+            on_service_heartbeat();
     }
 
     /// What the strategy subscribed to. Harness uses this to filter
     /// the captured tape down to the instruments the strategy cares
     /// about, avoiding wasted dispatches.
-    [[nodiscard]] const std::vector<InstrumentDesc>& subscribed_instruments() const {
-        return subscribed_;
-    }
+    [[nodiscard]] const std::vector<InstrumentDesc>& subscribed_instruments() const { return subscribed_; }
     [[nodiscard]] uint64_t last_correlation_id() const { return last_correlation_id_; }
 
 private:

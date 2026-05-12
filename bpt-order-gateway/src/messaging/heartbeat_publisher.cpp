@@ -11,8 +11,7 @@ using bpt::common::util::WallClock;
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
-HeartbeatPublisher::HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                       const std::string& channel, int stream_id)
+HeartbeatPublisher::HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
     // Heartbeats are strictly idempotent — next tick republishes. Drop
     // on no-subscriber; bounded retry on back-pressure.
     : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}

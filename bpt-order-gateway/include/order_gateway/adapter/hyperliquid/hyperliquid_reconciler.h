@@ -27,8 +27,8 @@
 
 #include "order_gateway/adapter/common/i_order_adapter.h"
 
-#include <boost/json.hpp>
 #include <atomic>
+#include <boost/json.hpp>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -54,7 +54,7 @@ public:
         uint64_t instrument_id;
         bpt::messages::OrderSide::Value side;
         bpt::messages::OrderType::Value order_type;
-        int64_t  price_e8;
+        int64_t price_e8;
         uint64_t quantity_e8;
         std::string exchange_symbol;
         uint64_t sent_ns;
@@ -71,11 +71,11 @@ public:
     /// identical to what the WS userFills stream would have.
     struct MatchResult {
         MatchKind kind{MatchKind::None};
-        uint64_t  exch_oid{0};
-        int64_t   fill_price_e8{0};
-        int64_t   fill_fee_e8{0};
-        uint64_t  fill_qty_e8{0};
-        uint64_t  fill_time_ns{0};
+        uint64_t exch_oid{0};
+        int64_t fill_price_e8{0};
+        int64_t fill_fee_e8{0};
+        uint64_t fill_qty_e8{0};
+        uint64_t fill_time_ns{0};
     };
 
     /// \brief Pure match logic — exposed as a static so unit tests can drive it directly.
@@ -96,14 +96,12 @@ public:
     ///
     /// Both are arrays; empty on failure (the caller's job to log and
     /// back off — reconciler treats empty as "no match → REJECTED").
-    using Poller =
-        std::function<std::pair<boost::json::array, boost::json::array>()>;
+    using Poller = std::function<std::pair<boost::json::array, boost::json::array>()>;
 
     /// \brief Callback invoked exactly once per candidate when reconciliation completes.
     ///
     /// Runs on the reconciler's worker thread.
-    using OnTerminal =
-        std::function<void(const Candidate&, const MatchResult&)>;
+    using OnTerminal = std::function<void(const Candidate&, const MatchResult&)>;
 
     HyperliquidReconciler(Poller poller,
                           OnTerminal on_terminal,

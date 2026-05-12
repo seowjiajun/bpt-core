@@ -17,8 +17,7 @@ class IRefdataDeltaSink {
 public:
     virtual ~IRefdataDeltaSink() = default;
 
-    virtual void publish_delta(bpt::messages::DeltaUpdateType::Value update_type,
-                               const refdata::Instrument& inst) = 0;
+    virtual void publish_delta(bpt::messages::DeltaUpdateType::Value update_type, const refdata::Instrument& inst) = 0;
 
     virtual void publish_heartbeat() = 0;
 

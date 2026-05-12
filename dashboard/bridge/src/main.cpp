@@ -4,14 +4,14 @@
 #include "bridge/settings.h"
 
 #include <CLI/CLI.hpp>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <utility>
 #include <bpt_app/app.h>
 #include <bpt_app/cli.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/strings.h>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace {
 
@@ -20,7 +20,8 @@ namespace {
 // Multiple bridges can run side-by-side for separate dashboard sessions,
 // so the exchange axis is the most useful disambiguator.
 std::string derive_service_name(const std::string& exchange) {
-    if (exchange.empty()) return "bpt-bridge";
+    if (exchange.empty())
+        return "bpt-bridge";
     return "bpt-bridge-" + bpt::common::util::to_lower(exchange);
 }
 
@@ -32,18 +33,18 @@ int main(int argc, char** argv) {
     std::string exchange_override;
     std::string mode_override;
     std::string instrument_type_override;
-    uint64_t    instrument_id_override = 0;
+    uint64_t instrument_id_override = 0;
 
-    auto args = bpt::app::parse_cli(argc, argv,
-                                    "bpt-bridge",
-                                    "Aeron → WebSocket forwarder for dashboard",
-        [&](CLI::App& cli) {
-            cli.add_option("--strategy-name",   strategy_override,         "Override session.strategy");
-            cli.add_option("--symbol",          symbol_override,           "Override session.symbol");
-            cli.add_option("--exchange",        exchange_override,         "Override session.exchange");
-            cli.add_option("--mode",            mode_override,             "Override session.mode (paper|live|mock)");
-            cli.add_option("--instrument-type", instrument_type_override,  "Override session.instrument_type (SPOT|PERP|FUTURE|OPTION)");
-            cli.add_option("--instrument-id",   instrument_id_override,    "Override session.instrument_id");
+    auto args =
+        bpt::app::parse_cli(argc, argv, "bpt-bridge", "Aeron → WebSocket forwarder for dashboard", [&](CLI::App& cli) {
+            cli.add_option("--strategy-name", strategy_override, "Override session.strategy");
+            cli.add_option("--symbol", symbol_override, "Override session.symbol");
+            cli.add_option("--exchange", exchange_override, "Override session.exchange");
+            cli.add_option("--mode", mode_override, "Override session.mode (paper|live|mock)");
+            cli.add_option("--instrument-type",
+                           instrument_type_override,
+                           "Override session.instrument_type (SPOT|PERP|FUTURE|OPTION)");
+            cli.add_option("--instrument-id", instrument_id_override, "Override session.instrument_id");
         });
 
     bridge::config::Settings settings;
@@ -56,20 +57,27 @@ int main(int argc, char** argv) {
     }
 
     // CLI overrides take precedence over TOML values.
-    if (!strategy_override.empty())        settings.strategy         = strategy_override;
-    if (!symbol_override.empty())          settings.symbol           = symbol_override;
-    if (!exchange_override.empty())        settings.exchange         = exchange_override;
-    if (!mode_override.empty())            settings.mode             = mode_override;
-    if (!instrument_type_override.empty()) settings.instrument_type  = instrument_type_override;
-    if (instrument_id_override > 0)        settings.instrument_id    = instrument_id_override;
+    if (!strategy_override.empty())
+        settings.strategy = strategy_override;
+    if (!symbol_override.empty())
+        settings.symbol = symbol_override;
+    if (!exchange_override.empty())
+        settings.exchange = exchange_override;
+    if (!mode_override.empty())
+        settings.mode = mode_override;
+    if (!instrument_type_override.empty())
+        settings.instrument_type = instrument_type_override;
+    if (instrument_id_override > 0)
+        settings.instrument_id = instrument_id_override;
 
     const std::string service_name = derive_service_name(settings.exchange);
 
     try {
-        return bpt::app::run(service_name, std::move(settings),
-            [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-                return std::make_unique<bridge::BridgeApp>(std::move(cfg), ctx.aeron);
-            });
+        return bpt::app::run(service_name,
+                             std::move(settings),
+                             [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
+                                 return std::make_unique<bridge::BridgeApp>(std::move(cfg), ctx.aeron);
+                             });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());
         return 1;

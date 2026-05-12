@@ -3,7 +3,6 @@
 #include "md_gateway/adapter/okx/okx_md_encoder.h"
 
 #include <bpt_common/logging.h>
-
 #include <chrono>
 #include <string>
 
@@ -20,7 +19,8 @@ void OkxMdWsClient::on_frame(std::string_view payload, uint64_t recv_ns) {
     if (payload == "pong")
         return;
 
-    if (handler_) handler_(payload, recv_ns);
+    if (handler_)
+        handler_(payload, recv_ns);
 }
 
 void OkxMdWsClient::on_tick() {

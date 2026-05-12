@@ -45,8 +45,43 @@ BacktesterApp::BacktesterApp(config::Settings settings, messaging::BacktesterBus
         settings_.results.starting_capital);
     hyperliquid_info_server_->start();
 
+    // ── Latency model ──────────────────────────────────────────────────────
+    // Built from settings.simulation.latency. Owned here so MatchingEngine
+    // can hold a non-owning pointer. Null when no [simulation.latency]
+    // section is set, in which case MatchingEngine reverts to zero-latency
+    // pre-Phase-3 behaviour.
+    {
+        const auto& lcfg = settings_.simulation.latency;
+        bool any_spec = !lcfg.per_venue.empty()
+                     || lcfg.default_spec.submit_to_match_base_ns > 0
+                     || lcfg.default_spec.submit_to_match_jitter_ns > 0
+                     || lcfg.default_spec.match_to_report_base_ns > 0
+                     || lcfg.default_spec.match_to_report_jitter_ns > 0;
+        if (any_spec) {
+            latency_model_ = std::make_unique<latency::ParametricLatencyModel>(lcfg.seed);
+            using Leg = latency::LatencyLeg;
+            latency_model_->set_default(Leg::SUBMIT_TO_MATCH,
+                {lcfg.default_spec.submit_to_match_base_ns,
+                 lcfg.default_spec.submit_to_match_jitter_ns});
+            latency_model_->set_default(Leg::MATCH_TO_REPORT,
+                {lcfg.default_spec.match_to_report_base_ns,
+                 lcfg.default_spec.match_to_report_jitter_ns});
+            for (const auto& [venue, spec] : lcfg.per_venue) {
+                latency_model_->set_spec(venue, Leg::SUBMIT_TO_MATCH,
+                    {spec.submit_to_match_base_ns, spec.submit_to_match_jitter_ns});
+                latency_model_->set_spec(venue, Leg::MATCH_TO_REPORT,
+                    {spec.match_to_report_base_ns, spec.match_to_report_jitter_ns});
+            }
+            bpt::common::log::info(
+                "[BacktesterApp] LatencyModel installed (seed={}, {} venue overrides)",
+                lcfg.seed, lcfg.per_venue.size());
+        }
+    }
+
     // ── Matching engine ────────────────────────────────────────────────────
     matching_engine_ = std::make_unique<matching::MatchingEngine>();
+    if (latency_model_)
+        matching_engine_->set_latency_model(latency_model_.get());
 
     // ── Order WS/REST servers ──────────────────────────────────────────────
     binance_order_server_ =

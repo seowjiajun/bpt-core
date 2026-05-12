@@ -15,17 +15,15 @@
 #include "tape/app/recorder_service.h"
 #include "tape/config/settings.h"
 
-#include <exception>
-#include <memory>
-#include <utility>
 #include <bpt_app/app.h>
 #include <bpt_app/cli.h>
 #include <bpt_common/logging.h>
+#include <exception>
+#include <memory>
+#include <utility>
 
 int main(int argc, char* argv[]) {
-    auto args = bpt::app::parse_cli(argc, argv,
-                                    "bpt-tape",
-                                    "venue WS-frame recorder");
+    auto args = bpt::app::parse_cli(argc, argv, "bpt-tape", "venue WS-frame recorder");
 
     // Bootstrap logger so pre-run failures (config load, etc.) land in
     // the same sink as later lines. bpt::app::run reinitializes with
@@ -37,10 +35,11 @@ int main(int argc, char* argv[]) {
         // connect_aeron=false: the recording host runs zero Aeron
         // infrastructure (no MediaDriver, no SBE publish, no refdata
         // subscription — the universe loads directly from JSON).
-        return bpt::app::run("bpt-tape", std::move(cfg),
+        return bpt::app::run(
+            "bpt-tape",
+            std::move(cfg),
             [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-                return std::make_unique<bpt::tape::app::RecorderService>(
-                    std::move(settings), ctx.topology);
+                return std::make_unique<bpt::tape::app::RecorderService>(std::move(settings), ctx.topology);
             },
             bpt::app::RunOptions{.connect_aeron = false});
     } catch (const std::exception& e) {

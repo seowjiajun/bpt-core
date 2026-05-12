@@ -1,11 +1,10 @@
 #include "bpt_common/util/topology.h"
 
-#include <toml++/toml.hpp>
-
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
+#include <toml++/toml.hpp>
 #include <unistd.h>
+#include <unordered_set>
 
 namespace bpt::common::util {
 
@@ -14,8 +13,7 @@ namespace {
 int online_cpu_count() {
     const long n = ::sysconf(_SC_NPROCESSORS_ONLN);
     if (n <= 0)
-        throw std::runtime_error("topology: sysconf(_SC_NPROCESSORS_ONLN) returned " +
-                                 std::to_string(n));
+        throw std::runtime_error("topology: sysconf(_SC_NPROCESSORS_ONLN) returned " + std::to_string(n));
     return static_cast<int>(n);
 }
 
@@ -31,8 +29,7 @@ Topology Topology::load(const std::string& path) {
     try {
         root = toml::parse_file(path);
     } catch (const toml::parse_error& e) {
-        throw std::runtime_error("topology: failed to parse " + path + ": " +
-                                 std::string(e.description()));
+        throw std::runtime_error("topology: failed to parse " + path + ": " + std::string(e.description()));
     }
 
     const int nproc = online_cpu_count();
@@ -43,10 +40,9 @@ Topology Topology::load(const std::string& path) {
     if (auto host = root["host"].as_table()) {
         if (auto tc = (*host)["total_cores"].value<int64_t>()) {
             if (*tc != nproc)
-                throw std::runtime_error(
-                    "topology: host.total_cores=" + std::to_string(*tc) +
-                    " does not match online CPU count " + std::to_string(nproc) +
-                    " (wrong topology file for this host?)");
+                throw std::runtime_error("topology: host.total_cores=" + std::to_string(*tc) +
+                                         " does not match online CPU count " + std::to_string(nproc) +
+                                         " (wrong topology file for this host?)");
         }
     }
 
@@ -66,12 +62,10 @@ Topology Topology::load(const std::string& path) {
         if (!role)
             throw std::runtime_error("topology: assignment missing required 'role' field");
         if (!core)
-            throw std::runtime_error("topology: assignment '" + *role +
-                                     "' missing required 'core' field");
+            throw std::runtime_error("topology: assignment '" + *role + "' missing required 'core' field");
 
         if (*core < 0 || *core >= nproc)
-            throw std::runtime_error("topology: role '" + *role + "' core=" +
-                                     std::to_string(*core) +
+            throw std::runtime_error("topology: role '" + *role + "' core=" + std::to_string(*core) +
                                      " out of range [0," + std::to_string(nproc) + ")");
 
         if (!seen_cores.insert(static_cast<int>(*core)).second)

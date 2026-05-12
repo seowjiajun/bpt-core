@@ -45,7 +45,7 @@ public:
     std::string post(const std::string& path, const std::string& body);
 
 private:
-    void connect();   ///< must be called with mutex_ held
+    void connect();  ///< must be called with mutex_ held
     void close() noexcept;
 
     const std::string host_;

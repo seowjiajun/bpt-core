@@ -11,14 +11,14 @@
 #include <messages/TradeSide.h>
 
 #include <atomic>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/tsc_clock.h>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
-#include <bpt_common/logging.h>
-#include <bpt_common/util/latency_histogram.h>
-#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -172,9 +172,9 @@ public:
                     auto lcid_it = last_change_id_.find(sym_key);
                     if (lcid_it != last_change_id_.end() && lcid_it->second != prev_change_id) {
                         bpt::common::log::warn("DeribitMdDecoder: book gap for {} (expected={} got={}), resubscribing",
-                                       sym_key,
-                                       lcid_it->second,
-                                       prev_change_id);
+                                               sym_key,
+                                               lcid_it->second,
+                                               prev_change_id);
                         last_change_id_.erase(lcid_it);
                         subs_.requeue(sym_key);
                         return;

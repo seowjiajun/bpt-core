@@ -5,11 +5,10 @@
 
 #include <array>
 #include <atomic>
+#include <boost/json/fwd.hpp>
 #include <cstdint>
 #include <string>
 #include <string_view>
-
-#include <boost/json/fwd.hpp>
 
 namespace bpt::order_gateway::adapter {
 

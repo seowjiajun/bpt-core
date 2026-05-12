@@ -15,9 +15,9 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/subscriber.h>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bpt::md_gateway::messaging {
 
@@ -28,9 +28,7 @@ namespace bpt::md_gateway::messaging {
 class MdControlSubscriber final : public IMdControlSource {
 public:
     /// \brief Open an Aeron Subscriber on the given control channel + stream.
-    MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                        const std::string& channel,
-                        int stream_id);
+    MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     /// \copydoc IMdControlSource::poll
     int poll(BatchHandler handler) override;

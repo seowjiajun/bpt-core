@@ -36,8 +36,8 @@ namespace bpt::strategy::strategy {
 class VolatilityGate {
 public:
     struct Config {
-        double max_bps_per_window{0.0};    // 0 disables the gate entirely
-        uint64_t window_ns{1'000'000'000}; // 1s default
+        double max_bps_per_window{0.0};            // 0 disables the gate entirely
+        uint64_t window_ns{1'000'000'000};         // 1s default
         uint64_t halt_duration_ns{5'000'000'000};  // 5s default
     };
 
@@ -49,12 +49,8 @@ public:
     // regime instead of requiring a per-asset tuning pass. No effect
     // on an in-progress halt (halt_end_ns_ unchanged); only future
     // update_and_check() calls see the new value.
-    void set_max_bps_per_window(double max_bps) noexcept {
-        cfg_.max_bps_per_window = max_bps;
-    }
-    [[nodiscard]] double max_bps_per_window() const noexcept {
-        return cfg_.max_bps_per_window;
-    }
+    void set_max_bps_per_window(double max_bps) noexcept { cfg_.max_bps_per_window = max_bps; }
+    [[nodiscard]] double max_bps_per_window() const noexcept { return cfg_.max_bps_per_window; }
 
     // Feed a new (timestamp, mid) sample. Returns the new halt state
     // AFTER any trip decision. Call this on every BBO tick even when
@@ -93,9 +89,7 @@ public:
 
     // Returns halt state without updating the window. Useful for
     // callers that want to check status between ticks.
-    bool is_halted(uint64_t now_ns) const {
-        return cfg_.max_bps_per_window > 0.0 && now_ns < halt_end_ns_;
-    }
+    bool is_halted(uint64_t now_ns) const { return cfg_.max_bps_per_window > 0.0 && now_ns < halt_end_ns_; }
 
     // Diagnostics
     uint64_t halt_end_ns() const { return halt_end_ns_; }

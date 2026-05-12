@@ -17,47 +17,53 @@
 namespace bpt::strategy::order {
 
 AeronOrderGatewayClient::AeronOrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
-                                       const std::string& channel,
-                                       int order_stream,
-                                       int exec_report_stream,
-                                       int heartbeat_stream,
-                                       int account_snapshot_stream) {
-    order_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-        aeron, channel, order_stream,
-        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+                                                 const std::string& channel,
+                                                 int order_stream,
+                                                 int exec_report_stream,
+                                                 int heartbeat_stream,
+                                                 int account_snapshot_stream) {
+    order_pub_ =
+        std::make_unique<bpt::common::aeron::Publisher>(aeron,
+                                                        channel,
+                                                        order_stream,
+                                                        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
     exec_report_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, exec_report_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        exec_report_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_exec_report_fragment(buf, offset, length, hdr);
         });
     heartbeat_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, heartbeat_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        heartbeat_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_heartbeat_fragment(buf, offset, length, hdr);
         });
 
     if (account_snapshot_stream != 0) {
         account_snapshot_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-            aeron, channel, account_snapshot_stream,
-            [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-                   aeron::util::index_t length, aeron::Header& hdr) {
-                handle_account_snapshot_fragment(buf, offset, length, hdr);
-            });
+            aeron,
+            channel,
+            account_snapshot_stream,
+            [this](aeron::AtomicBuffer& buf,
+                   aeron::util::index_t offset,
+                   aeron::util::index_t length,
+                   aeron::Header& hdr) { handle_account_snapshot_fragment(buf, offset, length, hdr); });
     }
 }
 
 bool AeronOrderGatewayClient::send_new_order(uint64_t order_id,
-                                        bpt::messages::ExchangeId::Value exchange_id,
-                                        uint64_t instrument_id,
-                                        bpt::messages::OrderSide::Value side,
-                                        bpt::messages::OrderType::Value order_type,
-                                        bpt::messages::TimeInForce::Value tif,
-                                        int64_t price,
-                                        uint64_t quantity,
-                                        uint8_t exec_inst,
-                                        const std::string& exchange_symbol) {
+                                             bpt::messages::ExchangeId::Value exchange_id,
+                                             uint64_t instrument_id,
+                                             bpt::messages::OrderSide::Value side,
+                                             bpt::messages::OrderType::Value order_type,
+                                             bpt::messages::TimeInForce::Value tif,
+                                             int64_t price,
+                                             uint64_t quantity,
+                                             uint8_t exec_inst,
+                                             const std::string& exchange_symbol) {
     using namespace bpt::messages;
 
     if (quantity == 0) {
@@ -65,7 +71,9 @@ bool AeronOrderGatewayClient::send_new_order(uint64_t order_id,
         return false;
     }
     if (order_type != OrderType::MARKET && price <= 0) {
-        bpt::common::log::warn("[OrderGW] Rejected order_id={}: price={} invalid for non-MARKET order", order_id, price);
+        bpt::common::log::warn("[OrderGW] Rejected order_id={}: price={} invalid for non-MARKET order",
+                               order_id,
+                               price);
         return false;
     }
     if (exchange_symbol.empty()) {
@@ -90,8 +98,8 @@ bool AeronOrderGatewayClient::send_new_order(uint64_t order_id,
 }
 
 void AeronOrderGatewayClient::send_cancel(uint64_t order_id,
-                                     bpt::messages::ExchangeId::Value exchange_id,
-                                     uint64_t instrument_id) {
+                                          bpt::messages::ExchangeId::Value exchange_id,
+                                          uint64_t instrument_id) {
     using namespace bpt::messages;
 
     order_pub_->publish<CancelOrder>([&](CancelOrder& msg) {
@@ -113,10 +121,10 @@ void AeronOrderGatewayClient::send_cancel_all(bpt::messages::ExchangeId::Value e
 }
 
 void AeronOrderGatewayClient::send_modify(uint64_t order_id,
-                                     bpt::messages::ExchangeId::Value exchange_id,
-                                     uint64_t instrument_id,
-                                     int64_t new_price,
-                                     uint64_t new_quantity) {
+                                          bpt::messages::ExchangeId::Value exchange_id,
+                                          uint64_t instrument_id,
+                                          int64_t new_price,
+                                          uint64_t new_quantity) {
     using namespace bpt::messages;
 
     order_pub_->publish<ModifyOrder>([&](ModifyOrder& msg) {
@@ -130,7 +138,7 @@ void AeronOrderGatewayClient::send_modify(uint64_t order_id,
 }
 
 void AeronOrderGatewayClient::send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
-                                                       uint64_t correlation_id) {
+                                                            uint64_t correlation_id) {
     using namespace bpt::messages;
 
     order_pub_->publish<AccountSnapshotRequest>([&](AccountSnapshotRequest& msg) {
@@ -150,9 +158,9 @@ int AeronOrderGatewayClient::poll(int fragment_limit) {
 }
 
 void AeronOrderGatewayClient::handle_exec_report_fragment(aeron::AtomicBuffer& buf,
-                                                     aeron::util::index_t offset,
-                                                     aeron::util::index_t length,
-                                                     aeron::Header& /*hdr*/) {
+                                                          aeron::util::index_t offset,
+                                                          aeron::util::index_t length,
+                                                          aeron::Header& /*hdr*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -176,9 +184,9 @@ void AeronOrderGatewayClient::handle_exec_report_fragment(aeron::AtomicBuffer& b
 }
 
 void AeronOrderGatewayClient::handle_heartbeat_fragment(aeron::AtomicBuffer& buf,
-                                                   aeron::util::index_t offset,
-                                                   aeron::util::index_t length,
-                                                   aeron::Header& /*hdr*/) {
+                                                        aeron::util::index_t offset,
+                                                        aeron::util::index_t length,
+                                                        aeron::Header& /*hdr*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -204,9 +212,9 @@ void AeronOrderGatewayClient::handle_heartbeat_fragment(aeron::AtomicBuffer& buf
 }
 
 void AeronOrderGatewayClient::handle_account_snapshot_fragment(aeron::AtomicBuffer& buf,
-                                                          aeron::util::index_t offset,
-                                                          aeron::util::index_t length,
-                                                          aeron::Header& /*hdr*/) {
+                                                               aeron::util::index_t offset,
+                                                               aeron::util::index_t length,
+                                                               aeron::Header& /*hdr*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())

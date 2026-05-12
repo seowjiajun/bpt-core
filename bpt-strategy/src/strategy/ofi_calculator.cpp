@@ -53,9 +53,7 @@ void OFICalculator::reset() {
     warm_ = false;
 }
 
-double OFICalculator::update(const std::vector<Level>& bids,
-                              const std::vector<Level>& asks,
-                              uint64_t timestamp_ns) {
+double OFICalculator::update(const std::vector<Level>& bids, const std::vector<Level>& asks, uint64_t timestamp_ns) {
     // First snapshot — just store it, no signal yet.
     if (!warm_) {
         prev_bids_ = bids;
@@ -64,8 +62,7 @@ double OFICalculator::update(const std::vector<Level>& bids,
         return 0.0;
     }
 
-    const int K = std::min(cfg_.max_levels,
-                           static_cast<int>(std::max(bids.size(), asks.size())));
+    const int K = std::min(cfg_.max_levels, static_cast<int>(std::max(bids.size(), asks.size())));
 
     double contribution = 0.0;
     double depth = 0.0;

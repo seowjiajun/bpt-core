@@ -13,9 +13,9 @@ namespace bpt::book::adapter {
 class HyperliquidBalanceAdapter final : public IBalanceAdapter {
 public:
     struct Config {
-        std::string rest_host;        // e.g. "api.hyperliquid-testnet.xyz"
+        std::string rest_host;  // e.g. "api.hyperliquid-testnet.xyz"
         std::string rest_port{"443"};
-        std::string wallet_address;   // EIP-55 hex address, public identifier
+        std::string wallet_address;  // EIP-55 hex address, public identifier
     };
 
     explicit HyperliquidBalanceAdapter(Config cfg);

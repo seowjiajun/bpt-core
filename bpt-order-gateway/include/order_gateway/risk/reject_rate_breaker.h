@@ -26,9 +26,9 @@ class RejectRateBreaker {
 public:
     struct Config {
         uint64_t window_ns = 60ULL * 1'000'000'000ULL;  // 60 s
-        double   threshold_pct = 20.0;                    // trip at >20 %
-        uint32_t min_events = 10;                         // ignore tiny samples
-        bool     enabled = false;                         // default off
+        double threshold_pct = 20.0;                    // trip at >20 %
+        uint32_t min_events = 10;                       // ignore tiny samples
+        bool enabled = false;                           // default off
     };
 
     explicit RejectRateBreaker(Config cfg);

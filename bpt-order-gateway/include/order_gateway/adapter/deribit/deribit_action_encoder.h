@@ -23,19 +23,17 @@
 namespace bpt::order_gateway::adapter::deribit {
 
 struct OrderSpec {
-    std::string                            instrument_name;  ///< e.g. "BTC-PERPETUAL"
-    bpt::messages::OrderSide::Value    side;
-    bpt::messages::OrderType::Value    order_type;
-    bpt::messages::TimeInForce::Value  tif;
-    int64_t                                price_e8;         ///< natural * 1e8
-    uint64_t                               quantity_e8;      ///< natural * 1e8
-    std::string                            label;            ///< client-side label (cloid)
+    std::string instrument_name;  ///< e.g. "BTC-PERPETUAL"
+    bpt::messages::OrderSide::Value side;
+    bpt::messages::OrderType::Value order_type;
+    bpt::messages::TimeInForce::Value tif;
+    int64_t price_e8;      ///< natural * 1e8
+    uint64_t quantity_e8;  ///< natural * 1e8
+    std::string label;     ///< client-side label (cloid)
 };
 
 /// \brief `public/auth` with grant_type=client_credentials.
-[[nodiscard]] std::string build_auth_msg(std::string_view client_id,
-                                          std::string_view client_secret,
-                                          uint64_t req_id);
+[[nodiscard]] std::string build_auth_msg(std::string_view client_id, std::string_view client_secret, uint64_t req_id);
 
 /// \brief `private/buy` or `private/sell` depending on side.
 ///
@@ -50,9 +48,9 @@ struct OrderSpec {
 
 /// \brief `private/edit` — Deribit's native amend. Takes new price + amount.
 [[nodiscard]] std::string build_edit_msg(std::string_view exchange_order_id,
-                                          int64_t new_price_e8,
-                                          uint64_t new_quantity_e8,
-                                          uint64_t req_id);
+                                         int64_t new_price_e8,
+                                         uint64_t new_quantity_e8,
+                                         uint64_t req_id);
 
 /// \brief `public/test` — reply to Deribit's heartbeat test_request.
 [[nodiscard]] std::string build_test_response(uint64_t req_id);
@@ -61,8 +59,6 @@ struct OrderSpec {
 ///
 /// Used by the adapter's post-login bring-up sequence
 /// (`enable_cancel_on_disconnect`, `set_heartbeat`, `private/subscribe`).
-[[nodiscard]] std::string build_simple_rpc(std::string_view method,
-                                            const std::string& params_json,
-                                            uint64_t req_id);
+[[nodiscard]] std::string build_simple_rpc(std::string_view method, const std::string& params_json, uint64_t req_id);
 
 }  // namespace bpt::order_gateway::adapter::deribit

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <arrow/api.h>
 #include <arrow/io/api.h>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <format>
@@ -23,14 +24,66 @@ quill::Logger* kLog() {
 }
 }  // namespace
 
-// ── Date helpers ─────────────────────────────────────────────────────────────
+// ── Date / timestamp helpers ─────────────────────────────────────────────────
 
-static sys_days parse_date(const std::string& iso8601) {
-    // Accepts "YYYY-MM-DDTHH:MM:SSZ" or "YYYY-MM-DD"
-    int y = std::stoi(iso8601.substr(0, 4));
-    int m = std::stoi(iso8601.substr(5, 2));
-    int d = std::stoi(iso8601.substr(8, 2));
-    return sys_days{year{y} / month{static_cast<unsigned>(m)} / day{static_cast<unsigned>(d)}};
+// Parses an ISO 8601 UTC timestamp to nanoseconds since the Unix epoch.
+// Accepted forms:
+//   "YYYY-MM-DD"                            → midnight UTC of that date
+//   "YYYY-MM-DDTHH:MM:SS[Z]"                → exact second
+//   "YYYY-MM-DDTHH:MM:SS.fffffffff[Z]"      → up to nanosecond precision
+// Extra digits beyond ns precision are accepted and truncated.
+static uint64_t parse_iso_ns(const std::string& s) {
+    if (s.size() < 10)
+        throw std::runtime_error("Invalid ISO 8601 timestamp: " + s);
+
+    int y  = std::stoi(s.substr(0, 4));
+    int mo = std::stoi(s.substr(5, 2));
+    int d  = std::stoi(s.substr(8, 2));
+
+    sys_days day_tp = sys_days{year{y} / month{static_cast<unsigned>(mo)} / day{static_cast<unsigned>(d)}};
+    int64_t day_ns = duration_cast<nanoseconds>(day_tp.time_since_epoch()).count();
+
+    if (s.size() == 10)
+        return static_cast<uint64_t>(day_ns);
+
+    if (s[10] != 'T')
+        throw std::runtime_error("Invalid ISO 8601 (expected 'T' at index 10): " + s);
+    if (s.size() < 19)
+        throw std::runtime_error("Invalid ISO 8601 (truncated): " + s);
+
+    int hh = std::stoi(s.substr(11, 2));
+    int mm = std::stoi(s.substr(14, 2));
+    int ss = std::stoi(s.substr(17, 2));
+    int64_t time_ns =
+        (static_cast<int64_t>(hh) * 3600 + static_cast<int64_t>(mm) * 60 + static_cast<int64_t>(ss))
+        * 1'000'000'000LL;
+
+    std::size_t i = 19;
+    int64_t frac_ns = 0;
+    if (i < s.size() && s[i] == '.') {
+        ++i;
+        int digits = 0;
+        while (i < s.size() && std::isdigit(static_cast<unsigned char>(s[i])) && digits < 9) {
+            frac_ns = frac_ns * 10 + (s[i] - '0');
+            ++i;
+            ++digits;
+        }
+        // Pad to 9 digits (ns precision).
+        for (int k = digits; k < 9; ++k) frac_ns *= 10;
+        // Truncate any further digits.
+        while (i < s.size() && std::isdigit(static_cast<unsigned char>(s[i])))
+            ++i;
+    }
+
+    if (i < s.size() && s[i] != 'Z')
+        throw std::runtime_error("Invalid ISO 8601 (trailing chars not 'Z'): " + s);
+
+    return static_cast<uint64_t>(day_ns + time_ns + frac_ns);
+}
+
+// Converts ns-since-epoch to the date that *contains* that instant in UTC.
+static sys_days day_of_ns(uint64_t ns) {
+    return std::chrono::floor<days>(sys_time<nanoseconds>(nanoseconds(static_cast<int64_t>(ns))));
 }
 
 static std::string format_date(sys_days d) {
@@ -89,13 +142,43 @@ static const arrow::Int8Array* get_int8_column(const arrow::Table& table, const 
 
 // ── DataLoader ────────────────────────────────────────────────────────────────
 
+// Date-only end strings ("2026-01-01") need to mean "all of 2026-01-01" —
+// bump to midnight of the next day so the half-open [start, end) interval
+// includes every event of that date. Strings with explicit time-of-day are
+// taken literally.
+static constexpr uint64_t kDayNs = 86'400ULL * 1'000'000'000ULL;
+
+static DataLoader::Window window_from_strings(const std::string& start, const std::string& end) {
+    DataLoader::Window w;
+    w.start_ns = parse_iso_ns(start);
+    w.end_ns = end.size() == 10 ? parse_iso_ns(end) + kDayNs : parse_iso_ns(end);
+    if (w.end_ns <= w.start_ns)
+        throw std::runtime_error("Window end must be strictly after start: [" + start + ", " + end + "]");
+    return w;
+}
+
 DataLoader::DataLoader(const config::DataConfig& data_cfg,
                        const config::SimulationConfig& sim_cfg,
                        const std::vector<config::InstrumentConfig>& instruments)
     : local_cache_(data_cfg.local_cache),
-      allow_partial_data_(sim_cfg.allow_partial_data),
-      start_day_(parse_date(sim_cfg.start)),
-      end_day_(parse_date(sim_cfg.end)) {
+      allow_partial_data_(sim_cfg.allow_partial_data) {
+    if (sim_cfg.windows.empty())
+        throw std::runtime_error("DataLoader: simulation.windows is empty (loader should populate)");
+
+    windows_.reserve(sim_cfg.windows.size());
+    for (const auto& tw : sim_cfg.windows)
+        windows_.push_back(window_from_strings(tw.start, tw.end));
+
+    std::sort(windows_.begin(), windows_.end(),
+              [](const Window& a, const Window& b) { return a.start_ns < b.start_ns; });
+
+    const uint64_t min_start = windows_.front().start_ns;
+    uint64_t max_end = 0;
+    for (const auto& w : windows_) max_end = std::max(max_end, w.end_ns);
+
+    start_day_ = day_of_ns(min_start);
+    end_day_ = day_of_ns(max_end - 1);
+
     for (const auto& inst : instruments) {
         InstrumentReader r;
         r.instrument = inst;
@@ -103,6 +186,16 @@ DataLoader::DataLoader(const config::DataConfig& data_cfg,
         r.end_day = end_day_;
         readers_.push_back(std::move(r));
     }
+}
+
+bool DataLoader::in_any_window(uint64_t ts) const {
+    // Linear scan. Windows are typically O(1)–O(100); switching to a binary
+    // search keyed on start_ns is straightforward if N grows.
+    for (const auto& w : windows_) {
+        if (ts >= w.start_ns && ts < w.end_ns)
+            return true;
+    }
+    return false;
 }
 
 std::string DataLoader::trades_path(const std::string& exchange, const std::string& symbol, sys_days day) const {
@@ -158,8 +251,11 @@ std::vector<MarketEvent> DataLoader::read_trades(const std::string& path,
     events.reserve(static_cast<std::size_t>(table->num_rows()));
 
     for (int64_t i = 0; i < table->num_rows(); ++i) {
+        const uint64_t ts_ns = static_cast<uint64_t>(ts->Value(i));
+        if (!in_any_window(ts_ns))
+            continue;
         TradeRecord t;
-        t.timestamp_ns = static_cast<uint64_t>(ts->Value(i));
+        t.timestamp_ns = ts_ns;
         t.price = px->Value(i);
         t.quantity = qty->Value(i);
         t.side = static_cast<TradeSide>(sd->Value(i));
@@ -194,8 +290,11 @@ std::vector<MarketEvent> DataLoader::read_orderbook(const std::string& path,
     events.reserve(static_cast<std::size_t>(table->num_rows()));
 
     for (int64_t i = 0; i < table->num_rows(); ++i) {
+        const uint64_t ts_ns = static_cast<uint64_t>(ts->Value(i));
+        if (!in_any_window(ts_ns))
+            continue;
         OrderBookRecord ob;
-        ob.timestamp_ns = static_cast<uint64_t>(ts->Value(i));
+        ob.timestamp_ns = ts_ns;
         ob.exchange = exchange;
         ob.symbol = symbol;
         for (int lvl = 0; lvl < kOrderBookDepth; ++lvl) {
@@ -299,12 +398,18 @@ bool DataLoader::load_next_day() const {
 }
 
 std::optional<MarketEvent> DataLoader::next() {
-    // On first call, load the first day for each reader and seed the heap.
+    // On first call, load each reader's first non-empty day and seed the heap.
+    // Skip days that produce zero events after filtering (sub-day windows can
+    // legitimately leave early days empty).
     if (heap_.empty()) {
         for (std::size_t i = 0; i < readers_.size(); ++i) {
             auto& r = readers_[i];
-            if (r.day_events.empty() && r.current_day <= r.end_day) {
+            while (r.day_events.empty() && r.current_day <= r.end_day) {
                 load_day(r);
+                if (!r.has_next() && r.current_day < r.end_day)
+                    r.advance();
+                else
+                    break;
             }
             if (r.has_next()) {
                 heap_.emplace(r.peek().timestamp_ns, i);
@@ -327,13 +432,17 @@ std::optional<MarketEvent> DataLoader::next() {
 
         MarketEvent ev = r.consume();
 
-        // If current day exhausted, load next day and re-seed heap.
+        // If current day exhausted, load subsequent days until one yields
+        // events (or we run past end_day). Empty days happen when a sub-day
+        // window doesn't overlap the day's parquet data.
         if (!r.has_next()) {
-            if (r.advance()) {
+            while (r.advance()) {
                 load_day(r);
                 if (r.has_next())
-                    heap_.emplace(r.peek().timestamp_ns, idx);
+                    break;
             }
+            if (r.has_next())
+                heap_.emplace(r.peek().timestamp_ns, idx);
         } else {
             heap_.emplace(r.peek().timestamp_ns, idx);
         }

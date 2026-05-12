@@ -19,9 +19,7 @@ class DashboardControlSubscriber {
 public:
     using OnCommandFn = std::function<void(uint8_t cmd)>;
 
-    DashboardControlSubscriber(std::shared_ptr<aeron::Aeron> aeron,
-                               const std::string& channel,
-                               int stream_id);
+    DashboardControlSubscriber(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     /// True when the underlying subscription connected within the
     /// startup wait. False = subscription unavailable (logged at boot).

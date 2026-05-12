@@ -7,6 +7,7 @@
 
 #include <messages/OrderSide.h>
 #include <messages/OrderType.h>
+
 #include <boost/json.hpp>
 #include <cstdint>
 #include <functional>
@@ -39,10 +40,10 @@ public:
     /// already has them typed. Also emits a REJECTED event if the JSON
     /// has a top-level `code` field (Binance's error shape).
     void handle_order_response(const boost::json::object& obj,
-                                uint64_t order_id,
-                                bpt::messages::OrderSide::Value side,
-                                bpt::messages::OrderType::Value order_type,
-                                uint64_t recv_ns);
+                               uint64_t order_id,
+                               bpt::messages::OrderSide::Value side,
+                               bpt::messages::OrderType::Value order_type,
+                               uint64_t recv_ns);
 
 private:
     mutable std::mutex mu_;

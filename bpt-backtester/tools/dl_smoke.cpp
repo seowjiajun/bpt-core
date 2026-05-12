@@ -12,7 +12,6 @@
 #include "backtester/data/data_loader.h"
 
 #include <CLI/CLI.hpp>
-
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -60,8 +59,7 @@ int main(int argc, char** argv) {
 
         std::printf("DataLoader OK:\n");
         std::printf("  exchange=%s symbol=%s\n", exchange.c_str(), symbol.c_str());
-        std::printf("  trades=%lu book=%lu total=%lu\n",
-                    trade_count, book_count, trade_count + book_count);
+        std::printf("  trades=%lu book=%lu total=%lu\n", trade_count, book_count, trade_count + book_count);
         if (first_ts != 0) {
             std::printf("  first_ts_ns=%lu\n", first_ts);
             std::printf("  last_ts_ns =%lu\n", last_ts);

@@ -6,10 +6,10 @@
 #include <messages/OptionSide.h>
 #include <messages/RefDataSnapshot.h>
 
-#include <vector>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <vector>
 
 namespace bpt::refdata::messaging {
 

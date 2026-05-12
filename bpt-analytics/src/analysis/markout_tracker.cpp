@@ -10,8 +10,11 @@ double MarkoutTracker::compute_markout_bps(const PendingFill& pf, double mid) co
     return pf.side_sign * (mid - pf.fill_mid) / pf.fill_mid * 1e4;
 }
 
-void MarkoutTracker::on_fill(uint64_t instrument_id, int side_sign, double fill_price,
-                             double current_mid, uint64_t fill_ts_ns) {
+void MarkoutTracker::on_fill(uint64_t instrument_id,
+                             int side_sign,
+                             double fill_price,
+                             double current_mid,
+                             uint64_t fill_ts_ns) {
     if (pending_.size() >= cfg_.max_pending)
         pending_.pop_front();  // evict oldest to prevent unbounded growth
 

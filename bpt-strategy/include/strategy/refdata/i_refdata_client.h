@@ -50,8 +50,7 @@ public:
     /// Send a subscription request with canonical filters so the server
     /// pre-filters the snapshot. An empty filters vector means subscribe-all
     /// (receive the full universe).
-    virtual void subscribe(uint64_t correlation_id,
-                           std::vector<CanonicalFilter> filters = {}) = 0;
+    virtual void subscribe(uint64_t correlation_id, std::vector<CanonicalFilter> filters = {}) = 0;
 
     /// Poll all streams. Returns total fragment count processed.
     /// Backtest impls may return 0 (no polling).
@@ -80,10 +79,8 @@ public:
     /// Fired when the refdata service signals it has completed startup
     /// for all configured exchanges.
     /// exchanges_loaded: bitmask — bit0=BINANCE, bit1=OKX, bit2=HYPERLIQUID.
-    std::function<void(uint8_t exchanges_loaded,
-                       uint16_t instrument_count,
-                       bool fee_schedules_loaded,
-                       bool funding_rates_loaded)>
+    std::function<
+        void(uint8_t exchanges_loaded, uint16_t instrument_count, bool fee_schedules_loaded, bool funding_rates_loaded)>
         on_ready;
 
     /// Fired when the refdata service reports a runtime error Strategy must act on.

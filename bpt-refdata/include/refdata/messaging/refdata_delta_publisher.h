@@ -15,8 +15,7 @@ class RefdataDeltaPublisher final : public port::IRefdataDeltaSink {
 public:
     RefdataDeltaPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
-    void publish_delta(bpt::messages::DeltaUpdateType::Value update_type,
-                       const refdata::Instrument& inst) override;
+    void publish_delta(bpt::messages::DeltaUpdateType::Value update_type, const refdata::Instrument& inst) override;
 
     // Publish a heartbeat on the delta stream so subscribers can detect silent failures.
     // Uses DeltaUpdateType::NULL_VALUE with instrumentId=0; sequence number increments

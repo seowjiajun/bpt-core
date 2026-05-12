@@ -12,10 +12,10 @@
 
 #include <messages/TradeSide.h>
 
+#include <bpt_common/util/inline_vec.h>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
-#include <bpt_common/util/inline_vec.h>
 
 namespace bpt::md_gateway::md {
 

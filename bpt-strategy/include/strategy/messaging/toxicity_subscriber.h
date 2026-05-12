@@ -7,10 +7,9 @@
 /// strategy-side clients (MdClient, VolSurfaceClient): owns its
 /// Subscription, exposes poll().
 
-#include <analytics/messaging/toxicity_update.h>
-
 #include <Aeron.h>
 
+#include <analytics/messaging/toxicity_update.h>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -22,9 +21,7 @@ class ToxicitySubscriber {
 public:
     using OnUpdateFn = std::function<void(const bpt::analytics::messaging::ToxicityUpdate&)>;
 
-    ToxicitySubscriber(std::shared_ptr<aeron::Aeron> aeron,
-                       const std::string& channel,
-                       int stream_id);
+    ToxicitySubscriber(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     int poll(int fragment_limit = 4);
 

@@ -7,8 +7,8 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
-#include <string>
 #include <bpt_common/logging.h>
+#include <string>
 
 namespace bpt::order_gateway::adapter {
 
@@ -16,10 +16,9 @@ namespace json = boost::json;
 
 static constexpr double kScale = 1e8;
 
-void HyperliquidExecDecoder::register_order(uint64_t exch_oid,
-                                           uint64_t client_order_id,
-                                           uint64_t original_qty_e8) {
-    if (exch_oid == 0) return;
+void HyperliquidExecDecoder::register_order(uint64_t exch_oid, uint64_t client_order_id, uint64_t original_qty_e8) {
+    if (exch_oid == 0)
+        return;
     pending_[exch_oid] = PendingOrder{client_order_id, original_qty_e8, 0};
 }
 
@@ -54,22 +53,18 @@ void HyperliquidExecDecoder::handle_fills(const json::array& fills, uint64_t rec
         ev.order_type = bpt::messages::OrderType::LIMIT;
 
         ev.price = static_cast<int64_t>(std::stod(std::string(fill.at("px").as_string())) * kScale);
-        const uint64_t slice_qty_e8 =
-            static_cast<uint64_t>(std::stod(std::string(fill.at("sz").as_string())) * kScale);
+        const uint64_t slice_qty_e8 = static_cast<uint64_t>(std::stod(std::string(fill.at("sz").as_string())) * kScale);
         ev.filled_qty = slice_qty_e8;
 
         po.cumulative_filled_e8 += slice_qty_e8;
         const bool fully_filled = po.cumulative_filled_e8 >= po.original_qty_e8;
 
-        ev.remaining_qty =
-            fully_filled ? 0 : (po.original_qty_e8 - po.cumulative_filled_e8);
+        ev.remaining_qty = fully_filled ? 0 : (po.original_qty_e8 - po.cumulative_filled_e8);
 
         ev.fee = static_cast<int64_t>(std::stod(std::string(fill.at("fee").as_string())) * kScale);
         ev.fee_currency = "USDT";
         ev.reject_reason = bpt::messages::RejectReason::OK;
-        ev.status = fully_filled
-                        ? bpt::messages::ExecStatus::FILLED
-                        : bpt::messages::ExecStatus::PARTIAL;
+        ev.status = fully_filled ? bpt::messages::ExecStatus::FILLED : bpt::messages::ExecStatus::PARTIAL;
 
         if (auto ts_it = fill.find("time"); ts_it != fill.end())
             ev.exchange_ts_ns = static_cast<uint64_t>(ts_it->value().as_int64()) * 1000000ULL;

@@ -3,12 +3,11 @@
 #include "bpt_common/logging.h"
 #include "bpt_common/util/tsc_clock.h"
 
-#include <fmt/format.h>
-
 #include <cerrno>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
+#include <fmt/format.h>
 
 namespace bpt::tape::io {
 
@@ -44,19 +43,21 @@ std::string Tape::build_path(uint64_t recv_ts_ns) const {
     const std::time_t t = static_cast<std::time_t>(recv_ts_ns / 1'000'000'000ULL);
     std::tm tm{};
     gmtime_r(&t, &tm);
-    return fmt::format(
-        "{}/{}/{:04}-{:02}-{:02}/{}-{:02}{:02}{:02}.wslog",
-        cfg_.root_dir, cfg_.venue_tag,
-        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-        cfg_.venue_tag,
-        tm.tm_hour, tm.tm_min, tm.tm_sec);
+    return fmt::format("{}/{}/{:04}-{:02}-{:02}/{}-{:02}{:02}{:02}.wslog",
+                       cfg_.root_dir,
+                       cfg_.venue_tag,
+                       tm.tm_year + 1900,
+                       tm.tm_mon + 1,
+                       tm.tm_mday,
+                       cfg_.venue_tag,
+                       tm.tm_hour,
+                       tm.tm_min,
+                       tm.tm_sec);
 }
 
 bool Tape::ensure_file_open(uint64_t recv_ts_ns) {
-    const uint64_t rotate_ns =
-        static_cast<uint64_t>(cfg_.rotate_interval_seconds) * 1'000'000'000ULL;
-    const bool need_rotate =
-        (fp_ == nullptr) || (recv_ts_ns - current_file_start_ns_ >= rotate_ns);
+    const uint64_t rotate_ns = static_cast<uint64_t>(cfg_.rotate_interval_seconds) * 1'000'000'000ULL;
+    const bool need_rotate = (fp_ == nullptr) || (recv_ts_ns - current_file_start_ns_ >= rotate_ns);
     if (!need_rotate)
         return true;
 
@@ -70,10 +71,10 @@ bool Tape::ensure_file_open(uint64_t recv_ts_ns) {
         // Surface the cause: ENOSPC, EACCES, EROFS all look identical at
         // the bool-return seam. The 2026-05-09 incident burned 36 hours
         // because this path was silent. See docs/backlog.md.
-        bpt::common::log::error(
-            "Tape: create_directories({}) failed: {} ({})",
-            fs::path(path).parent_path().string(),
-            ec.message(), ec.value());
+        bpt::common::log::error("Tape: create_directories({}) failed: {} ({})",
+                                fs::path(path).parent_path().string(),
+                                ec.message(),
+                                ec.value());
         if (cfg_.metrics.on_rotation_failure)
             cfg_.metrics.on_rotation_failure("create_directories");
         return false;
@@ -81,9 +82,7 @@ bool Tape::ensure_file_open(uint64_t recv_ts_ns) {
 
     fp_ = std::fopen(path.c_str(), "ab");
     if (fp_ == nullptr) {
-        bpt::common::log::error(
-            "Tape: fopen({}, \"ab\") failed: {} (errno={})",
-            path, std::strerror(errno), errno);
+        bpt::common::log::error("Tape: fopen({}, \"ab\") failed: {} (errno={})", path, std::strerror(errno), errno);
         if (cfg_.metrics.on_rotation_failure)
             cfg_.metrics.on_rotation_failure("fopen");
         return false;
@@ -121,9 +120,11 @@ bool Tape::write_record(uint64_t recv_ts_ns, RecordType type, std::string_view p
     if (buffer_pos_ + total > buffer_.size()) {
         if (buffer_pos_ > 0) {
             if (std::fwrite(buffer_.data(), 1, buffer_pos_, fp_) != buffer_pos_) {
-                bpt::common::log::error(
-                    "Tape: fwrite(buffer={} B) to {} failed: {} (errno={})",
-                    buffer_pos_, current_path_, std::strerror(errno), errno);
+                bpt::common::log::error("Tape: fwrite(buffer={} B) to {} failed: {} (errno={})",
+                                        buffer_pos_,
+                                        current_path_,
+                                        std::strerror(errno),
+                                        errno);
                 return false;
             }
             buffer_pos_ = 0;
@@ -131,16 +132,22 @@ bool Tape::write_record(uint64_t recv_ts_ns, RecordType type, std::string_view p
         // Pathological-size record: write direct.
         if (total > buffer_.size()) {
             const auto fail = [&](const char* what) {
-                bpt::common::log::error(
-                    "Tape: fwrite({} direct, {} B) to {} failed: {} (errno={})",
-                    what, total, current_path_, std::strerror(errno), errno);
+                bpt::common::log::error("Tape: fwrite({} direct, {} B) to {} failed: {} (errno={})",
+                                        what,
+                                        total,
+                                        current_path_,
+                                        std::strerror(errno),
+                                        errno);
                 return false;
             };
-            if (std::fwrite(&recv_ts_ns, sizeof(recv_ts_ns), 1, fp_) != 1) return fail("ts");
-            if (std::fwrite(&type_byte, sizeof(type_byte), 1, fp_) != 1)   return fail("type");
-            if (std::fwrite(&length,    sizeof(length),    1, fp_) != 1)   return fail("len");
-            if (length > 0 &&
-                std::fwrite(payload.data(), 1, length, fp_) != length)     return fail("payload");
+            if (std::fwrite(&recv_ts_ns, sizeof(recv_ts_ns), 1, fp_) != 1)
+                return fail("ts");
+            if (std::fwrite(&type_byte, sizeof(type_byte), 1, fp_) != 1)
+                return fail("type");
+            if (std::fwrite(&length, sizeof(length), 1, fp_) != 1)
+                return fail("len");
+            if (length > 0 && std::fwrite(payload.data(), 1, length, fp_) != length)
+                return fail("payload");
             frames_written_.fetch_add(1, std::memory_order_relaxed);
             bytes_written_.fetch_add(total, std::memory_order_relaxed);
             return true;
@@ -163,8 +170,7 @@ bool Tape::write_record(uint64_t recv_ts_ns, RecordType type, std::string_view p
 
     // Auto-flush if it's been a while since the last one. Caps replay-loss
     // on crash to ~flush_interval_ns regardless of buffer fill rate.
-    if (cfg_.flush_interval_ns > 0 &&
-        recv_ts_ns - last_flush_ns_ >= cfg_.flush_interval_ns) {
+    if (cfg_.flush_interval_ns > 0 && recv_ts_ns - last_flush_ns_ >= cfg_.flush_interval_ns) {
         if (buffer_pos_ > 0) {
             std::fwrite(buffer_.data(), 1, buffer_pos_, fp_);
             buffer_pos_ = 0;

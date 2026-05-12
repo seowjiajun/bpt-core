@@ -36,6 +36,13 @@ public:
 
     bool exhausted() const { return heap_.empty() && !load_next_day(); }
 
+    // Half-open replay window in epoch nanoseconds. Public so .cpp helpers
+    // can build instances without friending the loader.
+    struct Window {
+        uint64_t start_ns;
+        uint64_t end_ns;  // exclusive
+    };
+
 private:
     // One per instrument — tracks position within the current day's events
     // and advances to the next day when exhausted.
@@ -70,9 +77,17 @@ private:
 
     std::string local_cache_;
     bool allow_partial_data_;
+    // Half-open replay windows in epoch-ns. An event is emitted iff
+    // ts ∈ ⋃ windows_. Sorted by start_ns. Date-only end strings are
+    // sugared up to next-midnight at construction so existing day-level
+    // configs preserve full-day semantics.
+    std::vector<Window> windows_;
+    // Span over all windows — used to drive day-keyed parquet routing.
     std::chrono::sys_days start_day_;
     std::chrono::sys_days end_day_;
     std::vector<InstrumentReader> readers_;
+
+    bool in_any_window(uint64_t ts) const;
 
     // Min-heap: (timestamp_ns, reader_index)
     using HeapEntry = std::pair<uint64_t, std::size_t>;

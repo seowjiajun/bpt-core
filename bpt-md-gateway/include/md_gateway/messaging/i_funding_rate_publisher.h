@@ -24,11 +24,11 @@ namespace bpt::md_gateway::messaging {
 
 /// \brief Domain struct passed across the port — venue-agnostic shape.
 struct FundingRateUpdate {
-    uint64_t instrument_id;                  ///< canonical refdata ID
+    uint64_t instrument_id;                        ///< canonical refdata ID
     bpt::messages::ExchangeId::Value exchange_id;  ///< source venue tag for downstream filtering
-    int32_t rate_bps;                        ///< signed; rate * 1e6 (e.g. 0.0001 → 100)
-    uint64_t next_funding_ts_ns;             ///< 0 if the venue does not provide a schedule
-    uint64_t collected_ts_ns;                ///< wall-clock recv time stamped by the adapter
+    int32_t rate_bps;                              ///< signed; rate * 1e6 (e.g. 0.0001 → 100)
+    uint64_t next_funding_ts_ns;                   ///< 0 if the venue does not provide a schedule
+    uint64_t collected_ts_ns;                      ///< wall-clock recv time stamped by the adapter
 };
 
 /// \brief Per-event callback shape used inside the venue decoders.

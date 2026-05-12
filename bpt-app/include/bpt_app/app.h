@@ -35,19 +35,19 @@
 #include "bpt_app/base_settings.h"
 
 #include <Aeron.h>
+
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/signal.h>
 #include <bpt_common/util/topology.h>
 #include <bpt_common/util/tsc_clock.h>
-
-#include <execinfo.h>
-#include <sys/prctl.h>
 #include <cstdlib>
 #include <cstring>
+#include <execinfo.h>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <sys/prctl.h>
 #include <utility>
 
 namespace bpt::app {
@@ -59,8 +59,8 @@ namespace bpt::app {
 /// resources (credentials, sockets) can construct them inside their own
 /// code using ctx.aeron.
 struct AppContext {
-    std::shared_ptr<::aeron::Aeron> aeron;     ///< nullptr if RunOptions::connect_aeron == false
-    bpt::common::util::Topology     topology;  ///< empty when base.topology_path is unset
+    std::shared_ptr<::aeron::Aeron> aeron;  ///< nullptr if RunOptions::connect_aeron == false
+    bpt::common::util::Topology topology;   ///< empty when base.topology_path is unset
 };
 
 /// \brief Service contract.
@@ -99,8 +99,7 @@ struct RunOptions {
 ///         Exceptions from \c build_fn propagate so the service can
 ///         decide whether to translate them; bpt-app doesn't swallow.
 template <typename Settings, typename BuildFn>
-int run(const std::string& service_name, Settings settings, BuildFn build_fn,
-        RunOptions opts = {}) {
+int run(const std::string& service_name, Settings settings, BuildFn build_fn, RunOptions opts = {}) {
     auto& base = settings.base;
 
     bpt::common::signal::install();
@@ -164,13 +163,12 @@ int run(const std::string& service_name, Settings settings, BuildFn build_fn,
         // (client state corrupted, no amount of retry from the conductor
         // thread will reattach). Add more as they're seen in the wild.
         static constexpr std::string_view kFatalPatterns[] = {
-            "timeout between service calls",        // client conductor missed 20s service window
-            "client heartbeat timestamp not active", // MediaDriver declared the client dead
+            "timeout between service calls",          // client conductor missed 20s service window
+            "client heartbeat timestamp not active",  // MediaDriver declared the client dead
         };
         for (const auto& pat : kFatalPatterns) {
             if (msg.find(pat) != std::string_view::npos) {
-                bpt::common::log::error(
-                    "[Aeron] fatal — unrecoverable client state; exiting for systemd restart");
+                bpt::common::log::error("[Aeron] fatal — unrecoverable client state; exiting for systemd restart");
                 // _Exit skips destructors (Aeron's shutdown path may itself
                 // hit the conductor we just gave up on). systemd's
                 // Restart=on-failure in the unit file brings us back.
@@ -199,7 +197,8 @@ int run(const std::string& service_name, Settings settings, BuildFn build_fn,
         bpt::common::log::info("CPU topology: empty (no pinning)");
     else
         bpt::common::log::info("CPU topology: loaded {} assignments from '{}'",
-                               topology.assignment_count(), base.topology_path);
+                               topology.assignment_count(),
+                               base.topology_path);
 
     AppContext ctx{std::move(aeron), std::move(topology)};
 

@@ -20,8 +20,8 @@ std::unordered_map<std::string, int64_t> extract_exchange_positions(bpt::message
     return exchange_by_symbol;
 }
 
-std::unordered_map<std::string, ExchangePositionRow>
-extract_exchange_position_rows(bpt::messages::AccountSnapshot& snap) {
+std::unordered_map<std::string, ExchangePositionRow> extract_exchange_position_rows(
+    bpt::messages::AccountSnapshot& snap) {
     std::unordered_map<std::string, ExchangePositionRow> out;
     auto& positions = snap.positions();
     const std::size_t n = positions.count();

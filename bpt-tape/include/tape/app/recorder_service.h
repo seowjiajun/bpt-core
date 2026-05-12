@@ -15,18 +15,18 @@
 /// after — tape metrics-hook lambdas capture refs into its prometheus
 /// families, so member declaration order is load-bearing.
 
-#include "tape/io/tape.h"
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "tape/config/settings.h"
+#include "tape/io/tape.h"
 #include "tape/metrics/metrics.h"
 #include "tape/refdata/refdata_poller.h"
 
+#include <bpt_app/app.h>
+#include <bpt_common/util/topology.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <bpt_app/app.h>
-#include <bpt_common/util/topology.h>
 
 namespace bpt::tape::app {
 
@@ -42,8 +42,7 @@ public:
     ///         adapter implementation, or if the instrument-mapping JSON
     ///         can't be loaded. Adapter threads that started before the
     ///         throw are stopped before the exception propagates.
-    RecorderService(config::Settings settings,
-                    const bpt::common::util::Topology& topology);
+    RecorderService(config::Settings settings, const bpt::common::util::Topology& topology);
 
     /// \brief Block on bpt::common::signal until SIGINT/SIGTERM.
     void run() override;
@@ -68,16 +67,14 @@ private:
 
     /// \brief Build a Tape from settings_.recording, wiring per-venue
     ///        metrics hooks if metrics_ is live.
-    std::shared_ptr<bpt::tape::io::Tape> make_tape(
-        const std::string& venue_tag);
+    std::shared_ptr<bpt::tape::io::Tape> make_tape(const std::string& venue_tag);
 
     /// \brief Install on_connect / on_disconnect callbacks on the adapter
     ///        that (1) emit WS_RECONNECT / WS_DISCONNECT tape markers,
     ///        (2) drive ws_connected + ws_reconnects_total metrics.
-    void wire_connection_markers(
-        std::shared_ptr<bpt::md_gateway::adapter::IAdapter> adapter,
-        std::shared_ptr<bpt::tape::io::Tape> tape,
-        const std::string& venue_tag);
+    void wire_connection_markers(std::shared_ptr<bpt::md_gateway::adapter::IAdapter> adapter,
+                                 std::shared_ptr<bpt::tape::io::Tape> tape,
+                                 const std::string& venue_tag);
 
     config::Settings settings_;
     const bpt::common::util::Topology& topology_;
@@ -89,9 +86,7 @@ private:
 
     std::vector<std::shared_ptr<bpt::tape::io::Tape>> tapes_;
     std::vector<std::shared_ptr<bpt::md_gateway::adapter::IAdapter>> adapters_;
-    std::unordered_map<std::string,
-                       std::shared_ptr<bpt::md_gateway::adapter::IAdapter>>
-        adapters_per_venue_;
+    std::unordered_map<std::string, std::shared_ptr<bpt::md_gateway::adapter::IAdapter>> adapters_per_venue_;
 
     std::vector<std::shared_ptr<bpt::tape::io::Tape>> refdata_tapes_;
     std::vector<std::unique_ptr<refdata::RefdataPoller>> refdata_pollers_;

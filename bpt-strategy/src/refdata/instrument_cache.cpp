@@ -32,7 +32,8 @@ InstrumentType from_sbe_type(bpt::messages::InstrumentType::Value v) {
 // string comparisons in strategies/configs keep working with the long name.
 // Remove once the SBE schema is widened.
 std::string canonicalize_exchange(const std::string& truncated) {
-    if (truncated == "HYPERLIQ") return "HYPERLIQUID";
+    if (truncated == "HYPERLIQ")
+        return "HYPERLIQUID";
     return truncated;
 }
 

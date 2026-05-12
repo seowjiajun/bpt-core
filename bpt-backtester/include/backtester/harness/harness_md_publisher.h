@@ -26,12 +26,10 @@
 #include "backtester/data/orderbook_record.h"
 #include "backtester/data/trade_record.h"
 #include "backtester/matching/matching_engine.h"
-
-#include "strategy/md/inprocess_md_client.h"
-#include "strategy/refdata/instrument_cache.h"
-
 #include "md_gateway/md/md_encoder.h"
 #include "md_gateway/md/md_types.h"
+#include "strategy/md/inprocess_md_client.h"
+#include "strategy/refdata/instrument_cache.h"
 
 #include <messages/MdMarketData.h>
 #include <messages/MdOrderBook.h>
@@ -48,8 +46,7 @@ class HarnessMdPublisher {
 public:
     /// Strategy-only ctor (no matching-engine fan-out — useful for
     /// unit tests that want to assert the publisher → strategy hop).
-    explicit HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client)
-        : client_(client) {}
+    explicit HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client) : client_(client) {}
 
     /// Production ctor for the harness — every published OrderBook/Trade
     /// is also dispatched to the matching engine so resting LIMITs can
@@ -59,7 +56,9 @@ public:
     HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client,
                        matching::MatchingEngine* matching,
                        const bpt::strategy::refdata::InstrumentCache* cache)
-        : client_(client), matching_(matching), cache_(cache) {}
+        : client_(client),
+          matching_(matching),
+          cache_(cache) {}
 
     void publish(const bpt::md_gateway::md::MdBbo& bbo) {
         ++seq_;
@@ -75,20 +74,18 @@ public:
             if (auto inst = cache_->get(bbo.instrument_id)) {
                 bpt::backtester::data::OrderBookRecord ob;
                 ob.timestamp_ns = bbo.timestamp_ns;
-                ob.exchange     = inst->exchange;
-                ob.symbol       = inst->symbol;
-                ob.bid_px[0]    = bbo.bid_price;
-                ob.bid_sz[0]    = bbo.bid_qty;
-                ob.ask_px[0]    = bbo.ask_price;
-                ob.ask_sz[0]    = bbo.ask_qty;
-                matching_->on_market_event(
-                    bpt::backtester::data::MarketEvent::from_orderbook(std::move(ob)));
+                ob.exchange = inst->exchange;
+                ob.symbol = inst->symbol;
+                ob.bid_px[0] = bbo.bid_price;
+                ob.bid_sz[0] = bbo.bid_qty;
+                ob.ask_px[0] = bbo.ask_price;
+                ob.ask_sz[0] = bbo.ask_qty;
+                matching_->on_market_event(bpt::backtester::data::MarketEvent::from_orderbook(std::move(ob)));
             }
         }
 
         constexpr std::size_t kBufSize =
-            bpt::messages::MessageHeader::encodedLength() +
-            bpt::messages::MdMarketData::sbeBlockLength();
+            bpt::messages::MessageHeader::encodedLength() + bpt::messages::MdMarketData::sbeBlockLength();
         char buf[kBufSize]{};
         bpt::messages::MdMarketData msg;
         msg.wrapAndApplyHeader(buf, 0, kBufSize)
@@ -115,22 +112,19 @@ public:
             if (auto inst = cache_->get(trade.instrument_id)) {
                 bpt::backtester::data::TradeRecord tr{
                     .timestamp_ns = trade.timestamp_ns,
-                    .price        = trade.price,
-                    .quantity     = trade.qty,
-                    .side         = trade.side == bpt::messages::TradeSide::BUY
-                                        ? bpt::backtester::data::TradeSide::BUY
-                                        : bpt::backtester::data::TradeSide::SELL,
-                    .exchange     = inst->exchange,
-                    .symbol       = inst->symbol,
+                    .price = trade.price,
+                    .quantity = trade.qty,
+                    .side = trade.side == bpt::messages::TradeSide::BUY ? bpt::backtester::data::TradeSide::BUY
+                                                                        : bpt::backtester::data::TradeSide::SELL,
+                    .exchange = inst->exchange,
+                    .symbol = inst->symbol,
                 };
-                matching_->on_market_event(
-                    bpt::backtester::data::MarketEvent::from_trade(std::move(tr)));
+                matching_->on_market_event(bpt::backtester::data::MarketEvent::from_trade(std::move(tr)));
             }
         }
 
         constexpr std::size_t kBufSize =
-            bpt::messages::MessageHeader::encodedLength() +
-            bpt::messages::MdTrade::sbeBlockLength();
+            bpt::messages::MessageHeader::encodedLength() + bpt::messages::MdTrade::sbeBlockLength();
         char buf[kBufSize]{};
         bpt::messages::MdTrade msg;
         msg.wrapAndApplyHeader(buf, 0, kBufSize)
@@ -151,22 +145,21 @@ public:
             if (auto inst = cache_->get(book.instrument_id)) {
                 bpt::backtester::data::OrderBookRecord ob;
                 ob.timestamp_ns = book.timestamp_ns;
-                ob.exchange     = inst->exchange;
-                ob.symbol       = inst->symbol;
-                const std::size_t n_bid = std::min<std::size_t>(
-                    book.bids.size(), bpt::backtester::data::kOrderBookDepth);
+                ob.exchange = inst->exchange;
+                ob.symbol = inst->symbol;
+                const std::size_t n_bid =
+                    std::min<std::size_t>(book.bids.size(), bpt::backtester::data::kOrderBookDepth);
                 for (std::size_t i = 0; i < n_bid; ++i) {
                     ob.bid_px[i] = book.bids[i].first;
                     ob.bid_sz[i] = book.bids[i].second;
                 }
-                const std::size_t n_ask = std::min<std::size_t>(
-                    book.asks.size(), bpt::backtester::data::kOrderBookDepth);
+                const std::size_t n_ask =
+                    std::min<std::size_t>(book.asks.size(), bpt::backtester::data::kOrderBookDepth);
                 for (std::size_t i = 0; i < n_ask; ++i) {
                     ob.ask_px[i] = book.asks[i].first;
                     ob.ask_sz[i] = book.asks[i].second;
                 }
-                matching_->on_market_event(
-                    bpt::backtester::data::MarketEvent::from_orderbook(std::move(ob)));
+                matching_->on_market_event(bpt::backtester::data::MarketEvent::from_orderbook(std::move(ob)));
             }
         }
 
@@ -174,9 +167,9 @@ public:
         // OrderBook's variable-length payload is bit-identical between
         // backtest replay and production.
         char buf[bpt::md_gateway::md::MdEncoder::kMaxOrderBookBufSize];
-        const std::size_t len =
-            bpt::md_gateway::md::MdEncoder::encode(book, seq_, buf, sizeof(buf));
-        if (len == 0) return;
+        const std::size_t len = bpt::md_gateway::md::MdEncoder::encode(book, seq_, buf, sizeof(buf));
+        if (len == 0)
+            return;
         bpt::messages::MdOrderBook msg;
         msg.wrapForDecode(buf,
                           bpt::messages::MessageHeader::encodedLength(),

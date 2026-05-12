@@ -11,6 +11,7 @@
 #include "order_gateway/adapter/deribit/deribit_order_adapter.h"
 #include "order_gateway/adapter/hyperliquid/hyperliquid_order_adapter.h"
 #include "order_gateway/adapter/okx/okx_order_adapter.h"
+
 #include <messages/ExchangeRegistry.h>
 
 #include <memory>
@@ -22,10 +23,9 @@ namespace bpt::order_gateway::adapter {
 /// Order-side adapters aren't templated (no equivalent of mdgw's Pub
 /// parameter) — concrete subclasses suffice. Each takes the same
 /// (cfg, exchange_creds) constructor signature.
-inline std::shared_ptr<IOrderAdapter> make_order_adapter(
-    bpt::messages::ExchangeId::Value exch_id,
-    const bpt::order_gateway::config::AdapterConfig& cfg,
-    const ExchangeCredentials& creds) {
+inline std::shared_ptr<IOrderAdapter> make_order_adapter(bpt::messages::ExchangeId::Value exch_id,
+                                                         const bpt::order_gateway::config::AdapterConfig& cfg,
+                                                         const ExchangeCredentials& creds) {
     using namespace bpt::messages;
     switch (exch_id) {
         case ExchangeId::BINANCE:
@@ -50,11 +50,16 @@ inline std::shared_ptr<IOrderAdapter> make_order_adapter(
 inline uint8_t exchange_status_bit(bpt::messages::ExchangeId::Value exch_id) {
     using namespace bpt::messages;
     switch (exch_id) {
-        case ExchangeId::BINANCE:     return 0x01;
-        case ExchangeId::OKX:         return 0x02;
-        case ExchangeId::HYPERLIQUID: return 0x04;
-        case ExchangeId::DERIBIT:     return 0x08;
-        default:                      return 0x00;
+        case ExchangeId::BINANCE:
+            return 0x01;
+        case ExchangeId::OKX:
+            return 0x02;
+        case ExchangeId::HYPERLIQUID:
+            return 0x04;
+        case ExchangeId::DERIBIT:
+            return 0x08;
+        default:
+            return 0x00;
     }
 }
 

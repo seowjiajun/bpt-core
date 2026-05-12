@@ -9,7 +9,6 @@
 #include <messages/ExchangeRegistry.h>
 
 #include <bpt_common/logging.h>
-
 #include <format>
 #include <stdexcept>
 
@@ -60,8 +59,7 @@ void ClockMaster::run() {
         if (ctrl_pub_) {
             ctrl_pub_->send(BacktestCommand::START, seq, event->timestamp_ns);
             if (!ack_sub_->wait_for(seq, kAckTimeout))
-                throw std::runtime_error(
-                    std::format("Ack timed out at seq={} ts={}", seq, event->timestamp_ns));
+                throw std::runtime_error(std::format("Ack timed out at seq={} ts={}", seq, event->timestamp_ns));
         }
 
         if (seq % 100'000 == 0)
@@ -91,13 +89,16 @@ void ClockMaster::dispatch(const data::MarketEvent& event) {
     } else {
         switch (*exch_id) {
             case bpt::messages::ExchangeId::BINANCE:
-                if (binance_server_) binance_server_->push(event);
+                if (binance_server_)
+                    binance_server_->push(event);
                 break;
             case bpt::messages::ExchangeId::OKX:
-                if (okx_server_) okx_server_->push(event);
+                if (okx_server_)
+                    okx_server_->push(event);
                 break;
             case bpt::messages::ExchangeId::HYPERLIQUID:
-                if (hyperliquid_server_) hyperliquid_server_->push(event);
+                if (hyperliquid_server_)
+                    hyperliquid_server_->push(event);
                 break;
             default:
                 bpt::common::log::warn(kLog(), "No WS server for exchange '{}' — event dropped", exchange);

@@ -6,17 +6,16 @@ namespace bpt::order_gateway::adapter::binance {
 
 namespace http = boost::beast::http;
 
-BinanceHttpsClient::BinanceHttpsClient(const config::AdapterConfig& cfg,
-                                        const ExchangeCredentials& creds)
+BinanceHttpsClient::BinanceHttpsClient(const config::AdapterConfig& cfg, const ExchangeCredentials& creds)
     : cfg_(cfg),
       api_key_(creds.api_key),
       secret_key_(creds.secret_key),
       inner_(cfg.rest_host, cfg.rest_port) {}
 
 std::string BinanceHttpsClient::request(const std::string& method,
-                                         const std::string& path,
-                                         const std::string& body,
-                                         bool with_api_key) {
+                                        const std::string& path,
+                                        const std::string& body,
+                                        bool with_api_key) {
     http::verb verb;
     if (method == "POST")
         verb = http::verb::post;

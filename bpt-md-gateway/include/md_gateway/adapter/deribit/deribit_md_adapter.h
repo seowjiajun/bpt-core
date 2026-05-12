@@ -13,13 +13,13 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
+#include <bpt_common/logging.h>
+#include <bpt_common/ws/ws_connect.h>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
-#include <bpt_common/logging.h>
-#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -43,8 +43,7 @@ public:
         : Base(cfg, std::move(md_pub)),
           decoder_(this->subs_),
           ws_client_(this->cfg_, this->subs_) {
-        ws_client_.set_frame_handler(
-            [this](std::string_view p, uint64_t t) { this->handle_frame(p, t); });
+        ws_client_.set_frame_handler([this](std::string_view p, uint64_t t) { this->handle_frame(p, t); });
     }
 
     /// \brief Unsubscribe + clear gap-detection state for the instrument in the decoder.
@@ -57,8 +56,7 @@ public:
     /// \brief Push subscribe frames immediately on connect (bypassing on_tick).
     void subscribe(uint64_t instrument_id, std::string symbol, uint8_t depth = 0) override {
         Base::subscribe(instrument_id, symbol, depth);
-        if (ws_client_.send(deribit::build_subscribe_rpc(
-                ws_client_.next_rpc_id(), symbol, depth))) {
+        if (ws_client_.send(deribit::build_subscribe_rpc(ws_client_.next_rpc_id(), symbol, depth))) {
             bpt::common::log::info("DeribitMdAdapter: runtime subscribe {} depth={}", symbol, depth);
             this->subs_.take_pending();
         }
@@ -71,9 +69,7 @@ public:
 
 protected:
     /// \brief 2 s back-off — Deribit is slower to recover than the CEXs.
-    std::chrono::milliseconds reconnect_delay() const override {
-        return std::chrono::seconds(2);
-    }
+    std::chrono::milliseconds reconnect_delay() const override { return std::chrono::seconds(2); }
 
     std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() override {
         namespace beast = boost::beast;
@@ -81,39 +77,36 @@ protected:
         namespace net = boost::asio;
 
         bpt::common::log::info("DeribitMdAdapter connecting {}:{}{}",
-                                this->cfg_.ws_host, this->cfg_.ws_port, this->cfg_.ws_path);
+                               this->cfg_.ws_host,
+                               this->cfg_.ws_port,
+                               this->cfg_.ws_path);
         auto tls_ws = bpt::common::ws::ws_connect(this->ioc_,
-                                                   this->ssl_ctx_,
-                                                   this->cfg_.ws_host,
-                                                   this->cfg_.ws_port,
-                                                   this->cfg_.ws_path,
-                                                   this->cfg_.so_rcvbuf_bytes,
-                                                   this->cfg_.ws_connect_timeout_ms,
-                                                   "bpt-md-gateway/0.1",
-                                                   this->cfg_.pinned_tls_sha256);
+                                                  this->ssl_ctx_,
+                                                  this->cfg_.ws_host,
+                                                  this->cfg_.ws_port,
+                                                  this->cfg_.ws_path,
+                                                  this->cfg_.so_rcvbuf_bytes,
+                                                  this->cfg_.ws_connect_timeout_ms,
+                                                  "bpt-md-gateway/0.1",
+                                                  this->cfg_.pinned_tls_sha256);
         auto ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
 
         ws->text(true);
-        ws->set_option(websocket::stream_base::timeout{
-            websocket::stream_base::none(),
-            websocket::stream_base::none(),
-            false
-        });
+        ws->set_option(
+            websocket::stream_base::timeout{websocket::stream_base::none(), websocket::stream_base::none(), false});
 
         bpt::common::log::info("DeribitMdAdapter connected");
 
         // Enable Deribit heartbeat — CRITICAL: Deribit disconnects within 30s if
         // test_request is not answered with public/test.
-        ws->write(net::buffer(deribit::build_set_heartbeat_rpc(
-            ws_client_.next_rpc_id(), /*interval_s=*/30)));
+        ws->write(net::buffer(deribit::build_set_heartbeat_rpc(ws_client_.next_rpc_id(), /*interval_s=*/30)));
         bpt::common::log::info("DeribitMdAdapter: heartbeat enabled (interval=30s)");
 
         decoder_.reset();
 
         this->subs_.take_pending();
         for (const auto& [id, entry] : this->subs_.snapshot())
-            ws->write(net::buffer(deribit::build_subscribe_rpc(
-                ws_client_.next_rpc_id(), entry.symbol, entry.depth)));
+            ws->write(net::buffer(deribit::build_subscribe_rpc(ws_client_.next_rpc_id(), entry.symbol, entry.depth)));
 
         return ws;
     }

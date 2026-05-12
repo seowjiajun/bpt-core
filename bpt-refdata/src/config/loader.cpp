@@ -1,18 +1,20 @@
 #include "refdata/config/settings.h"
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::refdata::config {
 
 namespace {
 
-bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+bpt::common::config::StreamConfig load_stream(const toml::table* t,
+                                              std::string default_channel,
+                                              int32_t default_stream_id) {
     bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
@@ -49,13 +51,14 @@ Settings load(const std::string& path) {
         const bool path_has_live = exchange_config_path.find("live") != std::string::npos;
         const bool path_has_testnet = exchange_config_path.find("testnet") != std::string::npos;
         if (settings.base.is_prod() && path_has_testnet)
-            throw std::runtime_error(fmt::format(
-                "environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
-                "refusing to start", exchange_config_path));
+            throw std::runtime_error(
+                fmt::format("environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
+                            "refusing to start",
+                            exchange_config_path));
         if (!settings.base.is_prod() && path_has_live)
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
-                           bpt::app::to_string(settings.base.environment),
-                           exchange_config_path);
+                                   bpt::app::to_string(settings.base.environment),
+                                   exchange_config_path);
     }
 
     bpt::common::log::info("Environment: {}", bpt::app::to_string(settings.base.environment));
@@ -133,8 +136,8 @@ Settings load(const std::string& path) {
         // a new venue); skip the required-field check in that case.
         if (adapter.enabled) {
             if (adapter.rest_host.empty() || adapter.ws_host.empty() || adapter.ws_port.empty())
-                throw std::runtime_error(fmt::format(
-                    "Adapter {} missing required rest_host/ws_host/ws_port", exchange_name));
+                throw std::runtime_error(
+                    fmt::format("Adapter {} missing required rest_host/ws_host/ws_port", exchange_name));
         }
 
         settings.adapters.push_back(std::move(adapter));

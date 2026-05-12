@@ -6,8 +6,8 @@
 
 #include <Aeron.h>
 
-#include <memory>
 #include <bpt_common/aeron/subscriber.h>
+#include <memory>
 
 namespace bpt::refdata::messaging {
 

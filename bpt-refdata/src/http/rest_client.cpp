@@ -7,10 +7,10 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
+#include <bpt_common/logging.h>
 #include <chrono>
 #include <stdexcept>
 #include <thread>
-#include <bpt_common/logging.h>
 
 namespace bpt::refdata::http {
 
@@ -81,11 +81,11 @@ std::string with_retry(Fn&& fn, const std::string& desc) {
             if (attempt + 1 == kMaxAttempts)
                 throw;
             bpt::common::log::warn("[RestClient] {} failed (attempt {}/{}): {} — retrying in {}s",
-                           desc,
-                           attempt + 1,
-                           kMaxAttempts,
-                           msg,
-                           kBackoffS[attempt]);
+                                   desc,
+                                   attempt + 1,
+                                   kMaxAttempts,
+                                   msg,
+                                   kBackoffS[attempt]);
             std::this_thread::sleep_for(std::chrono::seconds(kBackoffS[attempt]));
         }
     }

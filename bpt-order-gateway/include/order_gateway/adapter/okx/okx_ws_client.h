@@ -26,11 +26,11 @@
 #include <atomic>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ssl/context.hpp>
+#include <bpt_common/ws/run_loop.h>
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
-#include <bpt_common/ws/run_loop.h>
 
 namespace bpt::order_gateway::adapter::okx {
 
@@ -39,9 +39,7 @@ public:
     using MessageHandler = std::function<void(const std::string& payload, uint64_t recv_ns)>;
     using LoginMsgBuilder = std::function<std::string()>;
 
-    OKXWsClient(boost::asio::io_context& ioc,
-                boost::asio::ssl::context& ssl_ctx,
-                const config::AdapterConfig& cfg);
+    OKXWsClient(boost::asio::io_context& ioc, boost::asio::ssl::context& ssl_ctx, const config::AdapterConfig& cfg);
 
     void set_message_handler(MessageHandler h);
     void set_login_msg_builder(LoginMsgBuilder b);

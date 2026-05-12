@@ -19,7 +19,6 @@
 #include "order_gateway/risk/pnl_tracker.h"
 #include "order_gateway/risk/risk_checker.h"
 
-#include <gtest/gtest.h>
 #include <messages/AccountSnapshot.h>
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -32,6 +31,7 @@
 
 #include <array>
 #include <cstring>
+#include <gtest/gtest.h>
 #include <vector>
 
 namespace {
@@ -192,11 +192,18 @@ struct Harness {
     std::vector<std::shared_ptr<adapter::IOrderAdapter>> adapters;
     order::OrderProcessor processor;
 
-    Harness(double max_daily_loss_usd = 10.0, double max_position_usd = 0.0,
+    Harness(double max_daily_loss_usd = 10.0,
+            double max_position_usd = 0.0,
             risk::RejectRateBreaker::Config breaker_cfg = {})
-        : processor(pub, state_mgr, risk_checker, pnl_tracker,
-                    max_daily_loss_usd, max_position_usd, breaker_cfg,
-                    metrics, adapters) {}
+        : processor(pub,
+                    state_mgr,
+                    risk_checker,
+                    pnl_tracker,
+                    max_daily_loss_usd,
+                    max_position_usd,
+                    breaker_cfg,
+                    metrics,
+                    adapters) {}
 };
 
 TEST(OrderProcessorRiskLatchTest, TradingEnabledUntilLossCrossesThreshold) {
@@ -204,25 +211,20 @@ TEST(OrderProcessorRiskLatchTest, TradingEnabledUntilLossCrossesThreshold) {
     EXPECT_TRUE(h.risk_checker.trading_enabled());
 
     // Open long 1 BTC @ $100 on OKX.
-    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY,
-                                         100 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
     EXPECT_TRUE(h.risk_checker.trading_enabled());
 
     // Close at $95 → realize -$5. Still above -$10 threshold.
-    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL,
-                                         95 * kScale, 1 * kScale));
-    EXPECT_TRUE(h.risk_checker.trading_enabled())
-        << "−$5 realized should not trip the $10 daily-loss threshold";
+    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL, 95 * kScale, 1 * kScale));
+    EXPECT_TRUE(h.risk_checker.trading_enabled()) << "−$5 realized should not trip the $10 daily-loss threshold";
 }
 
 TEST(OrderProcessorRiskLatchTest, KillSwitchFlipsOnBreach) {
     Harness h(/*max_daily_loss_usd=*/10.0);
 
     // Build up a -$15 loss in two trades.
-    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY,
-                                         100 * kScale, 1 * kScale));
-    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL,
-                                         85 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL, 85 * kScale, 1 * kScale));
 
     EXPECT_FALSE(h.risk_checker.trading_enabled())
         << "Realized -$15 > configured $10 cap → kill switch should have flipped";
@@ -232,19 +234,15 @@ TEST(OrderProcessorRiskLatchTest, LatchStaysSetEvenIfPnlRecovers) {
     Harness h(/*max_daily_loss_usd=*/10.0);
 
     // Breach: -$15.
-    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY,
-                                         100 * kScale, 1 * kScale));
-    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL,
-                                         85 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL, 85 * kScale, 1 * kScale));
     EXPECT_FALSE(h.risk_checker.trading_enabled());
 
     // "Recover": fictional profitable trades that take daily P&L back above
     // -$10. The latch is intentionally NOT auto-cleared — operators must
     // restart the service.
-    h.processor.on_exec_event(make_fill(3, ExchangeId::OKX, 100, OrderSide::BUY,
-                                         100 * kScale, 1 * kScale));
-    h.processor.on_exec_event(make_fill(4, ExchangeId::OKX, 100, OrderSide::SELL,
-                                         120 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(3, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(4, ExchangeId::OKX, 100, OrderSide::SELL, 120 * kScale, 1 * kScale));
     // Pretty daily P&L is now -$15 + $20 = +$5, but latch stays.
     EXPECT_FALSE(h.risk_checker.trading_enabled())
         << "Latch must NOT auto-clear on P&L recovery — human review required";
@@ -254,10 +252,8 @@ TEST(OrderProcessorRiskLatchTest, NewOrderRejectsAfterLatch) {
     Harness h(/*max_daily_loss_usd=*/10.0);
 
     // Trip the latch.
-    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY,
-                                         100 * kScale, 1 * kScale));
-    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL,
-                                         85 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL, 85 * kScale, 1 * kScale));
     ASSERT_FALSE(h.risk_checker.trading_enabled());
 
     // Now a NewOrder comes in. Should be rejected via the pretrade
@@ -265,8 +261,7 @@ TEST(OrderProcessorRiskLatchTest, NewOrderRejectsAfterLatch) {
     // adapter. (Adapters list is empty anyway; if trading were still
     // enabled we'd see an EXCHANGE_ERROR reject for "adapter not
     // connected". RISK_REJECTED proves the risk gate fired first.)
-    NewOrderBuf order(42, ExchangeId::OKX, 100, OrderSide::BUY,
-                     100 * kScale, 1 * kScale);
+    NewOrderBuf order(42, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale);
     const size_t before = h.pub.entries.size();
     h.processor.on_new_order(order.decoded);
     ASSERT_GT(h.pub.entries.size(), before);
@@ -279,8 +274,7 @@ TEST(OrderProcessorRiskLatchTest, NewOrderRejectsAfterLatch) {
 
 // ----- reject-rate breaker integration --------------------------------------
 
-risk::RejectRateBreaker::Config breaker_enabled(double threshold_pct = 20.0,
-                                                uint32_t min_events = 10) {
+risk::RejectRateBreaker::Config breaker_enabled(double threshold_pct = 20.0, uint32_t min_events = 10) {
     risk::RejectRateBreaker::Config c;
     c.enabled = true;
     c.threshold_pct = threshold_pct;
@@ -290,7 +284,8 @@ risk::RejectRateBreaker::Config breaker_enabled(double threshold_pct = 20.0,
 }
 
 TEST(OrderProcessorRejectBreakerTest, TripsAndLatchesRiskChecker) {
-    Harness h(/*max_daily_loss_usd=*/0.0, /*max_position_usd=*/0.0,
+    Harness h(/*max_daily_loss_usd=*/0.0,
+              /*max_position_usd=*/0.0,
               breaker_enabled(/*threshold_pct=*/20.0, /*min_events=*/10));
     EXPECT_TRUE(h.risk_checker.trading_enabled());
 
@@ -301,13 +296,11 @@ TEST(OrderProcessorRejectBreakerTest, TripsAndLatchesRiskChecker) {
         h.processor.on_exec_event(make_ack(100 + i, ts + i));
     for (int i = 0; i < 2; ++i)
         h.processor.on_exec_event(make_reject(200 + i, ts + 10 + i));
-    EXPECT_TRUE(h.risk_checker.trading_enabled())
-        << "20% exactly should sit at threshold, not trip";
+    EXPECT_TRUE(h.risk_checker.trading_enabled()) << "20% exactly should sit at threshold, not trip";
 
     // One more reject pushes us to 3/11 = 27% → trips.
     h.processor.on_exec_event(make_reject(300, ts + 20));
-    EXPECT_FALSE(h.risk_checker.trading_enabled())
-        << "Crossing threshold should flip RiskChecker latch";
+    EXPECT_FALSE(h.risk_checker.trading_enabled()) << "Crossing threshold should flip RiskChecker latch";
 }
 
 TEST(OrderProcessorRejectBreakerTest, DisabledBreakerNeverTrips) {
@@ -319,12 +312,12 @@ TEST(OrderProcessorRejectBreakerTest, DisabledBreakerNeverTrips) {
     uint64_t ts = 1'700'000'000'000'000'000ULL;
     for (int i = 0; i < 50; ++i)
         h.processor.on_exec_event(make_reject(100 + i, ts + i));
-    EXPECT_TRUE(h.risk_checker.trading_enabled())
-        << "Disabled breaker must not halt trading regardless of reject rate";
+    EXPECT_TRUE(h.risk_checker.trading_enabled()) << "Disabled breaker must not halt trading regardless of reject rate";
 }
 
 TEST(OrderProcessorRejectBreakerTest, NewOrderRejectsAfterBreakerTrip) {
-    Harness h(/*max_daily_loss_usd=*/0.0, /*max_position_usd=*/0.0,
+    Harness h(/*max_daily_loss_usd=*/0.0,
+              /*max_position_usd=*/0.0,
               breaker_enabled(/*threshold_pct=*/10.0, /*min_events=*/5));
 
     uint64_t ts = 1'700'000'000'000'000'000ULL;
@@ -333,8 +326,7 @@ TEST(OrderProcessorRejectBreakerTest, NewOrderRejectsAfterBreakerTrip) {
         h.processor.on_exec_event(make_reject(100 + i, ts + i));
     ASSERT_FALSE(h.risk_checker.trading_enabled());
 
-    NewOrderBuf order(42, ExchangeId::OKX, 100, OrderSide::BUY,
-                     100 * kScale, 1 * kScale);
+    NewOrderBuf order(42, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale);
     const size_t before = h.pub.entries.size();
     h.processor.on_new_order(order.decoded);
     ASSERT_GT(h.pub.entries.size(), before);
@@ -350,13 +342,10 @@ TEST(OrderProcessorRiskLatchTest, DisabledWhenMaxDailyLossZero) {
     // flip the kill switch.
     Harness h(/*max_daily_loss_usd=*/0.0);
 
-    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY,
-                                         100 * kScale, 1 * kScale));
-    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL,
-                                         1 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(1, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
+    h.processor.on_exec_event(make_fill(2, ExchangeId::OKX, 100, OrderSide::SELL, 1 * kScale, 1 * kScale));
     // -$99 realized.
-    EXPECT_TRUE(h.risk_checker.trading_enabled())
-        << "max_daily_loss_usd=0 should disable the latch entirely";
+    EXPECT_TRUE(h.risk_checker.trading_enabled()) << "max_daily_loss_usd=0 should disable the latch entirely";
 }
 
 }  // namespace

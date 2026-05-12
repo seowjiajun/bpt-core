@@ -22,7 +22,8 @@ using bpt::order_gateway::adapter::HyperliquidSigner;
 // priv  = 0x1111...1111
 // chain = testnet (source="b")
 // nonce = 1700000000000
-// action = {"type":"order","orders":[{"a":0,"b":true,"p":"50000.0","s":"0.001","r":false,"t":{"limit":{"tif":"Gtc"}}}],"grouping":"na"}
+// action =
+// {"type":"order","orders":[{"a":0,"b":true,"p":"50000.0","s":"0.001","r":false,"t":{"limit":{"tif":"Gtc"}}}],"grouping":"na"}
 TEST(HyperliquidSignerTest, MatchesPythonReference) {
     const char* kPriv = "0x1111111111111111111111111111111111111111111111111111111111111111";
     const uint64_t kNonce = 1700000000000ULL;
@@ -62,9 +63,8 @@ TEST(HyperliquidSignerTest, NonceIsMonotonic) {
 TEST(HyperliquidSignerTest, RejectsBadKey) {
     EXPECT_THROW(HyperliquidSigner("", false), std::runtime_error);
     EXPECT_THROW(HyperliquidSigner("deadbeef", false), std::runtime_error);
-    EXPECT_THROW(
-        HyperliquidSigner("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", false),
-        std::runtime_error);
+    EXPECT_THROW(HyperliquidSigner("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", false),
+                 std::runtime_error);
 }
 
 }  // namespace

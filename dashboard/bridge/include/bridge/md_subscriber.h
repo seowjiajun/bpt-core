@@ -1,11 +1,12 @@
 #pragma once
 
 #include <Aeron.h>
+
+#include <bpt_common/aeron/subscriber.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bridge {
 
@@ -16,9 +17,7 @@ public:
     // (instrument_id, mid_price, ts_ns)
     using TickHandler = std::function<void(uint64_t, double, uint64_t)>;
 
-    MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                 const std::string& channel,
-                 int32_t stream_id);
+    MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
 
     void set_handler(TickHandler h) { handler_ = std::move(h); }
 

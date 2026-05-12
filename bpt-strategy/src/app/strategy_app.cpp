@@ -265,11 +265,17 @@ void StrategyApp::check_refdata_watchdog() {
             break;
         }
         case RefdataStaleGate::State::GoneStale: {
-            const double age_s = (now_ns - hb) / 1e9;
-            bpt::common::log::warn(
-                "Refdata heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing strategy quotes",
-                age_s,
-                cfg_.strat.strategy.schedule.refdata_heartbeat_timeout_ns / 1e9);
+            // Gate returns GoneStale on every tick during the stale episode
+            // (per its contract); edge-gate the WARN to keep logs readable.
+            // Metric set + strategy hook are idempotent.
+            if (!refdata_stale_logged_) {
+                const double age_s = (now_ns - hb) / 1e9;
+                bpt::common::log::warn(
+                    "Refdata heartbeat stale ({:.1f}s, threshold={:.1f}s) — pausing strategy quotes",
+                    age_s,
+                    cfg_.strat.strategy.schedule.refdata_heartbeat_timeout_ns / 1e9);
+                refdata_stale_logged_ = true;
+            }
             metrics_.refdata_stale->Set(1.0);
             strategy_->on_refdata_stale_changed(true);
             break;
@@ -278,6 +284,7 @@ void StrategyApp::check_refdata_watchdog() {
             bpt::common::log::info("Refdata heartbeat recovered — resuming strategy quotes");
             metrics_.refdata_stale->Set(0.0);
             strategy_->on_refdata_stale_changed(false);
+            refdata_stale_logged_ = false;
             break;
         }
         case RefdataStaleGate::State::Ok:

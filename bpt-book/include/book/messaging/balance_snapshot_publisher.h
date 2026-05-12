@@ -4,17 +4,15 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/publisher.h>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::book::messaging {
 
 class BalanceSnapshotPublisher {
 public:
-    BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                             const std::string& channel,
-                             int stream_id);
+    BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     void publish(const adapter::BalanceSnapshot& snapshot);
 

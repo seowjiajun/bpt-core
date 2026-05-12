@@ -11,7 +11,8 @@ void DisconnectRateBreaker::reset(Config cfg) {
 }
 
 void DisconnectRateBreaker::record(uint64_t now_ns) {
-    if (!cfg_.enabled) return;
+    if (!cfg_.enabled)
+        return;
 
     // Evict older-than-window events. Underflow guard mirrors
     // RejectRateBreaker's — a backward NTP step can't produce a
@@ -22,7 +23,8 @@ void DisconnectRateBreaker::record(uint64_t now_ns) {
 
     events_.push_back(now_ns);
 
-    if (tripped_.load(std::memory_order_relaxed)) return;  // already latched
+    if (tripped_.load(std::memory_order_relaxed))
+        return;  // already latched
     if (events_.size() >= cfg_.threshold)
         tripped_.store(true, std::memory_order_release);
 }

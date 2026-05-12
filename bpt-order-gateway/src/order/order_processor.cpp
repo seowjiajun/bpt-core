@@ -4,10 +4,10 @@
 #include <messages/OrderSide.h>
 #include <messages/RejectReason.h>
 
-#include <cmath>
-#include <vector>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cmath>
+#include <vector>
 
 namespace {
 inline uint64_t now_ns() noexcept {
@@ -84,8 +84,7 @@ void OrderProcessor::on_exec_event(const adapter::ExecEvent& ev) {
     // rollovers — re-enabling requires a restart so an operator has a
     // chance to look at WHY we lost that much today.
     if ((ev.status == ES::FILLED || ev.status == ES::PARTIAL) && ev.filled_qty > 0) {
-        pnl_tracker_.on_fill(ev.exchange_id, ev.instrument_id, ev.side,
-                             ev.price, ev.filled_qty, ev.local_ts_ns);
+        pnl_tracker_.on_fill(ev.exchange_id, ev.instrument_id, ev.side, ev.price, ev.filled_qty, ev.local_ts_ns);
         if (!daily_loss_latched_ && max_daily_loss_usd_ > 0.0) {
             const double daily = pnl_tracker_.daily_realized_pnl_usd(ev.local_ts_ns);
             if (daily < -max_daily_loss_usd_) {
@@ -95,7 +94,8 @@ void OrderProcessor::on_exec_event(const adapter::ExecEvent& ev) {
                     "DAILY LOSS KILL SWITCH — realized P&L "
                     "{:.2f} USD < limit {:.2f} USD. Trading halted. "
                     "Restart service after human review to resume.",
-                    daily, -max_daily_loss_usd_);
+                    daily,
+                    -max_daily_loss_usd_);
             }
         }
     }
@@ -143,10 +143,10 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
     using RR = bpt::messages::RejectReason;
 
     bpt::common::log::debug("NewOrder: id={} exchange={} instrument_id={} qty={}",
-                    order.orderId(),
-                    static_cast<int>(order.exchangeId()),
-                    order.instrumentId(),
-                    order.quantity());
+                            order.orderId(),
+                            static_cast<int>(order.exchangeId()),
+                            order.instrumentId(),
+                            order.quantity());
 
     const char* exch = exchange_str(order.exchangeId());
     metrics_.orders_received(exch).Increment();
@@ -173,8 +173,8 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
                           ts,
                           ts);
         bpt::common::log::warn("Order {} rejected by risk: reason={}",
-                       order.orderId(),
-                       static_cast<int>(result.error()));
+                               order.orderId(),
+                               static_cast<int>(result.error()));
         metrics_.risk_reject(exch).Increment();
         return;
     }
@@ -187,23 +187,36 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
     // to cap those.
     if (max_position_usd_ > 0.0 && order.price() > 0) {
         using bpt::messages::OrderSide;
-        const int64_t cur_qty_e8 =
-            pnl_tracker_.net_qty_e8(order.exchangeId(), order.instrumentId());
-        const int64_t delta_e8 = (order.side() == OrderSide::BUY)
-            ? static_cast<int64_t>(order.quantity())
-            : -static_cast<int64_t>(order.quantity());
+        const int64_t cur_qty_e8 = pnl_tracker_.net_qty_e8(order.exchangeId(), order.instrumentId());
+        const int64_t delta_e8 = (order.side() == OrderSide::BUY) ? static_cast<int64_t>(order.quantity())
+                                                                  : -static_cast<int64_t>(order.quantity());
         const int64_t projected_qty_e8 = cur_qty_e8 + delta_e8;
         const double projected_qty = static_cast<double>(projected_qty_e8) / 1e8;
         const double price = static_cast<double>(order.price()) / 1e8;
         const double projected_usd = std::abs(projected_qty * price);
         if (projected_usd > max_position_usd_) {
             const uint64_t ts = now_ns();
-            exec_pub_.publish(order.orderId(), 0, order.exchangeId(), order.instrumentId(),
-                              ES::REJECTED, order.side(), order.orderType(), order.price(),
-                              0, order.quantity(), RR::RISK_REJECTED, 0, "USDT", ts, ts);
-            bpt::common::log::warn("Order {} rejected by position cap: "
-                           "projected=${:.2f} > limit=${:.2f}",
-                           order.orderId(), projected_usd, max_position_usd_);
+            exec_pub_.publish(order.orderId(),
+                              0,
+                              order.exchangeId(),
+                              order.instrumentId(),
+                              ES::REJECTED,
+                              order.side(),
+                              order.orderType(),
+                              order.price(),
+                              0,
+                              order.quantity(),
+                              RR::RISK_REJECTED,
+                              0,
+                              "USDT",
+                              ts,
+                              ts);
+            bpt::common::log::warn(
+                "Order {} rejected by position cap: "
+                "projected=${:.2f} > limit=${:.2f}",
+                order.orderId(),
+                projected_usd,
+                max_position_usd_);
             metrics_.risk_reject(exch).Increment();
             // Release the risk-checker slot since we've rejected — it was
             // incremented inside risk_checker_.check above.
@@ -236,7 +249,8 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
                           ts);
         if (adapter && adapter->is_halted()) {
             bpt::common::log::warn("Order {} rejected: {} halted by disconnect breaker",
-                           order.orderId(), adapter->exchange_name());
+                                   order.orderId(),
+                                   adapter->exchange_name());
         } else {
             bpt::common::log::warn("Order {} rejected: adapter not connected", order.orderId());
         }
@@ -267,9 +281,7 @@ void OrderProcessor::on_new_order(const bpt::messages::NewOrder& order) {
 }
 
 void OrderProcessor::on_cancel(const bpt::messages::CancelOrder& cancel) {
-    bpt::common::log::debug("CancelOrder: id={} exchange={}",
-                    cancel.orderId(),
-                    static_cast<int>(cancel.exchangeId()));
+    bpt::common::log::debug("CancelOrder: id={} exchange={}", cancel.orderId(), static_cast<int>(cancel.exchangeId()));
 
     auto* adapter = find_adapter(cancel.exchangeId());
     if (!adapter)
@@ -290,8 +302,8 @@ void OrderProcessor::on_cancel_all(const bpt::messages::CancelAll& msg) {
     using EX = bpt::messages::ExchangeId;
 
     bpt::common::log::debug("CancelAll: exchange={} instrument_id={}",
-                    static_cast<int>(msg.exchangeId()),
-                    msg.instrumentId());
+                            static_cast<int>(msg.exchangeId()),
+                            msg.instrumentId());
 
     if (msg.exchangeId() == EX::ALL) {
         // Kill switch path — atomically disables trading so no new orders can
@@ -311,9 +323,7 @@ void OrderProcessor::on_cancel_all(const bpt::messages::CancelAll& msg) {
 }
 
 void OrderProcessor::on_modify(const bpt::messages::ModifyOrder& modify) {
-    bpt::common::log::debug("ModifyOrder: id={} exchange={}",
-                    modify.orderId(),
-                    static_cast<int>(modify.exchangeId()));
+    bpt::common::log::debug("ModifyOrder: id={} exchange={}", modify.orderId(), static_cast<int>(modify.exchangeId()));
 
     auto* adapter = find_adapter(modify.exchangeId());
     if (!adapter)
@@ -336,9 +346,9 @@ void OrderProcessor::check_stale_orders(uint64_t stale_timeout_ns) {
     stale_ids_scratch_.clear();
     state_mgr_.check_stale(cur_ns, stale_timeout_ns, [&](const OrderState& st) {
         bpt::common::log::warn("Stale order detected: id={} exchange={} age_ms={}",
-                       st.order_id,
-                       static_cast<int>(st.exchange_id),
-                       (cur_ns - st.last_update_ns) / 1'000'000ULL);
+                               st.order_id,
+                               static_cast<int>(st.exchange_id),
+                               (cur_ns - st.last_update_ns) / 1'000'000ULL);
 
         metrics_.stale_orders_total->Increment();
 

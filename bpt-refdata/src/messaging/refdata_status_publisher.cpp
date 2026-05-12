@@ -13,14 +13,14 @@
 namespace bpt::refdata::messaging {
 
 RefdataStatusPublisher::RefdataStatusPublisher(std::shared_ptr<aeron::Aeron> aeron,
-                                             const std::string& channel,
-                                             int stream_id) {
+                                               const std::string& channel,
+                                               int stream_id) {
     publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
 void RefdataStatusPublisher::publish_ready(uint8_t exchanges_loaded,
-                                          uint16_t instrument_count,
-                                          bool fee_schedules_loaded) {
+                                           uint16_t instrument_count,
+                                           bool fee_schedules_loaded) {
     using namespace bpt::messages;
 
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + RefDataReady::sbeBlockLength();
@@ -41,14 +41,14 @@ void RefdataStatusPublisher::publish_ready(uint8_t exchanges_loaded,
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "refdata_ready");
 
     bpt::common::log::info("RefDataReady published exchanges_loaded=0x{:02x} instruments={} fee_schedules={}",
-                   exchanges_loaded,
-                   instrument_count,
-                   fee_schedules_loaded);
+                           exchanges_loaded,
+                           instrument_count,
+                           fee_schedules_loaded);
 }
 
 void RefdataStatusPublisher::publish_error(bpt::messages::RefDataErrorType::Value error_type,
-                                          bpt::messages::ExchangeId::Value exchange_id,
-                                          uint64_t instrument_id) {
+                                           bpt::messages::ExchangeId::Value exchange_id,
+                                           uint64_t instrument_id) {
     using namespace bpt::messages;
 
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + RefDataError::sbeBlockLength();
@@ -68,9 +68,9 @@ void RefdataStatusPublisher::publish_error(bpt::messages::RefDataErrorType::Valu
     aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "refdata_error");
 
     bpt::common::log::error("RefDataError published error_type={} exchange={} instrument_id={}",
-                    RefDataErrorType::c_str(error_type),
-                    ExchangeId::c_str(exchange_id),
-                    instrument_id);
+                            RefDataErrorType::c_str(error_type),
+                            ExchangeId::c_str(exchange_id),
+                            instrument_id);
 }
 
 }  // namespace bpt::refdata::messaging

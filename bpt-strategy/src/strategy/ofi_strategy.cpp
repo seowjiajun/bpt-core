@@ -9,9 +9,8 @@
 #include <messages/RejectSource.h>
 #include <messages/TimeInForce.h>
 
-#include <bpt_common/logging.h>
-
 #include <algorithm>
+#include <bpt_common/logging.h>
 #include <cmath>
 
 using bpt::messages::ExchangeId;
@@ -45,10 +44,10 @@ static constexpr double kAggressBps = 0.0;
 // ── Constructor ──────────────────────────────────────────────────────────────
 
 OFIStrategy::OFIStrategy(uint64_t correlation_id,
-                          const config::StrategyConfig& cfg,
-                          refdata::IRefdataClient& refdata,
-                          md::IMdClient* md,
-                          order::OrderManager* order_mgr)
+                         const config::StrategyConfig& cfg,
+                         refdata::IRefdataClient& refdata,
+                         md::IMdClient* md,
+                         order::OrderManager* order_mgr)
     : correlation_id_(correlation_id),
       book_levels_(static_cast<int>(cfg.params["book_levels"].value<int64_t>().value_or(5))),
       ofi_window_ns_(static_cast<uint64_t>(cfg.params["ofi_window_ms"].value<double>().value_or(1000.0) * 1e6)),
@@ -72,25 +71,29 @@ OFIStrategy::OFIStrategy(uint64_t correlation_id,
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
-    bpt::common::log::info(kLog(), "levels={} window={}ms entry={:.2f} exit={:.2f}",
-                   book_levels_,
-                   ofi_window_ns_ / 1'000'000,
-                   entry_threshold_,
-                   exit_threshold_);
-    bpt::common::log::info(kLog(), "stop={:.1f}bps target={:.1f}bps max_hold={:.0f}s cooldown={}ticks",
-                   stop_bps_,
-                   target_bps_,
-                   max_hold_ns_ / 1e9,
-                   cooldown_ticks_);
-    bpt::common::log::info(kLog(), "qty_usd={:.0f} max_spread={:.1f}bps depth={}",
-                   qty_usd_,
-                   max_spread_bps_,
-                   order_book_depth_);
+    bpt::common::log::info(kLog(),
+                           "levels={} window={}ms entry={:.2f} exit={:.2f}",
+                           book_levels_,
+                           ofi_window_ns_ / 1'000'000,
+                           entry_threshold_,
+                           exit_threshold_);
+    bpt::common::log::info(kLog(),
+                           "stop={:.1f}bps target={:.1f}bps max_hold={:.0f}s cooldown={}ticks",
+                           stop_bps_,
+                           target_bps_,
+                           max_hold_ns_ / 1e9,
+                           cooldown_ticks_);
+    bpt::common::log::info(kLog(),
+                           "qty_usd={:.0f} max_spread={:.1f}bps depth={}",
+                           qty_usd_,
+                           max_spread_bps_,
+                           order_book_depth_);
     if (vol_gate_cfg_.max_bps_per_window > 0.0) {
-        bpt::common::log::info(kLog(), "vol_gate max_bps={:.1f} window={}ms halt={}ms",
-                       vol_gate_cfg_.max_bps_per_window,
-                       vol_gate_cfg_.window_ns / 1'000'000,
-                       vol_gate_cfg_.halt_duration_ns / 1'000'000);
+        bpt::common::log::info(kLog(),
+                               "vol_gate max_bps={:.1f} window={}ms halt={}ms",
+                               vol_gate_cfg_.max_bps_per_window,
+                               vol_gate_cfg_.window_ns / 1'000'000,
+                               vol_gate_cfg_.halt_duration_ns / 1'000'000);
     } else {
         bpt::common::log::info(kLog(), "vol_gate disabled (vol_gate_max_bps=0)");
     }
@@ -106,11 +109,16 @@ void OFIStrategy::start() {
                 using T = refdata::InstrumentType;
                 using S = bpt::messages::InstrumentType;
                 switch (parsed->type) {
-                    case T::SPOT:       return S::SPOT;
-                    case T::PERPETUAL:  return S::PERPETUAL;
-                    case T::FUTURE:     return S::FUTURE;
-                    case T::OPTION:     return S::OPTION;
-                    default:            return S::NULL_VALUE;
+                    case T::SPOT:
+                        return S::SPOT;
+                    case T::PERPETUAL:
+                        return S::PERPETUAL;
+                    case T::FUTURE:
+                        return S::FUTURE;
+                    case T::OPTION:
+                        return S::OPTION;
+                    default:
+                        return S::NULL_VALUE;
                 }
             }();
             if (md_exchanges_.empty()) {
@@ -156,8 +164,13 @@ void OFIStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
         st.tick_size = inst->tick_size;
         st.lot_size = inst->lot_size;
 
-        bpt::common::log::info(kLog(), "Instrument [{}] {} @ {} tick={} lot={}",
-                       id, inst->symbol, inst->exchange, inst->tick_size, inst->lot_size);
+        bpt::common::log::info(kLog(),
+                               "Instrument [{}] {} @ {} tick={} lot={}",
+                               id,
+                               inst->symbol,
+                               inst->exchange,
+                               inst->tick_size,
+                               inst->lot_size);
         state_.emplace(id, std::move(st));
     }
     bpt::common::log::info(kLog(), "Resolved {} instrument(s)", state_.size());
@@ -170,8 +183,7 @@ void OFIStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
     md_client_->subscribe(correlation_id_, subs);
 }
 
-void OFIStrategy::on_delta(const refdata::Instrument& /*inst*/,
-                            bpt::messages::DeltaUpdateType::Value /*type*/) {}
+void OFIStrategy::on_delta(const refdata::Instrument& /*inst*/, bpt::messages::DeltaUpdateType::Value /*type*/) {}
 
 void OFIStrategy::on_trade(const bpt::messages::MdTrade& /*tick*/) {}
 
@@ -200,10 +212,11 @@ void OFIStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
     const bool was_halted = st.vol_gate.is_halted(st.last_bbo_ns);
     const bool now_halted = st.vol_gate.update_and_check(mid, st.last_bbo_ns);
     if (now_halted && !was_halted) {
-        bpt::common::log::warn(kLog(), "{} VOL HALT tripped last_trip={:.1f}bps — pausing entries for {}ms",
-                       st.symbol,
-                       st.vol_gate.last_trip_bps(),
-                       vol_gate_cfg_.halt_duration_ns / 1'000'000);
+        bpt::common::log::warn(kLog(),
+                               "{} VOL HALT tripped last_trip={:.1f}bps — pausing entries for {}ms",
+                               st.symbol,
+                               st.vol_gate.last_trip_bps(),
+                               vol_gate_cfg_.halt_duration_ns / 1'000'000);
     } else if (was_halted && !now_halted) {
         bpt::common::log::info(kLog(), "{} vol halt cleared — entries re-enabled", st.symbol);
     }
@@ -213,12 +226,12 @@ void OFIStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
 
     // Time-based exit: check even on BBO ticks so positions don't overrun
     // max_hold while waiting for the next book update.
-    if (st.pos != Position::FLAT && max_hold_ns_ > 0 &&
-        st.last_bbo_ns - st.entry_ns > max_hold_ns_) {
-        bpt::common::log::info(kLog(), "{} time_stop ({}s) — exiting {}",
-                       st.symbol,
-                       (st.last_bbo_ns - st.entry_ns) / 1'000'000'000ULL,
-                       st.pos == Position::LONG ? "LONG" : "SHORT");
+    if (st.pos != Position::FLAT && max_hold_ns_ > 0 && st.last_bbo_ns - st.entry_ns > max_hold_ns_) {
+        bpt::common::log::info(kLog(),
+                               "{} time_stop ({}s) — exiting {}",
+                               st.symbol,
+                               (st.last_bbo_ns - st.entry_ns) / 1'000'000'000ULL,
+                               st.pos == Position::LONG ? "LONG" : "SHORT");
         const auto exit_side = (st.pos == Position::LONG) ? OrderSide::SELL : OrderSide::BUY;
         st.active_is_entry = false;
         fire_order(st, exit_side, qty_usd_);
@@ -292,16 +305,24 @@ void OFIStrategy::try_enter(InstrumentState& st, double ofi_value, uint64_t now_
         return;
 
     if (ofi_value > entry_threshold_) {
-        bpt::common::log::info(kLog(), "{} ENTER LONG ofi={:.3f} mid={:.4f} spread={:.1f}bps",
-                       st.symbol, ofi_value, mid, spread_bps);
+        bpt::common::log::info(kLog(),
+                               "{} ENTER LONG ofi={:.3f} mid={:.4f} spread={:.1f}bps",
+                               st.symbol,
+                               ofi_value,
+                               mid,
+                               spread_bps);
         st.active_is_entry = true;
         fire_order(st, OrderSide::BUY, qty_usd_);
         st.pos = Position::LONG;
         st.entry_price = mid;
         st.entry_ns = now_ns;
     } else if (ofi_value < -entry_threshold_) {
-        bpt::common::log::info(kLog(), "{} ENTER SHORT ofi={:.3f} mid={:.4f} spread={:.1f}bps",
-                       st.symbol, ofi_value, mid, spread_bps);
+        bpt::common::log::info(kLog(),
+                               "{} ENTER SHORT ofi={:.3f} mid={:.4f} spread={:.1f}bps",
+                               st.symbol,
+                               ofi_value,
+                               mid,
+                               spread_bps);
         st.active_is_entry = true;
         fire_order(st, OrderSide::SELL, qty_usd_);
         st.pos = Position::SHORT;
@@ -336,8 +357,13 @@ void OFIStrategy::try_exit(InstrumentState& st, double ofi_value, uint64_t now_n
     if (!reason)
         return;
 
-    bpt::common::log::info(kLog(), "{} EXIT {} reason={} pnl={:.1f}bps ofi={:.3f}",
-                   st.symbol, is_long ? "LONG" : "SHORT", reason, pnl_bps, ofi_value);
+    bpt::common::log::info(kLog(),
+                           "{} EXIT {} reason={} pnl={:.1f}bps ofi={:.3f}",
+                           st.symbol,
+                           is_long ? "LONG" : "SHORT",
+                           reason,
+                           pnl_bps,
+                           ofi_value);
 
     const auto exit_side = is_long ? OrderSide::SELL : OrderSide::BUY;
     st.active_is_entry = false;
@@ -348,9 +374,7 @@ void OFIStrategy::try_exit(InstrumentState& st, double ofi_value, uint64_t now_n
 
 // ── Order submission ────────────────────────────────────────────────────────
 
-void OFIStrategy::fire_order(InstrumentState& st,
-                               bpt::messages::OrderSide::Value side,
-                               double qty_usd) {
+void OFIStrategy::fire_order(InstrumentState& st, bpt::messages::OrderSide::Value side, double qty_usd) {
     if (!order_mgr_) {
         bpt::common::log::warn(kLog(), "{} order_mgr null — dropping order", st.symbol);
         return;
@@ -366,9 +390,8 @@ void OFIStrategy::fire_order(InstrumentState& st,
     const double cross = mid * (kAggressBps / 1e4);
     const double price = (side == OrderSide::BUY) ? (st.ask + cross) : (st.bid - cross);
 
-    const uint64_t oid = order_mgr_->place_order(st.instrument_id, st.exchange_id, side,
-                                                   OrderType::LIMIT, TimeInForce::IOC,
-                                                   price, qty);
+    const uint64_t oid =
+        order_mgr_->place_order(st.instrument_id, st.exchange_id, side, OrderType::LIMIT, TimeInForce::IOC, price, qty);
     if (oid == 0) {
         bpt::common::log::warn(kLog(), "{} place_order rejected — preflight failed", st.symbol);
         return;
@@ -394,10 +417,14 @@ void OFIStrategy::check_markouts(InstrumentState& st, uint64_t now_ns) {
         const double move = (mid - mo.fill_price) * static_cast<double>(mo.side_sign);
         const double bps = (mo.fill_price > 0.0) ? (move / mo.fill_price * 1e4) : 0.0;
         bpt::common::log::info("[OFI markout] {} order_id={} kind={} side={} fill={:.4f} mid={:.4f} {}={:+.2f}bps",
-                       st.symbol, mo.order_id,
-                       mo.is_entry ? "ENTRY" : "EXIT",
-                       mo.side_sign > 0 ? "LONG" : "SHORT",
-                       mo.fill_price, mid, label, bps);
+                               st.symbol,
+                               mo.order_id,
+                               mo.is_entry ? "ENTRY" : "EXIT",
+                               mo.side_sign > 0 ? "LONG" : "SHORT",
+                               mo.fill_price,
+                               mid,
+                               label,
+                               bps);
     };
 
     for (auto& mo : st.pending_markouts) {
@@ -440,16 +467,20 @@ void OFIStrategy::on_exec_report(const bpt::messages::ExecutionReport& rpt) {
         return;
 
     if (status == ExecStatus::REJECTED) {
-        bpt::common::log::warn(kLog(), "{} order_id={} REJECTED reason={} source={}",
-                       st.symbol, order_id,
-                       bpt::messages::RejectReason::c_str(rpt.rejectReason()),
-                       bpt::messages::RejectSource::c_str(rpt.rejectSource()));
+        bpt::common::log::warn(kLog(),
+                               "{} order_id={} REJECTED reason={} source={}",
+                               st.symbol,
+                               order_id,
+                               bpt::messages::RejectReason::c_str(rpt.rejectReason()),
+                               bpt::messages::RejectSource::c_str(rpt.rejectSource()));
     } else {
-        bpt::common::log::info(kLog(), "{} order_id={} {} filled={:.6f}@{:.4f}",
-                       st.symbol, order_id,
-                       bpt::messages::ExecStatus::c_str(status),
-                       static_cast<double>(rpt.filledQty()) / kQtyScale,
-                       static_cast<double>(rpt.price()) / kPriceScale);
+        bpt::common::log::info(kLog(),
+                               "{} order_id={} {} filled={:.6f}@{:.4f}",
+                               st.symbol,
+                               order_id,
+                               bpt::messages::ExecStatus::c_str(status),
+                               static_cast<double>(rpt.filledQty()) / kQtyScale,
+                               static_cast<double>(rpt.price()) / kPriceScale);
     }
 
     // Mark-out diagnostic: on the FINAL fill (status=FILLED) of each
@@ -499,8 +530,10 @@ void OFIStrategy::on_shutdown_flatten() {
         if (st.pos == Position::FLAT)
             continue;
         const auto exit_side = (st.pos == Position::LONG) ? OrderSide::SELL : OrderSide::BUY;
-        bpt::common::log::warn(kLog(), "SHUTDOWN FLATTEN {} closing {} via IOC",
-                       st.symbol, st.pos == Position::LONG ? "LONG" : "SHORT");
+        bpt::common::log::warn(kLog(),
+                               "SHUTDOWN FLATTEN {} closing {} via IOC",
+                               st.symbol,
+                               st.pos == Position::LONG ? "LONG" : "SHORT");
         st.active_is_entry = false;
         fire_order(st, exit_side, qty_usd_);
         st.pos = Position::FLAT;

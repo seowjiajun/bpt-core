@@ -30,9 +30,9 @@ public:
     using MessageHandler = std::function<void(const std::string& payload, uint64_t recv_ns)>;
 
     BinanceUserDataWs(boost::asio::io_context& ioc,
-                       boost::asio::ssl::context& ssl_ctx,
-                       const config::AdapterConfig& cfg,
-                       BinanceHttpsClient& https);
+                      boost::asio::ssl::context& ssl_ctx,
+                      const config::AdapterConfig& cfg,
+                      BinanceHttpsClient& https);
 
     void set_message_handler(MessageHandler h);
 

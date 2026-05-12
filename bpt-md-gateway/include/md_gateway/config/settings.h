@@ -11,11 +11,11 @@
 /// "syntactically present" runs inside `load()` rather than each
 /// consumer.
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/aeron/stream_config.h>
 
 namespace bpt::md_gateway::config {
 
@@ -36,7 +36,7 @@ struct AeronConfig {
 /// per entry; the exchange string here is the key Settings::exchanges
 /// matches against to decide whether to instantiate this adapter.
 struct AdapterConfig {
-    std::string exchange;   ///< venue label (e.g. "BINANCE", "OKX", "HYPERLIQUID")
+    std::string exchange;  ///< venue label (e.g. "BINANCE", "OKX", "HYPERLIQUID")
     std::string ws_host;
     std::string ws_port;
     std::string ws_path;
@@ -109,8 +109,8 @@ struct AdapterConfig {
     /// until drop rates are characterised per-venue on a live feed
     /// (schemas change, symbol listings shift).
     /// @{
-    bool     validation_drop_breaker_enabled{false};
-    double   validation_drop_threshold_pct{30.0};
+    bool validation_drop_breaker_enabled{false};
+    double validation_drop_threshold_pct{30.0};
     uint32_t validation_drop_window_sec{60};
     uint32_t validation_drop_min_events{50};
     /// @}

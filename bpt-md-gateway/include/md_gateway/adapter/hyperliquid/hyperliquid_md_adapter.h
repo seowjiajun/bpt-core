@@ -13,12 +13,12 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
+#include <bpt_common/logging.h>
+#include <bpt_common/ws/ws_connect.h>
 #include <chrono>
 #include <memory>
 #include <string>
 #include <utility>
-#include <bpt_common/logging.h>
-#include <bpt_common/ws/ws_connect.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -54,8 +54,7 @@ public:
         : Base(cfg, std::move(md_pub)),
           decoder_(this->subs_),
           ws_client_(this->cfg_, this->subs_) {
-        ws_client_.set_frame_handler(
-            [this](std::string_view p, uint64_t t) { this->handle_frame(p, t); });
+        ws_client_.set_frame_handler([this](std::string_view p, uint64_t t) { this->handle_frame(p, t); });
     }
 
     [[nodiscard]] const char* exchange_name() const override { return "HYPERLIQUID"; }
@@ -84,19 +83,21 @@ protected:
         namespace net = boost::asio;
 
         bpt::common::log::info("HyperliquidMdAdapter connecting {}:{}{} (tls={})",
-                               this->cfg_.ws_host, this->cfg_.ws_port,
-                               this->cfg_.ws_path, this->cfg_.use_tls);
+                               this->cfg_.ws_host,
+                               this->cfg_.ws_port,
+                               this->cfg_.ws_path,
+                               this->cfg_.use_tls);
         std::unique_ptr<bpt::common::ws::AnyWsStream> ws;
         if (this->cfg_.use_tls) {
             auto tls_ws = bpt::common::ws::ws_connect(this->ioc_,
-                                                       this->ssl_ctx_,
-                                                       this->cfg_.ws_host,
-                                                       this->cfg_.ws_port,
-                                                       this->cfg_.ws_path,
-                                                       this->cfg_.so_rcvbuf_bytes,
-                                                       this->cfg_.ws_connect_timeout_ms,
-                                                       "bpt-md-gateway/0.1",
-                                                       this->cfg_.pinned_tls_sha256);
+                                                      this->ssl_ctx_,
+                                                      this->cfg_.ws_host,
+                                                      this->cfg_.ws_port,
+                                                      this->cfg_.ws_path,
+                                                      this->cfg_.so_rcvbuf_bytes,
+                                                      this->cfg_.ws_connect_timeout_ms,
+                                                      "bpt-md-gateway/0.1",
+                                                      this->cfg_.pinned_tls_sha256);
             ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(tls_ws));
         } else {
             auto plain_ws = bpt::common::ws::ws_connect_plain(this->ioc_,
@@ -108,11 +109,7 @@ protected:
             ws = std::make_unique<bpt::common::ws::AnyWsStream>(std::move(plain_ws));
         }
 
-        ws->set_option(websocket::stream_base::timeout{
-            websocket::stream_base::none(),
-            std::chrono::seconds(30),
-            true
-        });
+        ws->set_option(websocket::stream_base::timeout{websocket::stream_base::none(), std::chrono::seconds(30), true});
 
         bpt::common::log::info("HyperliquidMdAdapter connected, subscribing instruments");
 

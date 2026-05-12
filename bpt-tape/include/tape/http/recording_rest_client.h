@@ -24,9 +24,9 @@
 /// the header bytes — no second length field needed. Keeps the format
 /// binary-safe (no JSON escaping of binary response bodies).
 
-#include "tape/io/tape.h"
 #include "bpt_common/util/tsc_clock.h"
 #include "refdata/http/rest_client.h"
+#include "tape/io/tape.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -45,15 +45,11 @@ public:
     /// \param port     remote port (as string — Boost.Asio resolver shape)
     /// \param use_tls  true → https, false → http
     /// \param tape    where to tee response bodies; nullptr disables recording
-    RecordingRestClient(std::string host,
-                        std::string port,
-                        bool use_tls,
-                        std::shared_ptr<::bpt::tape::io::Tape> tape)
+    RecordingRestClient(std::string host, std::string port, bool use_tls, std::shared_ptr<::bpt::tape::io::Tape> tape)
         : RestClient(std::move(host), std::move(port), use_tls),
           tape_(std::move(tape)) {}
 
-    std::string get(const std::string& target,
-                    const Headers& extra_headers = {}) const override {
+    std::string get(const std::string& target, const Headers& extra_headers = {}) const override {
         std::string body = RestClient::get(target, extra_headers);
         record_response(/*method_byte=*/0, target, body);
         return body;
@@ -71,10 +67,9 @@ private:
     /// Build the on-disk envelope and write it as one Tape record.
     /// Aborts on tape failure so systemd recycles us — silent drops
     /// were the failure mode this guards against.
-    void record_response(uint8_t method_byte,
-                         std::string_view target,
-                         std::string_view body) const {
-        if (!tape_) return;
+    void record_response(uint8_t method_byte, std::string_view target, std::string_view body) const {
+        if (!tape_)
+            return;
         const uint16_t target_len = static_cast<uint16_t>(target.size());
         std::string buf;
         buf.reserve(sizeof(method_byte) + sizeof(target_len) + target.size() + body.size());
@@ -84,10 +79,12 @@ private:
         buf.append(target);
         buf.append(body);
         if (!tape_->write_marker(::bpt::common::util::WallClock::now_ns(),
-                                  ::bpt::common::recorder::RecordType::REST_RESPONSE,
-                                  buf)) {
-            std::fputs("[FATAL] bpt-tape: Tape::write_marker (REST) failed; "
-                       "aborting (Restart=always recycles).\n", stderr);
+                                 ::bpt::common::recorder::RecordType::REST_RESPONSE,
+                                 buf)) {
+            std::fputs(
+                "[FATAL] bpt-tape: Tape::write_marker (REST) failed; "
+                "aborting (Restart=always recycles).\n",
+                stderr);
             std::fflush(stderr);
             std::abort();
         }

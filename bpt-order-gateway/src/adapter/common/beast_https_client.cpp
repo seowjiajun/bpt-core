@@ -19,7 +19,8 @@ namespace ssl = net::ssl;
 using tcp = net::ip::tcp;
 
 BeastHttpsClient::BeastHttpsClient(std::string host, std::string port)
-    : host_(std::move(host)), port_(std::move(port)) {}
+    : host_(std::move(host)),
+      port_(std::move(port)) {}
 
 std::string BeastHttpsClient::send(http::request<http::string_body>& req) const {
     net::io_context ioc;

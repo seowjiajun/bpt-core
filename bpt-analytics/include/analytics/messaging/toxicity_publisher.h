@@ -8,17 +8,15 @@
 
 #include "analytics/messaging/toxicity_update.h"
 
+#include <bpt_common/aeron/publisher.h>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::analytics::messaging {
 
 class ToxicityPublisher {
 public:
-    ToxicityPublisher(std::shared_ptr<aeron::Aeron> aeron,
-                      const std::string& channel,
-                      int stream_id);
+    ToxicityPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     /// Returns true if Aeron accepted the offer. Idempotent/periodic
     /// stream — next tick replaces the previous, so drop-on-no-subscriber

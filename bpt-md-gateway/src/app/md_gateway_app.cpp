@@ -5,9 +5,9 @@
 #include <messages/ExchangeRegistry.h>
 #include <messages/MdSubscribeBatch.h>
 
+#include <bpt_common/signal.h>
 #include <chrono>
 #include <thread>
-#include <bpt_common/signal.h>
 
 using namespace std::chrono_literals;
 
@@ -32,16 +32,14 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
         // messages/exchanges.yaml is edited and codegen rerun.
         const auto exch_id = bpt::messages::ExchangeRegistry::from_name(a_cfg.exchange);
         if (!exch_id) {
-            throw std::runtime_error(fmt::format(
-                "Unknown exchange '{}' in mdgw config — not in messages/exchanges.yaml",
-                a_cfg.exchange));
+            throw std::runtime_error(
+                fmt::format("Unknown exchange '{}' in mdgw config — not in messages/exchanges.yaml", a_cfg.exchange));
         }
-        auto adapter = adapter::make_md_adapter<messaging::MdPublisher>(
-            *exch_id, a_cfg, md_pub_);
+        auto adapter = adapter::make_md_adapter<messaging::MdPublisher>(*exch_id, a_cfg, md_pub_);
         if (!adapter) {
-            throw std::runtime_error(fmt::format(
-                "Exchange '{}' is in the registry but mdgw has no adapter implementation for it",
-                a_cfg.exchange));
+            throw std::runtime_error(
+                fmt::format("Exchange '{}' is in the registry but mdgw has no adapter implementation for it",
+                            a_cfg.exchange));
         }
 
         adapter->on_funding_rate = [this](const messaging::FundingRateUpdate& fr) {
@@ -117,8 +115,8 @@ void MdGatewayApp::run() {
             for (auto& [exchange, a] : md_stat_reporters_) {
                 metrics_.md_messages_published(exchange).Set(static_cast<double>(a->md_published_count()));
                 metrics_.md_validation_drops(exchange).Set(static_cast<double>(a->validation_drop_count()));
-                metrics_.validation_drop_breaker_tripped(exchange)
-                    .Set(a->validation_drop_breaker_tripped() ? 1.0 : 0.0);
+                metrics_.validation_drop_breaker_tripped(exchange).Set(a->validation_drop_breaker_tripped() ? 1.0
+                                                                                                            : 0.0);
             }
             last_lat_report = now;
         }

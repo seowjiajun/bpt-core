@@ -16,17 +16,22 @@ const char* side_str(bpt::messages::OrderSide::Value s) {
 
 const char* type_str(bpt::messages::OrderType::Value t, std::uint8_t exec_inst) {
     using OT = bpt::messages::OrderType;
-    if (t == OT::MARKET)                              return "MARKET";
-    if (exec_inst & bpt::messages::kExecInstPostOnly) return "LIMIT_MAKER";
+    if (t == OT::MARKET)
+        return "MARKET";
+    if (exec_inst & bpt::messages::kExecInstPostOnly)
+        return "LIMIT_MAKER";
     return "LIMIT";
 }
 
 const char* tif_str(bpt::messages::TimeInForce::Value tif) {
     using TIF = bpt::messages::TimeInForce;
     switch (tif) {
-        case TIF::IOC: return "IOC";
-        case TIF::FOK: return "FOK";
-        default:       return "GTC";
+        case TIF::IOC:
+            return "IOC";
+        case TIF::FOK:
+            return "FOK";
+        default:
+            return "GTC";
     }
 }
 }  // namespace
@@ -34,8 +39,7 @@ const char* tif_str(bpt::messages::TimeInForce::Value tif) {
 std::string build_new_order_params(const OrderSpec& spec) {
     using OT = bpt::messages::OrderType;
 
-    std::string params = "symbol=" + spec.symbol +
-                         "&side=" + side_str(spec.side) +
+    std::string params = "symbol=" + spec.symbol + "&side=" + side_str(spec.side) +
                          "&type=" + type_str(spec.order_type, spec.exec_inst) +
                          "&quantity=" + std::to_string(static_cast<double>(spec.quantity_e8) / kScale) +
                          "&newClientOrderId=" + spec.cloid;
@@ -58,9 +62,9 @@ std::string build_cancel_params(std::string_view symbol, std::string_view cloid)
 }
 
 std::string build_modify_replace_params(std::string_view symbol,
-                                         std::string_view new_cloid,
-                                         int64_t new_price_e8,
-                                         uint64_t new_quantity_e8) {
+                                        std::string_view new_cloid,
+                                        int64_t new_price_e8,
+                                        uint64_t new_quantity_e8) {
     std::string s;
     s += "symbol=";
     s += symbol;

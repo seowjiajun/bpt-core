@@ -24,7 +24,6 @@
 
 #include "backtester/matching/matching_engine.h"
 #include "backtester/matching/open_order.h"
-
 #include "strategy/order/i_order_gateway_client.h"
 
 #include <messages/AccountSnapshot.h>
@@ -60,12 +59,9 @@ public:
                                       uint8_t exec_inst,
                                       const std::string& exchange_symbol) override;
 
-    void send_cancel(uint64_t order_id,
-                     bpt::messages::ExchangeId::Value exchange_id,
-                     uint64_t instrument_id) override;
+    void send_cancel(uint64_t order_id, bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) override;
 
-    void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id,
-                         uint64_t instrument_id) override;
+    void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) override;
 
     void send_modify(uint64_t order_id,
                      bpt::messages::ExchangeId::Value exchange_id,
@@ -73,8 +69,7 @@ public:
                      int64_t new_price,
                      uint64_t new_quantity) override;
 
-    void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
-                                        uint64_t correlation_id) override;
+    void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id, uint64_t correlation_id) override;
 
     /// Push-driven by the harness — events arrive synchronously.
     int poll(int /*fragment_limit*/ = 10) override { return 0; }
@@ -101,18 +96,18 @@ private:
     /// order_id; matching engine identifies them by string. We keep
     /// a forward + reverse map so both directions are O(1).
     struct LiveOrder {
-        uint64_t                         strategy_order_id;
+        uint64_t strategy_order_id;
         bpt::messages::ExchangeId::Value exchange_id;
-        uint64_t                         instrument_id;
-        bpt::messages::OrderSide::Value  side;
-        bpt::messages::OrderType::Value  order_type;
+        uint64_t instrument_id;
+        bpt::messages::OrderSide::Value side;
+        bpt::messages::OrderType::Value order_type;
         bpt::messages::TimeInForce::Value tif;
-        int64_t                          price;       // strategy-side scaled
-        uint64_t                         quantity;    // strategy-side scaled
-        std::string                      exchange_symbol;
-        std::string                      exchange;    // upper-case e.g. "HYPERLIQUID"
-        uint64_t                         cumulative_filled_qty{0};  // scaled
-        bool                             post_only{false};
+        int64_t price;      // strategy-side scaled
+        uint64_t quantity;  // strategy-side scaled
+        std::string exchange_symbol;
+        std::string exchange;               // upper-case e.g. "HYPERLIQUID"
+        uint64_t cumulative_filled_qty{0};  // scaled
+        bool post_only{false};
     };
 
     /// Translate strategy's ExchangeId enum to the upper-case string
@@ -137,8 +132,7 @@ private:
                              int64_t price,
                              uint64_t quantity,
                              uint64_t cumulative_filled_qty,
-                             bpt::messages::RejectSource::Value reject_source =
-                                 bpt::messages::RejectSource::EXCHANGE);
+                             bpt::messages::RejectSource::Value reject_source = bpt::messages::RejectSource::EXCHANGE);
 
     matching::MatchingEngine& matching_;
 

@@ -244,7 +244,10 @@ TEST(ExecutionReportTest, EncodeDecodeFilledReport) {
         .remainingQty(0ULL)
         .rejectReason(RejectReason::OK)
         .fee(50000LL)
-        .putFeeCurrency([]() { static const char b[8] = "USDT"; return b; }())
+        .putFeeCurrency([]() {
+            static const char b[8] = "USDT";
+            return b;
+        }())
         .timestampNs(555555ULL)
         .localTsNs(555666ULL);
 
@@ -287,7 +290,10 @@ TEST(ExecutionReportTest, RejectedReport) {
         .remainingQty(50000000ULL)
         .rejectReason(RejectReason::RISK_REJECTED)
         .fee(0LL)
-        .putFeeCurrency([]() { static const char b[8] = "USDT"; return b; }())
+        .putFeeCurrency([]() {
+            static const char b[8] = "USDT";
+            return b;
+        }())
         .timestampNs(1ULL)
         .localTsNs(1ULL);
 
@@ -319,7 +325,10 @@ TEST(ExecutionReportTest, PartialFillReport) {
         .remainingQty(70000000ULL)
         .rejectReason(RejectReason::OK)
         .fee(-10000LL)  // negative fee = rebate
-        .putFeeCurrency([]() { static const char b[8] = "BTC"; return b; }())
+        .putFeeCurrency([]() {
+            static const char b[8] = "BTC";
+            return b;
+        }())
         .timestampNs(12345ULL)
         .localTsNs(12400ULL);
 

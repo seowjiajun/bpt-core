@@ -20,7 +20,7 @@ namespace bpt::analytics::analysis {
 class FillRateTracker {
 public:
     struct Config {
-        std::size_t window_size{100};   // rolling window of completed orders
+        std::size_t window_size{100};  // rolling window of completed orders
     };
 
     FillRateTracker() : cfg_{} {}
@@ -36,8 +36,8 @@ public:
     void on_cancelled(uint64_t order_id, uint64_t cancel_ns);
 
     struct SideStats {
-        double fill_rate;       // 0.0–1.0, NaN if no data
-        double mean_ttf_ms;     // average time-to-fill in milliseconds, NaN if no fills
+        double fill_rate;    // 0.0–1.0, NaN if no data
+        double mean_ttf_ms;  // average time-to-fill in milliseconds, NaN if no fills
         uint32_t fills;
         uint32_t cancels;
         uint32_t total;
@@ -56,8 +56,8 @@ private:
 
     struct Outcome {
         int side_sign;
-        bool filled;            // true = filled, false = cancelled
-        double ttf_ms;          // time-to-fill in ms (0 if cancelled)
+        bool filled;    // true = filled, false = cancelled
+        double ttf_ms;  // time-to-fill in ms (0 if cancelled)
     };
 
     Config cfg_;

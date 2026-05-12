@@ -20,8 +20,7 @@ PositionTracker::FillResult PositionTracker::apply(encode::Side side, double qty
         avg_entry_ = price;
     } else if (std::abs(next_net) > std::abs(prev_net)) {
         // Adding to the existing position — weighted average
-        avg_entry_ =
-            (avg_entry_ * std::abs(prev_net) + price * qty) / std::abs(next_net);
+        avg_entry_ = (avg_entry_ * std::abs(prev_net) + price * qty) / std::abs(next_net);
     } else {
         // Reducing an existing position — realise PnL on the closed portion
         const double closed = std::abs(prev_net) - std::abs(next_net);
@@ -35,7 +34,7 @@ PositionTracker::FillResult PositionTracker::apply(encode::Side side, double qty
     net_qty_ = next_net;
     cumulative_pnl_ += realized;
 
-    return { realized, cumulative_pnl_, net_qty_, avg_entry_ };
+    return {realized, cumulative_pnl_, net_qty_, avg_entry_};
 }
 
 }  // namespace bridge

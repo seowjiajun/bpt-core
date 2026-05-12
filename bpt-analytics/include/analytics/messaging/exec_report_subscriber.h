@@ -9,10 +9,10 @@
 
 #include <messages/ExecutionReport.h>
 
+#include <bpt_common/aeron/subscriber.h>
 #include <functional>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bpt::analytics::messaging {
 
@@ -20,9 +20,7 @@ class ExecReportSubscriber {
 public:
     using OnReportFn = std::function<void(const bpt::messages::ExecutionReport&)>;
 
-    ExecReportSubscriber(std::shared_ptr<aeron::Aeron> aeron,
-                         const std::string& channel,
-                         int stream_id);
+    ExecReportSubscriber(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     int poll(int fragment_limit = 10);
 

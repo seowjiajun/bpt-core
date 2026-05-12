@@ -10,6 +10,7 @@
 #include "backtester/exchange/hyperliquid_order_server.h"
 #include "backtester/exchange/okx_md_server.h"
 #include "backtester/exchange/okx_order_server.h"
+#include "backtester/latency/latency_model.h"
 #include "backtester/matching/matching_engine.h"
 #include "backtester/messaging/aeron_bus.h"
 #include "backtester/results/results_collector.h"
@@ -35,6 +36,11 @@ private:
     std::unique_ptr<exchange::OkxMdServer> okx_md_server_;
     std::unique_ptr<exchange::HyperliquidMdServer> hyperliquid_md_server_;
     std::unique_ptr<exchange::HyperliquidInfoServer> hyperliquid_info_server_;
+    // latency_model_ must outlive matching_engine_ — the engine holds a
+    // non-owning pointer (set via set_latency_model). Declared first so
+    // destruction proceeds in reverse order. Concrete type so we can call
+    // set_spec/set_default during init.
+    std::unique_ptr<latency::ParametricLatencyModel> latency_model_;
     std::unique_ptr<matching::MatchingEngine> matching_engine_;
     std::unique_ptr<exchange::BinanceOrderServer> binance_order_server_;
     std::unique_ptr<exchange::OkxOrderServer> okx_order_server_;

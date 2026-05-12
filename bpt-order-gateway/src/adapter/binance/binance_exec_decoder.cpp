@@ -5,8 +5,8 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
-#include <string>
 #include <bpt_common/logging.h>
+#include <string>
 
 namespace bpt::order_gateway::adapter {
 
@@ -114,11 +114,10 @@ void BinanceExecDecoder::handle_order_response(const json::object& obj,
     if (auto code_it = obj.find("code"); code_it != obj.end()) {
         auto msg_it = obj.find("msg");
         std::string msg = (msg_it != obj.end()) ? std::string(msg_it->value().as_string()) : "?";
-        bpt::common::log::error(
-            "BinanceExecDecoder: exchange rejected order={} code={} msg={}",
-            order_id,
-            code_it->value().as_int64(),
-            msg);
+        bpt::common::log::error("BinanceExecDecoder: exchange rejected order={} code={} msg={}",
+                                order_id,
+                                code_it->value().as_int64(),
+                                msg);
         ev.exchange_ts_ns = recv_ns;
         ev.status = ES::REJECTED;
         ev.reject_reason = RR::EXCHANGE_ERROR;

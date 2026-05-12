@@ -3,10 +3,10 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
-#include <deque>
-#include <nlohmann/json.hpp>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/thread_name.h>
+#include <deque>
+#include <nlohmann/json.hpp>
 
 namespace bridge {
 
@@ -31,8 +31,7 @@ quill::Logger* kWsSessionLog() {
 // ─────────────────────────────────────────────────────────────────────────────
 class WsSession : public std::enable_shared_from_this<WsSession> {
 public:
-    WsSession(tcp::socket&& socket, WsServer& server)
-        : ws_(std::move(socket)), server_(server) {}
+    WsSession(tcp::socket&& socket, WsServer& server) : ws_(std::move(socket)), server_(server) {}
 
     void run() {
         ws_.set_option(websocket::stream_base::timeout::suggested(beast::role_type::server));
@@ -52,7 +51,8 @@ public:
     // Queue a message for writing.  Called from the IO thread via post().
     void enqueue(std::shared_ptr<const std::string> msg) {
         queue_.push_back(std::move(msg));
-        if (queue_.size() == 1) do_write();
+        if (queue_.size() == 1)
+            do_write();
     }
 
     void close() {
@@ -62,20 +62,20 @@ public:
 
 private:
     void do_read() {
-        ws_.async_read(buffer_,
-            [self = shared_from_this()](beast::error_code ec, std::size_t bytes) {
-                if (ec == websocket::error::closed || ec) {
-                    self->server_.remove_session(self);
-                    return;
-                }
-                self->handle_inbound(bytes);
-                self->buffer_.consume(self->buffer_.size());
-                self->do_read();
-            });
+        ws_.async_read(buffer_, [self = shared_from_this()](beast::error_code ec, std::size_t bytes) {
+            if (ec == websocket::error::closed || ec) {
+                self->server_.remove_session(self);
+                return;
+            }
+            self->handle_inbound(bytes);
+            self->buffer_.consume(self->buffer_.size());
+            self->do_read();
+        });
     }
 
     void handle_inbound(std::size_t bytes) {
-        if (bytes == 0) return;
+        if (bytes == 0)
+            return;
         try {
             auto data = beast::buffers_to_string(buffer_.data());
             auto j = nlohmann::json::parse(data);
@@ -94,14 +94,15 @@ private:
     void do_write() {
         ws_.text(true);
         ws_.async_write(net::buffer(*queue_.front()),
-            [self = shared_from_this()](beast::error_code ec, std::size_t /*bytes*/) {
-                if (ec) {
-                    self->server_.remove_session(self);
-                    return;
-                }
-                self->queue_.pop_front();
-                if (!self->queue_.empty()) self->do_write();
-            });
+                        [self = shared_from_this()](beast::error_code ec, std::size_t /*bytes*/) {
+                            if (ec) {
+                                self->server_.remove_session(self);
+                                return;
+                            }
+                            self->queue_.pop_front();
+                            if (!self->queue_.empty())
+                                self->do_write();
+                        });
     }
 
     websocket::stream<beast::tcp_stream> ws_;
@@ -113,8 +114,7 @@ private:
 // ─────────────────────────────────────────────────────────────────────────────
 //  WsServer
 // ─────────────────────────────────────────────────────────────────────────────
-WsServer::WsServer(uint16_t port)
-    : port_(port), acceptor_(io_ctx_) {}
+WsServer::WsServer(uint16_t port) : port_(port), acceptor_(io_ctx_) {}
 
 WsServer::~WsServer() {
     stop();
@@ -125,14 +125,23 @@ void WsServer::start() {
     tcp::endpoint endpoint{tcp::v4(), port_};
 
     acceptor_.open(endpoint.protocol(), ec);
-    if (ec) { bpt::common::log::error(kLog(), "open: {}", ec.message()); return; }
+    if (ec) {
+        bpt::common::log::error(kLog(), "open: {}", ec.message());
+        return;
+    }
 
     acceptor_.set_option(net::socket_base::reuse_address(true), ec);
     acceptor_.bind(endpoint, ec);
-    if (ec) { bpt::common::log::error(kLog(), "bind {}: {}", port_, ec.message()); return; }
+    if (ec) {
+        bpt::common::log::error(kLog(), "bind {}: {}", port_, ec.message());
+        return;
+    }
 
     acceptor_.listen(net::socket_base::max_listen_connections, ec);
-    if (ec) { bpt::common::log::error(kLog(), "listen: {}", ec.message()); return; }
+    if (ec) {
+        bpt::common::log::error(kLog(), "listen: {}", ec.message());
+        return;
+    }
 
     bpt::common::log::info(kLog(), "listening on :{}", port_);
     do_accept();
@@ -150,18 +159,21 @@ void WsServer::start() {
 }
 
 void WsServer::stop() {
-    if (!io_thread_.joinable()) return;
+    if (!io_thread_.joinable())
+        return;
 
     net::post(io_ctx_, [this] {
         beast::error_code ec;
         acceptor_.close(ec);
         std::lock_guard<std::mutex> lock(sessions_mutex_);
-        for (auto& s : sessions_) s->close();
+        for (auto& s : sessions_)
+            s->close();
         sessions_.clear();
     });
 
     io_ctx_.stop();
-    if (io_thread_.joinable()) io_thread_.join();
+    if (io_thread_.joinable())
+        io_thread_.join();
 }
 
 void WsServer::do_accept() {
@@ -170,7 +182,8 @@ void WsServer::do_accept() {
         // the acceptor is being closed during shutdown.  Anything else is a
         // transient per-connection error (client RST, handshake failure, etc.)
         // — log and keep accepting.
-        if (ec == net::error::operation_aborted) return;
+        if (ec == net::error::operation_aborted)
+            return;
 
         if (ec) {
             bpt::common::log::warn(kLog(), "accept: {}", ec.message());
@@ -195,20 +208,32 @@ void WsServer::publish(MsgKind kind, std::string message) {
         {
             std::lock_guard<std::mutex> lock(sessions_mutex_);
             live.reserve(sessions_.size());
-            for (auto& s : sessions_) live.push_back(s);
+            for (auto& s : sessions_)
+                live.push_back(s);
         }
-        for (auto& s : live) s->enqueue(msg);
+        for (auto& s : live)
+            s->enqueue(msg);
     });
 }
 
 void WsServer::update_snapshot(MsgKind kind, std::shared_ptr<const std::string> msg) {
     // Called only from the IO thread — no mutex on snapshot_.
     switch (kind) {
-        case MsgKind::Session:  snapshot_.session_msg  = std::move(msg); break;
-        case MsgKind::Status:   snapshot_.status_msg   = std::move(msg); break;
-        case MsgKind::Tick:     snapshot_.tick_msg     = std::move(msg); break;
-        case MsgKind::Position: snapshot_.position_msg = std::move(msg); break;
-        case MsgKind::Toxicity: snapshot_.toxicity_msg = std::move(msg); break;
+        case MsgKind::Session:
+            snapshot_.session_msg = std::move(msg);
+            break;
+        case MsgKind::Status:
+            snapshot_.status_msg = std::move(msg);
+            break;
+        case MsgKind::Tick:
+            snapshot_.tick_msg = std::move(msg);
+            break;
+        case MsgKind::Position:
+            snapshot_.position_msg = std::move(msg);
+            break;
+        case MsgKind::Toxicity:
+            snapshot_.toxicity_msg = std::move(msg);
+            break;
         case MsgKind::Fill:
             snapshot_.fills.push_back(std::move(msg));
             while (snapshot_.fills.size() > Snapshot::kMaxFills)
@@ -222,12 +247,18 @@ void WsServer::replay_snapshot_to(const std::shared_ptr<WsSession>& session) {
     // (oldest first) → latest position.  The frontend store handles messages
     // in any order, but this ordering matches what a live client would have
     // seen in chronological order.
-    if (snapshot_.session_msg)  session->enqueue(snapshot_.session_msg);
-    if (snapshot_.status_msg)   session->enqueue(snapshot_.status_msg);
-    if (snapshot_.tick_msg)     session->enqueue(snapshot_.tick_msg);
-    for (auto& f : snapshot_.fills) session->enqueue(f);
-    if (snapshot_.position_msg) session->enqueue(snapshot_.position_msg);
-    if (snapshot_.toxicity_msg) session->enqueue(snapshot_.toxicity_msg);
+    if (snapshot_.session_msg)
+        session->enqueue(snapshot_.session_msg);
+    if (snapshot_.status_msg)
+        session->enqueue(snapshot_.status_msg);
+    if (snapshot_.tick_msg)
+        session->enqueue(snapshot_.tick_msg);
+    for (auto& f : snapshot_.fills)
+        session->enqueue(f);
+    if (snapshot_.position_msg)
+        session->enqueue(snapshot_.position_msg);
+    if (snapshot_.toxicity_msg)
+        session->enqueue(snapshot_.toxicity_msg);
 }
 
 void WsServer::add_session(std::shared_ptr<WsSession> session) {

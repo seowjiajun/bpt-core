@@ -5,9 +5,9 @@
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
 
+#include <bpt_common/logging.h>
 #include <cmath>
 #include <nlohmann/json.hpp>
-#include <bpt_common/logging.h>
 
 using json = nlohmann::json;
 
@@ -53,8 +53,9 @@ refdata::InstrumentType deribit_to_inst_type(const std::string& kind, const std:
 DeribitRefdataDecoder::DeribitRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
     : mapping_(std::move(mapping)) {}
 
-std::vector<DeribitRefdataDecoder::InstrumentWithFee>
-DeribitRefdataDecoder::parse_instruments(const std::string& body, uint64_t collected_ts) const {
+std::vector<DeribitRefdataDecoder::InstrumentWithFee> DeribitRefdataDecoder::parse_instruments(
+    const std::string& body,
+    uint64_t collected_ts) const {
     std::vector<InstrumentWithFee> out;
 
     auto j = json::parse(body, nullptr, /*allow_exceptions=*/false);
@@ -64,8 +65,7 @@ DeribitRefdataDecoder::parse_instruments(const std::string& body, uint64_t colle
     }
 
     if (j.contains("error")) {
-        bpt::common::log::error("[DeribitRefData] get_instruments error: {}",
-                                j["error"].value("message", "unknown"));
+        bpt::common::log::error("[DeribitRefData] get_instruments error: {}", j["error"].value("message", "unknown"));
         return out;
     }
 

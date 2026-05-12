@@ -8,12 +8,11 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
 #include <boost/json.hpp>
-
+#include <bpt_common/logging.h>
 #include <chrono>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
-#include <bpt_common/logging.h>
 
 // HL account endpoints are public — /info accepts unsigned POST. No
 // signer, no credentials. Only the wallet address is sensitive (and
@@ -77,10 +76,13 @@ std::string HyperliquidBalanceAdapter::post(const std::string& body) const {
 namespace {
 
 int64_t to_e8(const char* s) {
-    if (!s) return 0;
+    if (!s)
+        return 0;
     return static_cast<int64_t>(std::round(std::stod(s) * 1e8));
 }
-int64_t to_e8(const std::string& s) { return to_e8(s.c_str()); }
+int64_t to_e8(const std::string& s) {
+    return to_e8(s.c_str());
+}
 
 }  // namespace
 
@@ -133,13 +135,15 @@ std::vector<BalanceRow> HyperliquidBalanceAdapter::fetch() {
         auto v = json::parse(resp).as_object();
         if (auto it = v.find("balances"); it != v.end() && it->value().is_array()) {
             for (const auto& b_val : it->value().as_array()) {
-                if (!b_val.is_object()) continue;
+                if (!b_val.is_object())
+                    continue;
                 const auto& b = b_val.as_object();
 
                 std::string coin;
                 if (auto cit = b.find("coin"); cit != b.end() && cit->value().is_string())
                     coin = std::string(cit->value().as_string());
-                if (coin.empty()) continue;
+                if (coin.empty())
+                    continue;
 
                 int64_t total_e8 = 0;
                 int64_t hold_e8 = 0;

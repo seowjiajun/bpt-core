@@ -1,5 +1,7 @@
 #include "strategy/app/strategy_app.h"
 
+#include "strategy/clock/sim_clock.h"
+
 #include <messages/BacktestCommand.h>
 
 #include <chrono>
@@ -24,6 +26,14 @@ void StrategyApp::run_backtest_loop() {
     bus_.backtest->on_control =
         [this, &stop_received](bpt::messages::BacktestCommand::Value cmd, uint64_t seq, uint64_t sim_ts) {
             using bpt::messages::BacktestCommand;
+
+            // Pin the simulation clock for any strategy code that would
+            // otherwise read system_clock::now() / steady_clock::now().
+            // Reproducibility relies on this firing before the MD/order
+            // drain below so anything triggered during the drain sees the
+            // tick's sim_ts, not wall time.
+            if (sim_ts != 0)
+                bpt::strategy::clock::SimClock::set_now_ns(sim_ts);
 
             if (cmd == BacktestCommand::START) {
                 if (seq == 0) {

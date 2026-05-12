@@ -32,8 +32,7 @@ struct AeronBus {
 
     /// \brief Build all five Aeron-backed adapters wired to the channels
     ///        and stream IDs in `settings`.
-    static AeronBus build(std::shared_ptr<aeron::Aeron> aeron,
-                          const config::Settings& settings);
+    static AeronBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace bpt::refdata::messaging

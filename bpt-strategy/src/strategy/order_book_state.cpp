@@ -63,11 +63,21 @@ void OrderBookState::reset() {
     last_update_ns_ = 0;
 }
 
-double OrderBookState::best_bid() const { return bids_.begin()->first; }
-double OrderBookState::best_ask() const { return asks_.begin()->first; }
-double OrderBookState::best_bid_qty() const { return bids_.begin()->second; }
-double OrderBookState::best_ask_qty() const { return asks_.begin()->second; }
-double OrderBookState::mid() const { return 0.5 * (best_bid() + best_ask()); }
+double OrderBookState::best_bid() const {
+    return bids_.begin()->first;
+}
+double OrderBookState::best_ask() const {
+    return asks_.begin()->first;
+}
+double OrderBookState::best_bid_qty() const {
+    return bids_.begin()->second;
+}
+double OrderBookState::best_ask_qty() const {
+    return asks_.begin()->second;
+}
+double OrderBookState::mid() const {
+    return 0.5 * (best_bid() + best_ask());
+}
 
 double OrderBookState::size_at_bid(double price) const {
     auto it = bids_.find(price);
@@ -103,7 +113,8 @@ std::vector<OrderBookState::Level> OrderBookState::top_bids(size_t n) const {
     out.reserve(std::min(n, bids_.size()));
     size_t i = 0;
     for (auto& [px, qty] : bids_) {
-        if (i++ >= n) break;
+        if (i++ >= n)
+            break;
         out.push_back({px, qty});
     }
     return out;
@@ -114,7 +125,8 @@ std::vector<OrderBookState::Level> OrderBookState::top_asks(size_t n) const {
     out.reserve(std::min(n, asks_.size()));
     size_t i = 0;
     for (auto& [px, qty] : asks_) {
-        if (i++ >= n) break;
+        if (i++ >= n)
+            break;
         out.push_back({px, qty});
     }
     return out;

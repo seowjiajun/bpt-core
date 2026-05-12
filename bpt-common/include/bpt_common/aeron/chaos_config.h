@@ -25,14 +25,13 @@
 #include "bpt_common/aeron/chaos_filter.h"
 #include "bpt_common/logging.h"
 
-#include <fmt/format.h>
-#include <toml++/toml.hpp>
-
 #include <cstddef>
 #include <cstdint>
+#include <fmt/format.h>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <toml++/toml.hpp>
 
 namespace bpt::common::aeron {
 
@@ -45,10 +44,12 @@ namespace bpt::common::aeron {
 inline ChaosConfig load_chaos_config(const toml::table& root, std::string_view env) {
     ChaosConfig out;
     auto chaos = root.get_as<toml::table>("chaos");
-    if (!chaos) return out;
+    if (!chaos)
+        return out;
 
     auto by_stream = chaos->get_as<toml::table>("drop_prob_by_stream_id");
-    if (!by_stream) return out;
+    if (!by_stream)
+        return out;
 
     for (const auto& [k, v] : *by_stream) {
         std::int32_t stream_id;
@@ -56,14 +57,14 @@ inline ChaosConfig load_chaos_config(const toml::table& root, std::string_view e
             stream_id = static_cast<std::int32_t>(std::stoi(std::string{k.str()}));
         } catch (const std::exception&) {
             throw std::invalid_argument(
-                fmt::format("[chaos.drop_prob_by_stream_id] key must be an int (got '{}')",
-                            std::string{k.str()}));
+                fmt::format("[chaos.drop_prob_by_stream_id] key must be an int (got '{}')", std::string{k.str()}));
         }
         const double p = v.value_or(-1.0);
         if (p < 0.0 || p > 1.0) {
             throw std::invalid_argument(
                 fmt::format("[chaos.drop_prob_by_stream_id] stream {} drop_prob must be in [0,1], got {}",
-                            stream_id, p));
+                            stream_id,
+                            p));
         }
         if (p > 0.0) {
             out.drop_prob_by_stream_id[stream_id] = p;
@@ -71,8 +72,7 @@ inline ChaosConfig load_chaos_config(const toml::table& root, std::string_view e
     }
 
     if (env == "prod" && !out.empty()) {
-        throw std::runtime_error(
-            "[chaos] config rejected in prod environment — chaos injection is dev/qa only");
+        throw std::runtime_error("[chaos] config rejected in prod environment — chaos injection is dev/qa only");
     }
 
     return out;
@@ -102,9 +102,7 @@ inline std::size_t install_chaos_from_toml(const std::string& config_path,
     }
     bpt::common::logging::init(std::string{service_name});
     for (const auto& [stream_id, p] : cfg.drop_prob_by_stream_id) {
-        bpt::common::log::warn(
-            "[chaos] stream {} drop_prob={:.2f} — fault injection active",
-            stream_id, p);
+        bpt::common::log::warn("[chaos] stream {} drop_prob={:.2f} — fault injection active", stream_id, p);
     }
     const auto count = cfg.drop_prob_by_stream_id.size();
     ChaosRegistry::set_global(std::move(cfg));

@@ -47,6 +47,8 @@
 #include "bpt_common/ws/ws_connect.h"
 
 #include <atomic>
+#include <boost/beast/core.hpp>
+#include <boost/beast/websocket.hpp>
 #include <chrono>
 #include <functional>
 #include <mutex>
@@ -54,9 +56,6 @@
 #include <string>
 #include <string_view>
 #include <thread>
-
-#include <boost/beast/core.hpp>
-#include <boost/beast/websocket.hpp>
 
 namespace bpt::common::ws {
 
@@ -155,11 +154,10 @@ inline void RunLoop::run(AnyWsStream ws,
             // Use a combined stop: the outer stop_flag OR our own ping_stop
             // (set on run() exit). The ping thread observes both to ensure
             // it wakes on BOTH shutdown paths.
-            while (!stop_flag.load(std::memory_order_relaxed) &&
-                   !ping_stop.load(std::memory_order_relaxed)) {
+            while (!stop_flag.load(std::memory_order_relaxed) && !ping_stop.load(std::memory_order_relaxed)) {
                 std::this_thread::sleep_for(cfg.interval);
-                if (stop_flag.load(std::memory_order_relaxed) ||
-                    ping_stop.load(std::memory_order_relaxed)) break;
+                if (stop_flag.load(std::memory_order_relaxed) || ping_stop.load(std::memory_order_relaxed))
+                    break;
                 try {
                     send(cfg.payload());
                 } catch (...) {
@@ -180,7 +178,8 @@ inline void RunLoop::run(AnyWsStream ws,
         std::atomic<bool>* stop;
         ~PingGuard() {
             stop->store(true, std::memory_order_relaxed);
-            if (t->joinable()) t->join();
+            if (t->joinable())
+                t->join();
         }
     } ping_guard{&ping_thread, &ping_stop};
 
@@ -189,8 +188,7 @@ inline void RunLoop::run(AnyWsStream ws,
     // Initialised to "now" so a just-opened socket isn't immediately
     // flagged as stale before the first frame arrives.
     uint64_t last_recv_ns = bpt::common::util::WallClock::now_ns();
-    const uint64_t liveness_ns =
-        static_cast<uint64_t>(liveness_timeout.count()) * 1'000'000ULL;
+    const uint64_t liveness_ns = static_cast<uint64_t>(liveness_timeout.count()) * 1'000'000ULL;
 
     try {
         beast::flat_buffer buf;
@@ -218,13 +216,12 @@ inline void RunLoop::run(AnyWsStream ws,
                 on_tick();
                 continue;
             }
-            if (ec) throw beast::system_error(ec);
+            if (ec)
+                throw beast::system_error(ec);
 
             const uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
             last_recv_ns = recv_ns;
-            std::string_view payload(
-                static_cast<const char*>(buf.data().data()),
-                buf.data().size());
+            std::string_view payload(static_cast<const char*>(buf.data().data()), buf.data().size());
             on_frame(payload, recv_ns);
             buf.consume(buf.size());
         }
@@ -240,7 +237,8 @@ inline void RunLoop::run(AnyWsStream ws,
 
 inline bool RunLoop::send(const std::string& msg) {
     std::lock_guard<std::mutex> lk(send_mu_);
-    if (ws_ == nullptr) return false;
+    if (ws_ == nullptr)
+        return false;
     namespace net = boost::asio;
     ws_->write(net::buffer(msg));
     return true;

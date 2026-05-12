@@ -46,10 +46,7 @@ TEST(OrderBookStateTest, BothSidesReady) {
 
 TEST(OrderBookStateTest, BidsSortedDescending) {
     OrderBookState book;
-    book.apply({{99.5, 1.0}, {100.0, 2.0}, {99.8, 3.0}},
-               {{101.0, 1.0}},
-               1,
-               1000);
+    book.apply({{99.5, 1.0}, {100.0, 2.0}, {99.8, 3.0}}, {{101.0, 1.0}}, 1, 1000);
     auto tops = book.top_bids(3);
     ASSERT_EQ(tops.size(), 3u);
     EXPECT_DOUBLE_EQ(tops[0].price, 100.0);
@@ -61,10 +58,7 @@ TEST(OrderBookStateTest, BidsSortedDescending) {
 
 TEST(OrderBookStateTest, AsksSortedAscending) {
     OrderBookState book;
-    book.apply({{100.0, 1.0}},
-               {{101.5, 1.0}, {101.0, 2.0}, {101.3, 3.0}},
-               1,
-               1000);
+    book.apply({{100.0, 1.0}}, {{101.5, 1.0}, {101.0, 2.0}, {101.3, 3.0}}, 1, 1000);
     auto tops = book.top_asks(3);
     ASSERT_EQ(tops.size(), 3u);
     EXPECT_DOUBLE_EQ(tops[0].price, 101.0);
@@ -136,10 +130,7 @@ TEST(OrderBookStateTest, SizeAtPresentPrice) {
 
 TEST(OrderBookStateTest, BidVolAboveExcludesEqualPrice) {
     OrderBookState book;
-    book.apply({{100.3, 1.0}, {100.2, 2.0}, {100.1, 3.0}, {100.0, 4.0}},
-               {{101.0, 1.0}},
-               1,
-               1000);
+    book.apply({{100.3, 1.0}, {100.2, 2.0}, {100.1, 3.0}, {100.0, 4.0}}, {{101.0, 1.0}}, 1, 1000);
     // Strictly above 100.1: 100.3 + 100.2 = 3.0
     EXPECT_DOUBLE_EQ(book.bid_vol_above(100.1), 3.0);
     // Strictly above 100.4 (outside ladder): 0
@@ -152,10 +143,7 @@ TEST(OrderBookStateTest, BidVolAboveExcludesEqualPrice) {
 
 TEST(OrderBookStateTest, AskVolBelowExcludesEqualPrice) {
     OrderBookState book;
-    book.apply({{100.0, 1.0}},
-               {{101.0, 1.0}, {101.1, 2.0}, {101.2, 3.0}, {101.3, 4.0}},
-               1,
-               1000);
+    book.apply({{100.0, 1.0}}, {{101.0, 1.0}, {101.1, 2.0}, {101.2, 3.0}, {101.3, 4.0}}, 1, 1000);
     // Strictly below 101.2: 101.0 + 101.1 = 3.0
     EXPECT_DOUBLE_EQ(book.ask_vol_below(101.2), 3.0);
     // Strictly below 101.0 (top): 0
@@ -184,10 +172,7 @@ TEST(OrderBookStateTest, ResetClearsEverything) {
 TEST(OrderBookStateTest, SnapshotReplacesStaleLevels) {
     OrderBookState book;
     // First frame as delta — levels accumulate.
-    book.apply({{100.0, 1.0}, {99.9, 2.0}, {99.8, 3.0}},
-               {{100.1, 1.0}, {100.2, 2.0}, {100.3, 3.0}},
-               1,
-               1000);
+    book.apply({{100.0, 1.0}, {99.9, 2.0}, {99.8, 3.0}}, {{100.1, 1.0}, {100.2, 2.0}, {100.3, 3.0}}, 1, 1000);
     EXPECT_EQ(book.n_bid_levels(), 3u);
 
     // Second frame as SNAPSHOT — only top-2 levels on each side. The
@@ -215,9 +200,7 @@ TEST(OrderBookStateTest, SnapshotOnEmptyStateIsSameAsDelta) {
 
 TEST(OrderBookStateTest, DeltaAfterSnapshotStillFolds) {
     OrderBookState book;
-    book.apply({{100.0, 1.0}, {99.9, 2.0}},
-               {{100.1, 1.0}, {100.2, 2.0}},
-               1, 1000, /*is_snapshot=*/true);
+    book.apply({{100.0, 1.0}, {99.9, 2.0}}, {{100.1, 1.0}, {100.2, 2.0}}, 1, 1000, /*is_snapshot=*/true);
     // Follow up with a delta that removes one level.
     book.apply({{99.9, 0.0}}, {}, 2, 2000, /*is_snapshot=*/false);
     EXPECT_EQ(book.n_bid_levels(), 1u);
@@ -231,10 +214,7 @@ TEST(OrderBookStateTest, DeltaAfterSnapshotStillFolds) {
 TEST(OrderBookStateTest, MiniBookScenario) {
     OrderBookState book;
     // Initial snapshot-like delta: 3 bid, 3 ask levels.
-    book.apply({{99.9, 1.0}, {99.8, 2.0}, {99.7, 3.0}},
-               {{100.1, 1.0}, {100.2, 2.0}, {100.3, 3.0}},
-               1,
-               1000);
+    book.apply({{99.9, 1.0}, {99.8, 2.0}, {99.7, 3.0}}, {{100.1, 1.0}, {100.2, 2.0}, {100.3, 3.0}}, 1, 1000);
     EXPECT_DOUBLE_EQ(book.mid(), 100.0);
 
     // Bid 99.9 trades out, bid 99.85 appears behind it.

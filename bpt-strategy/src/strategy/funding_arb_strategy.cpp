@@ -1,5 +1,7 @@
 #include "strategy/strategy/funding_arb_strategy.h"
 
+#include "strategy/clock/sim_clock.h"
+
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -76,10 +78,11 @@ FundingArbStrategy::FundingArbStrategy(uint64_t correlation_id,
     }
 
     // Seed order IDs from timestamp to avoid collisions across restarts.
-    const uint64_t seed = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch())
-            .count());
-    next_order_id_.store(seed, std::memory_order_relaxed);
+    // SimClock yields the simulation tick in backtest, wall clock in live —
+    // either way the seed avoids overlap between processes / runs sharing
+    // an exchange account, while staying reproducible per-tape.
+    const uint64_t seed_ns = bpt::strategy::clock::SimClock::now_ns();
+    next_order_id_.store(seed_ns / 1'000ULL, std::memory_order_relaxed);  // µs granularity, matches prior behaviour
 
     bpt::common::log::info(
         "[FA] min_rate={}bps exit_rate={}bps stable_periods={} "
@@ -98,7 +101,7 @@ FundingArbStrategy::FundingArbStrategy(uint64_t correlation_id,
                    cfg.risk.max_order_size_usd);
     for (const auto& b : base_assets_)
         bpt::common::log::info("[FA] base asset: {}", b);
-    bpt::common::log::info("[FA] order_id seed={}", seed);
+    bpt::common::log::info("[FA] order_id seed={}", next_order_id_.load(std::memory_order_relaxed));
 }
 
 // ── IStrategy ───────────────────────────────────────────────────────────────

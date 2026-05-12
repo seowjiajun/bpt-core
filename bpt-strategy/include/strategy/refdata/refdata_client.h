@@ -14,10 +14,10 @@
 #include <Aeron.h>
 #include <FragmentAssembler.h>
 
-#include <memory>
-#include <string>
 #include <bpt_common/aeron/publisher.h>
 #include <bpt_common/aeron/subscriber.h>
+#include <memory>
+#include <string>
 
 namespace bpt::strategy::refdata {
 

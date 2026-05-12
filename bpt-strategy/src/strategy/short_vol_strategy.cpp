@@ -1,5 +1,7 @@
 #include "strategy/strategy/short_vol_strategy.h"
 
+#include "strategy/clock/sim_clock.h"
+
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
 #include <messages/OptionSide.h>
@@ -623,9 +625,7 @@ void ShortVolStrategy::recompute_greeks(UnderlyingState& state) {
 
 PortfolioState ShortVolStrategy::get_portfolio_state() {
     PortfolioState ps;
-    ps.timestamp_ns = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    ps.timestamp_ns = bpt::strategy::clock::SimClock::now_ns();
 
     for (const auto& [key, state] : states_) {
         // Aggregate Greeks

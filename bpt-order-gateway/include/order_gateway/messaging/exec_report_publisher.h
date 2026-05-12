@@ -4,9 +4,9 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/publisher.h>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::order_gateway::messaging {
 
@@ -19,9 +19,7 @@ namespace bpt::order_gateway::messaging {
 /// hang (strategy down → gateway can't be useful anyway).
 class ExecReportPublisher final : public IExecReportPublisher {
 public:
-    ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                        const std::string& channel,
-                        int stream_id);
+    ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     void publish(uint64_t order_id,
                  uint64_t exchange_order_id,

@@ -36,10 +36,10 @@ public:
     /// populated the cache before strategy is run, so subscribe is
     /// the moment we synthesise the on_snapshot_complete + on_ready
     /// signal — same lifecycle the Aeron variant produces.
-    void subscribe(uint64_t correlation_id,
-                   std::vector<CanonicalFilter> /*filters*/ = {}) override {
+    void subscribe(uint64_t correlation_id, std::vector<CanonicalFilter> /*filters*/ = {}) override {
         last_correlation_id_ = correlation_id;
-        if (on_snapshot_complete) on_snapshot_complete(cache_);
+        if (on_snapshot_complete)
+            on_snapshot_complete(cache_);
         if (on_ready) {
             on_ready(/*exchanges_loaded=*/exchanges_loaded_,
                      /*instrument_count=*/instrument_count_,

@@ -1,8 +1,8 @@
 #include "order_gateway/risk/risk_checker.h"
 
+#include <bpt_common/util/tsc_clock.h>
 #include <cstring>
 #include <expected>
-#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::risk {
 
@@ -34,12 +34,11 @@ RiskChecker::RiskChecker(double max_order_size_usd,
       max_open_orders_per_venue_(max_open_orders_per_venue),
       max_orders_per_second_(max_orders_per_second) {}
 
-std::expected<void, bpt::messages::RejectReason::Value> RiskChecker::check(
-    bpt::messages::ExchangeId::Value exchange,
-    uint64_t /*instrument_id*/,
-    int64_t price,
-    uint64_t quantity,
-    uint64_t order_id) {
+std::expected<void, bpt::messages::RejectReason::Value> RiskChecker::check(bpt::messages::ExchangeId::Value exchange,
+                                                                           uint64_t /*instrument_id*/,
+                                                                           int64_t price,
+                                                                           uint64_t quantity,
+                                                                           uint64_t order_id) {
     using RR = bpt::messages::RejectReason;
 
     // 1. Kill switch check

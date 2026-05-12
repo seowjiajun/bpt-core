@@ -1,13 +1,11 @@
 #include "backtester/harness/strategy_harness.h"
 
 #include "backtester/harness/wslog_reader.h"
-
 #include "strategy/strategy/strategy_factory.h"
 
 #include <messages/ExchangeId.h>
 
 #include <bpt_common/logging.h>
-
 #include <stdexcept>
 #include <string_view>
 
@@ -16,19 +14,27 @@ namespace bpt::backtester::harness {
 namespace {
 
 bpt::strategy::refdata::InstrumentType map_inst_type(const std::string& t) {
-    if (t == "PERP")    return bpt::strategy::refdata::InstrumentType::PERPETUAL;
-    if (t == "FUTURE")  return bpt::strategy::refdata::InstrumentType::FUTURE;
-    if (t == "OPTION")  return bpt::strategy::refdata::InstrumentType::OPTION;
+    if (t == "PERP")
+        return bpt::strategy::refdata::InstrumentType::PERPETUAL;
+    if (t == "FUTURE")
+        return bpt::strategy::refdata::InstrumentType::FUTURE;
+    if (t == "OPTION")
+        return bpt::strategy::refdata::InstrumentType::OPTION;
     return bpt::strategy::refdata::InstrumentType::SPOT;
 }
 
 std::string exchange_name(uint8_t id) {
     switch (id) {
-        case 1: return "BINANCE";
-        case 2: return "OKX";
-        case 3: return "HYPERLIQUID";
-        case 4: return "DERIBIT";
-        default: return "";
+        case 1:
+            return "BINANCE";
+        case 2:
+            return "OKX";
+        case 3:
+            return "HYPERLIQUID";
+        case 4:
+            return "DERIBIT";
+        default:
+            return "";
     }
 }
 
@@ -63,20 +69,18 @@ void StrategyHarness::initialize() {
         const auto entries = mapping.instruments_for_venue(exch_id);
         for (const auto& e : entries) {
             bpt::strategy::refdata::Instrument inst{};
-            inst.instrument_id   = e.canonical_id;
-            inst.symbol          = e.venue_symbol;
-            inst.exchange        = exchange_name(exch_id);
-            inst.base_currency   = e.info.base;
+            inst.instrument_id = e.canonical_id;
+            inst.symbol = e.venue_symbol;
+            inst.exchange = exchange_name(exch_id);
+            inst.base_currency = e.info.base;
             // HL is USD-quoted natively (synthetic USD perpetuals — there
             // is no USDT pair on HL). The mapping JSON happens to record
             // quote="USDT" for HL because bpt-tape's universe builder
             // normalises that way; the live refdata service's HL adapter
             // emits quote="USD" so strategy configs use BASE/USD:PERPETUAL.
             // Mirror the live normalisation here.
-            inst.quote_currency  = (exch_id == 3 /*HYPERLIQUID*/)
-                                       ? std::string{"USD"}
-                                       : e.info.quote;
-            inst.type            = map_inst_type(e.info.type);
+            inst.quote_currency = (exch_id == 3 /*HYPERLIQUID*/) ? std::string{"USD"} : e.info.quote;
+            inst.type = map_inst_type(e.info.type);
             // tick_size / lot_size left at 0 — strategy treats 0 as
             // "unknown" and skips tick rounding. For full fidelity
             // these would come from a venue-meta snapshot (HL meta.json
@@ -87,7 +91,7 @@ void StrategyHarness::initialize() {
     }
     refdata_client_->mutable_cache().seed(std::move(seed));
     refdata_client_->set_ready_state(
-        /*exchanges_loaded=*/0xFF,        // pretend every configured exchange is up
+        /*exchanges_loaded=*/0xFF,  // pretend every configured exchange is up
         /*instrument_count=*/static_cast<uint16_t>(refdata_client_->cache().size()),
         /*fee_schedules_loaded=*/true,
         /*funding_rates_loaded=*/true);
@@ -98,30 +102,26 @@ void StrategyHarness::initialize() {
 
     // OrderManager wraps the order gateway + the refdata cache (used
     // for symbol → instrument resolution on send paths).
-    order_mgr_ = std::make_unique<bpt::strategy::order::OrderManager>(
-        *order_gw_, refdata_client_->cache());
+    order_mgr_ = std::make_unique<bpt::strategy::order::OrderManager>(*order_gw_, refdata_client_->cache());
 
     // Strategy.
-    strategy_ = bpt::strategy::strategy::StrategyFactory::create(
-        strategy_cfg_.strat,
-        *refdata_client_,
-        md_client_.get(),
-        order_mgr_.get(),
-        /*vol_client=*/nullptr);
+    strategy_ = bpt::strategy::strategy::StrategyFactory::create(strategy_cfg_.strat,
+                                                                 *refdata_client_,
+                                                                 md_client_.get(),
+                                                                 order_mgr_.get(),
+                                                                 /*vol_client=*/nullptr);
 
     // Wire strategy callbacks. These mirror StrategyApp::wire_*_callbacks()
     // but are simpler because we don't need the latency histograms,
     // dashboard publish, or watchdog logic — those are integration
     // concerns that belong on the multi-process path.
-    refdata_client_->on_snapshot_complete =
-        [this](const bpt::strategy::refdata::InstrumentCache& cache) {
-            strategy_->on_snapshot(cache);
-        };
-    refdata_client_->on_delta =
-        [this](const bpt::strategy::refdata::Instrument& inst,
-               bpt::messages::DeltaUpdateType::Value t) {
-            strategy_->on_delta(inst, t);
-        };
+    refdata_client_->on_snapshot_complete = [this](const bpt::strategy::refdata::InstrumentCache& cache) {
+        strategy_->on_snapshot(cache);
+    };
+    refdata_client_->on_delta = [this](const bpt::strategy::refdata::Instrument& inst,
+                                       bpt::messages::DeltaUpdateType::Value t) {
+        strategy_->on_delta(inst, t);
+    };
     md_client_->on_bbo = [this](const bpt::messages::MdMarketData& tick) {
         strategy_->on_bbo(tick);
     };
@@ -139,16 +139,15 @@ void StrategyHarness::initialize() {
     // same shape as ClockMaster's wiring in the multi-process path.
     bpt::backtester::results::ResultsCollector::RunMetadata md_meta{};
     // (RunMetadata fields populated from opts_ once we wire identity propagation.)
-    results_ = std::make_unique<bpt::backtester::results::ResultsCollector>(
-        opts_.starting_capital, opts_.output_dir, md_meta);
+    results_ =
+        std::make_unique<bpt::backtester::results::ResultsCollector>(opts_.starting_capital, opts_.output_dir, md_meta);
 
     // HL decoder + publisher. Publisher fans out to BOTH the strategy
     // (via InProcessMdClient) AND the matching engine (via
     // bpt::backtester::data::MarketEvent), so resting LIMITs can be
     // filled by replayed book updates synchronously alongside strategy
     // notifications.
-    hl_publisher_ = std::make_unique<HarnessMdPublisher>(
-        *md_client_, &matching_, &refdata_client_->cache());
+    hl_publisher_ = std::make_unique<HarnessMdPublisher>(*md_client_, &matching_, &refdata_client_->cache());
     hl_decoder_ = std::make_unique<bpt::md_gateway::adapter::HyperliquidMdDecoder<HarnessMdPublisher>>(hl_subs_);
 
     // Kick the strategy's lifecycle. start() typically sends the
@@ -168,9 +167,8 @@ void StrategyHarness::initialize() {
             hl_subs_.subscribe(desc.instrument_id, desc.symbol, desc.depth);
         }
     }
-    bpt::common::log::info(
-        "[harness] subscribed {} HL instruments via venue decoder",
-        md_client_->subscribed_instruments().size());
+    bpt::common::log::info("[harness] subscribed {} HL instruments via venue decoder",
+                           md_client_->subscribed_instruments().size());
 }
 
 uint64_t StrategyHarness::replay() {
@@ -188,15 +186,12 @@ uint64_t StrategyHarness::replay() {
             order_gw_->set_simulation_time(rec->ts_ns);
 
             if (rec->type == bpt::common::recorder::RecordType::WS_FRAME) {
-                std::string_view payload(
-                    reinterpret_cast<const char*>(rec->payload.data()),
-                    rec->payload.size());
+                std::string_view payload(reinterpret_cast<const char*>(rec->payload.data()), rec->payload.size());
                 // The decoder dispatches by HL channel ("l2Book" /
                 // "trades" / "activeAssetCtx"), invokes hl_publisher_
                 // for each parsed message — which fans out to both
                 // matching engine and strategy synchronously.
-                hl_decoder_->decode(payload, rec->ts_ns,
-                                    *hl_publisher_, noop_funding_cb_);
+                hl_decoder_->decode(payload, rec->ts_ns, *hl_publisher_, noop_funding_cb_);
             }
             // SESSION_*, CHECKPOINT, WS_DISCONNECT/RECONNECT records:
             // don't materially affect strategy output today (no
@@ -209,9 +204,9 @@ uint64_t StrategyHarness::replay() {
 
 void StrategyHarness::finalize(uint64_t end_ts_ns) {
     if (hl_publisher_) {
-        bpt::common::log::info(
-            "[harness] decoder produced {} trades + {} orderbooks for matching engine",
-            hl_publisher_->trade_count(), hl_publisher_->orderbook_count());
+        bpt::common::log::info("[harness] decoder produced {} trades + {} orderbooks for matching engine",
+                               hl_publisher_->trade_count(),
+                               hl_publisher_->orderbook_count());
     }
     // Tell the strategy to flatten any open positions. Multi-process
     // backtest does this via on_shutdown_flatten which sends IOC
@@ -223,9 +218,9 @@ void StrategyHarness::finalize(uint64_t end_ts_ns) {
     }
     if (results_) {
         results_->write();
-        bpt::common::log::info(
-            "[harness] wrote results to {} (final equity reflects {} fills)",
-            opts_.output_dir, "(see trades.csv)");
+        bpt::common::log::info("[harness] wrote results to {} (final equity reflects {} fills)",
+                               opts_.output_dir,
+                               "(see trades.csv)");
     }
 }
 

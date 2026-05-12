@@ -21,8 +21,8 @@
 //   flush_interval_ms = 0
 //   # pattern         = ""        # custom spdlog format string (omit for default)
 
-#include <toml++/toml.hpp>
 #include <bpt_common/logging.h>
+#include <toml++/toml.hpp>
 
 namespace bpt::common::logging {
 

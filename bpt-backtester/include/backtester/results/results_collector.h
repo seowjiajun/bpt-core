@@ -18,10 +18,16 @@ namespace bpt::backtester::results {
 // means "you got a good fill" (price moved with you, not against).
 // 50 ms / 1 s / 5 s / 30 s — the standard maker adverse-selection grid.
 inline constexpr std::array<int64_t, 4> kMarkoutHorizonsNs = {
-    50'000'000LL, 1'000'000'000LL, 5'000'000'000LL, 30'000'000'000LL,
+    50'000'000LL,
+    1'000'000'000LL,
+    5'000'000'000LL,
+    30'000'000'000LL,
 };
 inline constexpr std::array<const char*, 4> kMarkoutHorizonLabels = {
-    "50ms", "1s", "5s", "30s",
+    "50ms",
+    "1s",
+    "5s",
+    "30s",
 };
 
 // Collects fills and market prices throughout a backtest run and writes
@@ -41,14 +47,14 @@ public:
     // straight from the simulation config. wallclock_start_ns is captured
     // here at construction; wallclock_duration_ms is computed at write() time.
     struct RunMetadata {
-        std::string simulation_start;          // ISO 8601, e.g. "2026-04-25T00:00:00Z"
+        std::string simulation_start;  // ISO 8601, e.g. "2026-04-25T00:00:00Z"
         std::string simulation_end;
         std::vector<std::string> instruments;  // e.g. ["HYPERLIQUID:APE"]
         // Run identity. All optional — when empty the run still records,
         // it just can't be diff'd against a peer or replayed exactly.
-        std::string strategy_name;             // e.g. "AvellanedaStoikov"
-        std::string params_hash;               // sha256 of strategy config (8 chars typical)
-        std::string git_sha;                   // `git rev-parse HEAD` (7 chars typical)
+        std::string strategy_name;  // e.g. "AvellanedaStoikov"
+        std::string params_hash;    // sha256 of strategy config (8 chars typical)
+        std::string git_sha;        // `git rev-parse HEAD` (7 chars typical)
         // Path to the strategy params file used for this run. When set,
         // ResultsCollector::write() copies it into the run dir as
         // `params.toml` so the dashboard can read the actual param values
@@ -60,14 +66,12 @@ public:
     // the on-disk output directory and as the primary key in archive
     // tooling. Falls back to "{start}_{end}" if the identity fields are
     // empty so older runs and ad-hoc invocations still produce a path.
-    static std::string compose_run_id(const RunMetadata& m,
-                                      const std::string& start_tag,
-                                      const std::string& end_tag);
+    static std::string compose_run_id(const RunMetadata& m, const std::string& start_tag, const std::string& end_tag);
 
-    ResultsCollector(double starting_capital, std::string output_dir,
+    ResultsCollector(double starting_capital,
+                     std::string output_dir,
                      RunMetadata metadata = {},
-                     std::unordered_map<std::string, config::ResultsConfig::FeeRates>
-                         fees_by_venue = {});
+                     std::unordered_map<std::string, config::ResultsConfig::FeeRates> fees_by_venue = {});
 
     // Called on every fill from MatchingEngine.
     void on_fill(const matching::FillReport& fill);

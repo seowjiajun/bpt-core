@@ -1,12 +1,12 @@
 #pragma once
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <string>
 #include <toml++/toml.hpp>
 #include <unordered_map>
 #include <vector>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/aeron/stream_config.h>
 
 // Forward declaration for ScheduleConfig::configured_exchanges_mask conversion.
 
@@ -28,18 +28,20 @@ struct AeronConfig {
     bpt::common::config::StreamConfig md_data{"aeron:ipc", 0};
     bpt::common::config::StreamConfig md_ack_hb{"aeron:ipc", 0};
     // Order gateway streams (optional — stream_id 0 means OrderGateway client is not started)
-    bpt::common::config::StreamConfig order{"aeron:ipc", 0};             // Strategy → OrderGateway
-    bpt::common::config::StreamConfig exec_report{"aeron:ipc", 0};       // OrderGateway → Strategy (ExecutionReport)
-    bpt::common::config::StreamConfig heartbeat{"aeron:ipc", 0};         // OrderGateway → Strategy (OrderGatewayHeartbeat)
-    bpt::common::config::StreamConfig account_snapshot{"aeron:ipc", 0};  // OrderGateway → Strategy (AccountSnapshot id=27)
+    bpt::common::config::StreamConfig order{"aeron:ipc", 0};        // Strategy → OrderGateway
+    bpt::common::config::StreamConfig exec_report{"aeron:ipc", 0};  // OrderGateway → Strategy (ExecutionReport)
+    bpt::common::config::StreamConfig heartbeat{"aeron:ipc", 0};    // OrderGateway → Strategy (OrderGatewayHeartbeat)
+    bpt::common::config::StreamConfig account_snapshot{"aeron:ipc",
+                                                       0};  // OrderGateway → Strategy (AccountSnapshot id=27)
     // Pricer vol surface streams (optional — stream_id 0 means vol surface client is not started)
-    bpt::common::config::StreamConfig vol_surface{"aeron:ipc", 0};   // Pricer → Strategy (VolSurface id=21)
+    bpt::common::config::StreamConfig vol_surface{"aeron:ipc", 0};    // Pricer → Strategy (VolSurface id=21)
     bpt::common::config::StreamConfig pricer_status{"aeron:ipc", 0};  // PricerHeartbeat id=22, PricerReady id=23
     // Analytics toxicity stream (optional — stream_id 0 disables)
     bpt::common::config::StreamConfig toxicity{"aeron:ipc", 0};  // Analytics → Strategy (ToxicityUpdate)
     // Backtest streams (optional — only used when backtest_mode = true)
-    bpt::common::config::StreamConfig backtest_control{"aeron:ipc", 9002};  // Backtester → Strategy (BacktestControl id=25)
-    bpt::common::config::StreamConfig backtest_ack{"aeron:ipc", 9001};      // Strategy → Backtester (BacktestAck id=24)
+    bpt::common::config::StreamConfig backtest_control{"aeron:ipc",
+                                                       9002};           // Backtester → Strategy (BacktestControl id=25)
+    bpt::common::config::StreamConfig backtest_ack{"aeron:ipc", 9001};  // Strategy → Backtester (BacktestAck id=24)
     // Dashboard control (optional — stream_id 0 disables; bridge → Strategy)
     bpt::common::config::StreamConfig dashboard_control{"aeron:ipc", 9003};
     // Portfolio snapshot (optional — Strategy → bridge; published every ~100ms)
@@ -85,8 +87,8 @@ struct ScheduleConfig {
     // freshness knob inside FeeCache). These two govern the
     // strategy-side breaker on top of the heartbeat published every 5s
     // by bpt-refdata/RefdataDeltaPublisher.
-    uint64_t refdata_heartbeat_timeout_ns{25'000'000'000ULL};   // 25s = 5× heartbeat
-    uint64_t startup_refdata_timeout_ns{60'000'000'000ULL};      // 60s — fail startup if never heard
+    uint64_t refdata_heartbeat_timeout_ns{25'000'000'000ULL};  // 25s = 5× heartbeat
+    uint64_t startup_refdata_timeout_ns{60'000'000'000ULL};    // 60s — fail startup if never heard
 
     // Bitmask of exchanges Strategy expects Sindri to have loaded.
     // bit0=BINANCE(0x01), bit1=OKX(0x02), bit2=HYPERLIQUID(0x04).

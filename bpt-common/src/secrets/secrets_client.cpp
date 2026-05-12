@@ -47,9 +47,11 @@ std::map<std::string, std::string> fetch(const std::string& secret_name, Env env
     std::map<std::string, std::string> out;
     std::string line;
     while (std::getline(f, line)) {
-        if (line.empty() || line[0] == '#') continue;
+        if (line.empty() || line[0] == '#')
+            continue;
         auto eq = line.find('=');
-        if (eq == std::string::npos) continue;
+        if (eq == std::string::npos)
+            continue;
         out[line.substr(0, eq)] = line.substr(eq + 1);
     }
 

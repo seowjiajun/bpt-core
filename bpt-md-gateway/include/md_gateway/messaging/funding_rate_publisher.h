@@ -12,9 +12,9 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/publisher.h>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::md_gateway::messaging {
 

@@ -46,9 +46,9 @@ TEST(MarkoutTrackerTest, BuyFillFavorableMarkout) {
     auto obs = tracker.consume();
     ASSERT_EQ(obs.size(), 1u);
     EXPECT_EQ(obs[0].side_sign, +1);
-    EXPECT_NEAR(obs[0].markout_1s_bps, 10.0, 0.1);    // +10 bps at 1s
-    EXPECT_NEAR(obs[0].markout_5s_bps, 20.0, 0.1);    // +20 bps at 5s
-    EXPECT_NEAR(obs[0].markout_30s_bps, 5.0, 0.1);    // +5 bps at 30s
+    EXPECT_NEAR(obs[0].markout_1s_bps, 10.0, 0.1);  // +10 bps at 1s
+    EXPECT_NEAR(obs[0].markout_5s_bps, 20.0, 0.1);  // +20 bps at 5s
+    EXPECT_NEAR(obs[0].markout_30s_bps, 5.0, 0.1);  // +5 bps at 30s
 }
 
 TEST(MarkoutTrackerTest, SellFillAdverseMarkout) {

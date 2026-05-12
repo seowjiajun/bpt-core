@@ -18,10 +18,9 @@
 #include "refdata/refdata/instrument.h"
 #include "refdata/registry/instrument_registry.h"
 
-#include <gtest/gtest.h>
-
 #include <cstddef>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <memory>
 #include <vector>
 
@@ -58,8 +57,7 @@ public:
     std::size_t deltas{0};
     std::size_t heartbeats{0};
 
-    void publish_delta(bpt::messages::DeltaUpdateType::Value /*ut*/,
-                       const refdata::Instrument& /*inst*/) override {
+    void publish_delta(bpt::messages::DeltaUpdateType::Value /*ut*/, const refdata::Instrument& /*inst*/) override {
         ++deltas;
     }
     void publish_heartbeat() override { ++heartbeats; }
@@ -76,11 +74,7 @@ class FakeRefdataStatusSink final : public port::IRefdataStatusSink {
 public:
     std::size_t ready_calls{0};
     std::size_t error_calls{0};
-    void publish_ready(uint8_t /*exchanges*/,
-                       uint16_t /*instruments*/,
-                       bool /*fees*/) override {
-        ++ready_calls;
-    }
+    void publish_ready(uint8_t /*exchanges*/, uint16_t /*instruments*/, bool /*fees*/) override { ++ready_calls; }
     void publish_error(bpt::messages::RefDataErrorType::Value /*err*/,
                        bpt::messages::ExchangeId::Value /*exch*/,
                        uint64_t /*inst_id*/) override {
@@ -107,13 +101,7 @@ TEST(RefdataAppSeamTest, HandleRequestForwardsToSnapshotSink) {
     auto* snapshot_obs = snapshot.get();
     const uint64_t expected_seq = delta->seq;
 
-    RefdataApp app(make_test_settings(),
-                   std::move(control),
-                   std::move(snapshot),
-                   delta,
-                   fee,
-                   status,
-                   {});
+    RefdataApp app(make_test_settings(), std::move(control), std::move(snapshot), delta, fee, status, {});
 
     messaging::RefdataRequest req{};
     req.correlation_id = 7777;
@@ -137,13 +125,6 @@ TEST(RefdataAppSeamTest, ConstructsWithoutAeron) {
     auto fee = std::make_shared<FakeFeeScheduleSink>();
     auto status = std::make_shared<FakeRefdataStatusSink>();
 
-    EXPECT_NO_THROW({
-        RefdataApp app(make_test_settings(),
-                       std::move(control),
-                       std::move(snapshot),
-                       delta,
-                       fee,
-                       status,
-                       {});
-    });
+    EXPECT_NO_THROW(
+        { RefdataApp app(make_test_settings(), std::move(control), std::move(snapshot), delta, fee, status, {}); });
 }

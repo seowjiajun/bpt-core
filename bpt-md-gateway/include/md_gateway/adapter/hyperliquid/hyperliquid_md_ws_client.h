@@ -7,7 +7,6 @@
 #include "md_gateway/config/settings.h"
 
 #include <bpt_common/ws/run_loop.h>
-
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -28,14 +27,14 @@ class HyperliquidMdWsClient : public bpt::common::ws::RunLoop {
 public:
     using FrameHandler = std::function<void(std::string_view payload, uint64_t recv_ns)>;
 
-    HyperliquidMdWsClient(const config::AdapterConfig& cfg, SubscriptionMap& subs)
-        : cfg_(cfg), subs_(subs) {}
+    HyperliquidMdWsClient(const config::AdapterConfig& cfg, SubscriptionMap& subs) : cfg_(cfg), subs_(subs) {}
 
     void set_frame_handler(FrameHandler h) { handler_ = std::move(h); }
 
 protected:
     void on_frame(std::string_view payload, uint64_t recv_ns) override {
-        if (handler_) handler_(payload, recv_ns);
+        if (handler_)
+            handler_(payload, recv_ns);
     }
     void on_tick() override;
     std::optional<bpt::common::ws::PingConfig> ping_config() const override;

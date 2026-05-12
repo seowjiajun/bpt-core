@@ -21,27 +21,26 @@
 
 #include "order_gateway/adapter/hyperliquid/hyperliquid_signer.h"
 
+#include <atomic>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <boost/json/fwd.hpp>
-#include <atomic>
+#include <bpt_common/ws/run_loop.h>
 #include <cstdint>
 #include <functional>
 #include <future>
 #include <mutex>
 #include <optional>
 #include <string>
-#include <vector>
 #include <string_view>
 #include <unordered_map>
-#include <bpt_common/ws/run_loop.h>
+#include <vector>
 
 namespace bpt::order_gateway::adapter::hyperliquid {
 
 class HyperliquidWsClient : public bpt::common::ws::RunLoop {
 public:
-    using UserFillsHandler = std::function<void(const boost::json::array& fills,
-                                                 uint64_t recv_ns)>;
+    using UserFillsHandler = std::function<void(const boost::json::array& fills, uint64_t recv_ns)>;
 
     HyperliquidWsClient(boost::asio::io_context& ioc,
                         boost::asio::ssl::context& ssl_ctx,
@@ -65,9 +64,7 @@ public:
     /// 5 s timeout. Throws on timeout, write error, or disconnected WS.
     /// Thread-safe — called from the OrderProcessor thread and the
     /// detached account-snapshot fetcher.
-    std::string post_action(const boost::json::value& action,
-                            uint64_t nonce,
-                            const SignedTransaction& sig);
+    std::string post_action(const boost::json::value& action, uint64_t nonce, const SignedTransaction& sig);
 
 protected:
     void on_handshake_complete() override;

@@ -44,9 +44,7 @@ namespace bpt::common::aeron {
 struct ChaosConfig {
     std::map<std::int32_t, double> drop_prob_by_stream_id;
 
-    [[nodiscard]] bool empty() const noexcept {
-        return drop_prob_by_stream_id.empty();
-    }
+    [[nodiscard]] bool empty() const noexcept { return drop_prob_by_stream_id.empty(); }
 };
 
 /// Process-global chaos registry. Set once from main() before any
@@ -85,9 +83,7 @@ public:
 
     /// Test-only: peek the configured drop probability without going
     /// through wrap(). Returns 0.0 if no entry.
-    static double drop_prob_for_testing(std::int32_t stream_id) {
-        return drop_prob_for(stream_id);
-    }
+    static double drop_prob_for_testing(std::int32_t stream_id) { return drop_prob_for(stream_id); }
 
 private:
     static std::optional<ChaosConfig>& config() {
@@ -101,7 +97,8 @@ private:
 
     static double drop_prob_for(std::int32_t stream_id) {
         std::lock_guard lk(mu());
-        if (!config()) return 0.0;
+        if (!config())
+            return 0.0;
         const auto& m = config()->drop_prob_by_stream_id;
         auto it = m.find(stream_id);
         return it == m.end() ? 0.0 : it->second;
@@ -113,12 +110,11 @@ private:
         // handler will diverge in rng state — fine, we don't care about
         // cross-copy reproducibility.
         return [inner = std::move(inner),
-                rng  = std::mt19937_64{std::random_device{}()},
-                dist = std::bernoulli_distribution{drop_prob}](
-                ::aeron::AtomicBuffer& buf,
-                ::aeron::util::index_t off,
-                ::aeron::util::index_t len,
-                ::aeron::Header& hdr) mutable {
+                rng = std::mt19937_64{std::random_device{}()},
+                dist = std::bernoulli_distribution{drop_prob}](::aeron::AtomicBuffer& buf,
+                                                               ::aeron::util::index_t off,
+                                                               ::aeron::util::index_t len,
+                                                               ::aeron::Header& hdr) mutable {
             if (dist(rng)) {
                 return;  // dropped
             }

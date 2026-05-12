@@ -4,7 +4,6 @@
 /// \brief Binance MD WebSocket client — RunLoop subclass owned by BinanceMdAdapter.
 
 #include <bpt_common/ws/run_loop.h>
-
 #include <cstdint>
 #include <functional>
 #include <string_view>
@@ -26,7 +25,8 @@ public:
 
 protected:
     void on_frame(std::string_view payload, uint64_t recv_ns) override {
-        if (handler_) handler_(payload, recv_ns);
+        if (handler_)
+            handler_(payload, recv_ns);
     }
 
 private:

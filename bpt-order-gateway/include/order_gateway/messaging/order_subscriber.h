@@ -4,9 +4,9 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/subscriber.h>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bpt::order_gateway::messaging {
 
@@ -17,9 +17,7 @@ namespace bpt::order_gateway::messaging {
 /// contract — poll() drives from the main poll loop.
 class OrderSubscriber final : public IOrderControlSource {
 public:
-    OrderSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                    const std::string& channel,
-                    int stream_id);
+    OrderSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     /// \copydoc IOrderControlSource::poll
     int poll(int fragment_limit = 10) override;

@@ -7,7 +7,8 @@
 namespace bpt::md_gateway::adapter {
 
 void DeribitMdWsClient::on_frame(std::string_view payload, uint64_t recv_ns) {
-    if (handler_) handler_(payload, recv_ns);
+    if (handler_)
+        handler_(payload, recv_ns);
 
     // Service test_request at the cadence of incoming frames — preserves
     // the previous pre-RunLoop latency on active connections.

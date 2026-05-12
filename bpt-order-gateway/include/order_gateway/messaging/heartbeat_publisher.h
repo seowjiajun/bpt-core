@@ -4,10 +4,10 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/publisher.h>
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <bpt_common/aeron/publisher.h>
 
 namespace bpt::order_gateway::messaging {
 
@@ -18,14 +18,10 @@ namespace bpt::order_gateway::messaging {
 /// OrderGatewayApp::run heartbeat path).
 class HeartbeatPublisher final : public IHeartbeatPublisher {
 public:
-    HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                       const std::string& channel,
-                       int stream_id);
+    HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
     /// \copydoc IHeartbeatPublisher::publish
-    void publish(uint8_t service_id,
-                 uint16_t orders_in_flight,
-                 uint8_t exchange_status) override;
+    void publish(uint8_t service_id, uint16_t orders_in_flight, uint8_t exchange_status) override;
 
 private:
     bpt::common::aeron::Publisher publisher_;

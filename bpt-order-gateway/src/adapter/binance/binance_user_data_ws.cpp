@@ -7,11 +7,11 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
+#include <bpt_common/util/tsc_clock.h>
 #include <chrono>
 #include <stdexcept>
 #include <thread>
-#include <bpt_common/logging.h>
-#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter::binance {
 
@@ -23,10 +23,13 @@ namespace json = boost::json;
 using tcp = net::ip::tcp;
 
 BinanceUserDataWs::BinanceUserDataWs(net::io_context& ioc,
-                                      ssl::context& ssl_ctx,
-                                      const config::AdapterConfig& cfg,
-                                      BinanceHttpsClient& https)
-    : ioc_(ioc), ssl_ctx_(ssl_ctx), cfg_(cfg), https_(https) {}
+                                     ssl::context& ssl_ctx,
+                                     const config::AdapterConfig& cfg,
+                                     BinanceHttpsClient& https)
+    : ioc_(ioc),
+      ssl_ctx_(ssl_ctx),
+      cfg_(cfg),
+      https_(https) {}
 
 void BinanceUserDataWs::set_message_handler(MessageHandler h) {
     message_handler_ = std::move(h);

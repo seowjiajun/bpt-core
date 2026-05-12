@@ -17,13 +17,13 @@ class WsSession;
 // Tagged message kinds — the server needs to know what kind of message it is
 // so it can update its session-replay snapshot correctly.
 enum class MsgKind : uint8_t {
-    Session,    // latest wins
-    Status,     // latest wins
-    Tick,       // latest wins (per symbol — single-symbol for now)
-    Fill,       // appended to rolling buffer
-    Position,   // latest wins (per symbol)
-    Order,      // not snapshotted — transient lifecycle events
-    Toxicity,   // latest wins — tyr toxicity scores
+    Session,   // latest wins
+    Status,    // latest wins
+    Tick,      // latest wins (per symbol — single-symbol for now)
+    Fill,      // appended to rolling buffer
+    Position,  // latest wins (per symbol)
+    Order,     // not snapshotted — transient lifecycle events
+    Toxicity,  // latest wins — tyr toxicity scores
 };
 
 // Minimal broadcast-style WebSocket server with session replay.

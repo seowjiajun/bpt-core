@@ -3,6 +3,7 @@
 #include "strategy/strategy/i_strategy.h"
 
 #include <Aeron.h>
+
 #include <Publication.h>
 #include <cstdint>
 #include <memory>
@@ -23,9 +24,7 @@ public:
     // channel/stream may be empty/0 — in that case the publisher operates as
     // a no-op so call sites don't need conditionals. Used when running in
     // backtest mode or with no dashboard configured.
-    PortfolioSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron,
-                               const std::string& channel,
-                               int32_t stream_id);
+    PortfolioSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
 
     // Publishes a snapshot if at least kIntervalNs has elapsed since the
     // previous publish AND the snapshot has content. now_ns must come from
@@ -35,7 +34,8 @@ public:
     // Offer a raw buffer on the same publication. Used by StrategyApp to
     // publish strategy state JSON alongside portfolio snapshots.
     void offer_raw(aeron::AtomicBuffer& buf, int32_t length) {
-        if (pub_) pub_->offer(buf, 0, length);
+        if (pub_)
+            pub_->offer(buf, 0, length);
     }
 
     bool is_active() const noexcept { return static_cast<bool>(pub_); }

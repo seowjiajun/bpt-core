@@ -69,10 +69,7 @@ public:
     // Aggressor semantics: an aggressive BUY lifts offers (ask-side
     // passive fills). An aggressive SELL hits bids (bid-side passive
     // fills). `aggressor` is the side of the incoming taker.
-    void on_trade(bpt::messages::OrderSide::Value aggressor,
-                  double trade_price,
-                  double trade_qty,
-                  uint64_t ts_ns);
+    void on_trade(bpt::messages::OrderSide::Value aggressor, double trade_price, double trade_qty, uint64_t ts_ns);
 
     // Lookup. Returns nullptr if not tracked.
     const Entry* lookup(uint64_t order_id) const;

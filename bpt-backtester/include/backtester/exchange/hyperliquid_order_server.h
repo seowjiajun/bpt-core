@@ -45,9 +45,7 @@ class HyperliquidOrderSession;
 //                                  "fills":[{"oid":...,...}]}}
 class HyperliquidOrderServer {
 public:
-    HyperliquidOrderServer(uint16_t port,
-                           matching::MatchingEngine& engine,
-                           std::vector<std::string> asset_universe);
+    HyperliquidOrderServer(uint16_t port, matching::MatchingEngine& engine, std::vector<std::string> asset_universe);
     ~HyperliquidOrderServer();
 
     void start();

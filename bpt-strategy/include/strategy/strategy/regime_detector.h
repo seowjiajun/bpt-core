@@ -44,8 +44,8 @@ public:
 
         // Gamma multipliers per regime (applied to base gamma)
         double gamma_mult_mean_revert{0.6};  // tighter spreads
-        double gamma_mult_neutral{1.0};       // unchanged
-        double gamma_mult_trending{1.8};      // wider spreads
+        double gamma_mult_neutral{1.0};      // unchanged
+        double gamma_mult_trending{1.8};     // wider spreads
 
         // How often to recompute Hurst (every N ticks). Computing
         // Hurst on every tick is wasteful — it changes slowly.

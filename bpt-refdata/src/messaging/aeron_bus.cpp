@@ -9,19 +9,18 @@
 
 namespace bpt::refdata::messaging {
 
-AeronBus AeronBus::build(std::shared_ptr<aeron::Aeron> aeron,
-                         const config::Settings& settings) {
+AeronBus AeronBus::build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings) {
     AeronBus bus;
-    bus.control_source = std::make_unique<RefdataControlSubscriber>(
-        aeron, settings.control.channel, settings.control.stream_id);
-    bus.snapshot_sink = std::make_unique<RefdataSnapshotPublisher>(
-        aeron, settings.snapshot.channel, settings.snapshot.stream_id);
-    bus.delta_sink = std::make_shared<RefdataDeltaPublisher>(
-        aeron, settings.delta.channel, settings.delta.stream_id);
-    bus.fee_sink = std::make_shared<FeeSchedulePublisher>(
-        aeron, settings.fee_schedule.channel, settings.fee_schedule.stream_id);
-    bus.status_sink = std::make_shared<RefdataStatusPublisher>(
-        aeron, settings.refdata_status.channel, settings.refdata_status.stream_id);
+    bus.control_source =
+        std::make_unique<RefdataControlSubscriber>(aeron, settings.control.channel, settings.control.stream_id);
+    bus.snapshot_sink =
+        std::make_unique<RefdataSnapshotPublisher>(aeron, settings.snapshot.channel, settings.snapshot.stream_id);
+    bus.delta_sink = std::make_shared<RefdataDeltaPublisher>(aeron, settings.delta.channel, settings.delta.stream_id);
+    bus.fee_sink =
+        std::make_shared<FeeSchedulePublisher>(aeron, settings.fee_schedule.channel, settings.fee_schedule.stream_id);
+    bus.status_sink = std::make_shared<RefdataStatusPublisher>(aeron,
+                                                               settings.refdata_status.channel,
+                                                               settings.refdata_status.stream_id);
     return bus;
 }
 

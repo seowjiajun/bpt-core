@@ -1,10 +1,10 @@
 #pragma once
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/aeron/stream_config.h>
 
 namespace bpt::order_gateway::config {
 
@@ -46,8 +46,8 @@ struct RiskConfig {
     // venue has been observed long enough to pick sane thresholds;
     // enable per-env in the TOML once calibrated. min_events guards
     // against tripping on 1-of-1 false positives during warmup.
-    bool     reject_rate_breaker_enabled{false};
-    double   reject_rate_threshold_pct{20.0};
+    bool reject_rate_breaker_enabled{false};
+    double reject_rate_threshold_pct{20.0};
     uint32_t reject_rate_window_sec{60};
     uint32_t reject_rate_min_events{10};
 
@@ -60,14 +60,15 @@ struct RiskConfig {
     // other venues keep working. Restart required to clear.
     // Same config is shared across all adapters — threshold tuning
     // is not venue-specific yet.
-    bool     disconnect_breaker_enabled{false};
+    bool disconnect_breaker_enabled{false};
     uint32_t disconnect_threshold{5};
     uint32_t disconnect_window_sec{60};
 };
 
 struct AdapterConfig {
     std::string exchange;
-    std::string secret_name;  // systemd-creds name (slashes normalized to '-'); e.g. "bpt/testnet/OKX" → bpt-testnet-OKX
+    std::string
+        secret_name;  // systemd-creds name (slashes normalized to '-'); e.g. "bpt/testnet/OKX" → bpt-testnet-OKX
     bool testnet{false};
     std::string rest_host;
     std::string rest_port{"443"};

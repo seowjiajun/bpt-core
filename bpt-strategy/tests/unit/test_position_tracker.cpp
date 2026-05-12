@@ -4,9 +4,9 @@
 
 namespace {
 
-using bpt::strategy::strategy::PositionTracker;
 using bpt::messages::ExchangeId;
 using bpt::messages::OrderSide;
+using bpt::strategy::strategy::PositionTracker;
 
 constexpr uint64_t INST_BTC = 100;
 constexpr uint64_t INST_ETH = 101;
@@ -14,8 +14,12 @@ constexpr auto BINANCE = ExchangeId::BINANCE;
 constexpr auto OKX = ExchangeId::OKX;
 
 // Encode a natural price/qty as 1e8 fixed-point (matching SBE encoding).
-static uint64_t qty_fp(double q) { return static_cast<uint64_t>(q * 1e8); }
-static int64_t px_fp(double p) { return static_cast<int64_t>(p * 1e8); }
+static uint64_t qty_fp(double q) {
+    return static_cast<uint64_t>(q * 1e8);
+}
+static int64_t px_fp(double p) {
+    return static_cast<int64_t>(p * 1e8);
+}
 
 // ---------------------------------------------------------------------------
 // Empty state
@@ -247,7 +251,8 @@ TEST(PositionTrackerTest, SeedOntoEmptyTracker) {
     // position (the bug that caused the 2026-04-22 live-testnet
     // divergence). Seed must create the entry from nothing.
     PositionTracker tracker;
-    tracker.seed(INST_BTC, BINANCE,
+    tracker.seed(INST_BTC,
+                 BINANCE,
                  /*net_qty_e8=*/-static_cast<int64_t>(qty_fp(1.64)),
                  /*avg_price=*/377.14);
 
@@ -265,7 +270,8 @@ TEST(PositionTrackerTest, SeedOverwritesNetQtyAndAvgPrice) {
     tracker.on_fill(INST_BTC, BINANCE, OrderSide::SELL, qty_fp(0.5), px_fp(380.0));
     ASSERT_EQ(tracker.net_qty(INST_BTC, BINANCE), -static_cast<int64_t>(qty_fp(0.5)));
 
-    tracker.seed(INST_BTC, BINANCE,
+    tracker.seed(INST_BTC,
+                 BINANCE,
                  /*net_qty_e8=*/-static_cast<int64_t>(qty_fp(1.64)),
                  /*avg_price=*/377.14);
 
@@ -284,7 +290,8 @@ TEST(PositionTrackerTest, SeedPreservesRealizedPnl) {
     tracker.on_fill(INST_BTC, BINANCE, OrderSide::SELL, qty_fp(1.0), px_fp(110.0));
     EXPECT_NEAR(tracker.get(INST_BTC, BINANCE)->realized_pnl, 10.0, 1e-6);
 
-    tracker.seed(INST_BTC, BINANCE,
+    tracker.seed(INST_BTC,
+                 BINANCE,
                  /*net_qty_e8=*/static_cast<int64_t>(qty_fp(0.5)),
                  /*avg_price=*/105.0);
 
@@ -298,8 +305,8 @@ TEST(PositionTrackerTest, SeedPreservesRealizedPnl) {
 TEST(PositionTrackerTest, SeedIsolatedFromOtherInstruments) {
     // Seeding one (instrument, exchange) must not touch siblings.
     PositionTracker tracker;
-    tracker.on_fill(INST_BTC, BINANCE, OrderSide::BUY,  qty_fp(1.0), px_fp(100.0));
-    tracker.on_fill(INST_ETH, OKX,     OrderSide::SELL, qty_fp(2.0), px_fp(3500.0));
+    tracker.on_fill(INST_BTC, BINANCE, OrderSide::BUY, qty_fp(1.0), px_fp(100.0));
+    tracker.on_fill(INST_ETH, OKX, OrderSide::SELL, qty_fp(2.0), px_fp(3500.0));
 
     tracker.seed(INST_BTC, BINANCE, /*net_qty_e8=*/0, /*avg_price=*/0.0);
 
@@ -314,7 +321,8 @@ TEST(PositionTrackerTest, OnFillAfterSeedContinuesFromSeededState) {
     // After seeding -1.64 @ 377.14 (startup from HL), a subsequent buy
     // must close against the seeded short at the seeded avg price.
     PositionTracker tracker;
-    tracker.seed(INST_BTC, BINANCE,
+    tracker.seed(INST_BTC,
+                 BINANCE,
                  /*net_qty_e8=*/-static_cast<int64_t>(qty_fp(1.64)),
                  /*avg_price=*/377.14);
 
@@ -323,7 +331,7 @@ TEST(PositionTrackerTest, OnFillAfterSeedContinuesFromSeededState) {
     auto pos = tracker.get(INST_BTC, BINANCE);
     ASSERT_TRUE(pos.has_value());
     EXPECT_EQ(pos->net_qty, -static_cast<int64_t>(qty_fp(1.54)));  // covered 0.1
-    EXPECT_DOUBLE_EQ(pos->avg_price, 377.14);  // unchanged on partial close
+    EXPECT_DOUBLE_EQ(pos->avg_price, 377.14);                      // unchanged on partial close
     EXPECT_NEAR(pos->realized_pnl, 0.1 * (377.14 - 376.50), 1e-6);
 }
 

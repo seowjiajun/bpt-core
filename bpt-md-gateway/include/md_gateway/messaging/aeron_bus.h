@@ -73,8 +73,7 @@ struct AeronBus {
     /// Reads channel + stream-id assignments from `settings.aeron`. The
     /// supplied `aeron` shared client must already have a MediaDriver
     /// connection — see bpt::app::run() which sets it up.
-    static AeronBus build(std::shared_ptr<aeron::Aeron> aeron,
-                          const config::Settings& settings);
+    static AeronBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace bpt::md_gateway::messaging

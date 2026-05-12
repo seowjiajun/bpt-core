@@ -233,9 +233,9 @@ private:
         //
         // pending_*_fill_price > 0 indicates a fill awaiting evaluation;
         // cleared once the next BBO tick computes the markout.
-        double   pending_buy_fill_price{0.0};
+        double pending_buy_fill_price{0.0};
         uint64_t pending_buy_fill_ts{0};
-        double   pending_sell_fill_price{0.0};
+        double pending_sell_fill_price{0.0};
         uint64_t pending_sell_fill_ts{0};
 
         // While now < post_fill_suspend_until_*, the corresponding side
@@ -309,12 +309,12 @@ private:
     struct SuppressionState {
         bool drift_bid{false}, drift_ask{false};          // per-√s EWMA drift
         bool trend_bid{false}, trend_ask{false};          // cumulative return over slow_drift_window_s
-        bool tox_bid{false},  tox_ask{false};             // analytics toxicity score
+        bool tox_bid{false}, tox_ask{false};              // analytics toxicity score
         bool queue_bid{false}, queue_ask{false};          // projected fill-prob too low
         bool inventory_bid{false}, inventory_ask{false};  // |net_qty| >= max_inventory
         bool post_fill_bid{false}, post_fill_ask{false};  // post-fill markout cooldown (Phase 2.1)
-        bool vol_halted{false};                            // intra-tick realized-vol gate
-        bool pause_active{false};                          // PnL drawdown circuit-breaker
+        bool vol_halted{false};                           // intra-tick realized-vol gate
+        bool pause_active{false};                         // PnL drawdown circuit-breaker
 
         // Queue projection side outputs — populated when queue check
         // runs, cached here so logging + dashboard don't recompute.
@@ -323,12 +323,12 @@ private:
         // Full aggregate — every reason counted. Used by the dashboard
         // bidSuppressed / askSuppressed flags.
         [[nodiscard]] bool bid_suppressed() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid
-                || post_fill_bid || vol_halted || pause_active;
+            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid || post_fill_bid || vol_halted ||
+                   pause_active;
         }
         [[nodiscard]] bool ask_suppressed() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask
-                || post_fill_ask || vol_halted || pause_active;
+            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask || post_fill_ask || vol_halted ||
+                   pause_active;
         }
 
         // "Signal-only" aggregate — drift/trend/tyr/queue/post_fill. Used by
@@ -347,25 +347,41 @@ private:
         // least severe). post_fill ranks above drift because it's a
         // direct response to a confirmed adverse fill, not a forecast.
         [[nodiscard]] std::string_view bid_reason() const noexcept {
-            if (pause_active)   return "pause";
-            if (vol_halted)     return "vol_gate";
-            if (inventory_bid)  return "inventory";
-            if (post_fill_bid)  return "post_fill";
-            if (drift_bid)      return "drift";
-            if (trend_bid)      return "trend";
-            if (tox_bid)        return "tyr";
-            if (queue_bid)      return "queue";
+            if (pause_active)
+                return "pause";
+            if (vol_halted)
+                return "vol_gate";
+            if (inventory_bid)
+                return "inventory";
+            if (post_fill_bid)
+                return "post_fill";
+            if (drift_bid)
+                return "drift";
+            if (trend_bid)
+                return "trend";
+            if (tox_bid)
+                return "tyr";
+            if (queue_bid)
+                return "queue";
             return "";
         }
         [[nodiscard]] std::string_view ask_reason() const noexcept {
-            if (pause_active)   return "pause";
-            if (vol_halted)     return "vol_gate";
-            if (inventory_ask)  return "inventory";
-            if (post_fill_ask)  return "post_fill";
-            if (drift_ask)      return "drift";
-            if (trend_ask)      return "trend";
-            if (tox_ask)        return "tyr";
-            if (queue_ask)      return "queue";
+            if (pause_active)
+                return "pause";
+            if (vol_halted)
+                return "vol_gate";
+            if (inventory_ask)
+                return "inventory";
+            if (post_fill_ask)
+                return "post_fill";
+            if (drift_ask)
+                return "drift";
+            if (trend_ask)
+                return "trend";
+            if (tox_ask)
+                return "tyr";
+            if (queue_ask)
+                return "queue";
             return "";
         }
     };
@@ -425,7 +441,7 @@ private:
     double order_qty_fraction_;
     double order_qty_min_;
     double max_inventory_fraction_;
-    double min_half_spread_bps_;      // floor on half-spread expressed in basis points
+    double min_half_spread_bps_;  // floor on half-spread expressed in basis points
     // Sanity clamp: hard ceiling on the half-spread the AS formula
     // can produce. Guards against the cold-start pathology where a
     // noisy early σ² estimate or κ underestimate pushes the formula
@@ -433,7 +449,7 @@ private:
     // WARN with the formula value + the applied clamp so operators
     // can see that warmup isn't done yet — better than silently
     // quoting wide.
-    double max_half_spread_bps_;      // ceiling on half-spread in basis points
+    double max_half_spread_bps_;  // ceiling on half-spread in basis points
     // Sanity range around mid that any emitted quote must fall inside.
     // Last line of defence: if the AS formula produces a bid or ask
     // outside [mid * (1 - bps/10000), mid * (1 + bps/10000)] — typically
@@ -444,7 +460,7 @@ private:
     // half-spread; this one bounds the FINAL quote level after all
     // adjustments (reservation skew, drift, post-touch cap).
     double quote_sanity_bps_;
-    uint8_t order_book_depth_;        // 0 = BBO only, >0 subscribes to L2 ladder
+    uint8_t order_book_depth_;  // 0 = BBO only, >0 subscribes to L2 ladder
 
     // Fair-value estimator config — drives the choice of AS reference
     // price `s`. Parsed from [fair_value] TOML table; defaults to
@@ -473,7 +489,7 @@ private:
     double post_fill_markout_cooldown_s_;
 
     // Drift (momentum) detection — Cartea-Jaimungal extension of AS.
-    double drift_halflife_s_;    // EWMA half-life for µ estimation (seconds)
+    double drift_halflife_s_;  // EWMA half-life for µ estimation (seconds)
     // Warmup gate for drift_skew_frac. During the first N BBO ticks the
     // ewma_drift estimate is noisy — at session start, with no history,
     // a single big tick can produce drift_skew_frac of 30+ bps which

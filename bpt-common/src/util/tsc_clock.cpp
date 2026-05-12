@@ -1,8 +1,8 @@
 #include "bpt_common/util/tsc_clock.h"
 
+#include <bpt_common/logging.h>
 #include <time.h>
 #include <x86intrin.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::common::util {
 

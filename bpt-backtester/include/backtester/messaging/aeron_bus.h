@@ -19,7 +19,9 @@
 #include <memory>
 
 namespace bpt::backtester {
-namespace config { struct Settings; }
+namespace config {
+struct Settings;
+}
 
 namespace messaging {
 
@@ -33,8 +35,7 @@ public:
     /// Build the two messaging objects the backtester needs to
     /// tick-gate Strategy. Sole place that calls into `<Aeron.h>` from
     /// the application layer.
-    static BacktesterBus build(std::shared_ptr<aeron::Aeron> aeron,
-                               const config::Settings& settings);
+    static BacktesterBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace messaging

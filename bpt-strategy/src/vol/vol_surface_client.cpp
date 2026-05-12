@@ -25,8 +25,8 @@ VolSurfaceClient::VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
                aeron::Header& header) { handle_surface_fragment(buffer, offset, length, header); });
 
     bpt::common::log::info("[VolSurfaceClient] Subscriptions ready: surface={} status={}",
-                   vol_surface_stream,
-                   pricer_status_stream);
+                           vol_surface_stream,
+                           pricer_status_stream);
 }
 
 int VolSurfaceClient::poll(int fragment_limit) {
@@ -106,9 +106,9 @@ void VolSurfaceClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                             static_cast<uint64_t>(length));
 
         bpt::common::log::info("[VolSurfaceClient] PricerReady: exchanges=0x{:02x} underlyings={} points={}",
-                       ready.exchangesLoaded(),
-                       ready.underlyingCount(),
-                       ready.pointCount());
+                               ready.exchangesLoaded(),
+                               ready.underlyingCount(),
+                               ready.pointCount());
 
         if (on_ready)
             on_ready(ready.exchangesLoaded(), ready.underlyingCount(), ready.pointCount());

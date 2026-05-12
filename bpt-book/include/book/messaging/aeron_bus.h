@@ -14,7 +14,9 @@
 #include <memory>
 
 namespace bpt::book {
-namespace config { struct Settings; }
+namespace config {
+struct Settings;
+}
 
 namespace messaging {
 
@@ -24,8 +26,7 @@ struct BookBus {
 
 class BookAeronBus {
 public:
-    static BookBus build(std::shared_ptr<aeron::Aeron> aeron,
-                         const config::Settings& settings);
+    static BookBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace messaging

@@ -124,4 +124,35 @@ TEST(RefdataStaleGateTest, FlapResistance) {
     EXPECT_EQ(gate.evaluate(103 * SEC, 100 * SEC), State::Ok);
 }
 
+TEST(RefdataStaleGateTest, FutureHeartbeatDoesNotUnderflow) {
+    // bpt-refdata publishes its heartbeat with its own TscClock instance;
+    // small cross-process calibration skew can put hb a few ms ahead of
+    // strategy's now_ns. Without the guard, (now_ns - hb) wraps uint64
+    // and trivially exceeds the threshold, flapping the gate on every
+    // heartbeat. Verified live 2026-05-08 — pre-fix log showed
+    // "Refdata heartbeat stale (18446744073.X s, threshold=25.0s)".
+    RefdataStaleGate gate({.stale_threshold_ns = 25 * SEC});
+
+    // hb arrives 1ms ahead of local clock — must NOT trip stale.
+    EXPECT_EQ(gate.evaluate(100 * SEC, 100 * SEC + 1'000'000), State::Ok);
+    EXPECT_FALSE(gate.is_stale());
+
+    // Far-future hb (1 hour ahead) — also must not trip stale.
+    EXPECT_EQ(gate.evaluate(100 * SEC, 100 * SEC + 3600 * SEC), State::Ok);
+    EXPECT_FALSE(gate.is_stale());
+}
+
+TEST(RefdataStaleGateTest, FutureHeartbeatDuringStaleClearsStale) {
+    // If we're already in a stale episode and a future-dated heartbeat
+    // arrives, treat it like any other fresh heartbeat: flip Recovered.
+    RefdataStaleGate gate({.stale_threshold_ns = 25 * SEC});
+
+    EXPECT_EQ(gate.evaluate(100 * SEC, 70 * SEC), State::GoneStale);
+    EXPECT_TRUE(gate.is_stale());
+    // Future-dated hb (skewed clock between processes) — should recover.
+    EXPECT_EQ(gate.evaluate(101 * SEC, 102 * SEC), State::Recovered);
+    EXPECT_FALSE(gate.is_stale());
+    EXPECT_EQ(gate.evaluate(103 * SEC, 102 * SEC), State::Ok);
+}
+
 }  // namespace

@@ -3,9 +3,8 @@
 // would otherwise only surface when a real service tries to start.
 
 #include <bpt_common/logging.h>
-
-#include <gtest/gtest.h>
 #include <filesystem>
+#include <gtest/gtest.h>
 
 TEST(LoggingSmokeTest, InitWithDefaultPatternDoesNotThrow) {
     bpt::common::logging::LogConfig cfg;

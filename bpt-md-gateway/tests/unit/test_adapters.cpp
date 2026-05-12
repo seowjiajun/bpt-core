@@ -40,9 +40,9 @@ TEST(AdapterSmokeTest, BinanceBookTicker) {
     messaging::FundingRateCallback fr;
 
     parser.decode(R"({"stream":"btcusdt@bookTicker","data":{"b":"29990.50","B":"1.25","a":"29991.00","A":"0.75"}})",
-                 0,
-                 pub,
-                 fr);
+                  0,
+                  pub,
+                  fr);
 
     ASSERT_TRUE(pub.last_bbo.has_value());
     EXPECT_EQ(pub.last_bbo->instrument_id, 100ULL);

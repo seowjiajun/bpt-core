@@ -7,9 +7,9 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <functional>
 #include <string>
-#include <bpt_common/logging.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -22,8 +22,10 @@ static constexpr double kScale = 1e8;
 // prefix: BTC-PERPETUAL → "BTC", ETH-DEC25 → "ETH", everything else falls
 // back to "USDT".
 static std::string infer_fee_currency(const std::string& instrument_name) {
-    if (instrument_name.find("BTC") == 0) return "BTC";
-    if (instrument_name.find("ETH") == 0) return "ETH";
+    if (instrument_name.find("BTC") == 0)
+        return "BTC";
+    if (instrument_name.find("ETH") == 0)
+        return "ETH";
     return "USDT";
 }
 
@@ -202,9 +204,9 @@ void DeribitExecDecoder::handle_order_response(const json::object& order_obj, ui
         order_state = std::string(sit->value().as_string());
 
     bpt::common::log::info("DeribitExecDecoder: order response label={} exchange_oid={} state={}",
-                   label,
-                   exch_oid,
-                   order_state);
+                           label,
+                           exch_oid,
+                           order_state);
 
     // Only emit for terminal IOC states — GTC orders are reported via subscription channel.
     if (order_state != "filled" && order_state != "cancelled" && order_state != "rejected")

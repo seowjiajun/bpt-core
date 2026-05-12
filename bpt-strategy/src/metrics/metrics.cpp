@@ -9,8 +9,21 @@ const prometheus::Histogram::BucketBoundaries& StrategyMetrics::kDefaultLatencyB
     // Covers 1 µs → 1 s, widest at the slow end where tail-latency events
     // land (GC pauses, scheduler stalls, exchange-induced stop-the-world).
     static const prometheus::Histogram::BucketBoundaries k{
-        1e3, 5e3, 10e3, 25e3, 50e3, 100e3, 250e3, 500e3,
-        1e6, 5e6, 10e6, 50e6, 100e6, 500e6, 1e9,
+        1e3,
+        5e3,
+        10e3,
+        25e3,
+        50e3,
+        100e3,
+        250e3,
+        500e3,
+        1e6,
+        5e6,
+        10e6,
+        50e6,
+        100e6,
+        500e6,
+        1e9,
     };
     return k;
 }
@@ -21,10 +34,7 @@ StrategyMetrics::StrategyMetrics(int port) {
     exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
     exposer->RegisterCollectable(registry);
 
-    auto& h = prometheus::BuildGauge()
-                  .Name("strategy_healthy")
-                  .Help("1 if Strategy is running")
-                  .Register(*registry);
+    auto& h = prometheus::BuildGauge().Name("strategy_healthy").Help("1 if Strategy is running").Register(*registry);
     healthy = &h.Add({});
     healthy->Set(1.0);
 
@@ -99,7 +109,7 @@ StrategyMetrics::StrategyMetrics(int port) {
     // hot-path Observe() calls avoid the Family::Add() hash lookup on
     // every tick.
     tick_to_strategy_ns_hist = &tick_to_strategy_ns();
-    tick_to_order_ns_hist    = &tick_to_order_ns();
+    tick_to_order_ns_hist = &tick_to_order_ns();
 }
 
 }  // namespace bpt::strategy::metrics

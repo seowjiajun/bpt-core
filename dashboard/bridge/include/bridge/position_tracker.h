@@ -17,21 +17,22 @@ public:
     PositionTracker() = default;
 
     struct FillResult {
-        double realized_pnl;       // realized on this fill (0 unless closing/reducing)
-        double cumulative_pnl;     // running total of realized PnL since session start
+        double realized_pnl;    // realized on this fill (0 unless closing/reducing)
+        double cumulative_pnl;  // running total of realized PnL since session start
         double net_qty;
         double avg_entry;
     };
 
     FillResult apply(encode::Side side, double qty, double price);
 
-    double net_qty()       const noexcept { return net_qty_;  }
-    double avg_entry()     const noexcept { return avg_entry_; }
+    double net_qty() const noexcept { return net_qty_; }
+    double avg_entry() const noexcept { return avg_entry_; }
     double cumulative_pnl() const noexcept { return cumulative_pnl_; }
 
     // Mark-to-market PnL given the current market price.
     double unrealized_pnl(double mark_price) const noexcept {
-        if (net_qty_ == 0.0) return 0.0;
+        if (net_qty_ == 0.0)
+            return 0.0;
         return (mark_price - avg_entry_) * net_qty_;
     }
 

@@ -36,23 +36,23 @@ namespace bpt::order_gateway::adapter::okx {
 /// @{
 
 /// `/api/v5/public/instruments` → instIdCode field, required by the WS `order` op.
-using InstIdCodeMap  = std::unordered_map<std::string, int64_t>;
+using InstIdCodeMap = std::unordered_map<std::string, int64_t>;
 
 /// `/api/v5/public/instruments` → ctVal field; 1.0 for SPOT/MARGIN, >1 for SWAP/FUTURES.
 /// Used to convert our base-currency qty into OKX's sz (contracts).
-using ContractSizes  = std::unordered_map<std::string, double>;
+using ContractSizes = std::unordered_map<std::string, double>;
 /// @}
 
 /// \brief Common parameters shared by build_order_action / build_modify_action.
 struct OrderSpec {
-    std::string                        inst_id;         ///< e.g. "BTC-USDT-SWAP"
+    std::string inst_id;  ///< e.g. "BTC-USDT-SWAP"
     bpt::messages::OrderSide::Value side;
     bpt::messages::OrderType::Value order_type;
     bpt::messages::TimeInForce::Value tif;
-    int64_t                             price_e8;        ///< natural * 1e8
-    uint64_t                            quantity_e8;     ///< base currency * 1e8
-    std::string                         cloid;           ///< client order id
-    std::uint8_t                        exec_inst{0};    ///< NewOrder.execInst bitmask
+    int64_t price_e8;           ///< natural * 1e8
+    uint64_t quantity_e8;       ///< base currency * 1e8
+    std::string cloid;          ///< client order id
+    std::uint8_t exec_inst{0};  ///< NewOrder.execInst bitmask
 };
 
 /// \brief Build the `{"id":...,"op":"order","args":[{...}]}` envelope for a new order.
@@ -66,9 +66,7 @@ struct OrderSpec {
                                                     const ContractSizes& contract_sizes);
 
 /// \brief Build the `{"id":...,"op":"cancel-order","args":[...]}` envelope.
-[[nodiscard]] boost::json::value build_cancel_action(std::string_view inst_id,
-                                                     std::string_view cloid,
-                                                     uint64_t req_id);
+[[nodiscard]] boost::json::value build_cancel_action(std::string_view inst_id, std::string_view cloid, uint64_t req_id);
 
 /// \brief Build the `{"op":"amend-order","args":[...]}` envelope.
 ///

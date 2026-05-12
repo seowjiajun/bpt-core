@@ -95,8 +95,7 @@ public:
             return last_;
         }
         // All other modes only need top-of-book.
-        return estimate(book.best_bid(), book.best_ask(),
-                        book.best_bid_qty(), book.best_ask_qty());
+        return estimate(book.best_bid(), book.best_ask(), book.best_bid_qty(), book.best_ask_qty());
     }
 
     /// TOB-only overload for hot-path use (BBO ticks have no L2 ladder).
@@ -108,8 +107,7 @@ public:
     ///
     /// Returns NaN on a degenerate quote (non-positive prices, crossed,
     /// or zero total qty); state is updated to NaN as well.
-    [[nodiscard]] double estimate(double bid_px, double ask_px,
-                                  double bid_qty, double ask_qty) noexcept {
+    [[nodiscard]] double estimate(double bid_px, double ask_px, double bid_qty, double ask_qty) noexcept {
         if (bid_px <= 0.0 || ask_px <= 0.0 || ask_px <= bid_px) {
             last_ = std::numeric_limits<double>::quiet_NaN();
             return last_;
@@ -140,7 +138,7 @@ public:
 
 private:
     Config cfg_;
-    double last_       = std::numeric_limits<double>::quiet_NaN();
+    double last_ = std::numeric_limits<double>::quiet_NaN();
     double ewma_state_ = std::numeric_limits<double>::quiet_NaN();
 
     static double micro_tob(double bid_px, double ask_px, double bid_qty, double ask_qty) noexcept {
@@ -150,8 +148,7 @@ private:
         return (bid_px * ask_qty + ask_px * bid_qty) / total;
     }
 
-    static double micro_capped_tob(double bid_px, double ask_px,
-                                   double bid_qty, double ask_qty, double cap) noexcept {
+    static double micro_capped_tob(double bid_px, double ask_px, double bid_qty, double ask_qty, double cap) noexcept {
         const double bq = (cap > 0.0) ? std::fmin(bid_qty, cap) : bid_qty;
         const double aq = (cap > 0.0) ? std::fmin(ask_qty, cap) : ask_qty;
         return micro_tob(bid_px, ask_px, bq, aq);
@@ -165,9 +162,15 @@ private:
 
         double bq_w = 0.0, aq_w = 0.0;
         double w = 1.0;
-        for (const auto& lvl : bids) { bq_w += lvl.qty * w; w *= decay; }
+        for (const auto& lvl : bids) {
+            bq_w += lvl.qty * w;
+            w *= decay;
+        }
         w = 1.0;
-        for (const auto& lvl : asks) { aq_w += lvl.qty * w; w *= decay; }
+        for (const auto& lvl : asks) {
+            aq_w += lvl.qty * w;
+            w *= decay;
+        }
 
         const double total = bq_w + aq_w;
         if (total <= 0.0)

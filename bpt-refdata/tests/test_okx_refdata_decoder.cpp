@@ -1,5 +1,5 @@
-#include "refdata/adapter/okx/okx_refdata_decoder.h"
 #include "refdata/adapter/okx/okx_refdata_auth.h"
+#include "refdata/adapter/okx/okx_refdata_decoder.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 #include "refdata/refdata/types.h"
 

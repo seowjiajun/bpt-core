@@ -1,12 +1,12 @@
 #include "book/config/settings.h"
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::book::config {
 
@@ -59,8 +59,7 @@ Settings load(const std::string& path) {
     }
 
     if (auto* aeron = root["aeron"].as_table()) {
-        s.aeron.balance_snapshot =
-            load_stream((*aeron)["balance_snapshot"].as_table(), "aeron:ipc", 6001);
+        s.aeron.balance_snapshot = load_stream((*aeron)["balance_snapshot"].as_table(), "aeron:ipc", 6001);
     }
 
     if (auto* b = root["book"].as_table()) {
@@ -91,16 +90,15 @@ Settings load(const std::string& path) {
             ac.wallet_address = *v;
 
         if (ac.rest_host.empty())
-            throw std::runtime_error(fmt::format(
-                "Adapter {} missing required rest_host", exchange_name));
+            throw std::runtime_error(fmt::format("Adapter {} missing required rest_host", exchange_name));
 
         // Fatal: prod environment with testnet adapters. Mismatch would
         // make bpt-book publish stale / wrong numbers into the prod
         // message bus — dashboards would lie.
         if (s.base.is_prod() && ac.testnet)
-            throw std::runtime_error(fmt::format(
-                "environment = \"prod\" but adapter {} has testnet = true — refusing to start",
-                exchange_name));
+            throw std::runtime_error(
+                fmt::format("environment = \"prod\" but adapter {} has testnet = true — refusing to start",
+                            exchange_name));
 
         s.book.adapters.push_back(std::move(ac));
     }

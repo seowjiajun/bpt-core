@@ -14,11 +14,13 @@ namespace bpt::order_gateway::messaging {
 
 OrderSubscriber::OrderSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id) {
     subscription_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        std::move(aeron), channel, stream_id,
-        [this](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset,
-               ::aeron::util::index_t length, ::aeron::Header& hdr) {
-            handle_fragment(buf, offset, length, hdr);
-        });
+        std::move(aeron),
+        channel,
+        stream_id,
+        [this](::aeron::AtomicBuffer& buf,
+               ::aeron::util::index_t offset,
+               ::aeron::util::index_t length,
+               ::aeron::Header& hdr) { handle_fragment(buf, offset, length, hdr); });
 }
 
 void OrderSubscriber::handle_fragment(aeron::AtomicBuffer& buf,

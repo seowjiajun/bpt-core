@@ -18,14 +18,16 @@ std::string session(std::string_view symbol,
         {"exchange", exchange},
         {"mode", mode},
         {"instrumentType", instrument_type},
-    }.dump();
+    }
+        .dump();
 }
 
 std::string status(std::string_view state) {
     return json{
         {"type", "status"},
         {"state", state},
-    }.dump();
+    }
+        .dump();
 }
 
 std::string tick(uint64_t ts_ns, std::string_view symbol, double price) {
@@ -34,7 +36,8 @@ std::string tick(uint64_t ts_ns, std::string_view symbol, double price) {
         {"ts", ts_ns},
         {"symbol", symbol},
         {"price", price},
-    }.dump();
+    }
+        .dump();
 }
 
 std::string fill(uint64_t ts_ns,
@@ -59,20 +62,19 @@ std::string fill(uint64_t ts_ns,
         {"fee", fee},
         {"realizedPnl", realized_pnl},
         {"equity", equity},
-    }.dump();
+    }
+        .dump();
 }
 
-std::string position(std::string_view symbol,
-                     double net_qty,
-                     double avg_entry,
-                     double unrealized_pnl) {
+std::string position(std::string_view symbol, double net_qty, double avg_entry, double unrealized_pnl) {
     return json{
         {"type", "position"},
         {"symbol", symbol},
         {"netQty", net_qty},
         {"avgEntry", avg_entry},
         {"unrealizedPnl", unrealized_pnl},
-    }.dump();
+    }
+        .dump();
 }
 
 std::string account(uint64_t ts_ns,
@@ -104,7 +106,8 @@ std::string account(uint64_t ts_ns,
         {"equity", equity},
         {"positions", std::move(positions_json)},
         {"currencyBalances", std::move(currency_balances_json)},
-    }.dump();
+    }
+        .dump();
 }
 
 std::string order(uint64_t ts_ns,
@@ -129,7 +132,8 @@ std::string order(uint64_t ts_ns,
         {"filledQty", filled_qty},
         {"remainingQty", remaining_qty},
         {"status", status},
-    }.dump();
+    }
+        .dump();
 }
 
 std::string toxicity(double bid_markout_5s,
@@ -158,7 +162,8 @@ std::string toxicity(double bid_markout_5s,
         {"askFillRate", ask_fill_rate},
         {"bidTtfMs", bid_ttf_ms},
         {"askTtfMs", ask_ttf_ms},
-    }.dump();
+    }
+        .dump();
 }
 
 }  // namespace bridge::encode

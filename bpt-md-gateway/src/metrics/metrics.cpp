@@ -8,7 +8,8 @@ MdGatewayMetrics::MdGatewayMetrics(const std::string& host, uint16_t port) {
     exposer = std::make_unique<prometheus::Exposer>(host + ":" + std::to_string(port));
     exposer->RegisterCollectable(registry);
 
-    auto& h = prometheus::BuildGauge().Name("bpt_md_gateway_healthy").Help("1 if MdGateway is running").Register(*registry);
+    auto& h =
+        prometheus::BuildGauge().Name("bpt_md_gateway_healthy").Help("1 if MdGateway is running").Register(*registry);
     healthy = &h.Add({});
     healthy->Set(1.0);
 

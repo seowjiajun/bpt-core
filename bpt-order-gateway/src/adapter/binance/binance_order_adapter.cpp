@@ -11,9 +11,9 @@
 #include <messages/RejectReason.h>
 
 #include <boost/json.hpp>
+#include <bpt_common/util/tsc_clock.h>
 #include <chrono>
 #include <string>
-#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::order_gateway::adapter {
 
@@ -193,8 +193,8 @@ AccountSnapshotData BinanceOrderAdapter::fetch_account_snapshot(uint64_t correla
     }
 
     bpt::common::log::info("BinanceOrderAdapter: account snapshot fetched — balance={:.2f} positions={}",
-                   static_cast<double>(snap.available_balance_e8) / 1e8,
-                   snap.positions.size());
+                           static_cast<double>(snap.available_balance_e8) / 1e8,
+                           snap.positions.size());
     return snap;
 }
 

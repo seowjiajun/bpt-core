@@ -43,25 +43,22 @@ std::string fill(uint64_t ts_ns,
                  double equity);
 
 // { "type":"position", "symbol":"...", "netQty":..., "avgEntry":..., "unrealizedPnl":... }
-std::string position(std::string_view symbol,
-                     double net_qty,
-                     double avg_entry,
-                     double unrealized_pnl);
+std::string position(std::string_view symbol, double net_qty, double avg_entry, double unrealized_pnl);
 
 // Per-position row in an `account` message. Mirrors the `Position`
 // SBE repeating group inside order-gateway's AccountSnapshot.
 struct AccountPosition {
-    std::string symbol;         // exchange-native symbol (e.g. "BTC")
-    double      net_qty;        // signed (+ long, − short) in coin units
-    double      avg_entry;      // quote currency
-    double      unrealized_pnl; // quote currency
+    std::string symbol;     // exchange-native symbol (e.g. "BTC")
+    double net_qty;         // signed (+ long, − short) in coin units
+    double avg_entry;       // quote currency
+    double unrealized_pnl;  // quote currency
 };
 
 // Per-currency cash row. Mirrors the `CurrencyBalances` SBE group.
 struct AccountCurrencyBalance {
-    std::string ccy;                // currency code, ≤ 8 chars
-    double      equity;             // per-currency equity (natural units)
-    double      available_balance;  // per-currency withdrawable amount
+    std::string ccy;           // currency code, ≤ 8 chars
+    double equity;             // per-currency equity (natural units)
+    double available_balance;  // per-currency withdrawable amount
 };
 
 // { "type":"account", "ts":..., "balance":..., "equity":...,

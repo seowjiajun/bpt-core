@@ -60,8 +60,7 @@ public:
                              bpt::messages::ExchangeId::Value exchange_id,
                              uint64_t instrument_id) = 0;
 
-    virtual void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id,
-                                 uint64_t instrument_id) = 0;
+    virtual void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) = 0;
 
     virtual void send_modify(uint64_t order_id,
                              bpt::messages::ExchangeId::Value exchange_id,
@@ -70,7 +69,7 @@ public:
                              uint64_t new_quantity) = 0;
 
     virtual void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
-                                                uint64_t correlation_id) = 0;
+                                               uint64_t correlation_id) = 0;
 
     // Drain any pending inbound Aeron fragments (exec reports,
     // heartbeats, account snapshots). Returns the number of events

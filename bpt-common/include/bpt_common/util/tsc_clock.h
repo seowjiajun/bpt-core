@@ -31,15 +31,13 @@ public:
     [[nodiscard]] static inline uint64_t now_ns() noexcept {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
-        return static_cast<uint64_t>(ts.tv_sec) * 1'000'000'000ULL +
-               static_cast<uint64_t>(ts.tv_nsec);
+        return static_cast<uint64_t>(ts.tv_sec) * 1'000'000'000ULL + static_cast<uint64_t>(ts.tv_nsec);
     }
 
     [[nodiscard]] static inline uint64_t now_ms() noexcept {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
-        return static_cast<uint64_t>(ts.tv_sec) * 1'000ULL +
-               static_cast<uint64_t>(ts.tv_nsec) / 1'000'000ULL;
+        return static_cast<uint64_t>(ts.tv_sec) * 1'000ULL + static_cast<uint64_t>(ts.tv_nsec) / 1'000'000ULL;
     }
 
     [[nodiscard]] static inline uint64_t now_s() noexcept {

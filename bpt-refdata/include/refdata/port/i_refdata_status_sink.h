@@ -17,9 +17,7 @@ public:
     /// \brief Published once after all enabled exchange adapters have completed
     ///        their initial snapshot fetch.
     /// \param exchanges_loaded bitmask: bit0=BINANCE, bit1=OKX, bit2=HYPERLIQUID.
-    virtual void publish_ready(uint8_t exchanges_loaded,
-                               uint16_t instrument_count,
-                               bool fee_schedules_loaded) = 0;
+    virtual void publish_ready(uint8_t exchanges_loaded, uint16_t instrument_count, bool fee_schedules_loaded) = 0;
 
     /// \brief Published whenever a runtime error occurs that Strategy must act on.
     virtual void publish_error(bpt::messages::RefDataErrorType::Value error_type,

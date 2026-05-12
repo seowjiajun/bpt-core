@@ -9,65 +9,72 @@
 #include <messages/RefDataSnapshot.h>
 #include <messages/RefDataSubscriptionRequest.h>
 
-#include <cstring>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <cstring>
 
 namespace bpt::strategy::refdata {
 
 AeronRefdataClient::AeronRefdataClient(std::shared_ptr<aeron::Aeron> aeron,
-                             const std::string& channel,
-                             int control_stream,
-                             int snapshot_stream,
-                             int delta_stream,
-                             int fee_schedule_stream,
-                             int funding_rate_stream,
-                             int status_stream,
-                             uint64_t max_staleness_ns)
+                                       const std::string& channel,
+                                       int control_stream,
+                                       int snapshot_stream,
+                                       int delta_stream,
+                                       int fee_schedule_stream,
+                                       int funding_rate_stream,
+                                       int status_stream,
+                                       uint64_t max_staleness_ns)
     : fee_cache_(max_staleness_ns),
       funding_rate_cache_(max_staleness_ns) {
-    ctrl_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-        aeron, channel, control_stream,
-        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+    ctrl_pub_ =
+        std::make_unique<bpt::common::aeron::Publisher>(aeron,
+                                                        channel,
+                                                        control_stream,
+                                                        bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
     snap_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, snapshot_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        snapshot_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_snapshot_fragment(buf, offset, length, hdr);
         });
     delta_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, delta_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        delta_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_delta_fragment(buf, offset, length, hdr);
         });
     fee_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, fee_schedule_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        fee_schedule_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_fee_schedule_fragment(buf, offset, length, hdr);
         });
     funding_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, funding_rate_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        funding_rate_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_funding_rate_fragment(buf, offset, length, hdr);
         });
     status_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        aeron, channel, status_stream,
-        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset,
-               aeron::util::index_t length, aeron::Header& hdr) {
+        aeron,
+        channel,
+        status_stream,
+        [this](aeron::AtomicBuffer& buf, aeron::util::index_t offset, aeron::util::index_t length, aeron::Header& hdr) {
             handle_status_fragment(buf, offset, length, hdr);
         });
 
     bpt::common::log::info("RefdataClient connected: ctrl={} snap={} delta={} fee={} funding={} status={}",
-                   control_stream,
-                   snapshot_stream,
-                   delta_stream,
-                   fee_schedule_stream,
-                   funding_rate_stream,
-                   status_stream);
+                           control_stream,
+                           snapshot_stream,
+                           delta_stream,
+                           fee_schedule_stream,
+                           funding_rate_stream,
+                           status_stream);
 }
 
 void AeronRefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilter> filters) {
@@ -107,9 +114,9 @@ void AeronRefdataClient::subscribe(uint64_t correlation_id, std::vector<Canonica
 }
 
 void AeronRefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
-                                             aeron::util::index_t offset,
-                                             aeron::util::index_t length,
-                                             aeron::Header& /*header*/) {
+                                                  aeron::util::index_t offset,
+                                                  aeron::util::index_t length,
+                                                  aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -139,9 +146,9 @@ void AeronRefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
 }
 
 void AeronRefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
-                                          aeron::util::index_t offset,
-                                          aeron::util::index_t length,
-                                          aeron::Header& /*header*/) {
+                                               aeron::util::index_t offset,
+                                               aeron::util::index_t length,
+                                               aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (!cache_.snapshot_received())
@@ -201,9 +208,9 @@ void AeronRefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
 }
 
 void AeronRefdataClient::handle_fee_schedule_fragment(aeron::AtomicBuffer& buffer,
-                                                 aeron::util::index_t offset,
-                                                 aeron::util::index_t length,
-                                                 aeron::Header& /*header*/) {
+                                                      aeron::util::index_t offset,
+                                                      aeron::util::index_t length,
+                                                      aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -225,16 +232,16 @@ void AeronRefdataClient::handle_fee_schedule_fragment(aeron::AtomicBuffer& buffe
     fee_cache_.update(msg.exchangeId(), msg.instrumentId(), msg.makerFeeBps(), msg.takerFeeBps(), msg.updatedTs());
 
     bpt::common::log::debug("FeeSchedule: exchange={} instrument={} maker={}bps taker={}bps",
-                    ExchangeId::c_str(msg.exchangeId()),
-                    msg.instrumentId(),
-                    msg.makerFeeBps(),
-                    msg.takerFeeBps());
+                            ExchangeId::c_str(msg.exchangeId()),
+                            msg.instrumentId(),
+                            msg.makerFeeBps(),
+                            msg.takerFeeBps());
 }
 
 void AeronRefdataClient::handle_funding_rate_fragment(aeron::AtomicBuffer& buffer,
-                                                 aeron::util::index_t offset,
-                                                 aeron::util::index_t length,
-                                                 aeron::Header& /*header*/) {
+                                                      aeron::util::index_t offset,
+                                                      aeron::util::index_t length,
+                                                      aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -260,15 +267,15 @@ void AeronRefdataClient::handle_funding_rate_fragment(aeron::AtomicBuffer& buffe
                                msg.collectedTs());
 
     bpt::common::log::debug("FundingRate: exchange={} instrument={} rate={}bps",
-                    ExchangeId::c_str(msg.exchangeId()),
-                    msg.instrumentId(),
-                    msg.rateBps());
+                            ExchangeId::c_str(msg.exchangeId()),
+                            msg.instrumentId(),
+                            msg.rateBps());
 }
 
 void AeronRefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
-                                           aeron::util::index_t offset,
-                                           aeron::util::index_t length,
-                                           aeron::Header& /*header*/) {
+                                                aeron::util::index_t offset,
+                                                aeron::util::index_t length,
+                                                aeron::Header& /*header*/) {
     using namespace bpt::messages;
 
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
@@ -286,10 +293,10 @@ void AeronRefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                           static_cast<std::size_t>(length));
 
         bpt::common::log::debug("RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
-                        msg.exchangesLoaded(),
-                        msg.instrumentCount(),
-                        msg.feeSchedulesLoaded(),
-                        msg.fundingRatesLoaded());
+                                msg.exchangesLoaded(),
+                                msg.instrumentCount(),
+                                msg.feeSchedulesLoaded(),
+                                msg.fundingRatesLoaded());
 
         if (on_ready)
             on_ready(msg.exchangesLoaded(),
@@ -306,9 +313,9 @@ void AeronRefdataClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                           static_cast<std::size_t>(length));
 
         bpt::common::log::error("RefDataError: type={} exchange={} instrument={}",
-                        RefDataErrorType::c_str(msg.errorType()),
-                        ExchangeId::c_str(msg.exchangeId()),
-                        msg.instrumentId());
+                                RefDataErrorType::c_str(msg.errorType()),
+                                ExchangeId::c_str(msg.exchangeId()),
+                                msg.instrumentId());
 
         if (on_error)
             on_error(msg.errorType(), msg.exchangeId(), msg.instrumentId());

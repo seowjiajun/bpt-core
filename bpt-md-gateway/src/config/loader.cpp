@@ -1,18 +1,20 @@
 #include "md_gateway/config/settings.h"
 
+#include <bpt_app/base_settings.h>
+#include <bpt_common/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <stdexcept>
 #include <toml++/toml.hpp>
 #include <unordered_set>
-#include <bpt_app/base_settings.h>
-#include <bpt_common/logging.h>
 
 namespace bpt::md_gateway::config {
 
 namespace {
 
-bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+bpt::common::config::StreamConfig load_stream(const toml::table* t,
+                                              std::string default_channel,
+                                              int32_t default_stream_id) {
     bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;
@@ -51,13 +53,14 @@ Settings load(const std::string& path) {
         // to miss. The inverse (qa/dev with live) is usually intentional
         // during staging; keep that as a warning.
         if (s.base.is_prod() && path_has_testnet)
-            throw std::runtime_error(fmt::format(
-                "environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
-                "refusing to start (prevents prod → testnet misdeploy)", exchange_config_path));
+            throw std::runtime_error(
+                fmt::format("environment = \"prod\" but exchange_config = \"{}\" resolves to a testnet path — "
+                            "refusing to start (prevents prod → testnet misdeploy)",
+                            exchange_config_path));
         if (!s.base.is_prod() && path_has_live)
             bpt::common::log::warn("environment = \"{}\" but exchange_config = \"{}\" — possible misconfiguration",
-                           bpt::app::to_string(s.base.environment),
-                           exchange_config_path);
+                                   bpt::app::to_string(s.base.environment),
+                                   exchange_config_path);
     }
 
     bpt::common::log::info("Environment: {}", bpt::app::to_string(s.base.environment));
@@ -133,10 +136,10 @@ Settings load(const std::string& path) {
         // skipped the adapter and logged an error; that left the service
         // running in a half-configured state.
         if (ac.ws_host.empty() || ac.ws_port.empty() || ac.ws_path.empty())
-            throw std::runtime_error(fmt::format(
-                "Adapter {} missing required ws_host/ws_port/ws_path", exchange_name));
+            throw std::runtime_error(fmt::format("Adapter {} missing required ws_host/ws_port/ws_path", exchange_name));
         if (!ac.use_tls)
-            bpt::common::log::warn("Adapter {} has use_tls=false — TLS is enforced regardless; update config", exchange_name);
+            bpt::common::log::warn("Adapter {} has use_tls=false — TLS is enforced regardless; update config",
+                                   exchange_name);
 
         s.adapters.push_back(std::move(ac));
     }

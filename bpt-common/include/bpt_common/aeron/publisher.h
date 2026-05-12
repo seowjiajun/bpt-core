@@ -54,18 +54,17 @@ namespace bpt::common::aeron {
 /// BufferClaim it wraps.
 class ScopedClaim {
 public:
-    explicit ScopedClaim(::aeron::concurrent::logbuffer::BufferClaim& claim) noexcept
-        : claim_(claim) {}
+    explicit ScopedClaim(::aeron::concurrent::logbuffer::BufferClaim& claim) noexcept : claim_(claim) {}
 
     ~ScopedClaim() noexcept {
         if (!finalized_)
             claim_.abort();
     }
 
-    ScopedClaim(const ScopedClaim&)            = delete;
+    ScopedClaim(const ScopedClaim&) = delete;
     ScopedClaim& operator=(const ScopedClaim&) = delete;
-    ScopedClaim(ScopedClaim&&)                 = delete;
-    ScopedClaim& operator=(ScopedClaim&&)      = delete;
+    ScopedClaim(ScopedClaim&&) = delete;
+    ScopedClaim& operator=(ScopedClaim&&) = delete;
 
     void commit() {
         claim_.commit();
@@ -77,7 +76,7 @@ public:
     }
 
     [[nodiscard]] ::aeron::AtomicBuffer& buffer() noexcept { return claim_.buffer(); }
-    [[nodiscard]] std::int32_t           offset() const noexcept { return claim_.offset(); }
+    [[nodiscard]] std::int32_t offset() const noexcept { return claim_.offset(); }
 
 private:
     ::aeron::concurrent::logbuffer::BufferClaim& claim_;
@@ -127,29 +126,24 @@ public:
     /// symmetric with Subscriber (where the move-deletion fixes a real
     /// dangling-capture bug — see its header). Wrap in std::unique_ptr
     /// if the owner needs to be movable.
-    Publisher(const Publisher&)            = delete;
+    Publisher(const Publisher&) = delete;
     Publisher& operator=(const Publisher&) = delete;
-    Publisher(Publisher&&)                 = delete;
-    Publisher& operator=(Publisher&&)      = delete;
+    Publisher(Publisher&&) = delete;
+    Publisher& operator=(Publisher&&) = delete;
 
     /// Offer a pre-encoded buffer slice.
     ///
     /// Returns true if successfully offered, false if dropped
     /// (NOT_CONNECTED / CLOSED / retry budget exhausted). Never throws.
-    bool offer(const ::aeron::AtomicBuffer& buf,
-               std::int32_t offset,
-               std::int32_t length) {
+    bool offer(const ::aeron::AtomicBuffer& buf, std::int32_t offset, std::int32_t length) {
         return offer(buf, offset, length, default_policy_);
     }
 
-    bool offer(const ::aeron::AtomicBuffer& buf,
-               std::int32_t offset,
-               std::int32_t length,
-               Policy policy) {
+    bool offer(const ::aeron::AtomicBuffer& buf, std::int32_t offset, std::int32_t length, Policy policy) {
         std::lock_guard<std::mutex> lock(mutex_);
-        const int max = (policy == Policy::kDropAlways)  ? 1
-                      : (policy == Policy::kBoundedRetry) ? max_retries_
-                                                           : -1;  // unbounded
+        const int max = (policy == Policy::kDropAlways)     ? 1
+                        : (policy == Policy::kBoundedRetry) ? max_retries_
+                                                            : -1;  // unbounded
         for (int attempt = 0; max < 0 || attempt < max; ++attempt) {
             const std::int64_t rc = publication_->offer(buf, offset, length);
             if (rc >= 0)
@@ -192,13 +186,12 @@ public:
 
     template <typename MessageT, typename EncodeFn>
     bool publish(EncodeFn&& encode, Policy policy) {
-        constexpr std::int32_t length = static_cast<std::int32_t>(
-            MessageT::sbeBlockAndHeaderLength());
+        constexpr std::int32_t length = static_cast<std::int32_t>(MessageT::sbeBlockAndHeaderLength());
 
         std::lock_guard<std::mutex> lock(mutex_);
-        const int max = (policy == Policy::kDropAlways)   ? 1
-                      : (policy == Policy::kBoundedRetry) ? max_retries_
-                                                          : -1;  // unbounded
+        const int max = (policy == Policy::kDropAlways)     ? 1
+                        : (policy == Policy::kBoundedRetry) ? max_retries_
+                                                            : -1;  // unbounded
         for (int attempt = 0; max < 0 || attempt < max; ++attempt) {
             ::aeron::concurrent::logbuffer::BufferClaim raw_claim;
             const std::int64_t rc = publication_->tryClaim(length, raw_claim);
@@ -222,9 +215,7 @@ public:
 
     /// Exposed so callers can special-case their own telemetry or
     /// short-circuit encoding when no subscriber is connected.
-    [[nodiscard]] bool is_connected() const noexcept {
-        return publication_ && publication_->isConnected();
-    }
+    [[nodiscard]] bool is_connected() const noexcept { return publication_ && publication_->isConnected(); }
 
     [[nodiscard]] const std::string& channel() const noexcept { return channel_; }
     [[nodiscard]] std::int32_t stream_id() const noexcept { return stream_id_; }

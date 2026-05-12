@@ -23,18 +23,17 @@
 namespace bpt::backtester::harness {
 
 struct WslogRecord {
-    uint64_t                              ts_ns;
-    bpt::common::recorder::RecordType     type;
-    std::vector<uint8_t>                  payload;
+    uint64_t ts_ns;
+    bpt::common::recorder::RecordType type;
+    std::vector<uint8_t> payload;
 };
 
 class WslogReader {
 public:
-    explicit WslogReader(const std::string& path) {
-        fp_ = std::fopen(path.c_str(), "rb");
-    }
+    explicit WslogReader(const std::string& path) { fp_ = std::fopen(path.c_str(), "rb"); }
     ~WslogReader() {
-        if (fp_) std::fclose(fp_);
+        if (fp_)
+            std::fclose(fp_);
     }
     WslogReader(const WslogReader&) = delete;
     WslogReader& operator=(const WslogReader&) = delete;
@@ -44,20 +43,23 @@ public:
     /// Read the next record. Returns std::nullopt at EOF or on a
     /// truncated read. The buffer is owned by the returned record.
     std::optional<WslogRecord> next() {
-        if (!fp_) return std::nullopt;
+        if (!fp_)
+            return std::nullopt;
 
         WslogRecord rec;
         uint8_t type_byte;
         uint32_t length;
 
-        if (std::fread(&rec.ts_ns, sizeof(rec.ts_ns), 1, fp_) != 1) return std::nullopt;
-        if (std::fread(&type_byte, sizeof(type_byte), 1, fp_) != 1) return std::nullopt;
-        if (std::fread(&length, sizeof(length), 1, fp_) != 1) return std::nullopt;
+        if (std::fread(&rec.ts_ns, sizeof(rec.ts_ns), 1, fp_) != 1)
+            return std::nullopt;
+        if (std::fread(&type_byte, sizeof(type_byte), 1, fp_) != 1)
+            return std::nullopt;
+        if (std::fread(&length, sizeof(length), 1, fp_) != 1)
+            return std::nullopt;
 
         rec.type = static_cast<bpt::common::recorder::RecordType>(type_byte);
         rec.payload.resize(length);
-        if (length > 0 &&
-            std::fread(rec.payload.data(), 1, length, fp_) != length) {
+        if (length > 0 && std::fread(rec.payload.data(), 1, length, fp_) != length) {
             return std::nullopt;
         }
         return rec;

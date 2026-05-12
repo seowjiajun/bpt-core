@@ -3,9 +3,9 @@
 #include <messages/MessageHeader.h>
 #include <messages/VolSurface.h>
 
-#include <cstring>
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
+#include <cstring>
 
 namespace bpt::pricer::messaging {
 

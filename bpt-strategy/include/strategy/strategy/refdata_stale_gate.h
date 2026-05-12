@@ -72,6 +72,19 @@ public:
             return State::Ok;
         }
 
+        // Heartbeat timestamp is published by another process (bpt-refdata)
+        // using its own TscClock calibration; small cross-process skew can
+        // make hb > now_ns. Without this guard the next subtraction wraps
+        // around uint64 and trivially exceeds the threshold, flapping the
+        // gate on every fresh heartbeat.
+        if (last_heartbeat_ns > now_ns) {
+            if (was_stale_) {
+                was_stale_ = false;
+                return State::Recovered;
+            }
+            return State::Ok;
+        }
+
         const bool currently_stale = (now_ns - last_heartbeat_ns) > cfg_.stale_threshold_ns;
 
         if (currently_stale && !was_stale_) {

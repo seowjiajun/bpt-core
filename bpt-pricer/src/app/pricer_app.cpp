@@ -1,11 +1,11 @@
 #include "pricer/app/pricer_app.h"
 
-#include <chrono>
-#include <ctime>
-#include <thread>
 #include <bpt_common/logging.h>
 #include <bpt_common/signal.h>
 #include <bpt_common/util/tsc_clock.h>
+#include <chrono>
+#include <ctime>
+#include <thread>
 
 namespace {
 inline uint32_t today_yyyymmdd() noexcept {
@@ -38,25 +38,26 @@ PricerApp::PricerApp(config::Settings settings, messaging::PricerBus bus)
     bus_.refdata_sub->set_on_option([this](const surface::OptionInstrument& inst) {
         builder_.add_instrument(inst);
         bpt::common::log::info("Option instrument: id={} {} {} K={} exp={}",
-                       inst.instrument_id,
-                       inst.underlying,
-                       inst.exchange,
-                       inst.strike_price,
-                       inst.expiry_date);
+                               inst.instrument_id,
+                               inst.underlying,
+                               inst.exchange,
+                               inst.strike_price,
+                               inst.expiry_date);
     });
 
     bus_.refdata_sub->set_on_perp([this](const refdata::PerpInstrument& inst) {
         perp_map_[inst.instrument_id] = {inst.underlying, inst.exchange_id};
         bpt::common::log::info("Perp instrument registered: id={} {} {}",
-                       inst.instrument_id,
-                       inst.underlying,
-                       inst.exchange);
+                               inst.instrument_id,
+                               inst.underlying,
+                               inst.exchange);
     });
 
     bus_.refdata_sub->set_on_remove([this](uint64_t instrument_id) { builder_.remove_instrument(instrument_id); });
 
     bpt::common::log::info("publish_interval_ms={} risk_free_rate={:.4f}",
-                           settings_.publish_interval_ms, settings_.risk_free_rate);
+                           settings_.publish_interval_ms,
+                           settings_.risk_free_rate);
     for (const auto& u : settings_.underlyings)
         bpt::common::log::info("underlying: {}", u);
     for (const auto& e : settings_.exchanges)
@@ -65,7 +66,6 @@ PricerApp::PricerApp(config::Settings settings, messaging::PricerBus bus)
 }
 
 void PricerApp::run() {
-
     constexpr auto idle_sleep = std::chrono::microseconds(100);
     const auto publish_interval = std::chrono::milliseconds(settings_.publish_interval_ms);
     constexpr auto heartbeat_interval = std::chrono::seconds(5);
@@ -91,9 +91,9 @@ void PricerApp::run() {
             for (const auto& grid : grids) {
                 bus_.vol_pub->publish(grid, WallClock::now_ns());
                 bpt::common::log::debug("Published surface: {} {} points={}",
-                                grid.underlying,
-                                static_cast<int>(grid.exchange_id),
-                                grid.points.size());
+                                        grid.underlying,
+                                        static_cast<int>(grid.exchange_id),
+                                        grid.points.size());
             }
 
             if (!initial_ready_sent && builder_.instrument_count() > 0) {
@@ -143,14 +143,16 @@ void PricerApp::run() {
                 else if (g.exchange_id == EX::DERIBIT)
                     exchanges_loaded |= 0x08;
             }
-            bus_.status_pub->publish_ready(WallClock::now_ns(), exchanges_loaded, static_cast<uint16_t>(grids.size()), total_points);
+            bus_.status_pub->publish_ready(WallClock::now_ns(),
+                                           exchanges_loaded,
+                                           static_cast<uint16_t>(grids.size()),
+                                           total_points);
             last_ready = now;
         }
 
         if (fragments == 0)
             std::this_thread::sleep_for(idle_sleep);
     }
-
 }
 
 }  // namespace bpt::pricer

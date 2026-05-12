@@ -4,11 +4,11 @@
 #include <messages/BacktestControl.h>
 #include <messages/MessageHeader.h>
 
+#include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/logging.h>
 #include <chrono>
 #include <stdexcept>
 #include <x86intrin.h>
-#include <bpt_common/aeron/aeron_utils.h>
-#include <bpt_common/logging.h>
 
 using namespace bpt::messages;
 

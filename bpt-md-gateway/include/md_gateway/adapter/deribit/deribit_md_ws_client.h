@@ -6,9 +6,8 @@
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/config/settings.h"
 
-#include <bpt_common/ws/run_loop.h>
-
 #include <atomic>
+#include <bpt_common/ws/run_loop.h>
 #include <cstdint>
 #include <functional>
 #include <string_view>
@@ -33,8 +32,7 @@ class DeribitMdWsClient : public bpt::common::ws::RunLoop {
 public:
     using FrameHandler = std::function<void(std::string_view payload, uint64_t recv_ns)>;
 
-    DeribitMdWsClient(const config::AdapterConfig& cfg, SubscriptionMap& subs)
-        : cfg_(cfg), subs_(subs) {}
+    DeribitMdWsClient(const config::AdapterConfig& cfg, SubscriptionMap& subs) : cfg_(cfg), subs_(subs) {}
 
     void set_frame_handler(FrameHandler h) { handler_ = std::move(h); }
 

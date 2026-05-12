@@ -16,9 +16,10 @@ AccountSubscriber::AccountSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                      const std::string& channel,
                                      int32_t stream_id) {
     sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
-        std::move(aeron), channel, stream_id,
-        [this](::aeron::AtomicBuffer& b, ::aeron::util::index_t o,
-               ::aeron::util::index_t l, ::aeron::Header& h) {
+        std::move(aeron),
+        channel,
+        stream_id,
+        [this](::aeron::AtomicBuffer& b, ::aeron::util::index_t o, ::aeron::util::index_t l, ::aeron::Header& h) {
             on_fragment(b, o, l, h);
         });
     bpt::common::log::info("[bridge/Account] subscribed on {} stream {}", channel, stream_id);
@@ -32,14 +33,18 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
                                     ::aeron::util::index_t offset,
                                     ::aeron::util::index_t length,
                                     ::aeron::Header& /*header*/) {
-    decode_sbe_fragment<bpt::messages::AccountSnapshot>(buffer, offset, length,
+    decode_sbe_fragment<bpt::messages::AccountSnapshot>(
+        buffer,
+        offset,
+        length,
         [this](bpt::messages::AccountSnapshot& msg) {
             Snapshot s{};
-            s.ts_ns             = msg.timestampNs();
-            s.exchange_id       = static_cast<uint8_t>(msg.exchangeId());
+            s.ts_ns = msg.timestampNs();
+            s.exchange_id = static_cast<uint8_t>(msg.exchangeId());
             s.available_balance = static_cast<double>(msg.availableBalanceE8()) / kE8;
-            s.total_equity      = static_cast<double>(msg.totalEquityE8()) / kE8;
-            if (s.total_equity == 0.0) s.total_equity = s.available_balance;
+            s.total_equity = static_cast<double>(msg.totalEquityE8()) / kE8;
+            if (s.total_equity == 0.0)
+                s.total_equity = s.available_balance;
 
             // Decode the positions repeating group. SBE group iterators are
             // stateful — calling .next() advances the read cursor, so the order
@@ -53,10 +58,11 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
                 positions.next();
                 Position p;
                 p.exchange_symbol = positions.getExchangeSymbolAsString();
-                p.net_qty         = static_cast<double>(positions.netQtyE8())        / kE8;
-                p.avg_entry       = static_cast<double>(positions.avgEntryPriceE8()) / kE8;
-                p.unrealized_pnl  = static_cast<double>(positions.unrealizedPnlE8()) / kE8;
-                if (p.net_qty == 0.0) continue;
+                p.net_qty = static_cast<double>(positions.netQtyE8()) / kE8;
+                p.avg_entry = static_cast<double>(positions.avgEntryPriceE8()) / kE8;
+                p.unrealized_pnl = static_cast<double>(positions.unrealizedPnlE8()) / kE8;
+                if (p.net_qty == 0.0)
+                    continue;
                 s.positions.push_back(std::move(p));
             }
 
@@ -71,15 +77,17 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
                 for (std::size_t i = 0; i < m; ++i) {
                     ccy_group.next();
                     CurrencyBalance cb;
-                    cb.ccy               = ccy_group.getCcyAsString();
-                    cb.equity            = static_cast<double>(ccy_group.equityE8())            / kE8;
+                    cb.ccy = ccy_group.getCcyAsString();
+                    cb.equity = static_cast<double>(ccy_group.equityE8()) / kE8;
                     cb.available_balance = static_cast<double>(ccy_group.availableBalanceE8()) / kE8;
-                    if (cb.equity == 0.0 && cb.available_balance == 0.0) continue;
+                    if (cb.equity == 0.0 && cb.available_balance == 0.0)
+                        continue;
                     s.currency_balances.push_back(std::move(cb));
                 }
             }
 
-            if (handler_) handler_(s);
+            if (handler_)
+                handler_(s);
         });
 }
 

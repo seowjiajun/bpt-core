@@ -1,10 +1,8 @@
 #include <bpt_common/util/topology.h>
-
-#include <gtest/gtest.h>
-
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <string>
 #include <unistd.h>
 
@@ -49,7 +47,7 @@ TEST(TopologyTest, LoadsValidAssignments) {
     auto topo = bpt::common::util::Topology::load(p);
     EXPECT_EQ(topo.assignment_count(), 2u);
     EXPECT_EQ(topo.core_for("mdgw.okx.io"), 0);
-    EXPECT_EQ(topo.core_for("ogw.poll"),    1);
+    EXPECT_EQ(topo.core_for("ogw.poll"), 1);
     EXPECT_FALSE(topo.core_for("missing.role"));
 }
 
@@ -70,15 +68,13 @@ TEST(TopologyTest, RejectsDuplicateRole) {
 }
 
 TEST(TopologyTest, RejectsCoreOutOfRange) {
-    const std::string content =
-        "[[assignment]]\nrole = \"a\"\ncore = " + std::to_string(nproc() + 100) + "\n";
+    const std::string content = "[[assignment]]\nrole = \"a\"\ncore = " + std::to_string(nproc() + 100) + "\n";
     const auto p = write_tmp("oor.toml", content);
     EXPECT_THROW(bpt::common::util::Topology::load(p), std::runtime_error);
 }
 
 TEST(TopologyTest, RejectsNegativeCore) {
-    const std::string content =
-        "[[assignment]]\nrole = \"a\"\ncore = -1\n";
+    const std::string content = "[[assignment]]\nrole = \"a\"\ncore = -1\n";
     const auto p = write_tmp("neg.toml", content);
     EXPECT_THROW(bpt::common::util::Topology::load(p), std::runtime_error);
 }
@@ -87,16 +83,15 @@ TEST(TopologyTest, RejectsTotalCoresMismatch) {
     // host.total_cores deliberately wrong — should fail even before we
     // look at assignments so the operator catches "wrong topology file"
     // errors at the earliest possible point.
-    const std::string content =
-        "[host]\ntotal_cores = " + std::to_string(nproc() + 42) + "\n";
+    const std::string content = "[host]\ntotal_cores = " + std::to_string(nproc() + 42) + "\n";
     const auto p = write_tmp("mismatch.toml", content);
     EXPECT_THROW(bpt::common::util::Topology::load(p), std::runtime_error);
 }
 
 TEST(TopologyTest, AcceptsMatchingTotalCores) {
-    const std::string content =
-        "[host]\ntotal_cores = " + std::to_string(nproc()) + "\n"
-        "[[assignment]]\nrole = \"a\"\ncore = 0\n";
+    const std::string content = "[host]\ntotal_cores = " + std::to_string(nproc()) +
+                                "\n"
+                                "[[assignment]]\nrole = \"a\"\ncore = 0\n";
     const auto p = write_tmp("match.toml", content);
     auto topo = bpt::common::util::Topology::load(p);
     EXPECT_EQ(topo.assignment_count(), 1u);

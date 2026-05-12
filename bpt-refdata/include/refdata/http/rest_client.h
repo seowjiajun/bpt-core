@@ -26,7 +26,9 @@ public:
     virtual ~RestClient() = default;
 
     virtual std::string get(const std::string& target, const Headers& extra_headers = {}) const;
-    virtual std::string post(const std::string& target, const std::string& body, const Headers& extra_headers = {}) const;
+    virtual std::string post(const std::string& target,
+                             const std::string& body,
+                             const Headers& extra_headers = {}) const;
 
 protected:
     std::string host_;

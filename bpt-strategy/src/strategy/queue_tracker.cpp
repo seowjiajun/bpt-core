@@ -47,14 +47,10 @@ void QueueTracker::on_cancel(uint64_t order_id) {
     entries_.erase(order_id);
 }
 
-void QueueTracker::on_trade(OrderSide::Value aggressor,
-                            double trade_price,
-                            double trade_qty,
-                            uint64_t /*ts_ns*/) {
+void QueueTracker::on_trade(OrderSide::Value aggressor, double trade_price, double trade_qty, uint64_t /*ts_ns*/) {
     // Aggressive BUY consumes ask-side passives; aggressive SELL consumes
     // bid-side passives.
-    const OrderSide::Value passive_side =
-        (aggressor == OrderSide::BUY) ? OrderSide::SELL : OrderSide::BUY;
+    const OrderSide::Value passive_side = (aggressor == OrderSide::BUY) ? OrderSide::SELL : OrderSide::BUY;
 
     for (auto& [_, entry] : entries_) {
         if (entry.side != passive_side)

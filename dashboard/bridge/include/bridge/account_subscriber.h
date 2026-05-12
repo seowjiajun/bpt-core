@@ -1,12 +1,13 @@
 #pragma once
 
 #include <Aeron.h>
+
+#include <bpt_common/aeron/subscriber.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-#include <bpt_common/aeron/subscriber.h>
 
 namespace bridge {
 
@@ -23,7 +24,7 @@ public:
     struct Position {
         std::string exchange_symbol;  // e.g. "BTC", "ETH-PERPETUAL"
         double net_qty;               // signed coin qty (+ long, − short)
-        double avg_entry;              // natural units
+        double avg_entry;             // natural units
         double unrealized_pnl;        // natural units (quote currency)
     };
 
@@ -32,25 +33,23 @@ public:
     // dashboard renders one Holdings row per ccy in addition to the
     // crypto positions.
     struct CurrencyBalance {
-        std::string ccy;              // currency code, ≤ 8 chars
-        double equity;                // currency equity (natural units)
-        double available_balance;     // withdrawable amount (natural units)
+        std::string ccy;           // currency code, ≤ 8 chars
+        double equity;             // currency equity (natural units)
+        double available_balance;  // withdrawable amount (natural units)
     };
 
     struct Snapshot {
         uint64_t ts_ns;
-        uint8_t  exchange_id;
-        double   available_balance;  // natural units (quote currency available)
-        double   total_equity;       // natural units; falls back to balance when 0
+        uint8_t exchange_id;
+        double available_balance;  // natural units (quote currency available)
+        double total_equity;       // natural units; falls back to balance when 0
         std::vector<Position> positions;
         std::vector<CurrencyBalance> currency_balances;
     };
 
     using Handler = std::function<void(const Snapshot&)>;
 
-    AccountSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                      const std::string& channel,
-                      int32_t stream_id);
+    AccountSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
 
     void set_handler(Handler h) { handler_ = std::move(h); }
 

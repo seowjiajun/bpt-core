@@ -112,12 +112,37 @@ protected:
 
     SimulationConfig sim_cfg(const std::string& start, const std::string& end, bool partial = false) const {
         SimulationConfig cfg;
-        cfg.start = start;
+        cfg.windows.push_back(TimeWindow{start, end});
+        cfg.start = start;  // back-compat scalars (loader sets these too)
         cfg.end = end;
         cfg.allow_partial_data = partial;
         return cfg;
     }
+
+    SimulationConfig sim_cfg_windows(std::vector<TimeWindow> ws, bool partial = false) const {
+        SimulationConfig cfg;
+        cfg.windows = std::move(ws);
+        std::sort(cfg.windows.begin(), cfg.windows.end(),
+                  [](const TimeWindow& a, const TimeWindow& b) { return a.start < b.start; });
+        cfg.start = cfg.windows.front().start;
+        cfg.end   = cfg.windows.back().end;
+        cfg.allow_partial_data = partial;
+        return cfg;
+    }
 };
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+// Epoch-ns anchors. Real tape data carries epoch nanoseconds; the DataLoader
+// filters every event against [start_ns, end_ns), so test fixtures must use
+// timestamps that fall within their configured date.
+
+static constexpr uint64_t kJan1_2026_NsUtc = 1767225600000000000ULL;          // 00:00:00Z
+static constexpr uint64_t kDayNs           = 86'400ULL * 1'000'000'000ULL;
+static constexpr uint64_t epoch_ns_for_jan_2026(int day_of_month) {
+    return kJan1_2026_NsUtc + static_cast<uint64_t>(day_of_month - 1) * kDayNs;
+}
+static constexpr uint64_t kJan1_2026_13h_NsUtc = kJan1_2026_NsUtc + 13ULL * 3600 * 1'000'000'000ULL;
+static constexpr uint64_t kJan1_2026_14h_NsUtc = kJan1_2026_NsUtc + 14ULL * 3600 * 1'000'000'000ULL;
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -125,8 +150,9 @@ TEST_F(DataLoaderTest, ReturnsTradeEvents) {
     auto tp = make_dir("trades", "BINANCE", "BTCUSDT", "2026-01-01");
     auto op = make_dir("orderbook", "BINANCE", "BTCUSDT", "2026-01-01");
 
-    write_trades_parquet(tp, {1000, 3000}, {100.0, 101.0}, {0.1, 0.2}, {0, 1});
-    write_orderbook_parquet(op, {2000});
+    const uint64_t base = epoch_ns_for_jan_2026(1);
+    write_trades_parquet(tp, {base + 1000, base + 3000}, {100.0, 101.0}, {0.1, 0.2}, {0, 1});
+    write_orderbook_parquet(op, {base + 2000});
 
     InstrumentConfig inst{"BINANCE", "BTCUSDT"};
     DataLoader loader(data_cfg(), sim_cfg("2026-01-01", "2026-01-01"), {inst});
@@ -136,11 +162,11 @@ TEST_F(DataLoaderTest, ReturnsTradeEvents) {
         events.push_back(*ev);
 
     ASSERT_EQ(events.size(), 3u);
-    EXPECT_EQ(events[0].timestamp_ns, 1000u);
+    EXPECT_EQ(events[0].timestamp_ns, base + 1000);
     EXPECT_EQ(events[0].type, MarketEvent::Type::TRADE);
-    EXPECT_EQ(events[1].timestamp_ns, 2000u);
+    EXPECT_EQ(events[1].timestamp_ns, base + 2000);
     EXPECT_EQ(events[1].type, MarketEvent::Type::ORDER_BOOK);
-    EXPECT_EQ(events[2].timestamp_ns, 3000u);
+    EXPECT_EQ(events[2].timestamp_ns, base + 3000);
     EXPECT_EQ(events[2].type, MarketEvent::Type::TRADE);
 }
 
@@ -150,10 +176,11 @@ TEST_F(DataLoaderTest, MergesMultipleInstrumentsInOrder) {
     auto tp2 = make_dir("trades", "BINANCE", "ETHUSDT", "2026-01-01");
     auto op2 = make_dir("orderbook", "BINANCE", "ETHUSDT", "2026-01-01");
 
-    write_trades_parquet(tp1, {100, 300}, {1.0, 1.0}, {0.1, 0.1}, {0, 0});
-    write_orderbook_parquet(op1, {500});
-    write_trades_parquet(tp2, {200, 400}, {2.0, 2.0}, {0.2, 0.2}, {1, 1});
-    write_orderbook_parquet(op2, {600});
+    const uint64_t base = epoch_ns_for_jan_2026(1);
+    write_trades_parquet(tp1, {base + 100, base + 300}, {1.0, 1.0}, {0.1, 0.1}, {0, 0});
+    write_orderbook_parquet(op1, {base + 500});
+    write_trades_parquet(tp2, {base + 200, base + 400}, {2.0, 2.0}, {0.2, 0.2}, {1, 1});
+    write_orderbook_parquet(op2, {base + 600});
 
     InstrumentConfig btc{"BINANCE", "BTCUSDT"};
     InstrumentConfig eth{"BINANCE", "ETHUSDT"};
@@ -168,11 +195,14 @@ TEST_F(DataLoaderTest, MergesMultipleInstrumentsInOrder) {
 }
 
 TEST_F(DataLoaderTest, SpansMultipleDays) {
+    int day_of_month = 1;
     for (const std::string& date : {"2026-01-01", "2026-01-02"}) {
         auto tp = make_dir("trades", "BINANCE", "BTCUSDT", date);
         auto op = make_dir("orderbook", "BINANCE", "BTCUSDT", date);
-        write_trades_parquet(tp, {1000}, {100.0}, {1.0}, {0});
-        write_orderbook_parquet(op, {2000});
+        const uint64_t base = epoch_ns_for_jan_2026(day_of_month);
+        write_trades_parquet(tp, {base + 1000}, {100.0}, {1.0}, {0});
+        write_orderbook_parquet(op, {base + 2000});
+        ++day_of_month;
     }
 
     InstrumentConfig inst{"BINANCE", "BTCUSDT"};
@@ -204,7 +234,8 @@ TEST_F(DataLoaderTest, ValidatePassesWhenAllFilesPresent) {
 TEST_F(DataLoaderTest, AllowPartialDataSkipsMissingFiles) {
     // Only trades file present, no orderbook.
     auto tp = make_dir("trades", "BINANCE", "BTCUSDT", "2026-01-01");
-    write_trades_parquet(tp, {500}, {99.0}, {1.0}, {0});
+    const uint64_t ts = epoch_ns_for_jan_2026(1) + 500;
+    write_trades_parquet(tp, {ts}, {99.0}, {1.0}, {0});
     // orderbook dir not created on purpose
 
     InstrumentConfig inst{"BINANCE", "BTCUSDT"};
@@ -220,7 +251,8 @@ TEST_F(DataLoaderTest, AllowPartialDataSkipsMissingFiles) {
 TEST_F(DataLoaderTest, TradeFieldsAreCorrect) {
     auto tp = make_dir("trades", "OKX", "BTC-USDT-SWAP", "2026-01-05");
     auto op = make_dir("orderbook", "OKX", "BTC-USDT-SWAP", "2026-01-05");
-    write_trades_parquet(tp, {999}, {42000.5}, {0.05}, {1});
+    const uint64_t ts = epoch_ns_for_jan_2026(5) + 999;
+    write_trades_parquet(tp, {ts}, {42000.5}, {0.05}, {1});
     write_orderbook_parquet(op, {});
 
     InstrumentConfig inst{"OKX", "BTC-USDT-SWAP"};
@@ -231,7 +263,7 @@ TEST_F(DataLoaderTest, TradeFieldsAreCorrect) {
     ASSERT_EQ(ev->type, MarketEvent::Type::TRADE);
 
     const auto& t = std::get<TradeRecord>(ev->payload);
-    EXPECT_EQ(t.timestamp_ns, 999u);
+    EXPECT_EQ(t.timestamp_ns, ts);
     EXPECT_DOUBLE_EQ(t.price, 42000.5);
     EXPECT_DOUBLE_EQ(t.quantity, 0.05);
     EXPECT_EQ(t.side, TradeSide::SELL);
@@ -242,8 +274,9 @@ TEST_F(DataLoaderTest, TradeFieldsAreCorrect) {
 TEST_F(DataLoaderTest, OrderBookFieldsAreCorrect) {
     auto tp = make_dir("trades", "BINANCE", "BTCUSDT", "2026-01-05");
     auto op = make_dir("orderbook", "BINANCE", "BTCUSDT", "2026-01-05");
+    const uint64_t ts = epoch_ns_for_jan_2026(5) + 777;
     write_trades_parquet(tp, {}, {}, {}, {});
-    write_orderbook_parquet(op, {777});
+    write_orderbook_parquet(op, {ts});
 
     InstrumentConfig inst{"BINANCE", "BTCUSDT"};
     DataLoader loader(data_cfg(), sim_cfg("2026-01-05", "2026-01-05"), {inst});
@@ -253,7 +286,7 @@ TEST_F(DataLoaderTest, OrderBookFieldsAreCorrect) {
     ASSERT_EQ(ev->type, MarketEvent::Type::ORDER_BOOK);
 
     const auto& ob = std::get<OrderBookRecord>(ev->payload);
-    EXPECT_EQ(ob.timestamp_ns, 777u);
+    EXPECT_EQ(ob.timestamp_ns, ts);
     EXPECT_EQ(ob.exchange, "BINANCE");
     EXPECT_EQ(ob.symbol, "BTCUSDT");
     // write_orderbook_parquet fills each level with its level number
@@ -275,4 +308,208 @@ TEST_F(DataLoaderTest, ReturnsNulloptWhenExhausted) {
     loader.next();  // consume the one event
     EXPECT_FALSE(loader.next().has_value());
     EXPECT_FALSE(loader.next().has_value());  // idempotent
+}
+
+// ── Intra-day windowing (Phase 1) ─────────────────────────────────────────────
+
+TEST_F(DataLoaderTest, FullDayWindowEmitsAllEvents) {
+    // Sanity: a date-only window (existing API) still emits every event of the day.
+    auto tp = make_dir("trades", "HYPERLIQUID", "APE", "2026-01-01");
+    auto op = make_dir("orderbook", "HYPERLIQUID", "APE", "2026-01-01");
+    write_trades_parquet(tp,
+        {kJan1_2026_NsUtc + 1, kJan1_2026_13h_NsUtc + 5, kJan1_2026_14h_NsUtc + 10},
+        {1.0, 1.0, 1.0}, {0.1, 0.1, 0.1}, {0, 0, 0});
+    write_orderbook_parquet(op, {});
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    DataLoader loader(data_cfg(), sim_cfg("2026-01-01", "2026-01-01"), {inst});
+    int count = 0;
+    while (loader.next()) ++count;
+    EXPECT_EQ(count, 3);
+}
+
+TEST_F(DataLoaderTest, IntraDayWindowFiltersOutsideEvents) {
+    // 1pm-2pm window: only events with ts ∈ [13:00, 14:00) survive.
+    auto tp = make_dir("trades", "HYPERLIQUID", "APE", "2026-01-01");
+    auto op = make_dir("orderbook", "HYPERLIQUID", "APE", "2026-01-01");
+    write_trades_parquet(tp,
+        {
+            kJan1_2026_NsUtc + 1,                     // 00:00 — out (before)
+            kJan1_2026_13h_NsUtc - 1,                 // 12:59:59.999... — out
+            kJan1_2026_13h_NsUtc,                     // 13:00:00 — in (inclusive)
+            kJan1_2026_13h_NsUtc + 30LL * 60 * 1'000'000'000LL,  // 13:30 — in
+            kJan1_2026_14h_NsUtc - 1,                 // 13:59:59.999... — in
+            kJan1_2026_14h_NsUtc,                     // 14:00:00 — out (exclusive)
+            kJan1_2026_14h_NsUtc + 1,                 // 14:00:00.000... — out
+        },
+        {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0},
+        {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1},
+        {0, 0, 0, 0, 0, 0, 0});
+    write_orderbook_parquet(op, {});
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    DataLoader loader(data_cfg(),
+                      sim_cfg("2026-01-01T13:00:00Z", "2026-01-01T14:00:00Z"),
+                      {inst});
+
+    std::vector<uint64_t> tss;
+    while (auto ev = loader.next()) tss.push_back(ev->timestamp_ns);
+    ASSERT_EQ(tss.size(), 3u);
+    EXPECT_EQ(tss[0], kJan1_2026_13h_NsUtc);
+    EXPECT_EQ(tss[1], kJan1_2026_13h_NsUtc + 30LL * 60 * 1'000'000'000LL);
+    EXPECT_EQ(tss[2], kJan1_2026_14h_NsUtc - 1);
+}
+
+TEST_F(DataLoaderTest, SubSecondWindowIsRespected) {
+    // 100 µs window starting at 13:00:00.000 100µs.
+    const uint64_t window_start = kJan1_2026_13h_NsUtc + 100'000ULL;       // +100 µs
+    const uint64_t window_end   = kJan1_2026_13h_NsUtc + 200'000ULL;       // +200 µs
+
+    auto tp = make_dir("trades", "HYPERLIQUID", "APE", "2026-01-01");
+    auto op = make_dir("orderbook", "HYPERLIQUID", "APE", "2026-01-01");
+    write_trades_parquet(tp,
+        {window_start - 1, window_start, window_start + 50'000ULL, window_end - 1, window_end},
+        {1.0, 1.0, 1.0, 1.0, 1.0},
+        {0.1, 0.1, 0.1, 0.1, 0.1},
+        {0, 0, 0, 0, 0});
+    write_orderbook_parquet(op, {});
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    DataLoader loader(data_cfg(),
+                      sim_cfg("2026-01-01T13:00:00.000100000Z",
+                              "2026-01-01T13:00:00.000200000Z"),
+                      {inst});
+
+    int count = 0;
+    while (loader.next()) ++count;
+    EXPECT_EQ(count, 3);  // window_start, +50µs, window_end - 1
+}
+
+TEST_F(DataLoaderTest, MultiDayWindowSkipsEmptyFirstDay) {
+    // Window covers an exact slice on day 2; day 1 is in the date range but
+    // the window doesn't intersect it. The reader must advance past day 1
+    // even though day 1 yields zero events after filtering.
+    for (const std::string& date : {"2026-01-01", "2026-01-02"}) {
+        auto tp = make_dir("trades", "HYPERLIQUID", "APE", date);
+        auto op = make_dir("orderbook", "HYPERLIQUID", "APE", date);
+        write_trades_parquet(tp, {}, {}, {}, {});
+        write_orderbook_parquet(op, {});
+    }
+    // Add events only on day 2.
+    {
+        const uint64_t kJan2_2026_NsUtc = kJan1_2026_NsUtc + 86'400ULL * 1'000'000'000ULL;
+        auto tp = make_dir("trades", "HYPERLIQUID", "APE", "2026-01-02");
+        write_trades_parquet(tp,
+            {kJan2_2026_NsUtc + 5LL * 3600 * 1'000'000'000LL,
+             kJan2_2026_NsUtc + 6LL * 3600 * 1'000'000'000LL},
+            {1.0, 1.0}, {0.1, 0.1}, {0, 0});
+    }
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    DataLoader loader(data_cfg(),
+                      sim_cfg("2026-01-02T05:00:00Z", "2026-01-02T07:00:00Z"),
+                      {inst});
+
+    int count = 0;
+    while (loader.next()) ++count;
+    EXPECT_EQ(count, 2);
+}
+
+TEST_F(DataLoaderTest, RejectsInvertedWindow) {
+    InstrumentConfig inst{"BINANCE", "BTCUSDT"};
+    EXPECT_THROW(DataLoader(data_cfg(),
+                            sim_cfg("2026-01-02T00:00:00Z", "2026-01-01T00:00:00Z"),
+                            {inst}),
+                 std::runtime_error);
+}
+
+// ── Multi-window unions (Phase 2) ────────────────────────────────────────────
+
+TEST_F(DataLoaderTest, TwoDisjointWindowsSameDayDropsBetween) {
+    auto tp = make_dir("trades", "HYPERLIQUID", "APE", "2026-01-01");
+    auto op = make_dir("orderbook", "HYPERLIQUID", "APE", "2026-01-01");
+    write_orderbook_parquet(op, {});
+
+    const uint64_t base = epoch_ns_for_jan_2026(1);
+    const auto at = [&](int hh, int mm = 0) -> uint64_t {
+        return base + (uint64_t(hh) * 3600 + uint64_t(mm) * 60) * 1'000'000'000ULL;
+    };
+    write_trades_parquet(tp,
+        {at(8), at(9), at(10), at(11), at(12), at(13), at(14)},
+        {1, 1, 1, 1, 1, 1, 1},
+        {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1},
+        {0, 0, 0, 0, 0, 0, 0});
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    DataLoader loader(data_cfg(),
+                      sim_cfg_windows({
+                          {"2026-01-01T09:00:00Z", "2026-01-01T10:00:00Z"},
+                          {"2026-01-01T13:00:00Z", "2026-01-01T14:00:00Z"},
+                      }),
+                      {inst});
+
+    std::vector<uint64_t> tss;
+    while (auto ev = loader.next()) tss.push_back(ev->timestamp_ns);
+    // 09:00 in window 1; 10:00 excluded (window 1 is half-open); 11/12 dropped;
+    // 13:00 in window 2; 14:00 excluded.
+    ASSERT_EQ(tss.size(), 2u);
+    EXPECT_EQ(tss[0], at(9));
+    EXPECT_EQ(tss[1], at(13));
+}
+
+TEST_F(DataLoaderTest, TwoWindowsAcrossDifferentDays) {
+    for (const std::string& date : {"2026-01-01", "2026-01-02", "2026-01-03"}) {
+        auto tp = make_dir("trades", "HYPERLIQUID", "APE", date);
+        auto op = make_dir("orderbook", "HYPERLIQUID", "APE", date);
+        write_orderbook_parquet(op, {});
+        write_trades_parquet(tp, {}, {}, {}, {});
+    }
+    // One event 13:30 on each of 01, 02, 03.
+    for (int dom = 1; dom <= 3; ++dom) {
+        auto tp = make_dir("trades", "HYPERLIQUID", "APE",
+                           "2026-01-0" + std::to_string(dom));
+        const uint64_t ts = epoch_ns_for_jan_2026(dom)
+            + 13ULL * 3600 * 1'000'000'000ULL
+            + 30ULL * 60 * 1'000'000'000ULL;
+        write_trades_parquet(tp, {ts}, {1.0}, {0.1}, {0});
+    }
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    // Window day 1 + window day 3, skip day 2 entirely.
+    DataLoader loader(data_cfg(),
+                      sim_cfg_windows({
+                          {"2026-01-01T13:00:00Z", "2026-01-01T14:00:00Z"},
+                          {"2026-01-03T13:00:00Z", "2026-01-03T14:00:00Z"},
+                      }),
+                      {inst});
+
+    int count = 0;
+    while (loader.next()) ++count;
+    EXPECT_EQ(count, 2);  // day 2 event filtered out even though file is loaded
+}
+
+TEST_F(DataLoaderTest, OverlappingWindowsDoNotDoubleEmit) {
+    auto tp = make_dir("trades", "HYPERLIQUID", "APE", "2026-01-01");
+    auto op = make_dir("orderbook", "HYPERLIQUID", "APE", "2026-01-01");
+    write_orderbook_parquet(op, {});
+    const uint64_t base = epoch_ns_for_jan_2026(1);
+    const uint64_t ts = base + 13ULL * 3600 * 1'000'000'000ULL + 30ULL * 60 * 1'000'000'000ULL;
+    write_trades_parquet(tp, {ts}, {1.0}, {0.1}, {0});
+
+    InstrumentConfig inst{"HYPERLIQUID", "APE"};
+    DataLoader loader(data_cfg(),
+                      sim_cfg_windows({
+                          {"2026-01-01T13:00:00Z", "2026-01-01T14:00:00Z"},
+                          {"2026-01-01T13:15:00Z", "2026-01-01T13:45:00Z"},  // strict subset
+                      }),
+                      {inst});
+    int count = 0;
+    while (loader.next()) ++count;
+    EXPECT_EQ(count, 1);  // single event emitted once even though both windows match
+}
+
+TEST_F(DataLoaderTest, RejectsEmptyWindowsList) {
+    InstrumentConfig inst{"BINANCE", "BTCUSDT"};
+    SimulationConfig empty;  // no windows populated
+    EXPECT_THROW(DataLoader(data_cfg(), empty, {inst}), std::runtime_error);
 }

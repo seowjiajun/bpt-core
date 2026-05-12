@@ -2,8 +2,8 @@
 
 #include <messages/MessageHeader.h>
 
-#include <cstring>
 #include <bpt_common/util/tsc_clock.h>
+#include <cstring>
 
 namespace bpt::md_gateway::messaging {
 

@@ -48,10 +48,10 @@ struct InstrumentInfo {
 // callers can iterate the catalog without poking at private maps. Stable
 // across reloads; the loader rebuilds entries from the JSON each load().
 struct InstrumentEntry {
-    uint32_t        canonical_id;
-    uint8_t         exchange_id;
-    std::string     venue_symbol;   // exchange-native string (e.g. "BTC-USDT-SWAP", "BTC")
-    InstrumentInfo  info;
+    uint32_t canonical_id;
+    uint8_t exchange_id;
+    std::string venue_symbol;  // exchange-native string (e.g. "BTC-USDT-SWAP", "BTC")
+    InstrumentInfo info;
 };
 
 // Loads and caches the instrument mapping file (instrument_mapping.json).

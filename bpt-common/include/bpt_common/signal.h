@@ -6,8 +6,8 @@
 //   bpt::common::signal::install();          // call once in main
 //   while (bpt::common::signal::is_running()) { ... }
 
-#include <csignal>
 #include <bpt_common/logging.h>
+#include <csignal>
 
 namespace bpt::common::signal {
 

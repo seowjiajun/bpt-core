@@ -1,13 +1,15 @@
 #include "pricer/config/settings.h"
 
-#include <toml++/toml.hpp>
 #include <bpt_app/base_settings.h>
+#include <toml++/toml.hpp>
 
 namespace bpt::pricer::config {
 
 namespace {
 
-bpt::common::config::StreamConfig load_stream(const toml::table* t, std::string default_channel, int32_t default_stream_id) {
+bpt::common::config::StreamConfig load_stream(const toml::table* t,
+                                              std::string default_channel,
+                                              int32_t default_stream_id) {
     bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
     if (!t)
         return s;

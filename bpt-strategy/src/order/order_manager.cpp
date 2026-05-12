@@ -5,8 +5,8 @@
 #include <messages/OrderSide.h>
 #include <messages/OrderType.h>
 
-#include <cmath>
 #include <bpt_common/logging.h>
+#include <cmath>
 
 using bpt::messages::OrderSide;
 using bpt::messages::OrderType;

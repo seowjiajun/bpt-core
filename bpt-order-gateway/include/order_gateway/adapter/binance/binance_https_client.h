@@ -29,10 +29,7 @@ public:
     /// \param body          Only read for POST/PUT; Binance puts most
     ///                      params in the query string of `path`, so the
     ///                      body is usually empty.
-    std::string request(const std::string& method,
-                         const std::string& path,
-                         const std::string& body,
-                         bool with_api_key);
+    std::string request(const std::string& method, const std::string& path, const std::string& body, bool with_api_key);
 
     [[nodiscard]] const std::string& api_key() const { return api_key_; }
     [[nodiscard]] const std::string& secret_key() const { return secret_key_; }

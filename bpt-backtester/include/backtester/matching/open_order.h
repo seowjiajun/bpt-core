@@ -64,7 +64,7 @@ struct OpenOrder {
     // live, but materially less so than the previous "fill 100% on any
     // cross" engine.
     double queue_ahead{0.0};
-    bool   queue_seeded{false};
+    bool queue_seeded{false};
 
     // True iff the matching engine refused the order at submit time
     // (currently only POST_ONLY orders that would cross). Returned in

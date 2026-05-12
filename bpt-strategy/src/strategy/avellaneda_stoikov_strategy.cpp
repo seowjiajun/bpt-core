@@ -1,5 +1,6 @@
 #include "strategy/strategy/avellaneda_stoikov_strategy.h"
 
+#include "strategy/clock/sim_clock.h"
 #include "strategy/strategy/reconciler.h"
 
 #include <messages/DeltaUpdateType.h>
@@ -838,9 +839,7 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
         const uint64_t backoff_s = (st.consecutive_exchange_errors == 1)   ? 5
                                    : (st.consecutive_exchange_errors == 2) ? 15
                                                                            : 30;
-        const uint64_t now_ns = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
-                .count());
+        const uint64_t now_ns = bpt::strategy::clock::SimClock::now_ns();
         st.reject_backoff_until_ns = now_ns + backoff_s * 1'000'000'000ULL;
         bpt::common::log::warn(kLog(),
                                "Exchange rejection backoff {} @ {}: {}s (consecutive={})",
@@ -1211,9 +1210,7 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
                                               double new_ask) {
     // Honour exchange-error backoff before touching orders on this instrument.
     if (st.reject_backoff_until_ns > 0) {
-        const uint64_t now_ns = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
-                .count());
+        const uint64_t now_ns = bpt::strategy::clock::SimClock::now_ns();
         if (now_ns < st.reject_backoff_until_ns)
             return;
         // Backoff expired — clear it and allow quoting to resume.
@@ -1765,9 +1762,7 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
         // case where no snapshot has arrived yet (early session,
         // account-snapshot stream down).
         constexpr uint64_t kSnapshotFreshnessNs = 10ULL * 1'000'000'000ULL;
-        const uint64_t now_wall_ns = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
-                .count());
+        const uint64_t now_wall_ns = bpt::strategy::clock::SimClock::now_ns();
         const bool snapshot_fresh = last_snapshot_ns_ > 0 && (now_wall_ns - last_snapshot_ns_) <= kSnapshotFreshnessNs;
 
         int64_t net_qty_e8 = 0;
@@ -1981,9 +1976,7 @@ void AvellanedaStoikovStrategy::save_state(const std::string& path) {
     try {
         nlohmann::json root;
         root["version"] = kWarmStartSchemaVersion;
-        root["saved_at_ns"] =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
-                .count();
+        root["saved_at_ns"] = bpt::strategy::clock::SimClock::now_ns();
 
         nlohmann::json instruments = nlohmann::json::array();
         for (const auto& [instrument_id, st] : state_) {
@@ -2057,9 +2050,7 @@ void AvellanedaStoikovStrategy::load_state(const std::string& path, uint64_t max
         }
 
         const uint64_t saved_at_ns = root.value<uint64_t>("saved_at_ns", 0);
-        const uint64_t now_ns =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
-                .count();
+        const uint64_t now_ns = bpt::strategy::clock::SimClock::now_ns();
         const uint64_t age_ns = (now_ns > saved_at_ns) ? (now_ns - saved_at_ns) : 0;
         const uint64_t max_age_ns = max_age_s * 1'000'000'000ULL;
         if (age_ns > max_age_ns) {

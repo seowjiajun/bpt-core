@@ -15,21 +15,25 @@ DashboardControlSubscriber::DashboardControlSubscriber(std::shared_ptr<aeron::Ae
     const int64_t reg_id = aeron->addSubscription(channel, stream_id);
     for (int i = 0; i < 500; ++i) {
         sub_ = aeron->findSubscription(reg_id);
-        if (sub_) break;
+        if (sub_)
+            break;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 
 int DashboardControlSubscriber::poll(int fragment_limit) {
-    if (!sub_) return 0;
+    if (!sub_)
+        return 0;
     return sub_->poll(
         [this](aeron::AtomicBuffer& buffer,
                aeron::util::index_t offset,
                aeron::util::index_t length,
                aeron::Header& /*hdr*/) {
-            if (length < 1) return;
+            if (length < 1)
+                return;
             const uint8_t cmd = *reinterpret_cast<const uint8_t*>(buffer.buffer() + offset);
-            if (on_command) on_command(cmd);
+            if (on_command)
+                on_command(cmd);
         },
         fragment_limit);
 }

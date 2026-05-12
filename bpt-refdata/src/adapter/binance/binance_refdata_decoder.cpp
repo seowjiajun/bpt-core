@@ -5,9 +5,9 @@
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
 
+#include <bpt_common/logging.h>
 #include <cmath>
 #include <nlohmann/json.hpp>
-#include <bpt_common/logging.h>
 
 using json = nlohmann::json;
 
@@ -53,7 +53,7 @@ BinanceRefdataDecoder::BinanceRefdataDecoder(std::shared_ptr<mapping::Instrument
     : mapping_(std::move(mapping)) {}
 
 std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_spot_exchange_info(const std::string& body,
-                                                                         uint64_t collected_ts) const {
+                                                                                 uint64_t collected_ts) const {
     auto j = json::parse(body);
     std::vector<refdata::Instrument> result;
 
@@ -92,7 +92,7 @@ std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_spot_exchange_info
 }
 
 std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_futures_exchange_info(const std::string& body,
-                                                                            uint64_t collected_ts) const {
+                                                                                    uint64_t collected_ts) const {
     auto j = json::parse(body);
     std::vector<refdata::Instrument> result;
 
@@ -131,12 +131,13 @@ std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_futures_exchange_i
         result.push_back(std::move(inst));
     }
 
-    bpt::common::log::info("[BinanceRefdataDecoder] Parsed {} futures/perp instruments from fapi exchangeInfo", result.size());
+    bpt::common::log::info("[BinanceRefdataDecoder] Parsed {} futures/perp instruments from fapi exchangeInfo",
+                           result.size());
     return result;
 }
 
 std::vector<refdata::FeeScheduleState> BinanceRefdataDecoder::parse_trade_fee(const std::string& body,
-                                                                      uint64_t collected_ts) const {
+                                                                              uint64_t collected_ts) const {
     auto j = json::parse(body);
     std::vector<refdata::FeeScheduleState> result;
     if (!j.is_array())

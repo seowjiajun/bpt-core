@@ -3,11 +3,11 @@
 
 #include "tape/refdata/refdata_poller.h"
 
+#include <bpt_common/logging.h>
+#include <bpt_common/util/strings.h>
 #include <chrono>
 #include <exception>
 #include <fmt/format.h>
-#include <bpt_common/logging.h>
-#include <bpt_common/util/strings.h>
 
 namespace bpt::tape::refdata {
 
@@ -25,9 +25,7 @@ RefdataPoller::RefdataPoller(std::string venue_tag,
         std::string host;
         std::string port;
         bool use_tls;
-        bool operator==(const ClientKey& o) const {
-            return host == o.host && port == o.port && use_tls == o.use_tls;
-        }
+        bool operator==(const ClientKey& o) const { return host == o.host && port == o.port && use_tls == o.use_tls; }
     };
     std::vector<std::pair<ClientKey, std::shared_ptr<http::RecordingRestClient>>> clients;
 
@@ -36,11 +34,13 @@ RefdataPoller::RefdataPoller(std::string venue_tag,
         ClientKey key{e.host, e.port, e.use_tls};
         std::shared_ptr<http::RecordingRestClient> client;
         for (const auto& [k, c] : clients) {
-            if (k == key) { client = c; break; }
+            if (k == key) {
+                client = c;
+                break;
+            }
         }
         if (!client) {
-            client = std::make_shared<http::RecordingRestClient>(
-                key.host, key.port, key.use_tls, tape_);
+            client = std::make_shared<http::RecordingRestClient>(key.host, key.port, key.use_tls, tape_);
             clients.emplace_back(std::move(key), client);
         }
         endpoints_.push_back(EndpointState{std::move(e), std::move(client), {}});
@@ -53,14 +53,12 @@ RefdataPoller::~RefdataPoller() {
 
 void RefdataPoller::start() {
     if (endpoints_.empty()) {
-        bpt::common::log::info("bpt-tape: refdata poller [{}] no endpoints, skipping",
-                               venue_tag_);
+        bpt::common::log::info("bpt-tape: refdata poller [{}] no endpoints, skipping", venue_tag_);
         return;
     }
     running_.store(true, std::memory_order_release);
     thread_ = std::thread([this] { run_loop(); });
-    bpt::common::log::info("bpt-tape: refdata poller [{}] started ({} endpoints)",
-                           venue_tag_, endpoints_.size());
+    bpt::common::log::info("bpt-tape: refdata poller [{}] started ({} endpoints)", venue_tag_, endpoints_.size());
 }
 
 void RefdataPoller::stop() {
@@ -84,8 +82,10 @@ void RefdataPoller::run_loop() {
         // Drive endpoints sequentially so the tape sees a single writer
         // (Tape's invariant). RestClient is otherwise reentrant.
         for (auto& es : endpoints_) {
-            if (!running_.load(std::memory_order_acquire)) break;
-            if (es.next_due > loop_start) continue;
+            if (!running_.load(std::memory_order_acquire))
+                break;
+            if (es.next_due > loop_start)
+                continue;
 
             try {
                 const std::string method = to_upper(es.spec.method);
@@ -94,20 +94,22 @@ void RefdataPoller::run_loop() {
                 } else if (method == "POST") {
                     (void)es.client->post(es.spec.path, es.spec.body);
                 } else {
-                    bpt::common::log::warn(
-                        "bpt-tape: refdata poller [{}] unknown method '{}' for {} — skipping",
-                        venue_tag_, es.spec.method, es.spec.path);
+                    bpt::common::log::warn("bpt-tape: refdata poller [{}] unknown method '{}' for {} — skipping",
+                                           venue_tag_,
+                                           es.spec.method,
+                                           es.spec.path);
                 }
             } catch (const std::exception& e) {
                 // RestClient retries internally; this catch is the
                 // outer guard so one bad endpoint doesn't take down
                 // the poll loop. Move on to the next scheduled tick.
-                bpt::common::log::warn(
-                    "bpt-tape: refdata poller [{}] {} {} failed: {}",
-                    venue_tag_, es.spec.method, es.spec.path, e.what());
+                bpt::common::log::warn("bpt-tape: refdata poller [{}] {} {} failed: {}",
+                                       venue_tag_,
+                                       es.spec.method,
+                                       es.spec.path,
+                                       e.what());
             }
-            es.next_due = clock::now() +
-                          std::chrono::seconds(es.spec.interval_seconds);
+            es.next_due = clock::now() + std::chrono::seconds(es.spec.interval_seconds);
         }
 
         // Sleep on the soonest due time; stop() flips running_ and
@@ -119,9 +121,7 @@ void RefdataPoller::run_loop() {
             next = clock::now() + std::chrono::seconds(60);
 
         std::unique_lock<std::mutex> lk(mu_);
-        cv_.wait_until(lk, next, [this] {
-            return !running_.load(std::memory_order_acquire);
-        });
+        cv_.wait_until(lk, next, [this] { return !running_.load(std::memory_order_acquire); });
     }
 }
 

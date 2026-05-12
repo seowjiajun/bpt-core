@@ -12,15 +12,15 @@
 #include <messages/ExchangeId.h>
 #include <messages/TradeSide.h>
 
+#include <bpt_common/logging.h>
+#include <bpt_common/util/latency_histogram.h>
+#include <bpt_common/util/parse_double.h>
+#include <bpt_common/util/tsc_clock.h>
 #include <cmath>
 #include <cstdint>
 #include <functional>
 #include <string_view>
 #include <unordered_map>
-#include <bpt_common/logging.h>
-#include <bpt_common/util/latency_histogram.h>
-#include <bpt_common/util/parse_double.h>
-#include <bpt_common/util/tsc_clock.h>
 
 namespace bpt::md_gateway::adapter {
 
@@ -49,10 +49,7 @@ class OkxMdDecoder : public JsonDecoderBase {
 public:
     explicit OkxMdDecoder(const SubscriptionMap& subs) : subs_(subs) {}
 
-    void decode(std::string_view payload,
-                uint64_t recv_ns,
-                Pub& pub,
-                messaging::FundingRateCallback& on_funding_rate) {
+    void decode(std::string_view payload, uint64_t recv_ns, Pub& pub, messaging::FundingRateCallback& on_funding_rate) {
         const uint64_t parse_start_ns = bpt::common::util::TscClock::now_mono_ns();
         pad(payload);
 
@@ -260,14 +257,11 @@ private:
     /// heap allocations after warmup) — see md/sorted_ladder.h.
     struct BookState {
         md::SortedLadder<std::greater<double>> bids;
-        md::SortedLadder<std::less<double>>    asks;
+        md::SortedLadder<std::less<double>> asks;
     };
     std::unordered_map<uint64_t, BookState> book_state_;
 
-    void handle_trades(simdjson::ondemand::object& entry,
-                       uint64_t instrument_id,
-                       uint64_t recv_ns,
-                       Pub& pub) {
+    void handle_trades(simdjson::ondemand::object& entry, uint64_t instrument_id, uint64_t recv_ns, Pub& pub) {
         md::MdTrade trade;
         trade.timestamp_ns = recv_ns;
         trade.instrument_id = instrument_id;

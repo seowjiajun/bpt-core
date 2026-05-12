@@ -1,7 +1,7 @@
 #include "analytics/config/settings.h"
 
-#include <toml++/toml.hpp>
 #include <bpt_app/base_settings.h>
+#include <toml++/toml.hpp>
 
 namespace bpt::analytics::config {
 

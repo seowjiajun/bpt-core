@@ -9,10 +9,10 @@
 // logging, Aeron, metrics port) are universal; everything else (Aeron stream
 // IDs, adapter lists, risk thresholds, strategy params) stays service-local.
 
-#include <cstdint>
-#include <string>
 #include <bpt_common/env.h>
 #include <bpt_common/logging.h>
+#include <cstdint>
+#include <string>
 #include <toml++/toml.hpp>
 
 namespace bpt::app {
@@ -22,8 +22,8 @@ namespace bpt::app {
 // into bpt::app:: so existing call sites like `bpt::app::Env::PROD`
 // keep compiling.
 using Env = bpt::common::Env;
-using bpt::common::to_string;
 using bpt::common::env_from_string;
+using bpt::common::to_string;
 
 struct BaseSettings {
     // Deployment environment. Default DEV is the safest fallback (no
@@ -32,8 +32,8 @@ struct BaseSettings {
     Env environment{Env::DEV};
 
     [[nodiscard]] bool is_prod() const noexcept { return environment == Env::PROD; }
-    [[nodiscard]] bool is_qa()   const noexcept { return environment == Env::QA; }
-    [[nodiscard]] bool is_dev()  const noexcept { return environment == Env::DEV; }
+    [[nodiscard]] bool is_qa() const noexcept { return environment == Env::QA; }
+    [[nodiscard]] bool is_dev() const noexcept { return environment == Env::DEV; }
 
     // Aeron MediaDriver IPC directory. Empty = use Aeron's default.
     std::string media_driver_dir;

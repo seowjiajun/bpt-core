@@ -7,6 +7,7 @@
 // over either stream type.  Adapters that support backtest mode (use_tls=false)
 // return AnyWsStream from connect_and_subscribe() and accept it in read_loop().
 
+#include <algorithm>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -18,12 +19,11 @@
 #include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/websocket/ssl.hpp>
-#include <openssl/evp.h>
-#include <openssl/x509.h>
-#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <memory>
+#include <openssl/evp.h>
+#include <openssl/x509.h>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -161,29 +161,31 @@ inline std::unique_ptr<WsStream> ws_connect(boost::asio::io_context& ioc,
     if (pinned_cert_sha256.empty()) {
         ws->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(host));
     } else {
-        ws->next_layer().set_verify_callback(
-            [host, pins = pinned_cert_sha256](bool preverified, boost::asio::ssl::verify_context& ctx) {
-                boost::asio::ssl::host_name_verification hnv(host);
-                if (!hnv(preverified, ctx))
-                    return false;
-                auto* store_ctx = ctx.native_handle();
-                if (X509_STORE_CTX_get_error_depth(store_ctx) != 0)
-                    return true;  // only pin the leaf
-                X509* cert = X509_STORE_CTX_get_current_cert(store_ctx);
-                if (!cert) return false;
-                const std::string got = cert_sha256_hex(cert);
-                if (got.empty()) return false;
-                for (const auto& pin : pins) {
-                    if (pin.size() != got.size()) continue;
-                    bool match = std::equal(pin.begin(), pin.end(), got.begin(),
-                                            [](char a, char b) {
-                                                return std::tolower(static_cast<unsigned char>(a)) ==
-                                                       std::tolower(static_cast<unsigned char>(b));
-                                            });
-                    if (match) return true;
-                }
+        ws->next_layer().set_verify_callback([host, pins = pinned_cert_sha256](bool preverified,
+                                                                               boost::asio::ssl::verify_context& ctx) {
+            boost::asio::ssl::host_name_verification hnv(host);
+            if (!hnv(preverified, ctx))
                 return false;
-            });
+            auto* store_ctx = ctx.native_handle();
+            if (X509_STORE_CTX_get_error_depth(store_ctx) != 0)
+                return true;  // only pin the leaf
+            X509* cert = X509_STORE_CTX_get_current_cert(store_ctx);
+            if (!cert)
+                return false;
+            const std::string got = cert_sha256_hex(cert);
+            if (got.empty())
+                return false;
+            for (const auto& pin : pins) {
+                if (pin.size() != got.size())
+                    continue;
+                bool match = std::equal(pin.begin(), pin.end(), got.begin(), [](char a, char b) {
+                    return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                });
+                if (match)
+                    return true;
+            }
+            return false;
+        });
     }
     ws->next_layer().handshake(boost::asio::ssl::stream_base::client);
 

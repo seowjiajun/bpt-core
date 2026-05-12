@@ -6,10 +6,10 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json.hpp>
+#include <bpt_common/logging.h>
 #include <deque>
 #include <format>
 #include <string>
-#include <bpt_common/logging.h>
 
 namespace beast = boost::beast;
 namespace ws = beast::websocket;
@@ -35,8 +35,8 @@ static std::string format_execution_report(const matching::FillReport& fill, uin
     // Fee is negative for taker (OKX convention: negative = cost)
     double fee_val = -(fill.last_fill_qty * fill.last_fill_price * 0.0005);
 
-    std::string ord_type = (fill.order_type == matching::OrderType::MARKET)    ? "market"
-                          : (fill.order_type == matching::OrderType::POST_ONLY) ? "post_only"
+    std::string ord_type = (fill.order_type == matching::OrderType::MARKET)      ? "market"
+                           : (fill.order_type == matching::OrderType::POST_ONLY) ? "post_only"
                                                                                  : "limit";
 
     json::object item;
@@ -159,9 +159,12 @@ private:
         order.client_order_id = std::string(args.at("clOrdId").as_string());
 
         std::string ord_type = std::string(args.at("ordType").as_string());
-        if (ord_type == "market")          order.type = matching::OrderType::MARKET;
-        else if (ord_type == "post_only")  order.type = matching::OrderType::POST_ONLY;
-        else                                order.type = matching::OrderType::LIMIT;
+        if (ord_type == "market")
+            order.type = matching::OrderType::MARKET;
+        else if (ord_type == "post_only")
+            order.type = matching::OrderType::POST_ONLY;
+        else
+            order.type = matching::OrderType::LIMIT;
 
         std::string side_str = std::string(args.at("side").as_string());
         order.side = (side_str == "sell") ? matching::OrderSide::SELL : matching::OrderSide::BUY;

@@ -14,19 +14,19 @@ constexpr const char* kVersion = "0.1.0+dev";
 
 }  // namespace
 
-CliArgs parse_cli(int argc, char** argv,
+CliArgs parse_cli(int argc,
+                  char** argv,
                   std::string_view program,
                   std::string_view description,
                   std::function<void(CLI::App&)> extra) {
     CLI::App cli{fmt::format("{} — {}", program, description)};
 
     CliArgs args;
-    cli.add_option("-c,--config", args.config_path, "Path to TOML config file")
-        ->required()
-        ->check(CLI::ExistingFile);
+    cli.add_option("-c,--config", args.config_path, "Path to TOML config file")->required()->check(CLI::ExistingFile);
     cli.set_version_flag("--version", kVersion);
 
-    if (extra) extra(cli);
+    if (extra)
+        extra(cli);
 
     try {
         cli.parse(argc, argv);

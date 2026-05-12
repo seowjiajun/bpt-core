@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bpt_common/util/tsc_clock.h"
 #include "strategy/order/i_order_gateway_client.h"
 #include "strategy/refdata/instrument_cache.h"
 
@@ -11,8 +12,6 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
-
-#include "bpt_common/util/tsc_clock.h"
 
 namespace bpt::strategy::order {
 
@@ -80,9 +79,7 @@ private:
     const refdata::InstrumentCache& cache_;
     // High 32 bits = Unix timestamp at construction (seconds), low 32 bits = counter.
     // Guarantees uniqueness across process restarts without any persistent state.
-    static uint64_t make_session_base() {
-        return bpt::common::util::WallClock::now_s() << 32;
-    }
+    static uint64_t make_session_base() { return bpt::common::util::WallClock::now_s() << 32; }
     std::atomic<uint64_t> next_order_id_{make_session_base() + 1};
 };
 

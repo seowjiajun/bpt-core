@@ -15,6 +15,7 @@
 #include "md_gateway/adapter/deribit/deribit_md_adapter.h"
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_adapter.h"
 #include "md_gateway/adapter/okx/okx_md_adapter.h"
+
 #include <messages/ExchangeRegistry.h>
 
 #include <memory>
@@ -28,10 +29,9 @@ namespace bpt::md_gateway::adapter {
 /// ExchangeId::Value enum (what ExchangeRegistry::from_name() returns
 /// through std::optional).
 template <class Pub>
-inline std::shared_ptr<IAdapter> make_md_adapter(
-    bpt::messages::ExchangeId::Value exch_id,
-    const bpt::md_gateway::config::AdapterConfig& cfg,
-    std::shared_ptr<Pub> md_pub) {
+inline std::shared_ptr<IAdapter> make_md_adapter(bpt::messages::ExchangeId::Value exch_id,
+                                                 const bpt::md_gateway::config::AdapterConfig& cfg,
+                                                 std::shared_ptr<Pub> md_pub) {
     using namespace bpt::messages;
     switch (exch_id) {
         case ExchangeId::BINANCE:

@@ -26,8 +26,7 @@ quill::LogLevel g_default_level = quill::LogLevel::Info;
 // [Service] prefix operators used to write in every log call. Services
 // should let the pattern do the prefixing and drop the redundant manual
 // bracket from message bodies.
-constexpr const char* kDefaultPattern =
-    "%(time) [%(log_level_short_code)] [%(logger)] %(message)";
+constexpr const char* kDefaultPattern = "%(time) [%(log_level_short_code)] [%(logger)] %(message)";
 
 // Linux TASK_COMM_LEN is 16 bytes incl. null terminator → 15 usable chars.
 // Kept as a constant here rather than including <linux/sched.h> to keep
@@ -111,7 +110,7 @@ void init(const std::string& service_name, const LogConfig& cfg) {
 
 quill::Logger* get_logger(const std::string& name) {
     if (g_logger == nullptr)
-        return nullptr;  // init() not yet called
+        return nullptr;    // init() not yet called
     auto sinks = g_sinks;  // create_or_get_logger takes ownership; keep cache intact
     quill::Logger* logger = quill::Frontend::create_or_get_logger(name, std::move(sinks), g_fmt_opts);
     logger->set_log_level(g_default_level);

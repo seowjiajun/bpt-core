@@ -42,21 +42,19 @@ DeribitRefDataAdapter::DeribitRefDataAdapter(const config::AdapterConfig& cfg,
 }
 
 void DeribitRefDataAdapter::ingest_instruments(const std::string& currency,
-                                                const std::string& kind,
-                                                uint64_t collected_ts,
-                                                bool notify_deltas) {
+                                               const std::string& kind,
+                                               uint64_t collected_ts,
+                                               bool notify_deltas) {
     const auto params = deribit::build_get_instruments_params(currency, kind);
-    const auto body = deribit::build_jsonrpc_body(
-        g_jsonrpc_id.fetch_add(1, std::memory_order_relaxed),
-        "public/get_instruments",
-        params);
+    const auto body = deribit::build_jsonrpc_body(g_jsonrpc_id.fetch_add(1, std::memory_order_relaxed),
+                                                  "public/get_instruments",
+                                                  params);
 
     std::string response;
     try {
         response = rest_client_->post("/api/v2", body);
     } catch (const std::exception& e) {
-        bpt::common::log::error("[DeribitRefData] get_instruments {} {} failed: {}",
-                                currency, kind, e.what());
+        bpt::common::log::error("[DeribitRefData] get_instruments {} {} failed: {}", currency, kind, e.what());
         return;
     }
 
@@ -70,7 +68,9 @@ void DeribitRefDataAdapter::ingest_instruments(const std::string& currency,
         ++loaded;
     }
     bpt::common::log::info("[DeribitRefData] Loaded {} active instruments from get_instruments ({} {})",
-                           loaded, currency, kind);
+                           loaded,
+                           currency,
+                           kind);
 }
 
 void DeribitRefDataAdapter::fetchSnapshot() {

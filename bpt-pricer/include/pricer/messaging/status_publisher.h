@@ -10,9 +10,7 @@ namespace bpt::pricer::messaging {
 
 class StatusPublisher {
 public:
-    StatusPublisher(std::shared_ptr<aeron::Aeron> aeron,
-                    const std::string& channel,
-                    int32_t stream_id);
+    StatusPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
 
     void publish_heartbeat(uint64_t timestamp_ns, uint64_t seq_num);
     void publish_ready(uint64_t timestamp_ns,
