@@ -2,11 +2,10 @@
 # Risk limits are tightened well below the qa variant: this config is for
 # the OFI first-run smoke against real money, intended to buy information
 # (does OFI have edge on HL perps?) at minimum cost, not to scale P&L.
-environment = "live"
-exchange_config = "config/exchanges/live.toml"
-exchanges = ["HYPERLIQUID"]
-
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/live-hyperliquid.toml"
+
 aeron_config = "../deploy/config/aeron/streams.toml"
 
 [aeron]

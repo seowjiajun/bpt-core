@@ -1,10 +1,9 @@
 # Instance config — QA environment (demo trading, testnet endpoints).
 # Switch to order-gateway.prod.toml for live trading.
-environment = "dev"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["OKX"]
-
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-okx.toml"
+
 aeron_config = "../deploy/config/aeron/streams.toml"
 
 [aeron]

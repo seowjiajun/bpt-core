@@ -1,9 +1,8 @@
 # Instance config — QA environment, Hyperliquid testnet.
-environment = "dev"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["HYPERLIQUID"]
-
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-hyperliquid.toml"
+
 aeron_config = "../deploy/config/aeron/streams.toml"
 
 [aeron]

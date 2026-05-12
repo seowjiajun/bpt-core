@@ -1,9 +1,8 @@
 # Instance config — QA environment, Deribit testnet.
-environment = "qa"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["DERIBIT"]
-
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/qa-deribit.toml"
+
 aeron_config = "../deploy/config/aeron/streams.toml"
 
 [aeron]

@@ -1,11 +1,11 @@
 # Instance config — BACKTEST mode
 # Order Gateway routes orders to bpt-backtester's local order servers instead of real exchanges.
 # Aeron config is identical to QA — Fenrir still sends orders via Aeron as normal.
-environment    = "dev"
-exchange_config = "config/exchanges/backtest.toml"
-exchanges      = ["BINANCE", "OKX", "HYPERLIQUID"]
-
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+# Deployment profile (env + exchange filter + exchange-endpoints path).
+profile_config = "../deploy/config/profile/backtest-multi.toml"
+exchange_config = "config/exchanges/backtest.toml"
+
 aeron_config = "../deploy/config/aeron/streams.toml"
 
 [aeron]
