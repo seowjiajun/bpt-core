@@ -2,12 +2,6 @@
 # Deployment profile (env + exchange filter + exchange-endpoints path).
 profile_config = "../deploy/config/profile/qa-hyperliquid.toml"
 
-# LOCAL OVERRIDE: point refdata at HL MAINNET (read-only, no creds).
-# Comment out to revert to the profile's testnet.toml. Order-gateway
-# must be stopped while this is active; otherwise the strategy would
-# make decisions on mainnet data and fire orders to testnet.
-exchange_config = "config/exchanges/live-hl-mainnet-ro.toml"
-
 instrument_poll_interval_s = 3600
 
 # Shared aeron stream registry. Single source of truth for stream IDs +
