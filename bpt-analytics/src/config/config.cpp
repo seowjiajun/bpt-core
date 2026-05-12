@@ -2,7 +2,10 @@
 
 #include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/streams_map.h>
+#include <bpt_common/config/profile_config.h>
 #include <bpt_common/logging.h>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <toml++/toml.hpp>
 
 namespace bpt::analytics::config {
@@ -10,6 +13,17 @@ namespace bpt::analytics::config {
 Settings load(const std::string& path) {
     auto tbl = toml::parse_file(path);
     Settings s;
+
+    if (auto v = tbl["profile_config"].value<std::string>()) {
+        auto profile = bpt::common::config::load_profile_config(*v);
+        bpt::common::log::info("Loaded deployment profile from {} (env={}, exchanges=[{}])",
+                               *v,
+                               bpt::common::to_string(profile.environment),
+                               fmt::join(profile.exchanges, ", "));
+        if (!tbl.contains("environment"))
+            tbl.insert("environment", std::string(bpt::common::to_string(profile.environment)));
+    }
+
     bpt::app::load_base_settings(tbl, s.base);
 
     bpt::common::config::AeronStreamMap shared_streams;

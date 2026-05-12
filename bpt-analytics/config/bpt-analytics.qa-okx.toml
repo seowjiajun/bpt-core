@@ -2,9 +2,10 @@
 # Passive observer: subscribes to exec reports + MD, publishes toxicity scores.
 # Does NOT interfere with trading — fenrir optionally subscribes to stream 5001.
 
-environment = "dev"
-
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+# Deployment profile (env only; analytics doesn't open exchange conns).
+profile_config = "../deploy/config/profile/qa-okx.toml"
+
 aeron_config = "../deploy/config/aeron/streams.toml"
 
 [aeron]
