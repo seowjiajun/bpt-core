@@ -51,13 +51,16 @@ struct Settings {
 
     std::vector<std::string> exchanges;  // exchanges to activate from exchange_config (e.g. ["OKX", "BINANCE"])
 
-    // Instrument refdata (existing streams 1001-1003)
-    bpt::common::config::StreamConfig snapshot;
-    bpt::common::config::StreamConfig delta;
-    bpt::common::config::StreamConfig control;
+    // Instrument refdata streams. Field names match the global vocabulary
+    // in deploy/config/aeron/streams.toml — no per-service aliasing, so
+    // a misnamed lookup fails at the loader rather than silently using
+    // the wrong stream ID.
+    bpt::common::config::StreamConfig refdata_snapshot;
+    bpt::common::config::StreamConfig refdata_delta;
+    bpt::common::config::StreamConfig refdata_control;
 
-    // Exchange-sourced refdata streams (1004, 1006)
-    // Note: stream 1005 (FundingRate) has moved to MdGateway
+    // Exchange-sourced refdata streams.
+    // Note: stream 1005 (FundingRate) is published by MdGateway, not here.
     bpt::common::config::StreamConfig fee_schedule;
     bpt::common::config::StreamConfig refdata_status;
 

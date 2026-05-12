@@ -5,28 +5,12 @@ exchange_config = "config/exchanges/testnet.toml"
 exchanges = ["OKX"]
 instrument_poll_interval_s = 3600
 
+# Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+aeron_config = "../deploy/config/aeron/streams.toml"
+
 [aeron]
+# Fallback only — shared file wins when present.
 media_driver_dir = "/dev/shm/aeron-bpt"
-
-[aeron.snapshot]
-channel = "aeron:ipc"
-stream_id = 1001    # bpt-refdata → Fenrir (RefDataSnapshot)
-
-[aeron.delta]
-channel = "aeron:ipc"
-stream_id = 1002    # bpt-refdata → Fenrir (RefDataDelta)
-
-[aeron.control]
-channel = "aeron:ipc"
-stream_id = 1003    # Fenrir → bpt-refdata (RefDataSubscriptionRequest)
-
-[aeron.fee_schedule]
-channel = "aeron:ipc"
-stream_id = 1004    # bpt-refdata → Fenrir (FeeSchedule)
-
-[aeron.refdata_status]
-channel = "aeron:ipc"
-stream_id = 1006    # bpt-refdata → Fenrir (RefDataReady, RefDataError)
 
 [instrument_mapping]
 local_path = "/opt/bpt/data/instrument_mapping.json"

@@ -15,25 +15,10 @@ instrument_poll_interval_s = 7200
 [aeron]
 media_driver_dir = "/dev/shm/aeron"
 
-[aeron.snapshot]
-channel = "aeron:ipc"
-stream_id = 1001
-
-[aeron.delta]
-channel = "aeron:ipc"
-stream_id = 1002
-
-[aeron.control]
-channel = "aeron:ipc"
-stream_id = 1003
-
-[aeron.fee_schedule]
-channel = "aeron:ipc"
-stream_id = 1004
-
-[aeron.refdata_status]
-channel = "aeron:ipc"
-stream_id = 1006
+# Per-stream IDs come from deploy/config/aeron/streams.toml in production.
+# This test omits aeron_config, so resolve_stream() returns hardcoded
+# fallback ids (1001/1002/1003/1004/1006) — matches what the assertions
+# below expect.
 
 [[adapters]]
 exchange = "BINANCE"
@@ -67,9 +52,9 @@ use_tls = true
 TEST_F(ConfigTest, ParsesAeronConfig) {
     auto s = bpt::refdata::config::load("test_config_bpt-refdata.toml");
     EXPECT_EQ(s.base.media_driver_dir, "/dev/shm/aeron");
-    EXPECT_EQ(s.snapshot.stream_id, 1001);
-    EXPECT_EQ(s.delta.stream_id, 1002);
-    EXPECT_EQ(s.control.stream_id, 1003);
+    EXPECT_EQ(s.refdata_snapshot.stream_id, 1001);
+    EXPECT_EQ(s.refdata_delta.stream_id, 1002);
+    EXPECT_EQ(s.refdata_control.stream_id, 1003);
     EXPECT_EQ(s.fee_schedule.stream_id, 1004);
     EXPECT_EQ(s.refdata_status.stream_id, 1006);
 }

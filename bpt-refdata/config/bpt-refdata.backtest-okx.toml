@@ -1,7 +1,11 @@
-# Instance config — QA environment, Deribit testnet.
-environment = "qa"
-exchange_config = "config/exchanges/testnet.toml"
-exchanges = ["DERIBIT"]
+# Instance config — BACKTEST mode, OKX mainnet refdata.
+#
+# Used when AS-on-OKX-BTC-USDT backtest (testnet has only
+# 4 coins). Pulls reference data from HL mainnet REST — read-only, no orders.
+
+environment = "dev"
+exchange_config = "config/exchanges/backtest-okx-mainnet.toml"
+exchanges = ["OKX"]
 instrument_poll_interval_s = 3600
 
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
@@ -13,6 +17,9 @@ media_driver_dir = "/dev/shm/aeron-bpt"
 
 [instrument_mapping]
 local_path = "/opt/bpt/data/instrument_mapping.json"
+
+[instrument_mapping.sources]
+hyperliquid = "../config/instruments/instrument_mapping.hyperliquid.json"
 
 [metrics]
 port = 9101

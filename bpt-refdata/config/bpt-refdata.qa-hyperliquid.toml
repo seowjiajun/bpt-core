@@ -4,28 +4,15 @@ exchange_config = "config/exchanges/testnet.toml"
 exchanges = ["HYPERLIQUID"]
 instrument_poll_interval_s = 3600
 
+# Shared aeron stream registry. Single source of truth for stream IDs +
+# MediaDriver dir across every bpt-* service. Path is relative to this
+# service's WorkingDirectory (bpt-core/bpt-refdata).
+aeron_config = "../deploy/config/aeron/streams.toml"
+
 [aeron]
+# Fallback for deployments where aeron_config isn't readable. If the
+# shared file is present, its media_driver_dir wins.
 media_driver_dir = "/dev/shm/aeron-bpt"
-
-[aeron.snapshot]
-channel = "aeron:ipc"
-stream_id = 1001
-
-[aeron.delta]
-channel = "aeron:ipc"
-stream_id = 1002
-
-[aeron.control]
-channel = "aeron:ipc"
-stream_id = 1003
-
-[aeron.fee_schedule]
-channel = "aeron:ipc"
-stream_id = 1004
-
-[aeron.refdata_status]
-channel = "aeron:ipc"
-stream_id = 1006
 
 [instrument_mapping]
 local_path = "/opt/bpt/data/instrument_mapping.json"

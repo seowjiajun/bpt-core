@@ -1,6 +1,7 @@
 #include "refdata/config/settings.h"
 
 #include <bpt_app/base_settings.h>
+#include <bpt_common/aeron/streams_map.h>
 #include <bpt_common/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -9,23 +10,6 @@
 #include <unordered_set>
 
 namespace bpt::refdata::config {
-
-namespace {
-
-bpt::common::config::StreamConfig load_stream(const toml::table* t,
-                                              std::string default_channel,
-                                              int32_t default_stream_id) {
-    bpt::common::config::StreamConfig s{std::move(default_channel), default_stream_id};
-    if (!t)
-        return s;
-    if (auto v = (*t)["channel"].value<std::string>())
-        s.channel = *v;
-    if (auto v = (*t)["stream_id"].value<int64_t>())
-        s.stream_id = static_cast<int32_t>(*v);
-    return s;
-}
-
-}  // namespace
 
 Settings load(const std::string& path) {
     bpt::common::log::info("Loading configuration from: {}", path);
@@ -73,14 +57,27 @@ Settings load(const std::string& path) {
         bpt::common::log::info("Exchange filter: [{}]", fmt::join(settings.exchanges, ", "));
     }
 
-    if (auto* aeron = root["aeron"].as_table()) {
-        settings.snapshot = load_stream((*aeron)["snapshot"].as_table(), "aeron:ipc", 1001);
-        settings.delta = load_stream((*aeron)["delta"].as_table(), "aeron:ipc", 1002);
-        settings.control = load_stream((*aeron)["control"].as_table(), "aeron:ipc", 1003);
-        settings.fee_schedule = load_stream((*aeron)["fee_schedule"].as_table(), "aeron:ipc", 1004);
-        settings.refdata_status = load_stream((*aeron)["refdata_status"].as_table(), "aeron:ipc", 1006);
-        // Note: stream 1005 (funding_rate) has moved to MdGateway — no longer loaded here
+    // Layer 1: shared aeron stream registry. If aeron_config points at a
+    // streams.toml, every stream comes from there; otherwise we fall back
+    // to the hardcoded ids below (which match the historical block layout).
+    bpt::common::config::AeronStreamMap shared_streams;
+    if (auto v = root["aeron_config"].value<std::string>()) {
+        shared_streams = bpt::common::config::load_shared_streams(*v);
+        bpt::common::log::info("Loaded shared aeron stream map from {} ({} streams)",
+                               *v, shared_streams.stream_ids.size());
+        // streams.toml is the source of truth for media_driver_dir too —
+        // overrides whatever bpt::app::load_base_settings populated.
+        if (!shared_streams.media_driver_dir.empty())
+            settings.base.media_driver_dir = shared_streams.media_driver_dir;
     }
+
+    using bpt::common::config::resolve_stream;
+    settings.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
+    settings.refdata_delta    = resolve_stream(shared_streams, "refdata_delta",    1002);
+    settings.refdata_control  = resolve_stream(shared_streams, "refdata_control",  1003);
+    settings.fee_schedule     = resolve_stream(shared_streams, "fee_schedule",     1004);
+    settings.refdata_status   = resolve_stream(shared_streams, "refdata_status",   1006);
+    // Note: stream 1005 (funding_rate) is published by MdGateway, not consumed here.
 
     if (auto v = root["instrument_poll_interval_s"].value<int64_t>())
         settings.instrument_poll_interval_s = static_cast<uint32_t>(*v);

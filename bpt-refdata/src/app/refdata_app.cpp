@@ -153,7 +153,9 @@ RefdataApp::RefdataApp(config::Settings settings,
         adapters_.push_back(std::move(adapter));
     }
 
-    bpt::common::log::info("Ready — listening on {} stream {}", settings_.control.channel, settings_.control.stream_id);
+    bpt::common::log::info("Ready — listening on {} stream {}",
+                           settings_.refdata_control.channel,
+                           settings_.refdata_control.stream_id);
 }
 
 void RefdataApp::handle_request(const messaging::RefdataRequest& request) {
