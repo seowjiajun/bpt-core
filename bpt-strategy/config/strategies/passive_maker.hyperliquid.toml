@@ -1,0 +1,72 @@
+# Strategy params — PassiveMaker on HL testnet APE.
+#
+# PassiveMaker is the three-knob "dumb maker" baseline that AvellanedaStoikov
+# extends: post symmetric quotes at fixed half_spread_bps around the mid,
+# requote when fair value drifts past requote_threshold_bps, skew the
+# reservation by inventory_penalty × position.
+#
+# Calibrated for HL testnet APE — much thinner liquidity than mainnet but
+# the strategy mechanics are identical. APE testnet has visible 2-sided BBO
+# unlike PURR's one-sided book.
+
+[fenrir.strategy]
+type = "PassiveMakerStrategy"
+enabled = true
+instruments = ["APE/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "GTC"               # GTC LIMIT → translated to Alo (POST_ONLY) by HL adapter
+max_retries = 3
+
+[fenrir.strategy.risk]
+max_position_usd = 200.0   # testnet wallet is small; cap conservatively
+max_order_size_usd = 50.0
+max_daily_loss_usd = 100.0
+max_open_orders = 10
+
+[fenrir.strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[fenrir.strategy.params]
+# Core three knobs.
+# Testnet spreads are wider/noisier than mainnet; start with a fat quote
+# so we sit clearly outside the touch and don't get picked off constantly.
+half_spread_bps        = 25.0
+requote_threshold_bps  = 50.0
+inventory_penalty      = 0.0001
+
+# Sizing. APE testnet is at ~$0.16. HL enforces a $10 minimum order
+# value; the venue/min_order_value helper now auto-bumps qty when the
+# configured value would fall below the floor, so we can configure the
+# *desired* qty (10 here, ~$1.60 notional) without worrying about
+# rejects — the helper will round up to clear $10.
+qty_per_quote          = 10
+max_inventory          = 500
+
+# Vol-scaling and regime gates disabled; PassiveMaker on testnet is the
+# lifecycle test, not a tuning exercise.
+spread_vol_mult        = 0.0
+requote_vol_mult       = 0.0
+vol_window_size        = 60
+vol_sample_interval_ms = 1000.0
+
+regime_gating_enabled       = false
+regime_window_size          = 60
+regime_sample_interval_ms   = 10000.0
+regime_quiet_vol_bps_per_min = 5.0
+regime_trend_threshold_z    = 0.5
+regime_chop_cooldown_s      = 30.0
+
+# Hard halt on flash moves (vol > 100 bps within 1s). Disabled halt-ms
+# means the strategy resumes immediately after vol drops — appropriate
+# for a baseline test where we want to see lifecycle, not protection.
+vol_gate_max_bps    = 100.0
+vol_gate_window_ms  = 1000
+vol_gate_halt_ms    = 0

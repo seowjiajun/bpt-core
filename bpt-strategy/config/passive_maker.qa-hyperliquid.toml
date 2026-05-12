@@ -1,0 +1,17 @@
+# Deployment profile (env only; strategy keeps its own md_exchanges).
+profile_config = "../deploy/config/profile/qa-hyperliquid.toml"
+
+strategy_config = "strategies/passive_maker.hyperliquid.toml"
+
+# Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+aeron_config = "../deploy/config/aeron/streams.toml"
+
+[aeron]
+# Fallback only — shared file wins when present.
+media_driver_dir = "/dev/shm/aeron-bpt"
+
+[fenrir]
+correlation_id = 1010
+
+[metrics]
+port = 9104

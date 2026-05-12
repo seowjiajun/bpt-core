@@ -2,6 +2,7 @@
 
 #include "strategy/clock/sim_clock.h"
 #include "strategy/strategy/reconciler.h"
+#include "strategy/venue/min_order_value.h"
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
@@ -1079,12 +1080,19 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
 
 // ── Effective sizing — adaptive vs fixed ───────────────────────────────────
 double AvellanedaStoikovStrategy::effective_order_qty(const InstrumentState& st) const {
+    double qty = order_qty_;
     if (order_qty_fraction_ > 0.0 && last_equity_e8_ > 0 && st.last_mid > 0.0) {
         const double equity_usd = static_cast<double>(last_equity_e8_) / 1e8;
         const double derived = order_qty_fraction_ * equity_usd / st.last_mid;
-        return std::max(order_qty_min_, derived);
+        qty = std::max(order_qty_min_, derived);
     }
-    return order_qty_;
+    // Bump qty up if the venue enforces a min-notional floor that the
+    // chosen qty (fixed or equity-fractional) doesn't clear. HL has a
+    // venue-wide $10 floor; without this, equity-fractional sizing on
+    // a small account would emit orders that always reject.
+    return bpt::strategy::venue::bump_qty_for_min_notional(
+        qty, st.last_mid, st.lot_size,
+        bpt::strategy::venue::min_notional_usd(st.exchange));
 }
 
 double AvellanedaStoikovStrategy::effective_max_inventory(const InstrumentState& st) const {
