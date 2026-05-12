@@ -1,15 +1,15 @@
-# Hyperliquid testnet — funding arb on BTC/USDC spot + BTC perp.
-# Switched from PURR to BTC: PURR perp on testnet has one-sided BBO
-# (ask=0) which MdValidator filters, leaving the perp leg of the panel
-# permanently blank. BTC has the most active testnet liquidity on both
-# legs, but requires the BTC spot pair (HL spot index @50) to be
-# present in the canonical mapping — see config/instruments/.
+# Hyperliquid — funding arb on PURR/USDC spot + PURR perp.
+# PURR is the only base with a named spot pair on HL, and works on
+# both testnet (limited liquidity, often one-sided) and mainnet (real
+# funding, real basis). Other bases would require the canonical
+# mapping to translate @N spot indices (testnet ≠ mainnet indices).
 #
 # Plumbing-validation config: thresholds + sizing tuned so the strategy
 # attempts entry frequently rather than profitably. Testnet liquidity is
-# synthetic; results don't transfer to mainnet. Goal here is to verify
-# the lifecycle (both legs subscribe, BBO flows, funding rate read,
-# entry attempted, fills land, position reconciles, exit cycle works).
+# synthetic; mainnet has real ~12-15 bps funding rates on PURR. Goal here
+# is to verify the lifecycle (both legs subscribe, BBO flows, funding
+# rate read, entry attempted, fills land, position reconciles, exit
+# cycle works).
 
 [fenrir.strategy]
 type = "FundingArbStrategy"
@@ -19,7 +19,7 @@ enabled = true
 # PERP leg quote = USD (HL's synthetic USD-margined perp).
 # CanonicalResolver matches each leg independently; pair-up happens by
 # base_asset name.
-instruments = ["BTC/USDC:SPOT", "BTC/USD:PERPETUAL"]
+instruments = ["PURR/USDC:SPOT", "PURR/USD:PERPETUAL"]
 md_exchanges = ["HYPERLIQUID"]
 
 [fenrir.strategy.venue_exec.HYPERLIQUID]
@@ -47,7 +47,7 @@ max_refdata_staleness_ns = 300000000000
 configured_exchanges = ["HYPERLIQUID"]
 
 [fenrir.strategy.params]
-base_assets = ["BTC"]
+base_assets = ["PURR"]
 
 # ── Funding rate thresholds ──────────────────────────────────────────
 # Aggressive thresholds to trigger entry quickly on testnet, where

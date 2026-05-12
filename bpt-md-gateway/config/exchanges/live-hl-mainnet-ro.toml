@@ -1,0 +1,12 @@
+# Exchange adapter endpoints — HL MAINNET, READ-ONLY.
+# Used by dev-hyperliquid-mainnet-ro env for md-gateway. Public WS only.
+
+[[adapters]]
+exchange = "HYPERLIQUID"
+ws_host  = "api.hyperliquid.xyz"
+ws_port  = "443"
+ws_path  = "/ws"
+use_tls  = true
+ws_read_timeout_ms     = 5000
+ws_ping_interval_ms    = 25000
+ws_liveness_timeout_ms = 60000

@@ -1,0 +1,17 @@
+# Exchange adapter endpoints — HL MAINNET, READ-ONLY.
+#
+# Used by dev-hyperliquid-mainnet-ro env to point refdata at real
+# mainnet endpoints so the dashboard can render live BTC/ETH/SOL
+# instrument data (testnet is empty for everything except PURR).
+#
+# No credentials — HL refdata uses only public endpoints (POST /info
+# with type=meta / spotMeta / userFees). Binance/OKX intentionally
+# omitted: those require prod API keys that don't live on dev hosts.
+
+[[adapters]]
+exchange    = "HYPERLIQUID"
+rest_host   = "api.hyperliquid.xyz"
+rest_port   = "443"
+ws_host     = "api.hyperliquid.xyz"
+ws_port     = "443"
+use_tls     = true

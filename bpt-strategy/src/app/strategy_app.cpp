@@ -152,23 +152,30 @@ void StrategyApp::run() {
         if (startup_gate_->is_active()) {
             check_service_liveness();
             report_latency_stats();
+        }
 
-            if (bus_.portfolio_snap && bus_.portfolio_snap->is_active()) {
-                const auto now_ns = bpt::common::util::TscClock::now_epoch_ns();
-                bus_.portfolio_snap->publish_if_due(strategy_->get_portfolio_state(), now_ns);
+        // Dashboard state publishing is intentionally OUTSIDE the gate:
+        // get_strategy_state_json() returns "" when the strategy has
+        // nothing to report (pre-pair-resolution), and a populated JSON
+        // once pairs are resolved — even if order-gateway is absent (e.g.
+        // mainnet read-only runs with OG stopped). Tying it to the gate
+        // meant the dashboard showed "Waiting for strategy data" any time
+        // OG was down even though the strategy itself was fully alive.
+        if (bus_.portfolio_snap && bus_.portfolio_snap->is_active()) {
+            const auto now_ns = bpt::common::util::TscClock::now_epoch_ns();
+            bus_.portfolio_snap->publish_if_due(strategy_->get_portfolio_state(), now_ns);
 
-                // Publish strategy state at ~2 Hz (every 500ms).
-                static uint64_t last_state_ns = 0;
-                if (now_ns - last_state_ns > 500'000'000ULL) {
-                    last_state_ns = now_ns;
-                    auto state_json = strategy_->get_strategy_state_json();
-                    if (!state_json.empty()) {
-                        aeron::AtomicBuffer buf(reinterpret_cast<uint8_t*>(state_json.data()),
-                                                static_cast<aeron::util::index_t>(state_json.size()));
-                        // Reuse the same publication as portfolio snapshots —
-                        // the bridge relays all JSON on stream 9004 to WS clients.
-                        bus_.portfolio_snap->offer_raw(buf, static_cast<int32_t>(state_json.size()));
-                    }
+            // Publish strategy state at ~2 Hz (every 500ms).
+            static uint64_t last_state_ns = 0;
+            if (now_ns - last_state_ns > 500'000'000ULL) {
+                last_state_ns = now_ns;
+                auto state_json = strategy_->get_strategy_state_json();
+                if (!state_json.empty()) {
+                    aeron::AtomicBuffer buf(reinterpret_cast<uint8_t*>(state_json.data()),
+                                            static_cast<aeron::util::index_t>(state_json.size()));
+                    // Reuse the same publication as portfolio snapshots —
+                    // the bridge relays all JSON on stream 9004 to WS clients.
+                    bus_.portfolio_snap->offer_raw(buf, static_cast<int32_t>(state_json.size()));
                 }
             }
         }
