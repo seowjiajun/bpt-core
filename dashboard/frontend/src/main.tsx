@@ -10,5 +10,5 @@ import ArchiveApp from './ArchiveApp.tsx'
 const isArchive = window.location.pathname.startsWith('/archive')
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>{isArchive ? <ArchiveApp /> : <App />}</StrictMode>,
+  <StrictMode>{isArchive ? <ArchiveApp /> : <App />}</StrictMode>
 )

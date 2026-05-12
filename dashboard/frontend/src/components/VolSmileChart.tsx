@@ -42,8 +42,10 @@ export function VolSmileChart({ slices, legs = [] }: Props) {
     const h = ch - MARGIN.top - MARGIN.bottom
 
     // Compute axis ranges across all slices
-    let minStrike = Infinity, maxStrike = -Infinity
-    let minIv = Infinity, maxIv = -Infinity
+    let minStrike = Infinity,
+      maxStrike = -Infinity
+    let minIv = Infinity,
+      maxIv = -Infinity
     for (const s of slices) {
       for (const p of s.points) {
         if (p.strike < minStrike) minStrike = p.strike
@@ -77,7 +79,9 @@ export function VolSmileChart({ slices, legs = [] }: Props) {
 
     // X-axis labels (strikes)
     const xTicks = Math.min(slices[0]?.points.length ?? 0, 9)
-    const uniqueStrikes = [...new Set(slices.flatMap((s) => s.points.map((p) => p.strike)))].sort((a, b) => a - b)
+    const uniqueStrikes = [...new Set(slices.flatMap((s) => s.points.map((p) => p.strike)))].sort(
+      (a, b) => a - b
+    )
     const labelStrides = Math.max(1, Math.floor(uniqueStrikes.length / xTicks))
     for (let i = 0; i < uniqueStrikes.length; i += labelStrides) {
       const strike = uniqueStrikes[i]
@@ -93,7 +97,10 @@ export function VolSmileChart({ slices, legs = [] }: Props) {
       if (calls.length < 2) return
 
       const d = calls
-        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${MARGIN.left + xScale(p.strike)} ${MARGIN.top + yScale(p.iv)}`)
+        .map(
+          (p, i) =>
+            `${i === 0 ? 'M' : 'L'} ${MARGIN.left + xScale(p.strike)} ${MARGIN.top + yScale(p.iv)}`
+        )
         .join(' ')
       content += `<path d="${d}" fill="none" stroke="${COLORS[si % COLORS.length]}" stroke-width="1.5" opacity="0.9"/>`
 
@@ -117,10 +124,7 @@ export function VolSmileChart({ slices, legs = [] }: Props) {
 
   return (
     <div className="chart-host" ref={containerRef} style={{ position: 'relative' }}>
-      <svg
-        ref={svgRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      />
+      <svg ref={svgRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
     </div>
   )
 }

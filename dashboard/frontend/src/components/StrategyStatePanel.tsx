@@ -59,7 +59,12 @@ export function StrategyStatePanel() {
   }
 
   const driftDir = ss.drift > 0.0001 ? 'UP' : ss.drift < -0.0001 ? 'DN' : '--'
-  const driftClass = ss.drift > 0.0001 ? 'stat-value--green' : ss.drift < -0.0001 ? 'stat-value--red' : 'stat-value--muted'
+  const driftClass =
+    ss.drift > 0.0001
+      ? 'stat-value--green'
+      : ss.drift < -0.0001
+        ? 'stat-value--red'
+        : 'stat-value--muted'
   const invSign = ss.inventory > 0 ? '+' : ''
 
   return (
@@ -74,33 +79,52 @@ export function StrategyStatePanel() {
       <table className="blotter-table" style={{ fontSize: 11 }}>
         <thead>
           <tr>
-            <th colSpan={2} style={{ textAlign: 'left' }}>Model</th>
-            <th colSpan={2} style={{ textAlign: 'left' }}>State</th>
+            <th colSpan={2} style={{ textAlign: 'left' }}>
+              Model
+            </th>
+            <th colSpan={2} style={{ textAlign: 'left' }}>
+              State
+            </th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style={{ color: 'var(--text-muted)', width: 55 }}>DRIFT</td>
-            <td className={`num ${driftClass}`}>{fmtBps(ss.driftBps)} bps {driftDir}</td>
+            <td className={`num ${driftClass}`}>
+              {fmtBps(ss.driftBps)} bps {driftDir}
+            </td>
             <td style={{ color: 'var(--text-muted)', width: 50 }}>BID</td>
-            <td className="num"><SuppressIndicator suppressed={ss.bidSuppressed} reason={ss.bidSuppressReason} /></td>
+            <td className="num">
+              <SuppressIndicator suppressed={ss.bidSuppressed} reason={ss.bidSuppressReason} />
+            </td>
           </tr>
           <tr>
             <td style={{ color: 'var(--text-muted)' }}>VOL</td>
             <td className="num">{fmtSci(ss.sigma2)} /s</td>
             <td style={{ color: 'var(--text-muted)' }}>ASK</td>
-            <td className="num"><SuppressIndicator suppressed={ss.askSuppressed} reason={ss.askSuppressReason} /></td>
+            <td className="num">
+              <SuppressIndicator suppressed={ss.askSuppressed} reason={ss.askSuppressReason} />
+            </td>
           </tr>
           <tr>
             <td style={{ color: 'var(--text-muted)' }}>REGIME</td>
-            <td className={`num ${ss.regime === 'TRENDING' ? 'stat-value--red' : ss.regime === 'MEAN_REVERT' ? 'stat-value--green' : 'stat-value--muted'}`}>
-              {ss.regime === 'WARMING_UP' ? 'WARM' : ss.regime === 'MEAN_REVERT' ? 'MR' : ss.regime === 'TRENDING' ? 'TREND' : 'NEUT'}
-              {' '}H={fmt(ss.hurst, 2)}
+            <td
+              className={`num ${ss.regime === 'TRENDING' ? 'stat-value--red' : ss.regime === 'MEAN_REVERT' ? 'stat-value--green' : 'stat-value--muted'}`}
+            >
+              {ss.regime === 'WARMING_UP'
+                ? 'WARM'
+                : ss.regime === 'MEAN_REVERT'
+                  ? 'MR'
+                  : ss.regime === 'TRENDING'
+                    ? 'TREND'
+                    : 'NEUT'}{' '}
+              H={fmt(ss.hurst, 2)}
             </td>
             <td style={{ color: 'var(--text-muted)' }}>VGATE</td>
             <td className="num">
               <span className={ss.volGateHalted ? 'stat-value--red' : 'stat-value--green'}>
-                {ss.volGateHalted ? 'HALTED' : 'OK'}{ss.volGateTrips > 0 ? ` (${ss.volGateTrips})` : ''}
+                {ss.volGateHalted ? 'HALTED' : 'OK'}
+                {ss.volGateTrips > 0 ? ` (${ss.volGateTrips})` : ''}
               </span>
             </td>
           </tr>
@@ -108,19 +132,43 @@ export function StrategyStatePanel() {
             <td style={{ color: 'var(--text-muted)' }}>GAMMA</td>
             <td className="num">
               {fmt(ss.gammaEffective, 2)}
-              {ss.gammaMultiplier !== 1.0 && <span style={{ color: 'var(--text-muted)', fontSize: 9 }}> ({ss.gammaMultiplier.toFixed(1)}x)</span>}
+              {ss.gammaMultiplier !== 1.0 && (
+                <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>
+                  {' '}
+                  ({ss.gammaMultiplier.toFixed(1)}x)
+                </span>
+              )}
             </td>
             <td style={{ color: 'var(--text-muted)' }}>INV</td>
-            <td className="num">{invSign}{fmt(ss.inventory, 6)}</td>
+            <td className="num">
+              {invSign}
+              {fmt(ss.inventory, 6)}
+            </td>
           </tr>
           <tr>
             <td style={{ color: 'var(--text-muted)' }}>SPREAD</td>
             <td className="num">{fmtBps(ss.halfSpreadBps)} bps</td>
             <td style={{ color: 'var(--text-muted)' }}></td>
             <td className="num">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: 6,
+                }}
+              >
                 <InventoryBar pct={ss.inventoryPct} />
-                <span className={ss.inventoryPct > 90 ? 'stat-value--red' : ss.inventoryPct > 70 ? 'limit-warn' : 'stat-value--muted'} style={{ fontSize: 10 }}>
+                <span
+                  className={
+                    ss.inventoryPct > 90
+                      ? 'stat-value--red'
+                      : ss.inventoryPct > 70
+                        ? 'limit-warn'
+                        : 'stat-value--muted'
+                  }
+                  style={{ fontSize: 10 }}
+                >
                   {fmt(ss.inventoryPct, 0)}%
                 </span>
               </div>
@@ -128,21 +176,39 @@ export function StrategyStatePanel() {
           </tr>
           <tr>
             <td style={{ color: 'var(--text-muted)' }}>R-MID</td>
-            <td className={`num ${ss.reservationOffsetBps > 0.5 ? 'stat-value--green' : ss.reservationOffsetBps < -0.5 ? 'stat-value--red' : 'stat-value--muted'}`}>
-              {ss.reservationOffsetBps >= 0 ? '+' : ''}{fmtBps(ss.reservationOffsetBps)} bps
+            <td
+              className={`num ${ss.reservationOffsetBps > 0.5 ? 'stat-value--green' : ss.reservationOffsetBps < -0.5 ? 'stat-value--red' : 'stat-value--muted'}`}
+            >
+              {ss.reservationOffsetBps >= 0 ? '+' : ''}
+              {fmtBps(ss.reservationOffsetBps)} bps
             </td>
             <td style={{ color: 'var(--text-muted)' }}>KAPPA</td>
-            <td className="num">{fmt(ss.kappa, 3)}{ss.kappaLive ? '' : ' (fb)'}</td>
+            <td className="num">
+              {fmt(ss.kappa, 3)}
+              {ss.kappaLive ? '' : ' (fb)'}
+            </td>
           </tr>
           <tr>
             <td style={{ color: 'var(--text-muted)' }}>FPROJ</td>
             <td className="num" style={{ fontSize: 10 }}>
               <span className="stat-value--muted">B </span>
-              <span className={(ss.bidProjectedFillProb ?? 1) < (ss.queueSuppressMin ?? 0) ? 'stat-value--red' : ''}>
+              <span
+                className={
+                  (ss.bidProjectedFillProb ?? 1) < (ss.queueSuppressMin ?? 0)
+                    ? 'stat-value--red'
+                    : ''
+                }
+              >
                 {fmtProb(ss.bidProjectedFillProb)}
               </span>
               <span className="stat-value--muted"> / A </span>
-              <span className={(ss.askProjectedFillProb ?? 1) < (ss.queueSuppressMin ?? 0) ? 'stat-value--red' : ''}>
+              <span
+                className={
+                  (ss.askProjectedFillProb ?? 1) < (ss.queueSuppressMin ?? 0)
+                    ? 'stat-value--red'
+                    : ''
+                }
+              >
                 {fmtProb(ss.askProjectedFillProb)}
               </span>
             </td>

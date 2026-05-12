@@ -4,6 +4,7 @@ Queries /api/v5/public/instruments for SPOT + SWAP (linear USDT only).
 Filters to live state and USDT quote/settle to keep the canonical universe
 manageable (matches bpt/data-forge's production behaviour).
 """
+
 from __future__ import annotations
 
 from bpt_ops.common.http import get_json

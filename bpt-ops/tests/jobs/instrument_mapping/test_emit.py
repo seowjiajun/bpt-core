@@ -74,19 +74,13 @@ def test_emit_is_idempotent_when_only_timestamp_differs(tmp_path: Path):
     first = reconcile.build(_fixture_raws(), now_ms=1745000000000)
     emit.write_per_exchange(first, tmp_path)
 
-    first_bytes = {
-        p.name: p.read_bytes()
-        for p in tmp_path.glob("instrument_mapping.*.json")
-    }
+    first_bytes = {p.name: p.read_bytes() for p in tmp_path.glob("instrument_mapping.*.json")}
 
     # Same semantic content, different timestamp
     second = reconcile.build(_fixture_raws(), now_ms=9999999999999)
     emit.write_per_exchange(second, tmp_path)
 
-    second_bytes = {
-        p.name: p.read_bytes()
-        for p in tmp_path.glob("instrument_mapping.*.json")
-    }
+    second_bytes = {p.name: p.read_bytes() for p in tmp_path.glob("instrument_mapping.*.json")}
 
     assert first_bytes == second_bytes, "emit must be byte-idempotent on timestamp-only changes"
 

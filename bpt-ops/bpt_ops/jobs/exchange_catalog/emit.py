@@ -1,4 +1,5 @@
 """Emit the runtime JSON catalog read by non-C++ consumers (dashboard, etc.)."""
+
 from __future__ import annotations
 
 import json

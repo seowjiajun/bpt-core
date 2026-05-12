@@ -4,6 +4,7 @@ These schemas define the wire format that `bpt-refdata` expects to parse.
 Any change here is a change to a cross-language contract — update both sides
 in the same PR.
 """
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -16,8 +17,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # YAML without regenerating, or if the C++ ExchangeId.h drifts from the YAML.
 from bpt_ops.common._exchanges_generated import EXCHANGE_DISPLAY_NAMES, ExchangeId
 
-__all__ = ["ExchangeId", "EXCHANGE_DISPLAY_NAMES", "VALID_INSTRUMENT_TYPES",
-           "ReverseEntry", "InstrumentMapping"]
+__all__ = [
+    "ExchangeId",
+    "EXCHANGE_DISPLAY_NAMES",
+    "VALID_INSTRUMENT_TYPES",
+    "ReverseEntry",
+    "InstrumentMapping",
+]
 
 
 VALID_INSTRUMENT_TYPES: frozenset[str] = frozenset({"SPOT", "PERP", "FUTURES"})

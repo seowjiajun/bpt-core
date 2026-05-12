@@ -17,12 +17,12 @@ import {
 import { useStore } from '../store'
 
 const CHART_THEME = {
-  bg:        '#0d1117',
-  text:      '#768390',
-  grid:      '#141b26',
-  border:    '#1c2333',
-  up:        '#3fb950',
-  down:      '#f85149',
+  bg: '#0d1117',
+  text: '#768390',
+  grid: '#141b26',
+  border: '#1c2333',
+  up: '#3fb950',
+  down: '#f85149',
   crosshair: '#243044',
   // Overlay palette for AS quote placement. Market bid/ask sit behind
   // our quotes as dim reference rails; our quotes use the same up/down
@@ -30,10 +30,10 @@ const CHART_THEME = {
   // as "AS intent" distinct from actual order levels.
   marketBid: '#1e4a2a',
   marketAsk: '#4a1e22',
-  ourBid:    '#3fb950',
-  ourAsk:    '#f85149',
+  ourBid: '#3fb950',
+  ourAsk: '#f85149',
   reservation: '#d4a72c',
-  suppressed:  '#5a5a5a',
+  suppressed: '#5a5a5a',
 }
 
 export function PriceChart() {
@@ -173,10 +173,7 @@ export function PriceChart() {
       lineWidth: 1 | 2
     }
 
-    const sync = (
-      ref: React.MutableRefObject<IPriceLine | null>,
-      spec: LineSpec,
-    ) => {
+    const sync = (ref: React.MutableRefObject<IPriceLine | null>, spec: LineSpec) => {
       const valid = spec.price != null && spec.price > 0
       if (!valid) {
         if (ref.current) {
@@ -232,7 +229,8 @@ export function PriceChart() {
     // — on a fresh flat book reservation == mid and a third line on top
     // of the mid is visual noise.
     const showReservation =
-      strat?.reservation && strat?.mid &&
+      strat?.reservation &&
+      strat?.mid &&
       Math.abs((strat.reservation - strat.mid) / strat.mid) > 1e-5
     sync(reservationLineRef, {
       price: showReservation ? strat.reservation : undefined,

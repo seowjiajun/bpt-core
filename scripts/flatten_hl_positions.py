@@ -22,16 +22,16 @@ Credentials load order:
      prod/QA hosts where creds are centrally managed.
 The script prefers local so a dev laptop without AWS creds still works.
 """
+
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
+from eth_account import Account
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
 from hyperliquid.utils import constants
-from eth_account import Account
 
 
 def _fetch_from_local_file(env: str) -> tuple[str, str] | None:
@@ -56,6 +56,7 @@ def _fetch_from_local_file(env: str) -> tuple[str, str] | None:
 
 def _fetch_from_aws(env: str) -> tuple[str, str]:
     import boto3
+
     secret_id = f"bpt/{env}/HYPERLIQUID"
     sm = boto3.client("secretsmanager", region_name="ap-southeast-1")
     resp = sm.get_secret_value(SecretId=secret_id)
@@ -81,13 +82,14 @@ def show_state(info: Info, wallet: str) -> tuple[list, list]:
     """Return (open_positions, open_orders). Also prints them."""
     state = info.user_state(wallet)
     positions = [
-        ap for ap in state.get("assetPositions", [])
-        if float(ap["position"]["szi"]) != 0.0
+        ap for ap in state.get("assetPositions", []) if float(ap["position"]["szi"]) != 0.0
     ]
     orders = info.open_orders(wallet)
 
     print(f"\n─── Account state for {wallet} ───")
-    print(f"  marginSummary.accountValue : {state.get('marginSummary', {}).get('accountValue', '?')}")
+    print(
+        f"  marginSummary.accountValue : {state.get('marginSummary', {}).get('accountValue', '?')}"
+    )
     print(f"  withdrawable               : {state.get('withdrawable', '?')}")
 
     if not positions:
@@ -183,7 +185,9 @@ def main() -> int:
         print("\n--dry-run: exiting without touching anything.")
         return 0
 
-    print(f"\nAbout to flatten {len(positions)} position(s) and cancel {len(orders)} order(s) on {network}.")
+    print(
+        f"\nAbout to flatten {len(positions)} position(s) and cancel {len(orders)} order(s) on {network}."
+    )
     reply = input("Type 'FLATTEN' to proceed, anything else to abort: ").strip()
     if reply != "FLATTEN":
         print("Aborted.")

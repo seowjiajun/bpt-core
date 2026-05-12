@@ -20,11 +20,10 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pyarrow.parquet as pq
-
 
 BOOK_DEPTH = 5
 TRADE_COLS = {
@@ -87,9 +86,7 @@ def validate_day(cache: Path, exchange: str, symbol: str, day: date) -> dict:
                 result["errors"].append(f"{op}: timestamps not sorted")
             crossed = (df["bid_px_1"] >= df["ask_px_1"]) & (df["ask_px_1"] > 0)
             if crossed.any():
-                result["errors"].append(
-                    f"{op}: {crossed.sum()} crossed books (bid_1 >= ask_1)"
-                )
+                result["errors"].append(f"{op}: {crossed.sum()} crossed books (bid_1 >= ask_1)")
             result["book_first_ts"] = int(ts[0])
             result["book_last_ts"] = int(ts[-1])
 
@@ -159,8 +156,8 @@ def main():
     print(f"Totals: trades={total_trades} book={total_book} merged_events={total_merged}")
     if first_ts is not None:
         span_s = (last_ts - first_ts) / 1e9
-        fdt = datetime.fromtimestamp(first_ts / 1e9, tz=timezone.utc)
-        ldt = datetime.fromtimestamp(last_ts / 1e9, tz=timezone.utc)
+        fdt = datetime.fromtimestamp(first_ts / 1e9, tz=UTC)
+        ldt = datetime.fromtimestamp(last_ts / 1e9, tz=UTC)
         print(f"Span  : {fdt.isoformat()} → {ldt.isoformat()} ({span_s:.1f}s)")
 
     if all_errors:
@@ -171,8 +168,10 @@ def main():
         sys.exit(1)
 
     print()
-    print("OK — schema and data-quality checks pass. C++ DataLoader with the"
-          " same Arrow type bindings will read this cache.")
+    print(
+        "OK — schema and data-quality checks pass. C++ DataLoader with the"
+        " same Arrow type bindings will read this cache."
+    )
 
 
 if __name__ == "__main__":

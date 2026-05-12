@@ -5,6 +5,7 @@ Writes bpt_ops/common/_exchanges_generated.py. The content is deterministic
 byte-identical file; CI compares the generator's output against the committed
 file and fails on drift.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

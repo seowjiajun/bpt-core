@@ -15,8 +15,8 @@ export function PositionPanel() {
     unrealizedPnl > 0
       ? 'stat-value--green'
       : unrealizedPnl < 0
-      ? 'stat-value--red'
-      : 'stat-value--muted'
+        ? 'stat-value--red'
+        : 'stat-value--muted'
 
   return (
     <div className="panel">
@@ -42,9 +42,7 @@ export function PositionPanel() {
         <div className="stat-cell">
           <span className="stat-label">Mark Price</span>
           <span className="stat-value stat-value--sm">
-            {price
-              ? price.toLocaleString('en-US', { minimumFractionDigits: 1 })
-              : '—'}
+            {price ? price.toLocaleString('en-US', { minimumFractionDigits: 1 }) : '—'}
           </span>
         </div>
         <div className="stat-cell" style={{ gridColumn: '1 / -1' }}>

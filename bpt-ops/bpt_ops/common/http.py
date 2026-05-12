@@ -3,6 +3,7 @@
 All exchange-facing fetchers should go through `get_json()` so that transient
 failures don't break a scheduled run and so every job has uniform logging.
 """
+
 from __future__ import annotations
 
 from typing import Any

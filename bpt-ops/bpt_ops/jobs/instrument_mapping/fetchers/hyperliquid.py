@@ -1,4 +1,5 @@
 """Hyperliquid instrument fetcher — TODO stub."""
+
 from __future__ import annotations
 
 from bpt_ops.jobs.instrument_mapping.fetchers.base import RawInstrument

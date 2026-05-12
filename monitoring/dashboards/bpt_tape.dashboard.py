@@ -11,16 +11,16 @@ Render with:
 Output lands in monitoring/generated/bpt_tape.json and is picked up by
 Grafana via file provisioning on next reload.
 """
+
 from grafanalib.core import (
     BYTES_FORMAT,
+    OPS_FORMAT,
+    PERCENT_FORMAT,
+    SECONDS_FORMAT,
+    SHORT_FORMAT,
     Dashboard,
     Graph,
     GridPos,
-    OPS_FORMAT,
-    PERCENT_FORMAT,
-    PERCENT_UNIT_FORMAT,
-    SECONDS_FORMAT,
-    SHORT_FORMAT,
     Stat,
     Target,
     Templating,
@@ -32,8 +32,19 @@ from grafanalib.core import (
 DATASOURCE = "Prometheus"
 
 
-def stat(title, expr, *, x, y, w=4, h=3, unit=SHORT_FORMAT,
-         color_mode="value", thresholds=None, decimals=None):
+def stat(
+    title,
+    expr,
+    *,
+    x,
+    y,
+    w=4,
+    h=3,
+    unit=SHORT_FORMAT,
+    color_mode="value",
+    thresholds=None,
+    decimals=None,
+):
     s = Stat(
         title=title,
         dataSource=DATASOURCE,
@@ -72,13 +83,13 @@ def target(expr, legend):
 # Freshness thresholds: green if last write was within 1 min, yellow up
 # to 5 min, red beyond. Matches TapeWriterStale alert (300s = critical).
 FRESHNESS_THRESHOLDS = [
-    {"color": "green",  "value": None},
+    {"color": "green", "value": None},
     {"color": "yellow", "value": 60},
-    {"color": "red",    "value": 300},
+    {"color": "red", "value": 300},
 ]
 
 HEALTH_THRESHOLDS = [
-    {"color": "red",   "value": None},
+    {"color": "red", "value": None},
     {"color": "green", "value": 1},
 ]
 
@@ -92,13 +103,19 @@ top_row = [
     stat(
         "tape healthy",
         'bpt_tape_healthy{job="bpt-tape"} or on() vector(0)',
-        x=0, y=0, w=4, h=4,
+        x=0,
+        y=0,
+        w=4,
+        h=4,
         thresholds=HEALTH_THRESHOLDS,
     ),
     stat(
         "since last write — md (s)",
         'time() - bpt_tape_last_wslog_write_unix_seconds{job="bpt-tape",venue="hyperliquid"}',
-        x=4, y=0, w=10, h=4,
+        x=4,
+        y=0,
+        w=10,
+        h=4,
         unit=SECONDS_FORMAT,
         decimals=0,
         thresholds=FRESHNESS_THRESHOLDS,
@@ -106,15 +123,18 @@ top_row = [
     stat(
         "since last write — rest (s)",
         'time() - bpt_tape_last_wslog_write_unix_seconds{job="bpt-tape",venue="hyperliquid-rest"}',
-        x=14, y=0, w=10, h=4,
+        x=14,
+        y=0,
+        w=10,
+        h=4,
         unit=SECONDS_FORMAT,
         decimals=0,
         # REST polls hourly so 5min freshness threshold doesn't apply;
         # set a wider threshold (90 min before red).
         thresholds=[
-            {"color": "green",  "value": None},
-            {"color": "yellow", "value": 3700},   # ~62 min
-            {"color": "red",    "value": 5400},   # 90 min
+            {"color": "green", "value": None},
+            {"color": "yellow", "value": 3700},  # ~62 min
+            {"color": "red", "value": 5400},  # 90 min
         ],
     ),
 ]
@@ -125,13 +145,21 @@ top_row = [
 throughput_panels = [
     graph(
         "Frames written rate",
-        [target('rate(bpt_tape_frames_written_total{job="bpt-tape"}[1m])', '{{venue}}')],
-        x=0, y=4, w=12, h=7, unit=OPS_FORMAT,
+        [target('rate(bpt_tape_frames_written_total{job="bpt-tape"}[1m])', "{{venue}}")],
+        x=0,
+        y=4,
+        w=12,
+        h=7,
+        unit=OPS_FORMAT,
     ),
     graph(
         "Bytes written rate",
-        [target('rate(bpt_tape_bytes_written_total{job="bpt-tape"}[1m])', '{{venue}}')],
-        x=12, y=4, w=12, h=7, unit=BYTES_FORMAT,
+        [target('rate(bpt_tape_bytes_written_total{job="bpt-tape"}[1m])', "{{venue}}")],
+        x=12,
+        y=4,
+        w=12,
+        h=7,
+        unit=BYTES_FORMAT,
     ),
 ]
 
@@ -146,9 +174,11 @@ throughput_panels = [
 rotation_panels = [
     graph(
         "Rotations / min",
-        [target('rate(bpt_tape_wslog_rotations_total{job="bpt-tape"}[5m]) * 60',
-                '{{venue}}')],
-        x=0, y=11, w=12, h=7,
+        [target('rate(bpt_tape_wslog_rotations_total{job="bpt-tape"}[5m]) * 60', "{{venue}}")],
+        x=0,
+        y=11,
+        w=12,
+        h=7,
     ),
     graph(
         # `or vector(0)` so the panel renders 0 instead of "no data" when
@@ -156,12 +186,17 @@ rotation_panels = [
         # if/when an actual failure happens (the labeled series takes
         # over via PromQL's set semantics).
         "Rotation failures (5m)",
-        [target(
-            'increase(bpt_tape_wslog_rotation_failures_total{job="bpt-tape"}[5m]) '
-            'or on() vector(0)',
-            '{{venue}}/{{cause}}',
-        )],
-        x=12, y=11, w=12, h=7,
+        [
+            target(
+                'increase(bpt_tape_wslog_rotation_failures_total{job="bpt-tape"}[5m]) '
+                "or on() vector(0)",
+                "{{venue}}/{{cause}}",
+            )
+        ],
+        x=12,
+        y=11,
+        w=12,
+        h=7,
     ),
 ]
 
@@ -175,20 +210,31 @@ rotation_panels = [
 disk_panels = [
     graph(
         "/opt/bpt/data free",
-        [target(
-            'node_filesystem_avail_bytes{mountpoint="/opt/bpt/data"}',
-            '{{instance}}',
-        )],
-        x=0, y=18, w=12, h=7, unit=BYTES_FORMAT,
+        [
+            target(
+                'node_filesystem_avail_bytes{mountpoint="/opt/bpt/data"}',
+                "{{instance}}",
+            )
+        ],
+        x=0,
+        y=18,
+        w=12,
+        h=7,
+        unit=BYTES_FORMAT,
     ),
     graph(
         "/opt/bpt/data % used",
-        [target(
-            '100 * (1 - node_filesystem_avail_bytes{mountpoint="/opt/bpt/data"}'
-            '         / node_filesystem_size_bytes{mountpoint="/opt/bpt/data"})',
-            '{{instance}}',
-        )],
-        x=12, y=18, w=12, h=7,
+        [
+            target(
+                '100 * (1 - node_filesystem_avail_bytes{mountpoint="/opt/bpt/data"}'
+                '         / node_filesystem_size_bytes{mountpoint="/opt/bpt/data"})',
+                "{{instance}}",
+            )
+        ],
+        x=12,
+        y=18,
+        w=12,
+        h=7,
     ),
 ]
 
@@ -203,13 +249,19 @@ ws_state_row = [
     stat(
         "ws connected — md",
         'bpt_tape_ws_connected{job="bpt-tape",venue="hyperliquid"} or on() vector(0)',
-        x=0, y=25, w=6, h=4,
+        x=0,
+        y=25,
+        w=6,
+        h=4,
         thresholds=HEALTH_THRESHOLDS,
     ),
     stat(
         "subscriptions — hyperliquid",
         'bpt_tape_subscriptions{job="bpt-tape",venue="hyperliquid"}',
-        x=6, y=25, w=6, h=4,
+        x=6,
+        y=25,
+        w=6,
+        h=4,
     ),
     stat(
         "ws connected — rest",
@@ -218,7 +270,10 @@ ws_state_row = [
         # one. Substitute the freshness gauge: if rest hasn't written in
         # over 90 min, it's effectively "down".
         'clamp_max(bpt_tape_last_wslog_write_unix_seconds{job="bpt-tape",venue="hyperliquid-rest"} > bool (time() - 5400), 1) or on() vector(1)',
-        x=12, y=25, w=6, h=4,
+        x=12,
+        y=25,
+        w=6,
+        h=4,
         thresholds=HEALTH_THRESHOLDS,
     ),
     stat(
@@ -226,7 +281,10 @@ ws_state_row = [
         # REST endpoints aren't subscribed in the same way; show 0 for
         # consistency until refdata-poller exposes its own count.
         'count(bpt_tape_last_wslog_write_unix_seconds{job="bpt-tape",venue="hyperliquid-rest"}) or on() vector(0)',
-        x=18, y=25, w=6, h=4,
+        x=18,
+        y=25,
+        w=6,
+        h=4,
     ),
 ]
 
@@ -240,15 +298,20 @@ ws_state_row = [
 ws_rate_panels = [
     graph(
         "WS reconnects / min (per venue)",
-        [target('rate(bpt_tape_ws_reconnects_total{job="bpt-tape"}[5m]) * 60',
-                '{{venue}}')],
-        x=0, y=29, w=12, h=7, unit=OPS_FORMAT,
+        [target('rate(bpt_tape_ws_reconnects_total{job="bpt-tape"}[5m]) * 60', "{{venue}}")],
+        x=0,
+        y=29,
+        w=12,
+        h=7,
+        unit=OPS_FORMAT,
     ),
     graph(
         "WS reconnect cumulative",
-        [target('bpt_tape_ws_reconnects_total{job="bpt-tape"}',
-                '{{venue}}')],
-        x=12, y=29, w=12, h=7,
+        [target('bpt_tape_ws_reconnects_total{job="bpt-tape"}', "{{venue}}")],
+        x=12,
+        y=29,
+        w=12,
+        h=7,
     ),
 ]
 
@@ -264,20 +327,30 @@ host_cpu_mem_panels = [
         [
             # 1 - irate(idle) gives total non-idle. Per-mode breakdown
             # below shows where CPU went (user/sys/iowait/etc).
-            target('avg by (mode) (rate(node_cpu_seconds_total{job="tape-host"}[2m])) * 100',
-                   '{{mode}}'),
+            target(
+                'avg by (mode) (rate(node_cpu_seconds_total{job="tape-host"}[2m])) * 100',
+                "{{mode}}",
+            ),
         ],
-        x=0, y=36, w=12, h=7, unit=PERCENT_FORMAT,
+        x=0,
+        y=36,
+        w=12,
+        h=7,
+        unit=PERCENT_FORMAT,
     ),
     graph(
         "Host memory",
         [
-            target('node_memory_MemAvailable_bytes{job="tape-host"}', 'available'),
-            target('node_memory_MemFree_bytes{job="tape-host"}',      'free'),
-            target('node_memory_Cached_bytes{job="tape-host"}',       'cached'),
-            target('node_memory_Buffers_bytes{job="tape-host"}',      'buffers'),
+            target('node_memory_MemAvailable_bytes{job="tape-host"}', "available"),
+            target('node_memory_MemFree_bytes{job="tape-host"}', "free"),
+            target('node_memory_Cached_bytes{job="tape-host"}', "cached"),
+            target('node_memory_Buffers_bytes{job="tape-host"}', "buffers"),
         ],
-        x=12, y=36, w=12, h=7, unit=BYTES_FORMAT,
+        x=12,
+        y=36,
+        w=12,
+        h=7,
+        unit=BYTES_FORMAT,
     ),
 ]
 
@@ -295,21 +368,32 @@ host_net_load_panels = [
         [
             # ens5 / eth0 / etc — match all named interfaces, exclude
             # loopback. node_network_receive_bytes_total is per-NIC.
-            target('rate(node_network_receive_bytes_total{job="tape-host",device!~"lo|docker.*"}[1m])',
-                   'rx {{device}}'),
-            target('rate(node_network_transmit_bytes_total{job="tape-host",device!~"lo|docker.*"}[1m])',
-                   'tx {{device}}'),
+            target(
+                'rate(node_network_receive_bytes_total{job="tape-host",device!~"lo|docker.*"}[1m])',
+                "rx {{device}}",
+            ),
+            target(
+                'rate(node_network_transmit_bytes_total{job="tape-host",device!~"lo|docker.*"}[1m])',
+                "tx {{device}}",
+            ),
         ],
-        x=0, y=43, w=12, h=7, unit=BYTES_FORMAT,
+        x=0,
+        y=43,
+        w=12,
+        h=7,
+        unit=BYTES_FORMAT,
     ),
     graph(
         "Host load average",
         [
-            target('node_load1{job="tape-host"}',  '1m'),
-            target('node_load5{job="tape-host"}',  '5m'),
-            target('node_load15{job="tape-host"}', '15m'),
+            target('node_load1{job="tape-host"}', "1m"),
+            target('node_load5{job="tape-host"}', "5m"),
+            target('node_load15{job="tape-host"}', "15m"),
         ],
-        x=12, y=43, w=12, h=7,
+        x=12,
+        y=43,
+        w=12,
+        h=7,
     ),
 ]
 
@@ -326,20 +410,26 @@ inode_panel = [
         "/opt/bpt/data inode % free",
         '100 * node_filesystem_files_free{job="tape-host",mountpoint="/opt/bpt/data"}'
         ' / node_filesystem_files{job="tape-host",mountpoint="/opt/bpt/data"}',
-        x=0, y=50, w=12, h=4,
+        x=0,
+        y=50,
+        w=12,
+        h=4,
         unit=PERCENT_FORMAT,
         decimals=1,
         thresholds=[
-            {"color": "red",    "value": None},
+            {"color": "red", "value": None},
             {"color": "yellow", "value": 20},
-            {"color": "green",  "value": 50},
+            {"color": "green", "value": 50},
         ],
     ),
     stat(
         "/opt/bpt/data inodes used",
         'node_filesystem_files{job="tape-host",mountpoint="/opt/bpt/data"} '
         '- node_filesystem_files_free{job="tape-host",mountpoint="/opt/bpt/data"}',
-        x=12, y=50, w=12, h=4,
+        x=12,
+        y=50,
+        w=12,
+        h=4,
         decimals=0,
     ),
 ]

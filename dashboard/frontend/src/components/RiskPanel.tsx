@@ -49,14 +49,14 @@ export function RiskPanel(props: RiskPanelProps = {}) {
   let totalFills: number
 
   if (props.precomputed) {
-    totalPnl   = props.precomputed.totalPnl
-    returnPct  = props.precomputed.returnPct
-    maxDdPct   = props.precomputed.maxDdPct
-    sharpe     = props.precomputed.sharpe
-    winRate    = props.precomputed.winRate
+    totalPnl = props.precomputed.totalPnl
+    returnPct = props.precomputed.returnPct
+    maxDdPct = props.precomputed.maxDdPct
+    sharpe = props.precomputed.sharpe
+    winRate = props.precomputed.winRate
     totalFills = props.precomputed.totalFills
   } else if (isArchive) {
-    totalPnl  = fills.length ? fills[fills.length - 1].equity - startingCapital : 0
+    totalPnl = fills.length ? fills[fills.length - 1].equity - startingCapital : 0
     returnPct = startingCapital ? (totalPnl / startingCapital) * 100 : 0
 
     let peak = startingCapital
@@ -88,7 +88,7 @@ export function RiskPanel(props: RiskPanelProps = {}) {
     // are deposit-immune by construction.
     const first = accountHistory[0]?.equity ?? 0
     const realisedSum = liveFills.reduce((acc, f) => acc + f.realizedPnl, 0)
-    totalPnl  = realisedSum + liveUnrealizedPnl
+    totalPnl = realisedSum + liveUnrealizedPnl
     returnPct = first ? (totalPnl / first) * 100 : 0
 
     // Max DD computed on cumulative realized PnL series (deposit-immune).
@@ -129,20 +129,20 @@ export function RiskPanel(props: RiskPanelProps = {}) {
   // precomputed prop. In live mode we'd derive it from liveFills, but the
   // panel already covers Win Rate / Fills there, so skip rather than
   // double up.
-  const buyCount     = props.precomputed?.buyCount
-  const sellCount    = props.precomputed?.sellCount
-  const buyNotional  = props.precomputed?.buyNotional
+  const buyCount = props.precomputed?.buyCount
+  const sellCount = props.precomputed?.sellCount
+  const buyNotional = props.precomputed?.buyNotional
   const sellNotional = props.precomputed?.sellNotional
   const showSideSplit = buyCount !== undefined && sellCount !== undefined
 
-  const closedRTs    = props.precomputed?.closedRoundTrips
-  const avgHoldMs    = props.precomputed?.avgHoldingMs
-  const rtWinRate    = props.precomputed?.rtWinRatePct
+  const closedRTs = props.precomputed?.closedRoundTrips
+  const avgHoldMs = props.precomputed?.avgHoldingMs
+  const rtWinRate = props.precomputed?.rtWinRatePct
   const showRoundTrips = closedRTs !== undefined && closedRTs > 0
   const fmtHolding = (ms: number | undefined): string => {
     if (ms === undefined) return '—'
-    if (ms < 1000)    return `${ms.toFixed(0)}ms`
-    if (ms < 60_000)  return `${(ms / 1000).toFixed(1)}s`
+    if (ms < 1000) return `${ms.toFixed(0)}ms`
+    if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
     return `${(ms / 60_000).toFixed(1)}m`
   }
 
@@ -167,9 +167,7 @@ export function RiskPanel(props: RiskPanelProps = {}) {
         </div>
         <div className="stat-cell">
           <span className="stat-label">Max DD</span>
-          <span className="stat-value stat-value--red stat-value--sm">
-            -{maxDdPct.toFixed(2)}%
-          </span>
+          <span className="stat-value stat-value--red stat-value--sm">-{maxDdPct.toFixed(2)}%</span>
         </div>
         <div className="stat-cell">
           <span className="stat-label">Sharpe</span>

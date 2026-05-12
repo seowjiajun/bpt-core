@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import polars as pl
-
 from bpt_universe.diff import proposed_instruments, render_diff
 
 

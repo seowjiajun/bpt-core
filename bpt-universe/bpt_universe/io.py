@@ -5,7 +5,6 @@ from pathlib import Path
 
 import polars as pl
 
-
 _INSTRUMENT_TYPE = {
     "SPOT": "SPOT",
     "MARGIN": "SPOT",

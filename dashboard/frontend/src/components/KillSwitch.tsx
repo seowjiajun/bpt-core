@@ -63,7 +63,8 @@ export function KillSwitch() {
                     Open orders remain active. Existing positions are not flattened.
                   </p>
                   <p className="modal-note">
-                    Mode: <span className={`mode-pill mode-pill--${mode}`}>{mode.toUpperCase()}</span>
+                    Mode:{' '}
+                    <span className={`mode-pill mode-pill--${mode}`}>{mode.toUpperCase()}</span>
                   </p>
                 </>
               ) : (

@@ -6,6 +6,7 @@ doesn't depend on SBE — it regex-parses the enum literals out of the header
 and compares them to the YAML. If anyone edits one side without the other,
 CI fails.
 """
+
 from __future__ import annotations
 
 import re
@@ -22,7 +23,7 @@ _ENUM_LINE_RE = re.compile(
 
 _SENTINELS: set[str] = {
     "NULL_VALUE",  # SBE-emitted placeholder
-    "ALL",         # protocol sentinel meaning "all venues" (cancel-all, etc.)
+    "ALL",  # protocol sentinel meaning "all venues" (cancel-all, etc.)
 }
 
 

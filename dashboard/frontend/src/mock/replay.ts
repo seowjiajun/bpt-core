@@ -14,7 +14,7 @@ interface ReplayConfig {
   symbol: string
   strategy: string
   exchange: string
-  intervalMs?: number   // time between fills (default 1200)
+  intervalMs?: number // time between fills (default 1200)
   initialDelayMs?: number
 }
 
@@ -62,8 +62,8 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
     timeouts.push(
       window.setTimeout(
         () => dispatch({ type: 'tick', ts: firstTs, symbol, price: fills[0].price }),
-        0,
-      ),
+        0
+      )
     )
   }
 
@@ -88,10 +88,7 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
       const price = a.price + dPrice * frac + noise
       const wallDelay = Math.floor(baseWallMs + dWallMs * frac)
       timeouts.push(
-        window.setTimeout(
-          () => dispatch({ type: 'tick', ts: simTs, symbol, price }),
-          wallDelay,
-        ),
+        window.setTimeout(() => dispatch({ type: 'tick', ts: simTs, symbol, price }), wallDelay)
       )
     }
   }
@@ -116,7 +113,7 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
             remainingQty: fill.qty,
             status: 'acked',
           })
-        }, ackDelay),
+        }, ackDelay)
       )
     }
 
@@ -150,7 +147,7 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
         orderType: 'LIMIT',
         qty: fill.qty,
         price: fill.price,
-        fee: fill.qty * fill.price * 0.0002,  // 2 bps taker-ish placeholder
+        fee: fill.qty * fill.price * 0.0002, // 2 bps taker-ish placeholder
         realizedPnl: fill.realizedPnl,
         equity: fill.equity,
       })
@@ -169,10 +166,7 @@ export function startMockReplay(cfg: ReplayConfig): () => void {
 
       // After the last fill, mark the session complete.
       if (i === fills.length - 1) {
-        const doneId = window.setTimeout(
-          () => dispatch({ type: 'status', state: 'off' }),
-          1500,
-        )
+        const doneId = window.setTimeout(() => dispatch({ type: 'status', state: 'off' }), 1500)
         timeouts.push(doneId)
       }
     }, delay)

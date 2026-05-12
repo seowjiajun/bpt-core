@@ -104,12 +104,8 @@ export function ToxicityPanel() {
             <td className={`num ${scoreClass(mask(tox.bidToxScore, bidWarmup))}`}>
               {fmtScore(mask(tox.bidToxScore, bidWarmup))}
             </td>
-            <td className={`num ${fillRateClass(tox.bidFillRate)}`}>
-              {fmtPct(tox.bidFillRate)}
-            </td>
-            <td className={`num ${ttfClass(tox.bidTtfMs)}`}>
-              {fmtMs(tox.bidTtfMs)}
-            </td>
+            <td className={`num ${fillRateClass(tox.bidFillRate)}`}>{fmtPct(tox.bidFillRate)}</td>
+            <td className={`num ${ttfClass(tox.bidTtfMs)}`}>{fmtMs(tox.bidTtfMs)}</td>
           </tr>
           <tr>
             <td style={{ fontWeight: 600 }}>ASK</td>
@@ -122,12 +118,8 @@ export function ToxicityPanel() {
             <td className={`num ${scoreClass(mask(tox.askToxScore, askWarmup))}`}>
               {fmtScore(mask(tox.askToxScore, askWarmup))}
             </td>
-            <td className={`num ${fillRateClass(tox.askFillRate)}`}>
-              {fmtPct(tox.askFillRate)}
-            </td>
-            <td className={`num ${ttfClass(tox.askTtfMs)}`}>
-              {fmtMs(tox.askTtfMs)}
-            </td>
+            <td className={`num ${fillRateClass(tox.askFillRate)}`}>{fmtPct(tox.askFillRate)}</td>
+            <td className={`num ${ttfClass(tox.askTtfMs)}`}>{fmtMs(tox.askTtfMs)}</td>
           </tr>
         </tbody>
       </table>

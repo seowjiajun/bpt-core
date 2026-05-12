@@ -26,11 +26,10 @@ from __future__ import annotations
 
 import argparse
 import glob
-import os
 import struct
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -63,7 +62,7 @@ BOOK_LEVEL_SIZE = struct.calcsize(BOOK_LEVEL_FMT)
 
 
 def day_key(ts_ns: int) -> str:
-    dt = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc)
+    dt = datetime.fromtimestamp(ts_ns / 1e9, tz=UTC)
     return dt.strftime("%Y-%m-%d")
 
 
@@ -83,9 +82,7 @@ def parse_mdlog(path: Path):
         off += length
         if len(frame) < SBE_HEADER_SIZE:
             continue
-        _block_len, template_id, _schema_id, _version = struct.unpack_from(
-            SBE_HEADER_FMT, frame, 0
-        )
+        _block_len, template_id, _schema_id, _version = struct.unpack_from(SBE_HEADER_FMT, frame, 0)
         yield recv_ts_ns, template_id, frame[SBE_HEADER_SIZE:]
 
 
@@ -151,18 +148,10 @@ def write_orderbook_parquet(path: Path, rows: list):
         "timestamp_ns": pa.array([r["timestamp_ns"] for r in rows], type=pa.int64()),
     }
     for lvl in range(1, BOOK_DEPTH + 1):
-        cols[f"bid_px_{lvl}"] = pa.array(
-            [r["bid_px"][lvl - 1] for r in rows], type=pa.float64()
-        )
-        cols[f"bid_sz_{lvl}"] = pa.array(
-            [r["bid_sz"][lvl - 1] for r in rows], type=pa.float64()
-        )
-        cols[f"ask_px_{lvl}"] = pa.array(
-            [r["ask_px"][lvl - 1] for r in rows], type=pa.float64()
-        )
-        cols[f"ask_sz_{lvl}"] = pa.array(
-            [r["ask_sz"][lvl - 1] for r in rows], type=pa.float64()
-        )
+        cols[f"bid_px_{lvl}"] = pa.array([r["bid_px"][lvl - 1] for r in rows], type=pa.float64())
+        cols[f"bid_sz_{lvl}"] = pa.array([r["bid_sz"][lvl - 1] for r in rows], type=pa.float64())
+        cols[f"ask_px_{lvl}"] = pa.array([r["ask_px"][lvl - 1] for r in rows], type=pa.float64())
+        cols[f"ask_sz_{lvl}"] = pa.array([r["ask_sz"][lvl - 1] for r in rows], type=pa.float64())
     table = pa.table(cols)
     pq.write_table(table, path)
     print(f"wrote {path} ({table.num_rows} book snapshots)")

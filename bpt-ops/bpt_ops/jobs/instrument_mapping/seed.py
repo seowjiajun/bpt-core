@@ -8,6 +8,7 @@ cross-temporal meaning mismatch that's effectively unfixable.
 apply_seeds() is idempotent: seeds with an existing reverse entry are
 skipped; only missing exchange entries + forward keys are filled in.
 """
+
 from __future__ import annotations
 
 from bpt_ops.common.schema import ExchangeId, InstrumentMapping
@@ -18,34 +19,70 @@ from bpt_ops.jobs.instrument_mapping.forward_key import build_forward_key
 # (canonical_id, base, quote, type, {ExchangeId: venue_symbol})
 _SEEDS: list[tuple[int, str, str, str, dict[ExchangeId, str]]] = [
     # PERP — 1001-1009 reserved for top tier
-    (1001, "BTC", "USDT", "PERP", {
-        ExchangeId.BINANCE: "BTCUSDT",
-        ExchangeId.OKX: "BTC-USDT-SWAP",
-        ExchangeId.HYPERLIQUID: "BTC",
-    }),
-    (1002, "ETH", "USDT", "PERP", {
-        ExchangeId.BINANCE: "ETHUSDT",
-        ExchangeId.OKX: "ETH-USDT-SWAP",
-        ExchangeId.HYPERLIQUID: "ETH",
-    }),
-    (1003, "SOL", "USDT", "PERP", {
-        ExchangeId.BINANCE: "SOLUSDT",
-        ExchangeId.OKX: "SOL-USDT-SWAP",
-        ExchangeId.HYPERLIQUID: "SOL",
-    }),
+    (
+        1001,
+        "BTC",
+        "USDT",
+        "PERP",
+        {
+            ExchangeId.BINANCE: "BTCUSDT",
+            ExchangeId.OKX: "BTC-USDT-SWAP",
+            ExchangeId.HYPERLIQUID: "BTC",
+        },
+    ),
+    (
+        1002,
+        "ETH",
+        "USDT",
+        "PERP",
+        {
+            ExchangeId.BINANCE: "ETHUSDT",
+            ExchangeId.OKX: "ETH-USDT-SWAP",
+            ExchangeId.HYPERLIQUID: "ETH",
+        },
+    ),
+    (
+        1003,
+        "SOL",
+        "USDT",
+        "PERP",
+        {
+            ExchangeId.BINANCE: "SOLUSDT",
+            ExchangeId.OKX: "SOL-USDT-SWAP",
+            ExchangeId.HYPERLIQUID: "SOL",
+        },
+    ),
     # SPOT — 2001-2009 reserved for top tier
-    (2001, "BTC", "USDT", "SPOT", {
-        ExchangeId.BINANCE: "BTCUSDT",
-        ExchangeId.OKX: "BTC-USDT",
-    }),
-    (2002, "ETH", "USDT", "SPOT", {
-        ExchangeId.BINANCE: "ETHUSDT",
-        ExchangeId.OKX: "ETH-USDT",
-    }),
-    (2003, "SOL", "USDT", "SPOT", {
-        ExchangeId.BINANCE: "SOLUSDT",
-        ExchangeId.OKX: "SOL-USDT",
-    }),
+    (
+        2001,
+        "BTC",
+        "USDT",
+        "SPOT",
+        {
+            ExchangeId.BINANCE: "BTCUSDT",
+            ExchangeId.OKX: "BTC-USDT",
+        },
+    ),
+    (
+        2002,
+        "ETH",
+        "USDT",
+        "SPOT",
+        {
+            ExchangeId.BINANCE: "ETHUSDT",
+            ExchangeId.OKX: "ETH-USDT",
+        },
+    ),
+    (
+        2003,
+        "SOL",
+        "USDT",
+        "SPOT",
+        {
+            ExchangeId.BINANCE: "SOLUSDT",
+            ExchangeId.OKX: "SOL-USDT",
+        },
+    ),
 ]
 
 

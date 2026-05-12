@@ -3,6 +3,7 @@
 Each file ships to bpt-refdata under config/generated/instrument_mapping.<exchange>.json;
 refdata's InstrumentMappingMerger consumes them at service startup.
 """
+
 from __future__ import annotations
 
 import json

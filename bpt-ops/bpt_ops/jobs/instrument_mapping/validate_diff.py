@@ -13,6 +13,7 @@ Run by CI on every PR that touches config/instruments/. Catches:
 Exits 0 when the diff passes, non-zero with a human-readable explanation
 when it doesn't. When non-zero, CI fails; the PR stays open for review.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -56,9 +57,7 @@ def _check_mass_delete(
         )
 
 
-def _check_id_stability(
-    *, exchange: str, prev: InstrumentMapping, new: InstrumentMapping
-) -> None:
+def _check_id_stability(*, exchange: str, prev: InstrumentMapping, new: InstrumentMapping) -> None:
     for cid, prev_entry in prev.reverse.items():
         new_entry = new.reverse.get(cid)
         if new_entry is None:

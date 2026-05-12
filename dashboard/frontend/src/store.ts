@@ -42,7 +42,7 @@ export interface OpenOrder {
 // type on the wire.  Keep it in sync with lightweight-charts' time unit
 // (unix seconds, not nanos).
 export interface Candle {
-  time: number    // unix seconds
+  time: number // unix seconds
   open: number
   high: number
   low: number
@@ -79,7 +79,7 @@ interface State {
   accountCurrencyBalances: import('./types/messages').AccountCurrencyBalance[]
 
   // Market
-  firstPrice: number     // set on the first tick; used for top-bar % change
+  firstPrice: number // set on the first tick; used for top-bar % change
   price: number
 
   // Position (bridge-provided — bridge is the source of truth)
@@ -189,8 +189,7 @@ export const useStore = create<State>((set) => ({
 
         case 'tick': {
           const firstPrice = state.firstPrice || msg.price
-          const unrealizedPnl =
-            state.netQty !== 0 ? (msg.price - state.avgEntry) * state.netQty : 0
+          const unrealizedPnl = state.netQty !== 0 ? (msg.price - state.avgEntry) * state.netQty : 0
 
           // Roll this tick into the current 1m bar, or start a new bar
           // if the tick crossed a bucket boundary.  Time is in seconds
@@ -205,7 +204,7 @@ export const useStore = create<State>((set) => ({
               time: bucketStart,
               open: msg.price,
               high: msg.price,
-              low:  msg.price,
+              low: msg.price,
               close: msg.price,
             }
             candles = [...state.candles, fresh]
@@ -214,8 +213,8 @@ export const useStore = create<State>((set) => ({
             // Still inside the same bucket — update high/low/close in place.
             const updated: Candle = {
               ...last,
-              high:  msg.price > last.high ? msg.price : last.high,
-              low:   msg.price < last.low  ? msg.price : last.low,
+              high: msg.price > last.high ? msg.price : last.high,
+              low: msg.price < last.low ? msg.price : last.low,
               close: msg.price,
             }
             candles = [...state.candles.slice(0, -1), updated]
@@ -226,7 +225,7 @@ export const useStore = create<State>((set) => ({
 
         case 'fill': {
           const fill: Fill = {
-            seq: state.fills.length,  // monotonic, unique per store instance
+            seq: state.fills.length, // monotonic, unique per store instance
             ts: msg.ts,
             orderId: msg.orderId,
             side: msg.side,
@@ -282,7 +281,7 @@ export const useStore = create<State>((set) => ({
               underlying: l.underlying,
               strike: l.strike,
               expiry: l.expiry,
-              optionSide: l.isCall ? 'CALL' as const : 'PUT' as const,
+              optionSide: l.isCall ? ('CALL' as const) : ('PUT' as const),
               qty: l.qty,
               avgEntry: l.entryPrice,
               markPrice: l.markPrice,

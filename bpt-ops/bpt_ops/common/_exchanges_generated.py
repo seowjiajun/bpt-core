@@ -2,6 +2,7 @@
 # Regenerate with: bpt-ops exchange-catalog generate-python
 # Source of truth: messages/exchanges.yaml
 """Exchange IDs — wire-format enum generated from messages/exchanges.yaml."""
+
 from __future__ import annotations
 
 from enum import IntEnum
@@ -15,8 +16,8 @@ class ExchangeId(IntEnum):
 
 
 EXCHANGE_DISPLAY_NAMES: dict[ExchangeId, str] = {
-    ExchangeId.BINANCE: 'Binance',
-    ExchangeId.OKX: 'OKX',
-    ExchangeId.HYPERLIQUID: 'Hyperliquid',
-    ExchangeId.DERIBIT: 'Deribit',
+    ExchangeId.BINANCE: "Binance",
+    ExchangeId.OKX: "OKX",
+    ExchangeId.HYPERLIQUID: "Hyperliquid",
+    ExchangeId.DERIBIT: "Deribit",
 }

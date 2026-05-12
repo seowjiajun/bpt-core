@@ -7,6 +7,7 @@ Pipeline:
   3. For each fetched instrument, assign (or reuse) a canonical ID, union
      its exchange symbol into the reverse entry, add the forward key.
 """
+
 from __future__ import annotations
 
 import time

@@ -28,7 +28,10 @@ function readRoute(): Route {
     return { kind: 'list' }
   }
   if (h.startsWith('sweep:')) {
-    const parts = h.slice(6).split(':').filter((p) => p.length > 0)
+    const parts = h
+      .slice(6)
+      .split(':')
+      .filter((p) => p.length > 0)
     if (parts.length >= 2) {
       return { kind: 'sweep', runs: parts.map(decodeURIComponent) }
     }
@@ -63,21 +66,50 @@ export default function ArchiveApp() {
   if (route.kind === 'detail') {
     title = (
       <>
-        <a href="#" onClick={(e) => { e.preventDefault(); backToList() }} className="archive-back">← runs</a>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            backToList()
+          }}
+          className="archive-back"
+        >
+          ← runs
+        </a>
         <span style={{ marginLeft: 12 }}>{route.name}</span>
       </>
     )
   } else if (route.kind === 'diff') {
     title = (
       <>
-        <a href="#" onClick={(e) => { e.preventDefault(); backToList() }} className="archive-back">← runs</a>
-        <span style={{ marginLeft: 12 }}>diff: {route.a} ↔ {route.b}</span>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            backToList()
+          }}
+          className="archive-back"
+        >
+          ← runs
+        </a>
+        <span style={{ marginLeft: 12 }}>
+          diff: {route.a} ↔ {route.b}
+        </span>
       </>
     )
   } else if (route.kind === 'sweep') {
     title = (
       <>
-        <a href="#" onClick={(e) => { e.preventDefault(); backToList() }} className="archive-back">← runs</a>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            backToList()
+          }}
+          className="archive-back"
+        >
+          ← runs
+        </a>
         <span style={{ marginLeft: 12 }}>sweep: {route.runs.length} runs</span>
       </>
     )
@@ -100,7 +132,9 @@ export default function ArchiveApp() {
       {route.kind === 'detail' && <ArchiveDetail name={route.name} />}
       {route.kind === 'diff' && <ArchiveDiff runA={route.a} runB={route.b} />}
       {route.kind === 'sweep' && <ArchiveSweep runs={route.runs} />}
-      {route.kind === 'list' && <ArchiveList onOpen={openRun} onCompare={openDiff} onSweep={openSweep} />}
+      {route.kind === 'list' && (
+        <ArchiveList onOpen={openRun} onCompare={openDiff} onSweep={openSweep} />
+      )}
     </div>
   )
 }

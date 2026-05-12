@@ -3,6 +3,7 @@
 Fetches per-exchange instruments, reconciles into canonical IDs, writes
 one JSON file per exchange to --output-dir.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -50,9 +51,7 @@ def run(
         raws.extend(batch)
 
     mapping = reconcile.build(raws)
-    typer.echo(
-        f"[instrument-mapping] reconciled: {mapping.instrument_count} canonical instruments"
-    )
+    typer.echo(f"[instrument-mapping] reconciled: {mapping.instrument_count} canonical instruments")
 
     if dry_run:
         typer.echo(f"[instrument-mapping] --dry-run: skipping write to {output_dir}")

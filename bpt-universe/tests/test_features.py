@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import polars as pl
-
 from bpt_universe import features as feat
 
 
@@ -24,10 +23,26 @@ def test_md_features_aggregates_per_instrument(md_samples_lazy):
 
 
 def test_md_features_drops_crossed_spreads():
-    bad = pl.LazyFrame([
-        {"instrument_id": 7, "ts_ns": 0, "best_bid": 100.0, "best_ask": 99.0, "bid_size": 1.0, "ask_size": 1.0},
-        {"instrument_id": 7, "ts_ns": 1, "best_bid": 100.0, "best_ask": 100.5, "bid_size": 1.0, "ask_size": 1.0},
-    ])
+    bad = pl.LazyFrame(
+        [
+            {
+                "instrument_id": 7,
+                "ts_ns": 0,
+                "best_bid": 100.0,
+                "best_ask": 99.0,
+                "bid_size": 1.0,
+                "ask_size": 1.0,
+            },
+            {
+                "instrument_id": 7,
+                "ts_ns": 1,
+                "best_bid": 100.0,
+                "best_ask": 100.5,
+                "bid_size": 1.0,
+                "ask_size": 1.0,
+            },
+        ]
+    )
     out = feat.md_features(bad)
     # Only the non-crossed sample contributes to mean spread.
     row = out.filter(pl.col("instrument_id") == 7).to_dicts()[0]

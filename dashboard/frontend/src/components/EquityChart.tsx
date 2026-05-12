@@ -19,13 +19,13 @@ interface EquityChartProps {
 }
 
 const CHART_THEME = {
-  bg:        '#0d1117',
-  text:      '#768390',
-  grid:      '#141b26',
-  border:    '#1c2333',
-  line:      '#388bfd',
-  fillTop:   'rgba(56, 139, 253, 0.28)',
-  fillBot:   'rgba(56, 139, 253, 0.00)',
+  bg: '#0d1117',
+  text: '#768390',
+  grid: '#141b26',
+  border: '#1c2333',
+  line: '#388bfd',
+  fillTop: 'rgba(56, 139, 253, 0.28)',
+  fillBot: 'rgba(56, 139, 253, 0.00)',
   crosshair: '#243044',
 }
 
@@ -50,9 +50,9 @@ export function EquityChart(props: EquityChartProps = {}) {
     const chart = createChart(hostRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: CHART_THEME.bg },
-        textColor:  CHART_THEME.text,
+        textColor: CHART_THEME.text,
         fontFamily: '"SF Mono", "Fira Code", Menlo, monospace',
-        fontSize:   11,
+        fontSize: 11,
       },
       grid: {
         vertLines: { color: CHART_THEME.grid },
@@ -72,18 +72,18 @@ export function EquityChart(props: EquityChartProps = {}) {
     })
 
     const series = chart.addSeries(AreaSeries, {
-      lineColor:         CHART_THEME.line,
-      topColor:          CHART_THEME.fillTop,
-      bottomColor:       CHART_THEME.fillBot,
-      lineWidth:         2,
-      priceLineVisible:  false,
-      lastValueVisible:  true,
+      lineColor: CHART_THEME.line,
+      topColor: CHART_THEME.fillTop,
+      bottomColor: CHART_THEME.fillBot,
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: true,
     })
 
     chartRef.current = chart
     seriesRef.current = series
 
-    const ro = new ResizeObserver(entries => {
+    const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
         chart.resize(e.contentRect.width, e.contentRect.height)
       }

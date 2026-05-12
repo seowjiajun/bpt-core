@@ -28,7 +28,14 @@ interface RunRow {
   git_sha?: string
 }
 
-type SortKey = 'name' | 'strategy_name' | 'return_pct' | 'max_drawdown_pct' | 'sharpe_per_fill' | 'total_fills' | 'win_rate_pct'
+type SortKey =
+  | 'name'
+  | 'strategy_name'
+  | 'return_pct'
+  | 'max_drawdown_pct'
+  | 'sharpe_per_fill'
+  | 'total_fills'
+  | 'win_rate_pct'
 
 interface Props {
   onOpen: (name: string) => void
@@ -119,7 +126,10 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
       <div className="panel" style={{ height: '100%' }}>
         <div className="panel-header">
           <span className="panel-title">Backtest Runs</span>
-          <span className="panel-badge" style={{ flex: 1, textAlign: 'left', marginLeft: 16, color: 'var(--text-muted)' }}>
+          <span
+            className="panel-badge"
+            style={{ flex: 1, textAlign: 'left', marginLeft: 16, color: 'var(--text-muted)' }}
+          >
             {selected.length === 0 && 'tip: tick 2 to compare, 3+ to sweep'}
             {selected.length === 1 && `selected: 1 (pick one more to compare, or 2+ more to sweep)`}
             {selected.length >= 2 && `selected: ${selected.length}`}
@@ -127,7 +137,12 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
           {selected.length === 2 && (
             <button
               className="kill-switch"
-              style={{ marginRight: 12, background: 'rgba(56,139,253,0.18)', color: 'var(--blue)', borderColor: 'var(--blue)' }}
+              style={{
+                marginRight: 12,
+                background: 'rgba(56,139,253,0.18)',
+                color: 'var(--blue)',
+                borderColor: 'var(--blue)',
+              }}
               onClick={() => onCompare(selected[0], selected[1])}
             >
               Compare →
@@ -136,13 +151,20 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
           {selected.length >= 3 && (
             <button
               className="kill-switch"
-              style={{ marginRight: 12, background: 'rgba(210,153,34,0.18)', color: 'var(--yellow)', borderColor: 'var(--yellow)' }}
+              style={{
+                marginRight: 12,
+                background: 'rgba(210,153,34,0.18)',
+                color: 'var(--yellow)',
+                borderColor: 'var(--yellow)',
+              }}
               onClick={() => onSweep(selected)}
             >
               Sweep ({selected.length}) →
             </button>
           )}
-          <span className="panel-badge">{runs ? `${runs.length} run${runs.length === 1 ? '' : 's'}` : '—'}</span>
+          <span className="panel-badge">
+            {runs ? `${runs.length} run${runs.length === 1 ? '' : 's'}` : '—'}
+          </span>
         </div>
         <div className="panel-body panel-body--flush">
           {/* Filter strip — substring match on each field. Lives in the
@@ -173,7 +195,11 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
             {(fStrategy || fParams || fInstrument) && (
               <button
                 className="archive-filter-clear"
-                onClick={() => { setFStrategy(''); setFParams(''); setFInstrument('') }}
+                onClick={() => {
+                  setFStrategy('')
+                  setFParams('')
+                  setFInstrument('')
+                }}
               >
                 clear
               </button>
@@ -182,8 +208,12 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
               {sorted.length} / {runs?.length ?? 0}
             </span>
           </div>
-          {error && <div style={{ padding: 16, color: 'var(--red)' }}>Error loading runs: {error}</div>}
-          {!error && runs === null && <div style={{ padding: 16, color: 'var(--text-muted)' }}>Loading…</div>}
+          {error && (
+            <div style={{ padding: 16, color: 'var(--red)' }}>Error loading runs: {error}</div>
+          )}
+          {!error && runs === null && (
+            <div style={{ padding: 16, color: 'var(--text-muted)' }}>Loading…</div>
+          )}
           {!error && runs !== null && runs.length === 0 && (
             <div style={{ padding: 16, color: 'var(--text-muted)' }}>
               No runs found in bpt-backtester/results/.
@@ -194,16 +224,28 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
               <thead>
                 <tr>
                   <th style={{ width: 28 }}></th>
-                  <th onClick={() => toggleSort('strategy_name')} className="th-sortable">Strategy{arrow('strategy_name')}</th>
+                  <th onClick={() => toggleSort('strategy_name')} className="th-sortable">
+                    Strategy{arrow('strategy_name')}
+                  </th>
                   <th>SHA</th>
                   <th>Params</th>
                   <th>Window</th>
                   <th>Instruments</th>
-                  <th onClick={() => toggleSort('return_pct')} className="th-sortable num">Return{arrow('return_pct')}</th>
-                  <th onClick={() => toggleSort('max_drawdown_pct')} className="th-sortable num">Max DD{arrow('max_drawdown_pct')}</th>
-                  <th onClick={() => toggleSort('sharpe_per_fill')} className="th-sortable num">Sharpe/fill{arrow('sharpe_per_fill')}</th>
-                  <th onClick={() => toggleSort('win_rate_pct')} className="th-sortable num">Win %{arrow('win_rate_pct')}</th>
-                  <th onClick={() => toggleSort('total_fills')} className="th-sortable num">Fills{arrow('total_fills')}</th>
+                  <th onClick={() => toggleSort('return_pct')} className="th-sortable num">
+                    Return{arrow('return_pct')}
+                  </th>
+                  <th onClick={() => toggleSort('max_drawdown_pct')} className="th-sortable num">
+                    Max DD{arrow('max_drawdown_pct')}
+                  </th>
+                  <th onClick={() => toggleSort('sharpe_per_fill')} className="th-sortable num">
+                    Sharpe/fill{arrow('sharpe_per_fill')}
+                  </th>
+                  <th onClick={() => toggleSort('win_rate_pct')} className="th-sortable num">
+                    Win %{arrow('win_rate_pct')}
+                  </th>
+                  <th onClick={() => toggleSort('total_fills')} className="th-sortable num">
+                    Fills{arrow('total_fills')}
+                  </th>
                   <th className="num">Wallclock</th>
                   <th className="num">Final equity</th>
                 </tr>
@@ -251,7 +293,13 @@ export function ArchiveList({ onOpen, onCompare, onSweep }: Props) {
                           ? `${(r.wallclock_duration_ms / 1000).toFixed(1)}s`
                           : '—'}
                       </td>
-                      <td className="num">${r.final_equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="num">
+                        $
+                        {r.final_equity.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
                     </tr>
                   )
                 })}

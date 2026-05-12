@@ -1,0 +1,36 @@
+# ruff config — formats + lints every Python file in the repo.
+#
+# Single source of truth: sub-package pyproject.toml files (bpt-ops,
+# bpt-universe) don't carry a [tool.ruff] block, so ruff falls back to
+# this root file. If a sub-package ever needs to diverge, add its own
+# [tool.ruff] section — nearest-config-wins.
+
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    ".venv",
+    "build",
+    "build-cmake",
+    "dist",
+    "node_modules",
+    "vcpkg",
+    "messages/generated",
+]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (import order)
+    "W",   # pycodestyle warnings
+    "UP",  # pyupgrade — flag legacy syntax for the target Python
+    "B",   # bugbear — common Python gotchas
+    "SIM", # simplify — collapse trivially redundant patterns
+]
+# E501 (line too long) is already covered by the formatter — let ruff
+# format set widths, don't double-flag.
+ignore = ["E501"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

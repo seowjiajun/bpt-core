@@ -8,15 +8,15 @@ export type OptionSide = 'CALL' | 'PUT'
 // Greeks snapshot from the latest vol surface update.
 export interface OptionLeg {
   instrumentId: number
-  symbol: string            // e.g. "BTC-20260620-100000-C"
-  underlying: string        // e.g. "BTC-USDT"
+  symbol: string // e.g. "BTC-20260620-100000-C"
+  underlying: string // e.g. "BTC-USDT"
   strike: number
-  expiry: number            // YYYYMMDD
+  expiry: number // YYYYMMDD
   optionSide: OptionSide
-  qty: number               // +ve = long, -ve = short
-  avgEntry: number          // average fill price
-  markPrice: number         // current market mid
-  iv: number                // implied vol (annualized)
+  qty: number // +ve = long, -ve = short
+  avgEntry: number // average fill price
+  markPrice: number // current market mid
+  iv: number // implied vol (annualized)
   // Per-leg Greeks (from bpt-pricer, per 1 contract)
   delta: number
   gamma: number
@@ -39,19 +39,19 @@ export interface PortfolioGreeks {
 export interface VolSurfacePoint {
   instrumentId: number
   strike: number
-  expiry: number            // YYYYMMDD
+  expiry: number // YYYYMMDD
   optionSide: OptionSide
-  iv: number                // mid IV
+  iv: number // mid IV
   bidIv: number
   askIv: number
   delta: number
-  timeToExpiry: number      // years
+  timeToExpiry: number // years
 }
 
 // Grouped by expiry for rendering smile curves.
 export interface VolSmileSlice {
-  expiry: number            // YYYYMMDD
-  label: string             // e.g. "20 Jun"
+  expiry: number // YYYYMMDD
+  label: string // e.g. "20 Jun"
   daysToExpiry: number
   points: VolSurfacePoint[]
 }

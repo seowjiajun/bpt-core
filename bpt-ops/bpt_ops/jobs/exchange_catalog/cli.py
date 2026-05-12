@@ -1,7 +1,7 @@
 """`bpt-ops exchange-catalog` — generate / emit / verify the exchange catalog."""
+
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import typer
@@ -127,6 +127,7 @@ def check_json(
     """Verify the committed catalog.json matches what the YAML would produce.
     Fails if someone edited the YAML without running `emit-json`."""
     import json
+
     catalog = model.load(yaml_path)
     expected = {
         "exchanges": [

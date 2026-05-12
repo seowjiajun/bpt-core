@@ -1,45 +1,53 @@
 /* ── Reset ─────────────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
   /* backgrounds */
-  --bg-base:       #080b0e;
-  --bg-panel:      #0d1117;
-  --bg-header:     #0a0d12;
-  --bg-row-hover:  #131a22;
-  --bg-row-alt:    #0f151c;
+  --bg-base: #080b0e;
+  --bg-panel: #0d1117;
+  --bg-header: #0a0d12;
+  --bg-row-hover: #131a22;
+  --bg-row-alt: #0f151c;
 
   /* borders */
-  --border:        #1c2333;
+  --border: #1c2333;
   --border-strong: #243044;
 
   /* text */
-  --text-primary:   #cdd9e5;
+  --text-primary: #cdd9e5;
   --text-secondary: #768390;
-  --text-muted:     #444c56;
-  --text-label:     #909dab;
+  --text-muted: #444c56;
+  --text-label: #909dab;
 
   /* semantic colours */
-  --green:      #3fb950;
-  --green-dim:  #1a3a23;
-  --red:        #f85149;
-  --red-dim:    #3a1a1a;
-  --blue:       #388bfd;
-  --blue-dim:   #1a2a3a;
-  --yellow:     #d29922;
+  --green: #3fb950;
+  --green-dim: #1a3a23;
+  --red: #f85149;
+  --red-dim: #3a1a1a;
+  --blue: #388bfd;
+  --blue-dim: #1a2a3a;
+  --yellow: #d29922;
 
   /* typography */
-  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
-  --font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 
   /* sizing */
-  --header-h:  42px;
-  --gap:       1px;
+  --header-h: 42px;
+  --gap: 1px;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   overflow: hidden;
   background: var(--bg-base);
@@ -51,10 +59,20 @@ html, body, #root {
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar             { width: 6px; height: 6px; }
-::-webkit-scrollbar-track       { background: var(--bg-panel); }
-::-webkit-scrollbar-thumb       { background: var(--border-strong); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-panel);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 
 /* ── Shell grid ────────────────────────────────────────────────────────────── */
 .shell {
@@ -62,14 +80,14 @@ html, body, #root {
   height: 100vh;
   grid-template-rows: var(--header-h) 1fr 140px 185px 90px 140px 160px 180px;
   grid-template-areas:
-    "topbar"
-    "main"
-    "equity"
-    "stratstate"
-    "toxicity"
-    "orders"
-    "holdings"
-    "blotter";
+    'topbar'
+    'main'
+    'equity'
+    'stratstate'
+    'toxicity'
+    'orders'
+    'holdings'
+    'blotter';
   gap: var(--gap);
   background: var(--border); /* gap colour */
 }
@@ -98,13 +116,13 @@ html, body, #root {
 .shell--options {
   grid-template-rows: var(--header-h) 1fr 240px 130px 130px 150px 160px;
   grid-template-areas:
-    "topbar"
-    "main"
-    "options"
-    "equity"
-    "orders"
-    "holdings"
-    "blotter";
+    'topbar'
+    'main'
+    'options'
+    'equity'
+    'orders'
+    'holdings'
+    'blotter';
 }
 
 .options-row {
@@ -114,7 +132,9 @@ html, body, #root {
   gap: var(--gap);
   min-height: 0;
 }
-.options-row > * { min-height: 0; }
+.options-row > * {
+  min-height: 0;
+}
 
 /* ── Risk limits ──────────────────────────────────────────────────────────── */
 .limit-row {
@@ -143,9 +163,18 @@ html, body, #root {
   border-radius: 3px;
   transition: width 200ms;
 }
-.limit-bar-fill.limit-ok   { background: var(--green); opacity: 0.7; }
-.limit-bar-fill.limit-warn { background: var(--yellow); opacity: 0.9; }
-.limit-bar-fill.limit-breach { background: var(--red); animation: limit-flash 0.8s ease-in-out infinite; }
+.limit-bar-fill.limit-ok {
+  background: var(--green);
+  opacity: 0.7;
+}
+.limit-bar-fill.limit-warn {
+  background: var(--yellow);
+  opacity: 0.9;
+}
+.limit-bar-fill.limit-breach {
+  background: var(--red);
+  animation: limit-flash 0.8s ease-in-out infinite;
+}
 .limit-bar-threshold {
   position: absolute;
   top: 0;
@@ -154,19 +183,42 @@ html, body, #root {
   background: var(--yellow);
   opacity: 0.5;
 }
-.limit-value { color: var(--text-secondary); text-align: right; }
-.limit-pct   { text-align: right; }
-.limit-ok    { color: var(--text-muted); }
-.limit-warn  { color: var(--yellow) !important; }
-.limit-breach { color: var(--red) !important; font-weight: 700; }
+.limit-value {
+  color: var(--text-secondary);
+  text-align: right;
+}
+.limit-pct {
+  text-align: right;
+}
+.limit-ok {
+  color: var(--text-muted);
+}
+.limit-warn {
+  color: var(--yellow) !important;
+}
+.limit-breach {
+  color: var(--red) !important;
+  font-weight: 700;
+}
 @keyframes limit-flash {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* ── Order status ──────────────────────────────────────────────────────────── */
-.order-status--acked   { color: var(--blue) !important; font-weight: 600; }
-.order-status--partial { color: var(--yellow) !important; font-weight: 600; }
+.order-status--acked {
+  color: var(--blue) !important;
+  font-weight: 600;
+}
+.order-status--partial {
+  color: var(--yellow) !important;
+  font-weight: 600;
+}
 
 .options-agg-row td {
   border-top: 1px solid var(--border-strong);
@@ -273,23 +325,23 @@ html, body, #root {
   margin-left: 4px;
 }
 .inst-type-pill--spot {
-  background: rgba(56, 139, 253, 0.10);
-  color:      var(--blue);
+  background: rgba(56, 139, 253, 0.1);
+  color: var(--blue);
   border-color: rgba(56, 139, 253, 0.4);
 }
 .inst-type-pill--perp {
-  background: rgba(63, 185, 80, 0.10);
-  color:      var(--green);
+  background: rgba(63, 185, 80, 0.1);
+  color: var(--green);
   border-color: rgba(63, 185, 80, 0.4);
 }
 .inst-type-pill--future {
-  background: rgba(210, 153, 34, 0.10);
-  color:      var(--yellow);
+  background: rgba(210, 153, 34, 0.1);
+  color: var(--yellow);
   border-color: rgba(210, 153, 34, 0.4);
 }
 .inst-type-pill--option {
-  background: rgba(248, 81, 73, 0.10);
-  color:      var(--red);
+  background: rgba(248, 81, 73, 0.1);
+  color: var(--red);
   border-color: rgba(248, 81, 73, 0.4);
 }
 
@@ -307,10 +359,16 @@ html, body, #root {
   font-weight: 500;
 }
 
-.topbar-change--up   { color: var(--green); }
-.topbar-change--down { color: var(--red); }
+.topbar-change--up {
+  color: var(--green);
+}
+.topbar-change--down {
+  color: var(--red);
+}
 
-.topbar-spacer { flex: 1; }
+.topbar-spacer {
+  flex: 1;
+}
 
 .topbar-status {
   display: flex;
@@ -328,10 +386,20 @@ html, body, #root {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.status-dot--live   { background: var(--green); box-shadow: 0 0 5px var(--green); }
-.status-dot--mock   { background: var(--yellow); }
-.status-dot--halted { background: var(--red); box-shadow: 0 0 5px var(--red); }
-.status-dot--off    { background: var(--text-muted); }
+.status-dot--live {
+  background: var(--green);
+  box-shadow: 0 0 5px var(--green);
+}
+.status-dot--mock {
+  background: var(--yellow);
+}
+.status-dot--halted {
+  background: var(--red);
+  box-shadow: 0 0 5px var(--red);
+}
+.status-dot--off {
+  background: var(--text-muted);
+}
 
 .topbar-clock {
   font-family: var(--font-mono);
@@ -358,26 +426,31 @@ html, body, #root {
 
 .mode-pill--paper {
   background: rgba(210, 153, 34, 0.14);
-  color:      var(--yellow);
+  color: var(--yellow);
   border-color: var(--yellow);
 }
 
 .mode-pill--live {
   background: var(--red-dim);
-  color:      var(--red);
+  color: var(--red);
   border-color: var(--red);
   animation: mode-pulse 2s ease-in-out infinite;
 }
 
 .mode-pill--mock {
   background: transparent;
-  color:      var(--text-muted);
+  color: var(--text-muted);
   border-color: var(--text-muted);
 }
 
 @keyframes mode-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0);   }
-  50%      { box-shadow: 0 0 8px 1px rgba(248, 81, 73, 0.55); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 81, 73, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 1px rgba(248, 81, 73, 0.55);
+  }
 }
 
 /* ── Stat grid (position + risk) ───────────────────────────────────────────── */
@@ -413,10 +486,18 @@ html, body, #root {
   line-height: 1;
 }
 
-.stat-value--sm    { font-size: 13px; }
-.stat-value--green { color: var(--green); }
-.stat-value--red   { color: var(--red); }
-.stat-value--muted { color: var(--text-secondary); }
+.stat-value--sm {
+  font-size: 13px;
+}
+.stat-value--green {
+  color: var(--green);
+}
+.stat-value--red {
+  color: var(--red);
+}
+.stat-value--muted {
+  color: var(--text-secondary);
+}
 
 /* ── Blotter ───────────────────────────────────────────────────────────────── */
 .blotter-table {
@@ -446,7 +527,10 @@ html, body, #root {
 }
 
 .blotter-table th:last-child,
-.blotter-table td:last-child { text-align: right; padding-right: 16px; }
+.blotter-table td:last-child {
+  text-align: right;
+  padding-right: 16px;
+}
 
 .blotter-table td {
   padding: 5px 12px;
@@ -455,15 +539,33 @@ html, body, #root {
   white-space: nowrap;
 }
 
-.blotter-table tbody tr:hover td { background: var(--bg-row-hover); }
-.blotter-table tbody tr:nth-child(even) td { background: var(--bg-row-alt); }
-.blotter-table tbody tr:nth-child(even):hover td { background: var(--bg-row-hover); }
+.blotter-table tbody tr:hover td {
+  background: var(--bg-row-hover);
+}
+.blotter-table tbody tr:nth-child(even) td {
+  background: var(--bg-row-alt);
+}
+.blotter-table tbody tr:nth-child(even):hover td {
+  background: var(--bg-row-hover);
+}
 
-.side-buy  { color: var(--green) !important; font-weight: 600; }
-.side-sell { color: var(--red)   !important; font-weight: 600; }
-.pnl-pos   { color: var(--green) !important; }
-.pnl-neg   { color: var(--red)   !important; }
-.pnl-zero  { color: var(--text-muted) !important; }
+.side-buy {
+  color: var(--green) !important;
+  font-weight: 600;
+}
+.side-sell {
+  color: var(--red) !important;
+  font-weight: 600;
+}
+.pnl-pos {
+  color: var(--green) !important;
+}
+.pnl-neg {
+  color: var(--red) !important;
+}
+.pnl-zero {
+  color: var(--text-muted) !important;
+}
 
 /* ── Chart container ───────────────────────────────────────────────────────── */
 .chart-host {
@@ -496,8 +598,8 @@ html, body, #root {
    * Declare both areas explicitly so the named-area reference
    * resolves cleanly. */
   grid-template-areas:
-    "topbar"
-    "body";
+    'topbar'
+    'body';
   background: var(--border);
   gap: var(--gap);
 }
@@ -513,7 +615,7 @@ html, body, #root {
 
 .mode-pill--research {
   background: rgba(210, 153, 34, 0.14);
-  color:      var(--yellow);
+  color: var(--yellow);
   border-color: var(--yellow);
 }
 
@@ -522,7 +624,9 @@ html, body, #root {
   text-decoration: none;
   font-size: 11px;
 }
-.archive-back:hover { text-decoration: underline; }
+.archive-back:hover {
+  text-decoration: underline;
+}
 
 /* Body fills the 1fr row of .archive-shell. Using grid on the body itself
  * lets single-child (list) and multi-child (detail) both size correctly
@@ -547,9 +651,9 @@ html, body, #root {
 .archive-body--detail {
   grid-template-rows: 300px 1fr 240px;
   grid-template-areas:
-    "risk"
-    "equity"
-    "blotter";
+    'risk'
+    'equity'
+    'blotter';
   gap: var(--gap);
 }
 
@@ -558,22 +662,44 @@ html, body, #root {
 .archive-body--detail-markouts {
   grid-template-rows: 300px 180px 1fr 240px;
   grid-template-areas:
-    "risk"
-    "markouts"
-    "equity"
-    "blotter";
+    'risk'
+    'markouts'
+    'equity'
+    'blotter';
 }
 
 /* Each grid cell in the detail view should clamp to its row height. */
-.archive-body--detail > * { min-height: 0; min-width: 0; }
+.archive-body--detail > * {
+  min-height: 0;
+  min-width: 0;
+}
 
-.archive-table th.th-sortable { cursor: pointer; user-select: none; }
-.archive-table th.th-sortable:hover { color: var(--text-primary); }
-.archive-table th.num, .archive-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.archive-row { cursor: pointer; }
-.archive-row--selected { background: rgba(56, 139, 253, 0.10); }
-.archive-row--selected:hover { background: rgba(56, 139, 253, 0.16); }
-.archive-table .mono-7 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
+.archive-table th.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.archive-table th.th-sortable:hover {
+  color: var(--text-primary);
+}
+.archive-table th.num,
+.archive-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.archive-row {
+  cursor: pointer;
+}
+.archive-row--selected {
+  background: rgba(56, 139, 253, 0.1);
+}
+.archive-row--selected:hover {
+  background: rgba(56, 139, 253, 0.16);
+}
+.archive-table .mono-7 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
 
 /* Filter strip — sits above the table inside the panel body and stays
  * visible while the table scrolls underneath. */
@@ -599,8 +725,12 @@ html, body, #root {
   min-width: 160px;
   outline: none;
 }
-.archive-filter-input:focus { border-color: var(--blue); }
-.archive-filter-input::placeholder { color: var(--text-muted); }
+.archive-filter-input:focus {
+  border-color: var(--blue);
+}
+.archive-filter-input::placeholder {
+  color: var(--text-muted);
+}
 .archive-filter-clear {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -611,7 +741,10 @@ html, body, #root {
   padding: 3px 8px;
   cursor: pointer;
 }
-.archive-filter-clear:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.archive-filter-clear:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
 .archive-filter-count {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -637,7 +770,9 @@ html, body, #root {
   border: 1px solid transparent;
   cursor: pointer;
   user-select: none;
-  transition: background 100ms, box-shadow 100ms;
+  transition:
+    background 100ms,
+    box-shadow 100ms;
 }
 
 .kill-switch--halt {
@@ -701,8 +836,13 @@ html, body, #root {
   font-size: 11px;
 }
 @keyframes halted-pulse {
-  0%, 100% { background: var(--red-dim); }
-  50%      { background: rgba(248, 81, 73, 0.22); }
+  0%,
+  100% {
+    background: var(--red-dim);
+  }
+  50% {
+    background: rgba(248, 81, 73, 0.22);
+  }
 }
 
 /* ── Modal (used by kill-switch confirm) ───────────────────────────────────── */
@@ -739,8 +879,13 @@ html, body, #root {
   flex-direction: column;
   gap: 10px;
 }
-.modal-body p { line-height: 1.5; }
-.modal-note { color: var(--text-muted); font-size: 11px; }
+.modal-body p {
+  line-height: 1.5;
+}
+.modal-note {
+  color: var(--text-muted);
+  font-size: 11px;
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -764,16 +909,23 @@ html, body, #root {
   color: var(--text-secondary);
   border-color: var(--border-strong);
 }
-.btn--ghost:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.btn--ghost:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
 .btn--danger {
   background: var(--red);
   color: #fff;
   border-color: var(--red);
 }
-.btn--danger:hover { box-shadow: 0 0 10px 1px rgba(248, 81, 73, 0.55); }
+.btn--danger:hover {
+  box-shadow: 0 0 10px 1px rgba(248, 81, 73, 0.55);
+}
 .btn--warn {
   background: var(--yellow);
   color: #1a1a1a;
   border-color: var(--yellow);
 }
-.btn--warn:hover { box-shadow: 0 0 10px 1px rgba(210, 153, 34, 0.55); }
+.btn--warn:hover {
+  box-shadow: 0 0 10px 1px rgba(210, 153, 34, 0.55);
+}

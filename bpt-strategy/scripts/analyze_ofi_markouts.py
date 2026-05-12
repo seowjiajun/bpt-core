@@ -18,22 +18,19 @@ are paired in time order. Fenrir's OFI strategy serializes order flow
 Usage:
     python3 fenrir/scripts/analyze_ofi_markouts.py [fenrir/logs/fenrir.log]
 """
+
 import argparse
 import re
 import statistics
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
-
 
 TS = r"(\d{2}:\d{2}:\d{2}\.\d+)"
 ENTER_RE = re.compile(
     rf"^{TS}.*\[OFI\] (\S+) ENTER (\w+) ofi=(-?[\d.]+) mid=([\d.]+) spread=([\d.]+)bps"
 )
-FILLED_RE = re.compile(
-    rf"^{TS}.*\[OFI\] (\S+) order_id=(\d+) FILLED"
-)
+FILLED_RE = re.compile(rf"^{TS}.*\[OFI\] (\S+) order_id=(\d+) FILLED")
 MARKOUT_RE = re.compile(
     rf"^{TS}.*\[OFI markout\] (\S+) order_id=(\d+) kind=(\w+) side=(\w+) "
     rf"fill=([\d.]+) mid=([\d.]+) t\+(\d+)s=(-?[\d.]+)bps"
@@ -50,7 +47,7 @@ def ts_to_ns(ts: str) -> int:
 @dataclass
 class Trade:
     order_id: int = 0
-    direction: str = ""           # "LONG" or "SHORT"
+    direction: str = ""  # "LONG" or "SHORT"
     ofi_at_entry: float = 0.0
     mid_at_entry: float = 0.0
     spread_at_entry: float = 0.0
@@ -62,7 +59,7 @@ class Trade:
 def parse_log(path: str) -> list[Trade]:
     """Walk the log and pair ENTER lines with their FILLED order_ids + ENTRY markouts."""
     trades: list[Trade] = []
-    pending_enter: Optional[Trade] = None
+    pending_enter: Trade | None = None
     active_entry_oids: set[int] = set()
     oid_to_trade: dict[int, Trade] = {}
 
@@ -120,7 +117,10 @@ def bin_stats(label: str, buckets: dict, horizon: int = 1) -> None:
         if not vals:
             continue
         n = len(vals)
-        def pct(p): return vals[min(n - 1, int(n * p))]
+
+        def pct(p):
+            return vals[min(n - 1, int(n * p))]
+
         print(
             f"{key!s:<24}{n:>5}{statistics.mean(vals):>9.2f}"
             f"{pct(0.5):>9.2f}{pct(0.25):>9.2f}{pct(0.75):>9.2f}"
@@ -135,8 +135,10 @@ def main() -> int:
     trades = parse_log(args.log)
     trades_with_m1 = [t for t in trades if 1 in t.markouts]
     trades_with_m30 = [t for t in trades if 30 in t.markouts]
-    print(f"Parsed {len(trades)} entries "
-          f"({len(trades_with_m1)} have t+1s, {len(trades_with_m30)} have t+30s)")
+    print(
+        f"Parsed {len(trades)} entries "
+        f"({len(trades_with_m1)} have t+1s, {len(trades_with_m30)} have t+30s)"
+    )
 
     if not trades_with_m1:
         print("No entries with t+1s markouts yet — need more runtime.")
@@ -149,9 +151,12 @@ def main() -> int:
     # ─────────────────────────────────────────────────────────────────
     def signal_bucket(t: Trade) -> str:
         a = abs(t.ofi_at_entry)
-        if a < 1.25: return "(1) 1.00-1.25"
-        if a < 1.75: return "(2) 1.25-1.75"
-        if a < 2.50: return "(3) 1.75-2.50"
+        if a < 1.25:
+            return "(1) 1.00-1.25"
+        if a < 1.75:
+            return "(2) 1.25-1.75"
+        if a < 2.50:
+            return "(3) 1.75-2.50"
         return "(4) >=2.50"
 
     by_signal = defaultdict(list)
@@ -165,9 +170,12 @@ def main() -> int:
     # ─────────────────────────────────────────────────────────────────
     def spread_bucket(t: Trade) -> str:
         s = t.spread_at_entry
-        if s < 0.25: return "(1) <0.25"
-        if s < 0.5:  return "(2) 0.25-0.5"
-        if s < 1.0:  return "(3) 0.5-1.0"
+        if s < 0.25:
+            return "(1) <0.25"
+        if s < 0.5:
+            return "(2) 0.25-0.5"
+        if s < 1.0:
+            return "(3) 0.5-1.0"
         return "(4) >=1.0"
 
     by_spread = defaultdict(list)

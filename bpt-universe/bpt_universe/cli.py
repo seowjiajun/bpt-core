@@ -6,9 +6,8 @@ import click
 import polars as pl
 
 from . import features as feat
-from . import io
+from . import io, scoring
 from . import report as rpt
-from . import scoring
 from .diff import render_diff
 
 
@@ -56,12 +55,31 @@ def cli() -> None:
 
 
 _common_filter_opts = [
-    click.option("--venue", multiple=True, help="Repeat to allow multiple. Defaults to OKX + HYPERLIQUID."),
+    click.option(
+        "--venue", multiple=True, help="Repeat to allow multiple. Defaults to OKX + HYPERLIQUID."
+    ),
     click.option("--inst-type", multiple=True, help="Repeat. Defaults to PERP + SPOT."),
     click.option("--min-score", type=float, default=0.0, show_default=True),
-    click.option("--min-samples", type=int, default=100, show_default=True, help="MD samples needed to trust spread features"),
-    click.option("--min-fills", type=int, default=20, show_default=True, help="Fills needed to trust markout features"),
-    click.option("--min-capture-bps", type=float, default=None, help="Hard floor on realized markout-after-fees"),
+    click.option(
+        "--min-samples",
+        type=int,
+        default=100,
+        show_default=True,
+        help="MD samples needed to trust spread features",
+    ),
+    click.option(
+        "--min-fills",
+        type=int,
+        default=20,
+        show_default=True,
+        help="Fills needed to trust markout features",
+    ),
+    click.option(
+        "--min-capture-bps",
+        type=float,
+        default=None,
+        help="Hard floor on realized markout-after-fees",
+    ),
 ]
 
 
@@ -78,7 +96,9 @@ def _add_filter_opts(fn):
     default=Path("/opt/bpt/data/instrument_mapping.json"),
     show_default=True,
 )
-@click.option("--md-samples", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None)
+@click.option(
+    "--md-samples", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None
+)
 @click.option("--fills", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None)
 @click.option(
     "--out",
@@ -87,7 +107,18 @@ def _add_filter_opts(fn):
     show_default=True,
 )
 @_add_filter_opts
-def score_cmd(refdata, md_samples, fills, out, venue, inst_type, min_score, min_samples, min_fills, min_capture_bps):
+def score_cmd(
+    refdata,
+    md_samples,
+    fills,
+    out,
+    venue,
+    inst_type,
+    min_score,
+    min_samples,
+    min_fills,
+    min_capture_bps,
+):
     """Score the universe and write candidates.parquet."""
     cfg = _build_cfg(venue, inst_type, min_score, min_samples, min_fills, min_capture_bps)
     candidates = _run_score(refdata, md_samples, fills, cfg)
@@ -135,8 +166,19 @@ def diff_cmd(candidates, config, top_n):
     default=Path("universe-report.md"),
     show_default=True,
 )
-@click.option("--top-n", type=int, default=30, show_default=True, help="Rows shown in the report's top-N table")
-@click.option("--diff-top-n", type=int, default=None, help="Trim proposed list inside the diff (omit = full ranked list)")
+@click.option(
+    "--top-n",
+    type=int,
+    default=30,
+    show_default=True,
+    help="Rows shown in the report's top-N table",
+)
+@click.option(
+    "--diff-top-n",
+    type=int,
+    default=None,
+    help="Trim proposed list inside the diff (omit = full ranked list)",
+)
 def report_cmd(candidates, config, out, top_n, diff_top_n):
     """Render the markdown review report."""
     df = pl.read_parquet(candidates)

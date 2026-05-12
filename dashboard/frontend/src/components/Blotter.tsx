@@ -1,9 +1,9 @@
 import { useStore } from '../store'
 
 export interface Fill {
-  seq: number         // client-side monotonic counter; used as React key so
-                      // partial fills (which share orderId) don't collide
-  ts: number          // ns since epoch
+  seq: number // client-side monotonic counter; used as React key so
+  // partial fills (which share orderId) don't collide
+  ts: number // ns since epoch
   orderId: number
   side: 'BUY' | 'SELL'
   orderType: string
@@ -78,7 +78,10 @@ export function Blotter(props: BlotterProps = {}) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                <td
+                  colSpan={9}
+                  style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}
+                >
                   No fills yet
                 </td>
               </tr>
@@ -95,9 +98,13 @@ export function Blotter(props: BlotterProps = {}) {
                   <td>{fmtTime(f.ts)}</td>
                   <td style={{ color: 'var(--text-muted)' }}>
                     {isContinuation ? (
-                      <span style={{ opacity: 0.5 }}>↳ ({idx}/{total})</span>
+                      <span style={{ opacity: 0.5 }}>
+                        ↳ ({idx}/{total})
+                      </span>
                     ) : isPartial ? (
-                      <>#{f.orderId} <span style={{ opacity: 0.6 }}>(1/{total})</span></>
+                      <>
+                        #{f.orderId} <span style={{ opacity: 0.6 }}>(1/{total})</span>
+                      </>
                     ) : (
                       <>#{f.orderId}</>
                     )}
@@ -110,9 +117,17 @@ export function Blotter(props: BlotterProps = {}) {
                     {f.fee === 0 ? '—' : `$${f.fee.toFixed(4)}`}
                   </td>
                   <td className={pnlClass(f.realizedPnl)}>
-                    {f.realizedPnl === 0 ? '—' : `${f.realizedPnl >= 0 ? '+' : ''}$${f.realizedPnl.toFixed(2)}`}
+                    {f.realizedPnl === 0
+                      ? '—'
+                      : `${f.realizedPnl >= 0 ? '+' : ''}$${f.realizedPnl.toFixed(2)}`}
                   </td>
-                  <td>${f.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>
+                    $
+                    {f.equity.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
                 </tr>
               )
             })}

@@ -72,7 +72,10 @@ export function VolTermStructure({ slices, spot }: Props) {
     // Line connecting points
     if (points.length >= 2) {
       const d = points
-        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${MARGIN.left + xScale(p.dte)} ${MARGIN.top + yScale(p.iv)}`)
+        .map(
+          (p, i) =>
+            `${i === 0 ? 'M' : 'L'} ${MARGIN.left + xScale(p.dte)} ${MARGIN.top + yScale(p.iv)}`
+        )
         .join(' ')
       content += `<path d="${d}" fill="none" stroke="#388bfd" stroke-width="2" opacity="0.9"/>`
     }
@@ -94,10 +97,7 @@ export function VolTermStructure({ slices, spot }: Props) {
 
   return (
     <div className="chart-host" ref={containerRef} style={{ position: 'relative' }}>
-      <svg
-        ref={svgRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      />
+      <svg ref={svgRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
     </div>
   )
 }

@@ -10,9 +10,12 @@ function fmtPrice(p: number) {
 
 function statusClass(s: OpenOrder['status']): string {
   switch (s) {
-    case 'acked':   return 'order-status--acked'
-    case 'partial': return 'order-status--partial'
-    default:        return ''
+    case 'acked':
+      return 'order-status--acked'
+    case 'partial':
+      return 'order-status--partial'
+    default:
+      return ''
   }
 }
 
@@ -24,9 +27,7 @@ export function OpenOrdersPanel() {
     <div className="panel" style={{ gridArea: 'orders' }}>
       <div className="panel-header">
         <span className="panel-title">Open Orders</span>
-        <span className="panel-badge">
-          {orders.length} working
-        </span>
+        <span className="panel-badge">{orders.length} working</span>
       </div>
       <div className="panel-body panel-body--flush">
         <table className="blotter-table">
@@ -46,7 +47,10 @@ export function OpenOrdersPanel() {
           <tbody>
             {orders.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                <td
+                  colSpan={9}
+                  style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}
+                >
                   No open orders
                 </td>
               </tr>
@@ -61,9 +65,7 @@ export function OpenOrdersPanel() {
                 <td>{o.qty.toFixed(4)}</td>
                 <td>{o.filledQty.toFixed(4)}</td>
                 <td>{o.remainingQty.toFixed(4)}</td>
-                <td className={statusClass(o.status)}>
-                  {o.status.toUpperCase()}
-                </td>
+                <td className={statusClass(o.status)}>{o.status.toUpperCase()}</td>
               </tr>
             ))}
           </tbody>

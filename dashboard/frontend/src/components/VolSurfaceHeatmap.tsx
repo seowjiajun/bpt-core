@@ -66,14 +66,17 @@ export function VolSurfaceHeatmap({ slices, legs = [] }: Props) {
     const h = dims.h - MARGIN.top - MARGIN.bottom
 
     // Collect unique strikes and expiries
-    const strikes = [...new Set(slices.flatMap((s) => s.points.map((p) => p.strike)))].sort((a, b) => a - b)
+    const strikes = [...new Set(slices.flatMap((s) => s.points.map((p) => p.strike)))].sort(
+      (a, b) => a - b
+    )
     const expiries = slices.map((s) => s.expiry).sort((a, b) => a - b)
 
     if (strikes.length === 0 || expiries.length === 0) return
 
     // Build IV lookup: calls only (puts have near-identical IV)
     const ivMap = new Map<string, number>()
-    let minIv = Infinity, maxIv = -Infinity
+    let minIv = Infinity,
+      maxIv = -Infinity
     for (const s of slices) {
       for (const p of s.points) {
         if (p.optionSide !== 'CALL') continue
@@ -175,10 +178,7 @@ export function VolSurfaceHeatmap({ slices, legs = [] }: Props) {
 
   return (
     <div className="chart-host" ref={containerRef} style={{ position: 'relative' }}>
-      <canvas
-        ref={canvasRef}
-        style={{ position: 'absolute', inset: 0 }}
-      />
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
     </div>
   )
 }

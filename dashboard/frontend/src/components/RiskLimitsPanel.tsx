@@ -7,7 +7,7 @@ export interface RiskLimits {
   maxAbsGamma: number
   maxAbsVega: number
   maxAbsTheta: number
-  maxUnrealizedLoss: number   // max negative unrealized PnL before alert
+  maxUnrealizedLoss: number // max negative unrealized PnL before alert
 }
 
 interface Props {
@@ -26,7 +26,12 @@ function utilizationClass(pct: number): string {
   return 'limit-ok'
 }
 
-function LimitBar({ label, current, limit, decimals = 2 }: {
+function LimitBar({
+  label,
+  current,
+  limit,
+  decimals = 2,
+}: {
   label: string
   current: number
   limit: number
@@ -41,16 +46,12 @@ function LimitBar({ label, current, limit, decimals = 2 }: {
       <span className="limit-label">{label}</span>
       <div className="limit-bar-track">
         <div className={`limit-bar-fill ${cls}`} style={{ width: `${barWidth}%` }} />
-        {pct >= 0.8 && (
-          <div className="limit-bar-threshold" style={{ left: '80%' }} />
-        )}
+        {pct >= 0.8 && <div className="limit-bar-threshold" style={{ left: '80%' }} />}
       </div>
       <span className={`limit-value ${cls}`}>
         {Math.abs(current).toFixed(decimals)} / {limit.toFixed(decimals)}
       </span>
-      <span className={`limit-pct ${cls}`}>
-        {(pct * 100).toFixed(0)}%
-      </span>
+      <span className={`limit-pct ${cls}`}>{(pct * 100).toFixed(0)}%</span>
     </div>
   )
 }
@@ -61,8 +62,11 @@ function detectBreaches(greeks: PortfolioGreeks, limits: RiskLimits): string[] {
   if (utilization(greeks.netGamma, limits.maxAbsGamma) >= 1.0) breaches.push('Gamma')
   if (utilization(greeks.netVega, limits.maxAbsVega) >= 1.0) breaches.push('Vega')
   if (utilization(greeks.netTheta, limits.maxAbsTheta) >= 1.0) breaches.push('Theta')
-  if (limits.maxUnrealizedLoss > 0 && greeks.totalUnrealizedPnl < 0 &&
-      utilization(greeks.totalUnrealizedPnl, limits.maxUnrealizedLoss) >= 1.0) {
+  if (
+    limits.maxUnrealizedLoss > 0 &&
+    greeks.totalUnrealizedPnl < 0 &&
+    utilization(greeks.totalUnrealizedPnl, limits.maxUnrealizedLoss) >= 1.0
+  ) {
     breaches.push('Unrealized Loss')
   }
   return breaches
@@ -100,10 +104,15 @@ export function RiskLimitsPanel({ greeks, limits }: Props) {
             AUTO-HALT · {breaches.join(', ')}
           </span>
         ) : (
-          <span className="panel-badge" style={{ color: 'var(--green)' }}>AUTO-HALT ARMED</span>
+          <span className="panel-badge" style={{ color: 'var(--green)' }}>
+            AUTO-HALT ARMED
+          </span>
         )}
       </div>
-      <div className="panel-body" style={{ padding: '8px 12px', gap: 6, display: 'flex', flexDirection: 'column' }}>
+      <div
+        className="panel-body"
+        style={{ padding: '8px 12px', gap: 6, display: 'flex', flexDirection: 'column' }}
+      >
         <LimitBar label="Delta" current={greeks.netDelta} limit={limits.maxAbsDelta} />
         <LimitBar label="Gamma" current={greeks.netGamma} limit={limits.maxAbsGamma} decimals={6} />
         <LimitBar label="Vega" current={greeks.netVega} limit={limits.maxAbsVega} decimals={1} />

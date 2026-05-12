@@ -83,12 +83,18 @@ export function HoldingsPanel() {
                 <td>{cb.ccy}</td>
                 <td className="stat-value--muted">CASH</td>
                 <td className="num">
-                  {cb.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {cb.equity.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
                 <td className="num">—</td>
                 <td className="num">—</td>
                 <td className="num">
-                  {cb.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {cb.equity.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
                 <td className="num stat-value--muted">—</td>
               </tr>
@@ -98,12 +104,19 @@ export function HoldingsPanel() {
               <td>{exchange === 'OKX' ? 'USDT' : 'USDC'}</td>
               <td className="stat-value--muted">CASH</td>
               <td className="num">
-                {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {balance.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </td>
               <td className="num">—</td>
               <td className="num">—</td>
               <td className="num">
-                ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                $
+                {balance.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </td>
               <td className="num stat-value--muted">—</td>
             </tr>
@@ -117,13 +130,23 @@ export function HoldingsPanel() {
                 <td className={sideClass}>{long ? 'LONG' : 'SHORT'}</td>
                 <td className="num">{Math.abs(r.netQty).toFixed(4)}</td>
                 <td className="num">
-                  {r.avgEntry.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                  {r.avgEntry.toLocaleString('en-US', {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}
                 </td>
                 <td className="num">
-                  {r.mark.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                  {r.mark.toLocaleString('en-US', {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}
                 </td>
                 <td className="num">
-                  ${r.notional.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  $
+                  {r.notional.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
                 <td className={`num ${pnlClass(r.unrealizedPnl)}`}>
                   {r.unrealizedPnl >= 0 ? '+' : ''}${r.unrealizedPnl.toFixed(2)}
@@ -134,7 +157,11 @@ export function HoldingsPanel() {
           <tr style={{ borderTop: '1px solid var(--border)', fontWeight: 600 }}>
             <td colSpan={5}>Equity (cash + positions + uPnL)</td>
             <td className="num">
-              ${equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              $
+              {equity.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </td>
             <td className={`num ${pnlClass(totalPnl)}`}>
               {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}

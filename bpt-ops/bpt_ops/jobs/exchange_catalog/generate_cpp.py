@@ -9,6 +9,7 @@ Output is deterministic (sorted by id) so re-running on an unchanged YAML
 produces a byte-identical file. CI compares the generator's output against
 the committed file via `check-cpp-registry`.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +17,7 @@ from pathlib import Path
 from bpt_ops.jobs.exchange_catalog.model import ExchangeCatalog
 
 
-_TEMPLATE = '''\
+_TEMPLATE = """\
 // AUTO-GENERATED — DO NOT EDIT BY HAND.
 // Regenerate with: bpt-ops exchange-catalog generate-cpp-registry
 // Source of truth: messages/exchanges.yaml
@@ -79,17 +80,14 @@ public:
 
 }}  // namespace messages
 }}  // namespace bpt
-'''
+"""
 
 
 def render(catalog: ExchangeCatalog) -> str:
     sorted_exchanges = sorted(catalog.exchanges, key=lambda e: e.id)
     entry_lines = []
     for e in sorted_exchanges:
-        entry_lines.append(
-            f'        {{ExchangeId::{e.name}, '
-            f'"{e.name}", "{e.display_name}"}},'
-        )
+        entry_lines.append(f'        {{ExchangeId::{e.name}, "{e.name}", "{e.display_name}"}},')
     return _TEMPLATE.format(
         n_entries=len(sorted_exchanges),
         entries="\n".join(entry_lines),

@@ -50,9 +50,7 @@ def test_extra_exchange_in_header_flagged(tmp_path: Path):
 
 
 def test_id_disagreement_flagged(tmp_path: Path):
-    body = _GOOD.replace(
-        "OKX = static_cast<std::uint8_t>(2)", "OKX = static_cast<std::uint8_t>(7)"
-    )
+    body = _GOOD.replace("OKX = static_cast<std::uint8_t>(2)", "OKX = static_cast<std::uint8_t>(7)")
     p = _header(tmp_path, body)
     findings = check(_CATALOG, p)
     assert any("OKX" in f and "id=7" in f for f in findings)

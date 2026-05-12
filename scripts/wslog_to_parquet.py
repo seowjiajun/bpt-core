@@ -33,7 +33,7 @@ import json
 import struct
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -76,7 +76,7 @@ def parse_records(path: Path):
 
 
 def day_key(ts_ns: int) -> str:
-    return datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(ts_ns / 1e9, tz=UTC).strftime("%Y-%m-%d")
 
 
 def _f(d: dict, key: str):
@@ -91,6 +91,7 @@ def _f(d: dict, key: str):
 
 
 # ─── OKX ────────────────────────────────────────────────────────────────────
+
 
 def parse_okx_frame(text: str):
     """Parse one OKX WS JSON frame. Yields tagged tuples; see parse_frame()."""
@@ -120,7 +121,7 @@ def parse_okx_frame(text: str):
                 continue
     elif channel.startswith("book") or channel == "bbo-tbt":
         action = msg.get("action", "update")
-        for d in (data or []):
+        for d in data or []:
             try:
                 ts_ns = int(d["ts"]) * 1_000_000
                 bids = [(float(b[0]), float(b[1])) for b in (d.get("bids") or [])]
@@ -162,6 +163,7 @@ def parse_okx_frame(text: str):
 
 # ─── Hyperliquid ────────────────────────────────────────────────────────────
 
+
 def parse_hyperliquid_frame(text: str):
     """Parse one HL WS JSON frame.
 
@@ -195,8 +197,12 @@ def parse_hyperliquid_frame(text: str):
             coin = data["coin"]
             ts_ns = int(data["time"]) * 1_000_000
             levels = data.get("levels") or [[], []]
-            bids = [(float(lv["px"]), float(lv["sz"])) for lv in levels[0]] if len(levels) > 0 else []
-            asks = [(float(lv["px"]), float(lv["sz"])) for lv in levels[1]] if len(levels) > 1 else []
+            bids = (
+                [(float(lv["px"]), float(lv["sz"])) for lv in levels[0]] if len(levels) > 0 else []
+            )
+            asks = (
+                [(float(lv["px"]), float(lv["sz"])) for lv in levels[1]] if len(levels) > 1 else []
+            )
             yield ("book", coin, ts_ns, "snapshot", bids, asks)
         except (KeyError, ValueError, TypeError):
             return
@@ -222,6 +228,7 @@ def parse_hyperliquid_frame(text: str):
 
 
 # ─── Deribit ────────────────────────────────────────────────────────────────
+
 
 def parse_deribit_frame(text: str):
     """Parse one Deribit WS JSON-RPC notification.
@@ -265,6 +272,7 @@ def parse_deribit_frame(text: str):
             inst = data["instrument_name"]
             ts_ns = int(data["timestamp"]) * 1_000_000
             book_type = data.get("type", "change")
+
             # Deribit deltas are [action, price, size] tuples where action is
             # "new"/"change"/"delete". For our converter, "delete" → size=0
             # so the OrderBookState.apply() update path drops it.
@@ -280,6 +288,7 @@ def parse_deribit_frame(text: str):
                         p, s = row
                         out.append((float(p), float(s)))
                 return out
+
             bids = _decode_levels(data.get("bids"))
             asks = _decode_levels(data.get("asks"))
             action = "snapshot" if book_type == "snapshot" else "update"
@@ -324,6 +333,7 @@ def parse_deribit_frame(text: str):
 
 # ─── Dispatch ───────────────────────────────────────────────────────────────
 
+
 def parse_frame(text: str, exchange: str):
     if exchange == "OKX":
         yield from parse_okx_frame(text)
@@ -337,8 +347,10 @@ def parse_frame(text: str, exchange: str):
 
 # ─── Order book state ──────────────────────────────────────────────────────
 
+
 class OrderBookState:
     """Maintains an L2 ladder per instrument; emits top-N snapshots."""
+
     def __init__(self):
         self.bids: dict[float, float] = {}
         self.asks: dict[float, float] = {}
@@ -367,17 +379,20 @@ class OrderBookState:
 
 # ─── Parquet writers ───────────────────────────────────────────────────────
 
+
 def write_trades_parquet(path: Path, rows: list):
     if not rows:
         return
     rows.sort(key=lambda r: r[0])
     path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.table({
-        "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
-        "price": pa.array([r[1] for r in rows], type=pa.float64()),
-        "quantity": pa.array([r[2] for r in rows], type=pa.float64()),
-        "side": pa.array([r[3] for r in rows], type=pa.int8()),
-    })
+    table = pa.table(
+        {
+            "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
+            "price": pa.array([r[1] for r in rows], type=pa.float64()),
+            "quantity": pa.array([r[2] for r in rows], type=pa.float64()),
+            "side": pa.array([r[3] for r in rows], type=pa.int8()),
+        }
+    )
     pq.write_table(table, path)
     print(f"wrote {path} ({table.num_rows} trades)")
 
@@ -403,11 +418,13 @@ def write_funding_parquet(path: Path, rows: list):
         return
     rows.sort(key=lambda r: r[0])
     path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.table({
-        "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
-        "funding_rate": pa.array([r[1] for r in rows], type=pa.float64()),
-        "next_funding_ns": pa.array([r[2] for r in rows], type=pa.int64()),
-    })
+    table = pa.table(
+        {
+            "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
+            "funding_rate": pa.array([r[1] for r in rows], type=pa.float64()),
+            "next_funding_ns": pa.array([r[2] for r in rows], type=pa.int64()),
+        }
+    )
     pq.write_table(table, path)
     print(f"wrote {path} ({table.num_rows} funding ticks)")
 
@@ -417,12 +434,14 @@ def write_mark_parquet(path: Path, rows: list):
         return
     rows.sort(key=lambda r: r[0])
     path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.table({
-        "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
-        "mark_px": pa.array([r[1] for r in rows], type=pa.float64()),
-        "oracle_px": pa.array([r[2] for r in rows], type=pa.float64()),
-        "open_interest": pa.array([r[3] for r in rows], type=pa.float64()),
-    })
+    table = pa.table(
+        {
+            "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
+            "mark_px": pa.array([r[1] for r in rows], type=pa.float64()),
+            "oracle_px": pa.array([r[2] for r in rows], type=pa.float64()),
+            "open_interest": pa.array([r[3] for r in rows], type=pa.float64()),
+        }
+    )
     pq.write_table(table, path)
     print(f"wrote {path} ({table.num_rows} mark ticks)")
 
@@ -432,15 +451,18 @@ def write_index_parquet(path: Path, rows: list):
         return
     rows.sort(key=lambda r: r[0])
     path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.table({
-        "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
-        "index_px": pa.array([r[1] for r in rows], type=pa.float64()),
-    })
+    table = pa.table(
+        {
+            "timestamp_ns": pa.array([r[0] for r in rows], type=pa.int64()),
+            "index_px": pa.array([r[1] for r in rows], type=pa.float64()),
+        }
+    )
     pq.write_table(table, path)
     print(f"wrote {path} ({table.num_rows} index ticks)")
 
 
 # ─── Gap manifest ───────────────────────────────────────────────────────────
+
 
 def detect_gaps(events: list, max_quiet_ns: int):
     """Walk through (recv_ts, record_type, info) tuples in order and emit gap dicts.
@@ -458,19 +480,23 @@ def detect_gaps(events: list, max_quiet_ns: int):
     for ts, rtype, info in events:
         if rtype == REC_SESSION_START:
             if have_open_session:
-                gaps.append({
-                    "reason": "unclean_shutdown",
-                    "gap_end_ns": ts,
-                    "detail": "SESSION_START with previous session still open",
-                    "previous_seen_ts_ns": last_seen_ts,
-                })
+                gaps.append(
+                    {
+                        "reason": "unclean_shutdown",
+                        "gap_end_ns": ts,
+                        "detail": "SESSION_START with previous session still open",
+                        "previous_seen_ts_ns": last_seen_ts,
+                    }
+                )
             elif last_clean_close is not None and ts - last_clean_close > 0:
-                gaps.append({
-                    "reason": "process_down",
-                    "gap_start_ns": last_clean_close,
-                    "gap_end_ns": ts,
-                    "detail": "process restarted after clean shutdown",
-                })
+                gaps.append(
+                    {
+                        "reason": "process_down",
+                        "gap_start_ns": last_clean_close,
+                        "gap_end_ns": ts,
+                        "detail": "process restarted after clean shutdown",
+                    }
+                )
             have_open_session = True
             last_clean_close = None
         elif rtype == REC_SESSION_STOP:
@@ -478,32 +504,42 @@ def detect_gaps(events: list, max_quiet_ns: int):
             last_clean_close = ts
         elif rtype == REC_WS_FRAME:
             if last_seen_ts is not None and ts - last_seen_ts > max_quiet_ns:
-                gaps.append({
-                    "reason": "long_quiet_no_checkpoint",
-                    "gap_start_ns": last_seen_ts,
-                    "gap_end_ns": ts,
-                    "detail": f"no frames or checkpoints for {(ts - last_seen_ts)/1e9:.1f}s",
-                })
+                gaps.append(
+                    {
+                        "reason": "long_quiet_no_checkpoint",
+                        "gap_start_ns": last_seen_ts,
+                        "gap_end_ns": ts,
+                        "detail": f"no frames or checkpoints for {(ts - last_seen_ts) / 1e9:.1f}s",
+                    }
+                )
         last_seen_ts = ts
 
     if have_open_session:
-        gaps.append({
-            "reason": "unclean_shutdown_at_eof",
-            "gap_start_ns": last_seen_ts,
-            "detail": "no SESSION_STOP at end of input",
-        })
+        gaps.append(
+            {
+                "reason": "unclean_shutdown_at_eof",
+                "gap_start_ns": last_seen_ts,
+                "detail": "no SESSION_STOP at end of input",
+            }
+        )
 
     return gaps
 
 
 def _ts_iso(ns: int) -> str:
-    return datetime.fromtimestamp(ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.fromtimestamp(ns / 1e9, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # ─── Main convert loop ─────────────────────────────────────────────────────
 
-def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str | None,
-            max_quiet_seconds: float):
+
+def convert(
+    input_glob: str,
+    output_dir: Path,
+    exchange: str,
+    symbol_filter: str | None,
+    max_quiet_seconds: float,
+):
     files = sorted(glob.glob(input_glob, recursive=True))
     if not files:
         print(f"error: no files matched {input_glob}", file=sys.stderr)
@@ -518,9 +554,19 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
     events_for_gap_detection = []
     connection_events = []  # WS_DISCONNECT / WS_RECONNECT
 
-    counts = {"frames": 0, "trades": 0, "books": 0, "funding": 0, "mark": 0, "index": 0,
-              "session_start": 0, "session_stop": 0, "checkpoint": 0,
-              "ws_disconnect": 0, "ws_reconnect": 0}
+    counts = {
+        "frames": 0,
+        "trades": 0,
+        "books": 0,
+        "funding": 0,
+        "mark": 0,
+        "index": 0,
+        "session_start": 0,
+        "session_stop": 0,
+        "checkpoint": 0,
+        "ws_disconnect": 0,
+        "ws_reconnect": 0,
+    }
 
     for fpath in files:
         for recv_ts_ns, rtype, payload in parse_records(Path(fpath)):
@@ -540,13 +586,15 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
                     info = json.loads(payload.decode("utf-8", errors="replace"))
                 except (json.JSONDecodeError, ValueError):
                     info = {}
-                connection_events.append({
-                    "ts": _ts_iso(recv_ts_ns),
-                    "ts_ns": recv_ts_ns,
-                    "event": "disconnect",
-                    "reason": info.get("reason"),
-                    "attempt": info.get("attempt"),
-                })
+                connection_events.append(
+                    {
+                        "ts": _ts_iso(recv_ts_ns),
+                        "ts_ns": recv_ts_ns,
+                        "event": "disconnect",
+                        "reason": info.get("reason"),
+                        "attempt": info.get("attempt"),
+                    }
+                )
                 continue
             if rtype == REC_WS_RECONNECT:
                 counts["ws_reconnect"] += 1
@@ -554,12 +602,14 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
                     info = json.loads(payload.decode("utf-8", errors="replace"))
                 except (json.JSONDecodeError, ValueError):
                     info = {}
-                connection_events.append({
-                    "ts": _ts_iso(recv_ts_ns),
-                    "ts_ns": recv_ts_ns,
-                    "event": "reconnect",
-                    "attempt": info.get("attempt"),
-                })
+                connection_events.append(
+                    {
+                        "ts": _ts_iso(recv_ts_ns),
+                        "ts_ns": recv_ts_ns,
+                        "event": "reconnect",
+                        "attempt": info.get("attempt"),
+                    }
+                )
                 continue
             if rtype != REC_WS_FRAME:
                 continue
@@ -611,7 +661,8 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
                         continue
                     counts["funding"] += 1
                     funding_by_day_symbol[(day_key(ts_ns), inst)].append(
-                        (ts_ns, fr, next_ns if next_ns is not None else 0))
+                        (ts_ns, fr, next_ns if next_ns is not None else 0)
+                    )
                 elif kind == "mark":
                     _, inst, ts_ns, mark_px, oracle_px, oi = parsed
                     if ts_ns == 0:
@@ -620,10 +671,13 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
                         continue
                     counts["mark"] += 1
                     mark_by_day_symbol[(day_key(ts_ns), inst)].append(
-                        (ts_ns,
-                         mark_px if mark_px is not None else float("nan"),
-                         oracle_px if oracle_px is not None else float("nan"),
-                         oi if oi is not None else float("nan")))
+                        (
+                            ts_ns,
+                            mark_px if mark_px is not None else float("nan"),
+                            oracle_px if oracle_px is not None else float("nan"),
+                            oi if oi is not None else float("nan"),
+                        )
+                    )
                 elif kind == "index":
                     _, idx_sym, ts_ns, idx_px = parsed
                     if symbol_filter and idx_sym != symbol_filter:
@@ -635,7 +689,8 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
         "frames: ws={frames} (trades={trades} books={books} mark={mark} "
         "funding={funding} index={index}) sessions={session_start} "
         "stops={session_stop} checkpoints={checkpoint} "
-        "disconnects={ws_disconnect} reconnects={ws_reconnect}".format(**counts))
+        "disconnects={ws_disconnect} reconnects={ws_reconnect}".format(**counts)
+    )
 
     for (day, sym), rows in trades_by_day_symbol.items():
         write_trades_parquet(output_dir / "trades" / exchange / sym / f"{day}.parquet", rows)
@@ -683,21 +738,39 @@ def convert(input_glob: str, output_dir: Path, exchange: str, symbol_filter: str
         connection_events.sort(key=lambda e: e["ts_ns"])
         with open(output_dir / "connection_state.json", "w") as f:
             json.dump(connection_events, f, indent=2)
-        print(f"wrote {output_dir / 'connection_state.json'} "
-              f"({counts['ws_disconnect']} disconnects, {counts['ws_reconnect']} reconnects)")
+        print(
+            f"wrote {output_dir / 'connection_state.json'} "
+            f"({counts['ws_disconnect']} disconnects, {counts['ws_reconnect']} reconnects)"
+        )
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--input", required=True, help="Glob for .wslog files (e.g. /opt/bpt/data/raw/okx/**/*.wslog)")
-    ap.add_argument("--output", default="/opt/bpt/data/backtest-cache",
-                    help="Output Parquet root (bpt-backtester local_cache)")
-    ap.add_argument("--exchange", required=True, choices=["OKX", "HYPERLIQUID", "HL", "DERIBIT"],
-                    help="Venue parser dispatch")
-    ap.add_argument("--symbol", default=None,
-                    help="Optional exchange-native symbol filter, e.g. BTC-USDT")
-    ap.add_argument("--max-quiet-seconds", type=float, default=60.0,
-                    help="Flag a gap if WS frames are absent for this long without a checkpoint")
+    ap.add_argument(
+        "--input",
+        required=True,
+        help="Glob for .wslog files (e.g. /opt/bpt/data/raw/okx/**/*.wslog)",
+    )
+    ap.add_argument(
+        "--output",
+        default="/opt/bpt/data/backtest-cache",
+        help="Output Parquet root (bpt-backtester local_cache)",
+    )
+    ap.add_argument(
+        "--exchange",
+        required=True,
+        choices=["OKX", "HYPERLIQUID", "HL", "DERIBIT"],
+        help="Venue parser dispatch",
+    )
+    ap.add_argument(
+        "--symbol", default=None, help="Optional exchange-native symbol filter, e.g. BTC-USDT"
+    )
+    ap.add_argument(
+        "--max-quiet-seconds",
+        type=float,
+        default=60.0,
+        help="Flag a gap if WS frames are absent for this long without a checkpoint",
+    )
     args = ap.parse_args()
 
     convert(

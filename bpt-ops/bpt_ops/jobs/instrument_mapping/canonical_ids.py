@@ -8,6 +8,7 @@ This matches the pattern already in production in bpt/data-forge; the intent
 is that canonical_ids never get renumbered once assigned. Once a strategy has
 internalised id=2003 as SOL-USDT SPOT, that must stay true forever.
 """
+
 from __future__ import annotations
 
 from bpt_ops.common.schema import InstrumentMapping, ReverseEntry

@@ -100,36 +100,100 @@ export function ArchiveDiff({ runA, runB }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setA(null); setB(null); setError(null)
+    setA(null)
+    setB(null)
+    setError(null)
     Promise.all([
       fetch(`/api/backtest-runs/${encodeURIComponent(runA)}`).then((r) => r.json()),
       fetch(`/api/backtest-runs/${encodeURIComponent(runB)}`).then((r) => r.json()),
     ])
-      .then(([dA, dB]: [RunDetail, RunDetail]) => { setA(dA); setB(dB) })
+      .then(([dA, dB]: [RunDetail, RunDetail]) => {
+        setA(dA)
+        setB(dB)
+      })
       .catch((e) => setError(String(e)))
   }, [runA, runB])
 
-  if (error) return <div className="archive-body" style={{ padding: 16, color: 'var(--red)' }}>Error: {error}</div>
-  if (!a || !b) return <div className="archive-body" style={{ padding: 16, color: 'var(--text-muted)' }}>Loading…</div>
-  if (!a.summary || !b.summary) return <div className="archive-body" style={{ padding: 16, color: 'var(--red)' }}>Missing summary.json</div>
+  if (error)
+    return (
+      <div className="archive-body" style={{ padding: 16, color: 'var(--red)' }}>
+        Error: {error}
+      </div>
+    )
+  if (!a || !b)
+    return (
+      <div className="archive-body" style={{ padding: 16, color: 'var(--text-muted)' }}>
+        Loading…
+      </div>
+    )
+  if (!a.summary || !b.summary)
+    return (
+      <div className="archive-body" style={{ padding: 16, color: 'var(--red)' }}>
+        Missing summary.json
+      </div>
+    )
 
   const sa = a.summary
   const sb = b.summary
 
   const rows: MetricRow[] = [
-    { label: 'Total PnL ($)',        a: sa.total_pnl,         b: sb.total_pnl,         digits: 4,  higherIsBetter: true },
-    { label: 'Return %',             a: sa.return_pct * 100,  b: sb.return_pct * 100,  digits: 4, suffix: '%', higherIsBetter: true },
-    { label: 'Max DD %',             a: sa.max_drawdown_pct,  b: sb.max_drawdown_pct,  digits: 4, suffix: '%', higherIsBetter: false },
-    { label: 'Sharpe / fill',        a: sa.sharpe_per_fill,   b: sb.sharpe_per_fill,   digits: 4,  higherIsBetter: true },
-    { label: 'Win rate %',           a: sa.win_rate_pct,      b: sb.win_rate_pct,      digits: 2, suffix: '%', higherIsBetter: true },
-    { label: 'Total fills',          a: sa.total_fills,       b: sb.total_fills,       digits: 0,  higherIsBetter: true },
-    { label: 'Buys',                 a: sa.buy_count,         b: sb.buy_count,         digits: 0,  higherIsBetter: true },
-    { label: 'Sells',                a: sa.sell_count,        b: sb.sell_count,        digits: 0,  higherIsBetter: true },
-    { label: 'Buy notional ($)',     a: sa.buy_notional_usd,  b: sb.buy_notional_usd,  digits: 2,  higherIsBetter: true },
-    { label: 'Sell notional ($)',    a: sa.sell_notional_usd, b: sb.sell_notional_usd, digits: 2,  higherIsBetter: true },
-    { label: 'Wallclock (s)',        a: sa.wallclock_duration_ms !== undefined ? sa.wallclock_duration_ms / 1000 : undefined,
-                                       b: sb.wallclock_duration_ms !== undefined ? sb.wallclock_duration_ms / 1000 : undefined,
-                                       digits: 2, suffix: 's', higherIsBetter: false },
+    { label: 'Total PnL ($)', a: sa.total_pnl, b: sb.total_pnl, digits: 4, higherIsBetter: true },
+    {
+      label: 'Return %',
+      a: sa.return_pct * 100,
+      b: sb.return_pct * 100,
+      digits: 4,
+      suffix: '%',
+      higherIsBetter: true,
+    },
+    {
+      label: 'Max DD %',
+      a: sa.max_drawdown_pct,
+      b: sb.max_drawdown_pct,
+      digits: 4,
+      suffix: '%',
+      higherIsBetter: false,
+    },
+    {
+      label: 'Sharpe / fill',
+      a: sa.sharpe_per_fill,
+      b: sb.sharpe_per_fill,
+      digits: 4,
+      higherIsBetter: true,
+    },
+    {
+      label: 'Win rate %',
+      a: sa.win_rate_pct,
+      b: sb.win_rate_pct,
+      digits: 2,
+      suffix: '%',
+      higherIsBetter: true,
+    },
+    { label: 'Total fills', a: sa.total_fills, b: sb.total_fills, digits: 0, higherIsBetter: true },
+    { label: 'Buys', a: sa.buy_count, b: sb.buy_count, digits: 0, higherIsBetter: true },
+    { label: 'Sells', a: sa.sell_count, b: sb.sell_count, digits: 0, higherIsBetter: true },
+    {
+      label: 'Buy notional ($)',
+      a: sa.buy_notional_usd,
+      b: sb.buy_notional_usd,
+      digits: 2,
+      higherIsBetter: true,
+    },
+    {
+      label: 'Sell notional ($)',
+      a: sa.sell_notional_usd,
+      b: sb.sell_notional_usd,
+      digits: 2,
+      higherIsBetter: true,
+    },
+    {
+      label: 'Wallclock (s)',
+      a: sa.wallclock_duration_ms !== undefined ? sa.wallclock_duration_ms / 1000 : undefined,
+      b: sb.wallclock_duration_ms !== undefined ? sb.wallclock_duration_ms / 1000 : undefined,
+      digits: 2,
+      suffix: 's',
+      higherIsBetter: false,
+    },
   ]
 
   // Markout rows — only if either run has them. Higher = better
@@ -155,16 +219,42 @@ export function ArchiveDiff({ runA, runB }: Props) {
   const rtRows: MetricRow[] = []
   if (sa.round_trips || sb.round_trips) {
     rtRows.push(
-      { label: 'Closed round-trips', a: sa.round_trips?.closed_round_trips,
-        b: sb.round_trips?.closed_round_trips, digits: 0, higherIsBetter: true },
-      { label: 'Avg holding (ms)',   a: sa.round_trips?.avg_holding_ms,
-        b: sb.round_trips?.avg_holding_ms,    digits: 0, higherIsBetter: false },
-      { label: 'Median holding (ms)', a: sa.round_trips?.median_holding_ms,
-        b: sb.round_trips?.median_holding_ms, digits: 0, higherIsBetter: false },
-      { label: 'RT win rate %',      a: sa.round_trips?.round_trip_win_rate_pct,
-        b: sb.round_trips?.round_trip_win_rate_pct, digits: 2, suffix: '%', higherIsBetter: true },
-      { label: 'Avg RT PnL ($)',     a: sa.round_trips?.avg_round_trip_pnl,
-        b: sb.round_trips?.avg_round_trip_pnl, digits: 4, higherIsBetter: true },
+      {
+        label: 'Closed round-trips',
+        a: sa.round_trips?.closed_round_trips,
+        b: sb.round_trips?.closed_round_trips,
+        digits: 0,
+        higherIsBetter: true,
+      },
+      {
+        label: 'Avg holding (ms)',
+        a: sa.round_trips?.avg_holding_ms,
+        b: sb.round_trips?.avg_holding_ms,
+        digits: 0,
+        higherIsBetter: false,
+      },
+      {
+        label: 'Median holding (ms)',
+        a: sa.round_trips?.median_holding_ms,
+        b: sb.round_trips?.median_holding_ms,
+        digits: 0,
+        higherIsBetter: false,
+      },
+      {
+        label: 'RT win rate %',
+        a: sa.round_trips?.round_trip_win_rate_pct,
+        b: sb.round_trips?.round_trip_win_rate_pct,
+        digits: 2,
+        suffix: '%',
+        higherIsBetter: true,
+      },
+      {
+        label: 'Avg RT PnL ($)',
+        a: sa.round_trips?.avg_round_trip_pnl,
+        b: sb.round_trips?.avg_round_trip_pnl,
+        digits: 4,
+        higherIsBetter: true,
+      }
     )
   }
 
@@ -174,9 +264,11 @@ export function ArchiveDiff({ runA, runB }: Props) {
         <div className="panel-header">
           <span className="panel-title">Run diff</span>
           <span className="panel-badge" style={{ color: 'var(--text-muted)' }}>
-            {sa.strategy_name ?? '—'} {sa.git_sha ? sa.git_sha.slice(0, 7) : ''} {sa.params_hash ? sa.params_hash.slice(0, 8) : ''}
+            {sa.strategy_name ?? '—'} {sa.git_sha ? sa.git_sha.slice(0, 7) : ''}{' '}
+            {sa.params_hash ? sa.params_hash.slice(0, 8) : ''}
             {' vs '}
-            {sb.strategy_name ?? '—'} {sb.git_sha ? sb.git_sha.slice(0, 7) : ''} {sb.params_hash ? sb.params_hash.slice(0, 8) : ''}
+            {sb.strategy_name ?? '—'} {sb.git_sha ? sb.git_sha.slice(0, 7) : ''}{' '}
+            {sb.params_hash ? sb.params_hash.slice(0, 8) : ''}
           </span>
         </div>
         <div style={{ padding: 12, overflow: 'auto' }}>
@@ -184,8 +276,12 @@ export function ArchiveDiff({ runA, runB }: Props) {
             <thead>
               <tr>
                 <th>Metric</th>
-                <th className="num" style={{ color: 'var(--blue)' }}>A: {a.name}</th>
-                <th className="num" style={{ color: 'var(--yellow)' }}>B: {b.name}</th>
+                <th className="num" style={{ color: 'var(--blue)' }}>
+                  A: {a.name}
+                </th>
+                <th className="num" style={{ color: 'var(--yellow)' }}>
+                  B: {b.name}
+                </th>
                 <th className="num">Δ (B − A)</th>
               </tr>
             </thead>
@@ -196,14 +292,19 @@ export function ArchiveDiff({ runA, runB }: Props) {
                 const delta = av !== undefined && bv !== undefined ? bv - av : undefined
                 // Visual break before each metric block.
                 const isMarkoutStart = idx === rows.length && markoutRows.length > 0
-                const isRtStart      = idx === rows.length + markoutRows.length && rtRows.length > 0
+                const isRtStart = idx === rows.length + markoutRows.length && rtRows.length > 0
                 const sectionTop = isMarkoutStart || isRtStart
                 return (
-                  <tr key={r.label} style={sectionTop ? { borderTop: '2px solid var(--border-strong)' } : undefined}>
+                  <tr
+                    key={r.label}
+                    style={sectionTop ? { borderTop: '2px solid var(--border-strong)' } : undefined}
+                  >
                     <td>{r.label}</td>
                     <td className="num">{fmt(av, r.digits, r.suffix)}</td>
                     <td className="num">{fmt(bv, r.digits, r.suffix)}</td>
-                    <td className={`num ${delta !== undefined ? deltaClass(delta, r.higherIsBetter) : ''}`}>
+                    <td
+                      className={`num ${delta !== undefined ? deltaClass(delta, r.higherIsBetter) : ''}`}
+                    >
                       {delta !== undefined ? deltaStr(delta, r.digits, r.suffix) : '—'}
                     </td>
                   </tr>
@@ -212,12 +313,25 @@ export function ArchiveDiff({ runA, runB }: Props) {
             </tbody>
           </table>
 
-          <h3 style={{ marginTop: 24, marginBottom: 8, fontSize: 11, letterSpacing: '0.09em', color: 'var(--text-label)', textTransform: 'uppercase' }}>
+          <h3
+            style={{
+              marginTop: 24,
+              marginBottom: 8,
+              fontSize: 11,
+              letterSpacing: '0.09em',
+              color: 'var(--text-label)',
+              textTransform: 'uppercase',
+            }}
+          >
             Equity curves
           </h3>
           <DualEquity
-            seriesA={a.pnlCurve.filter((p) => p.ts > 0).map((p) => ({ ts: p.ts, equity: p.equity }))}
-            seriesB={b.pnlCurve.filter((p) => p.ts > 0).map((p) => ({ ts: p.ts, equity: p.equity }))}
+            seriesA={a.pnlCurve
+              .filter((p) => p.ts > 0)
+              .map((p) => ({ ts: p.ts, equity: p.equity }))}
+            seriesB={b.pnlCurve
+              .filter((p) => p.ts > 0)
+              .map((p) => ({ ts: p.ts, equity: p.equity }))}
             labelA={a.name}
             labelB={b.name}
           />
@@ -296,7 +410,11 @@ function DualEquity({ seriesA, seriesB }: DualEquityProps) {
       for (const e of entries) chart.resize(e.contentRect.width, 260)
     })
     ro.observe(hostRef.current)
-    return () => { ro.disconnect(); chart.remove(); chartRef.current = null }
+    return () => {
+      ro.disconnect()
+      chart.remove()
+      chartRef.current = null
+    }
   }, [seriesA, seriesB])
 
   return <div ref={hostRef} style={{ width: '100%', height: 260 }} />

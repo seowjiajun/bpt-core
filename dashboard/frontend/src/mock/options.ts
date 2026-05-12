@@ -85,13 +85,17 @@ export const MOCK_LEGS: OptionLeg[] = [
 
 // ── Aggregated Greeks ────────────────────────────────────────────────────────
 function computeGreeks(legs: OptionLeg[]): PortfolioGreeks {
-  let netDelta = 0, netGamma = 0, netVega = 0, netTheta = 0
-  let totalUnrealizedPnl = 0, totalRealizedPnl = 0
+  let netDelta = 0,
+    netGamma = 0,
+    netVega = 0,
+    netTheta = 0
+  let totalUnrealizedPnl = 0,
+    totalRealizedPnl = 0
   for (const l of legs) {
     const absQty = Math.abs(l.qty)
     netDelta += l.delta * absQty
     netGamma += l.gamma * absQty
-    netVega  += l.vega  * absQty
+    netVega += l.vega * absQty
     netTheta += l.theta * absQty
     totalUnrealizedPnl += l.unrealizedPnl
   }
@@ -105,7 +109,7 @@ export const MOCK_GREEKS: PortfolioGreeks = computeGreeks(MOCK_LEGS)
 function smile(expiry: number, daysToExpiry: number, label: string): VolSmileSlice {
   const tte = daysToExpiry / 365
   const strikes = [78_000, 82_000, 86_000, 88_000, 92_000, 95_000, 98_000, 100_000, 105_000]
-  const baseIv = 0.55 + (0.08 / Math.sqrt(daysToExpiry / 7))
+  const baseIv = 0.55 + 0.08 / Math.sqrt(daysToExpiry / 7)
 
   const points: VolSurfacePoint[] = []
   for (const strike of strikes) {
@@ -154,7 +158,7 @@ function normalCdf(x: number): number {
 }
 
 export const MOCK_VOL_SURFACE: VolSmileSlice[] = [
-  smile(20260113, 7,  '13 Jan'),
+  smile(20260113, 7, '13 Jan'),
   smile(20260206, 30, '06 Feb'),
 ]
 

@@ -27,9 +27,9 @@ export type InstrumentType = 'SPOT' | 'PERP' | 'FUTURE' | 'OPTION'
 export interface SessionMsg {
   type: 'session'
   symbol: string
-  strategy: string              // e.g. "MomentumStrategy" — display only
-  exchange: string              // e.g. "OKX" — display only
-  mode: RunMode                 // paper | live | mock — display only
+  strategy: string // e.g. "MomentumStrategy" — display only
+  exchange: string // e.g. "OKX" — display only
+  mode: RunMode // paper | live | mock — display only
   instrumentType?: InstrumentType // SPOT/PERP/FUTURE/OPTION — display only
 }
 
@@ -42,7 +42,7 @@ export interface StatusMsg {
 // Market data tick.  Emitted frequently — top-bar price comes from these.
 export interface TickMsg {
   type: 'tick'
-  ts: number        // ns since epoch
+  ts: number // ns since epoch
   symbol: string
   price: number
 }
@@ -54,10 +54,10 @@ export interface FillMsg {
   orderId: number
   symbol: string
   side: Side
-  orderType: string   // "LIMIT" | "MARKET" — POST_ONLY is now an execInst flag, not a type
+  orderType: string // "LIMIT" | "MARKET" — POST_ONLY is now an execInst flag, not a type
   qty: number
   price: number
-  fee: number         // in quote currency
+  fee: number // in quote currency
   realizedPnl: number
   equity: number
 }
@@ -65,19 +65,19 @@ export interface FillMsg {
 // One open position row, as reported by the exchange and relayed via
 // bpt-order-gateway → bridge → this message.
 export interface AccountPosition {
-  symbol: string          // exchange-native, e.g. "BTC"
-  netQty: number          // signed (+ long, − short)
-  avgEntry: number        // quote currency
-  unrealizedPnl: number   // quote currency, MTM'd by the exchange
+  symbol: string // exchange-native, e.g. "BTC"
+  netQty: number // signed (+ long, − short)
+  avgEntry: number // quote currency
+  unrealizedPnl: number // quote currency, MTM'd by the exchange
 }
 
 // One per-currency cash balance row reported by the exchange — e.g.
 // OKX accounts hold USDT + USDC + SGD + USD all at once. Distinct from
 // AccountPosition (which is for non-stable crypto holdings).
 export interface AccountCurrencyBalance {
-  ccy: string                       // currency code, ≤ 8 chars (e.g. "USDT", "SGD")
-  equity: number                    // total holdings in that currency
-  availableBalance: number          // withdrawable amount in that currency
+  ccy: string // currency code, ≤ 8 chars (e.g. "USDT", "SGD")
+  equity: number // total holdings in that currency
+  availableBalance: number // withdrawable amount in that currency
 }
 
 // Live exchange account snapshot from order-gateway, relayed by the bridge.
@@ -87,11 +87,11 @@ export interface AccountCurrencyBalance {
 // feeds per-stable-ccy rows.
 export interface AccountMsg {
   type: 'account'
-  ts: number                        // ns since epoch
-  balance: number                   // quote-ccy available balance (USDT for OKX, USDC for HL)
-  equity: number                    // total account equity (falls back to balance when 0)
-  positions: AccountPosition[]      // open positions with per-leg uPnL
-  currencyBalances?: AccountCurrencyBalance[]  // per-ccy cash rows (since v13 — may be absent on older snapshots)
+  ts: number // ns since epoch
+  balance: number // quote-ccy available balance (USDT for OKX, USDC for HL)
+  equity: number // total account equity (falls back to balance when 0)
+  positions: AccountPosition[] // open positions with per-leg uPnL
+  currencyBalances?: AccountCurrencyBalance[] // per-ccy cash rows (since v13 — may be absent on older snapshots)
 }
 
 // Current net position.  Emitted by the bridge after every fill.
@@ -114,9 +114,9 @@ export interface OrderMsg {
   orderId: number
   symbol: string
   side: Side
-  orderType: string     // "LIMIT" | "MARKET"
+  orderType: string // "LIMIT" | "MARKET"
   price: number
-  qty: number           // original order qty
+  qty: number // original order qty
   filledQty: number
   remainingQty: number
   status: OrderStatus
@@ -255,4 +255,14 @@ export interface StrategyStateMsg {
   marketAsk?: number
 }
 
-export type Msg = SessionMsg | StatusMsg | TickMsg | FillMsg | PositionMsg | OrderMsg | PortfolioMsg | AccountMsg | ToxicityMsg | StrategyStateMsg
+export type Msg =
+  | SessionMsg
+  | StatusMsg
+  | TickMsg
+  | FillMsg
+  | PositionMsg
+  | OrderMsg
+  | PortfolioMsg
+  | AccountMsg
+  | ToxicityMsg
+  | StrategyStateMsg

@@ -89,7 +89,8 @@ export function ArchiveDetail({ name }: Props) {
 
   if (error) return <div style={{ padding: 16, color: 'var(--red)' }}>Error: {error}</div>
   if (!data) return <div style={{ padding: 16, color: 'var(--text-muted)' }}>Loading {name}…</div>
-  if (!data.summary) return <div style={{ padding: 16, color: 'var(--red)' }}>Missing summary.json</div>
+  if (!data.summary)
+    return <div style={{ padding: 16, color: 'var(--red)' }}>Missing summary.json</div>
 
   const { summary, trades, pnlCurve } = data
 
@@ -101,10 +102,10 @@ export function ArchiveDetail({ name }: Props) {
     ts: t.ts,
     orderId: t.orderId,
     side: t.side,
-    orderType: 'LIMIT',  // archive runs don't persist order type — default to LIMIT
+    orderType: 'LIMIT', // archive runs don't persist order type — default to LIMIT
     qty: t.qty,
     price: t.price,
-    fee: 0,              // not persisted in archive CSVs today
+    fee: 0, // not persisted in archive CSVs today
     realizedPnl: t.realizedPnl,
     equity: t.equity,
   }))
@@ -114,20 +115,20 @@ export function ArchiveDetail({ name }: Props) {
   const equityPoints = pnlCurve.filter((p) => p.ts > 0)
 
   const precomputed = {
-    totalPnl:   summary.total_pnl,
-    returnPct:  summary.return_pct,
-    maxDdPct:   summary.max_drawdown_pct,
-    sharpe:     summary.sharpe_per_fill,
-    winRate:    summary.win_rate_pct,
+    totalPnl: summary.total_pnl,
+    returnPct: summary.return_pct,
+    maxDdPct: summary.max_drawdown_pct,
+    sharpe: summary.sharpe_per_fill,
+    winRate: summary.win_rate_pct,
     totalFills: summary.total_fills,
-    buyCount:   summary.buy_count,
-    sellCount:  summary.sell_count,
-    buyNotional:  summary.buy_notional_usd,
+    buyCount: summary.buy_count,
+    sellCount: summary.sell_count,
+    buyNotional: summary.buy_notional_usd,
     sellNotional: summary.sell_notional_usd,
     closedRoundTrips: summary.round_trips?.closed_round_trips,
-    avgHoldingMs:     summary.round_trips?.avg_holding_ms,
-    medianHoldingMs:  summary.round_trips?.median_holding_ms,
-    rtWinRatePct:     summary.round_trips?.round_trip_win_rate_pct,
+    avgHoldingMs: summary.round_trips?.avg_holding_ms,
+    medianHoldingMs: summary.round_trips?.median_holding_ms,
+    rtWinRatePct: summary.round_trips?.round_trip_win_rate_pct,
   }
 
   const metadataLine = [
@@ -146,18 +147,25 @@ export function ArchiveDetail({ name }: Props) {
   const hasMarkouts = !!markouts && Object.values(markouts).some((h) => h && h.resolved_fills > 0)
   const markoutHorizons: Array<['50ms' | '1s' | '5s' | '30s', MarkoutHorizon | undefined]> = [
     ['50ms', markouts?.['50ms']],
-    ['1s',   markouts?.['1s']],
-    ['5s',   markouts?.['5s']],
-    ['30s',  markouts?.['30s']],
+    ['1s', markouts?.['1s']],
+    ['5s', markouts?.['5s']],
+    ['30s', markouts?.['30s']],
   ]
   const bpsCell = (v: number | undefined) => {
     if (v === undefined) return <span style={{ color: 'var(--text-muted)' }}>—</span>
     const cls = v > 0.5 ? 'pnl-pos' : v < -0.5 ? 'pnl-neg' : 'pnl-zero'
-    return <span className={cls}>{v >= 0 ? '+' : ''}{v.toFixed(2)}</span>
+    return (
+      <span className={cls}>
+        {v >= 0 ? '+' : ''}
+        {v.toFixed(2)}
+      </span>
+    )
   }
 
   return (
-    <div className={`archive-body archive-body--detail${hasMarkouts ? ' archive-body--detail-markouts' : ''}`}>
+    <div
+      className={`archive-body archive-body--detail${hasMarkouts ? ' archive-body--detail-markouts' : ''}`}
+    >
       <div style={{ gridArea: 'risk', display: 'grid' }}>
         <RiskPanel
           fills={fills}
@@ -192,7 +200,9 @@ export function ArchiveDetail({ name }: Props) {
                     <td className="num">{bpsCell(h?.avg_bps)}</td>
                     <td className="num">{bpsCell(h?.avg_buy_bps)}</td>
                     <td className="num">{bpsCell(h?.avg_sell_bps)}</td>
-                    <td className="num" style={{ color: 'var(--text-muted)' }}>{h?.resolved_fills ?? 0}</td>
+                    <td className="num" style={{ color: 'var(--text-muted)' }}>
+                      {h?.resolved_fills ?? 0}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -204,11 +214,18 @@ export function ArchiveDetail({ name }: Props) {
       <div className="panel" style={{ gridArea: 'equity' }}>
         <div className="panel-header">
           <span className="panel-title">Equity Curve</span>
-          <span className="panel-badge" style={{ flex: 1, textAlign: 'left', marginLeft: 16, color: 'var(--text-muted)' }}>
+          <span
+            className="panel-badge"
+            style={{ flex: 1, textAlign: 'left', marginLeft: 16, color: 'var(--text-muted)' }}
+          >
             {metadataLine}
           </span>
           <span className="panel-badge">
-            ${summary.final_equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {summary.final_equity.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
             {' · '}
             {equityPoints.length.toLocaleString()} pts
           </span>

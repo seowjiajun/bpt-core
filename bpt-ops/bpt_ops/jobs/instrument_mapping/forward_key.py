@@ -6,6 +6,7 @@ We disambiguate by appending _SPOT to Binance SPOT rows. All other exchanges
 (OKX, Hyperliquid, Deribit) have distinct symbols per market and don't need
 the suffix.
 """
+
 from __future__ import annotations
 
 from bpt_ops.common.schema import ExchangeId

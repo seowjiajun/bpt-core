@@ -4,6 +4,7 @@ Each exchange's adapter implements a `fetch()` that returns a list of
 RawInstrument records. The reconcile step turns those into canonical IDs
 plus the (forward, reverse) index shape that bpt-refdata consumes.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,10 +15,10 @@ from bpt_ops.common.schema import ExchangeId
 @dataclass(frozen=True, slots=True)
 class RawInstrument:
     exchange: ExchangeId
-    venue_symbol: str       # exactly as the exchange returns it (e.g. "BTC-USDT-SWAP")
-    base: str               # "BTC"
-    quote: str              # "USDT"
-    instrument_type: str    # SPOT | PERP | FUTURE | OPTION
+    venue_symbol: str  # exactly as the exchange returns it (e.g. "BTC-USDT-SWAP")
+    base: str  # "BTC"
+    quote: str  # "USDT"
+    instrument_type: str  # SPOT | PERP | FUTURE | OPTION
 
 
 def fetch_for(exchange: ExchangeId) -> list[RawInstrument]:

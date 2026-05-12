@@ -22,11 +22,9 @@ Annualized rate assumes 8h funding periods for OKX/Binance/Deribit
 import argparse
 import csv
 import json
-import sys
 import time
 import urllib.request
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 # Funding period varies by venue.  Annualization must use the right count.
 #   8h venues (OKX/Binance/Deribit): 3 payments/day × 365 = 1095 periods/yr
@@ -75,6 +73,7 @@ def _hl_extract(asset):
     def _inner(_):
         data = _hl_fetch()
         return float(data[asset]["funding"])
+
     return _inner
 
 
@@ -169,7 +168,7 @@ def fmt_annual(rate, periods):
 
 
 def print_table(rows):
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     print(f"\n{now}")
     print(f"{'Venue':<12} {'Symbol':<18} {'Period':>7} {'Rate':>12} {'bps':>8} {'Annualized':>12}")
     print("-" * 75)
@@ -185,9 +184,13 @@ def print_table(rows):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--interval", type=int, default=60, help="seconds between polls (default 60)")
-    ap.add_argument("--csv", type=str, default=None, help="optional path to append a CSV row per poll")
+    ap.add_argument(
+        "--csv", type=str, default=None, help="optional path to append a CSV row per poll"
+    )
     ap.add_argument("--once", action="store_true", help="poll once and exit")
     args = ap.parse_args()
 
@@ -198,7 +201,17 @@ def main():
         csv_file = open(args.csv, "a", newline="")
         csv_writer = csv.writer(csv_file)
         if new_file:
-            csv_writer.writerow(["timestamp", "venue", "symbol", "periods_per_year", "rate", "rate_bps", "annualized_pct"])
+            csv_writer.writerow(
+                [
+                    "timestamp",
+                    "venue",
+                    "symbol",
+                    "periods_per_year",
+                    "rate",
+                    "rate_bps",
+                    "annualized_pct",
+                ]
+            )
 
     try:
         while True:
@@ -209,7 +222,7 @@ def main():
                 if csv_writer and rate is not None:
                     csv_writer.writerow(
                         [
-                            datetime.now(timezone.utc).isoformat(),
+                            datetime.now(UTC).isoformat(),
                             venue["name"],
                             venue["symbol"],
                             venue["periods"],
