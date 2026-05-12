@@ -39,7 +39,12 @@ const CHART_THEME = {
 export function PriceChart() {
   const fills = useStore((s) => s.fills)
   const candles = useStore((s) => s.candles)
-  const strat = useStore((s) => s.strategyState)
+  // Quote/reservation overlays are AS-specific (resting maker orders +
+  // reservation price). Narrow to AS so other strategies don't render
+  // meaningless overlay lines and TS catches the field-access mismatch
+  // at build time.
+  const strategyState = useStore((s) => s.strategyState)
+  const strat = strategyState?.kind === 'AS' ? strategyState : null
   const hostRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)

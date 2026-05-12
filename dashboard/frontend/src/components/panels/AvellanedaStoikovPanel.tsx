@@ -1,4 +1,4 @@
-import { useStore } from '../store'
+import type { ASStrategyState } from '../../types/messages'
 
 const fmt = (v: number, d: number = 2) => v.toFixed(d)
 const fmtBps = (v: number) => v.toFixed(1)
@@ -41,23 +41,7 @@ function InventoryBar({ pct }: { pct: number }) {
   )
 }
 
-export function StrategyStatePanel() {
-  const ss = useStore((s) => s.strategyState)
-
-  if (!ss) {
-    return (
-      <div className="panel" style={{ gridArea: 'stratstate' }}>
-        <div className="panel-header">
-          <span className="panel-title">Strategy State</span>
-          <span className="panel-badge">AS</span>
-        </div>
-        <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
-          Waiting for strategy data.
-        </div>
-      </div>
-    )
-  }
-
+export function AvellanedaStoikovPanel({ state: ss }: { state: ASStrategyState }) {
   const driftDir = ss.drift > 0.0001 ? 'UP' : ss.drift < -0.0001 ? 'DN' : '--'
   const driftClass =
     ss.drift > 0.0001

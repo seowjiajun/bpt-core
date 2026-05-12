@@ -182,12 +182,28 @@ export interface ToxicityMsg {
   askTtfMs: number
 }
 
-// Live strategy state from fenrir — AS model parameters, suppression state,
-// inventory, vol gate status. Published at ~2 Hz.
-export interface StrategyStateMsg {
+// Live strategy state from fenrir. Each strategy implementing
+// IStrategy::get_strategy_state_json() emits its own shape; the `kind`
+// discriminator picks the matching panel on the dashboard
+// (components/panels/index.ts).
+//
+// To add a new strategy: add its kind below, extend StrategyStateMsg
+// with a new interface, write the C++ JSON emitter, and register a
+// panel component. Unknown kinds fall back to GenericStrategyPanel.
+export type StrategyKind = 'AS' | 'FundingArb'
+
+interface BaseStrategyState {
   type: 'strategyState'
+  kind: StrategyKind
   symbol: string
   exchange: string
+}
+
+// AvellanedaStoikov — market-making strategy with regime detection,
+// queue-position-aware sizing, and vol-gate / inventory / drift /
+// trend / toxicity suppression.
+export interface ASStrategyState extends BaseStrategyState {
+  kind: 'AS'
   drift: number
   driftBps: number
   // Slow-drift signal: cumulative return (in bps) from a rolling
@@ -254,6 +270,25 @@ export interface StrategyStateMsg {
   marketBid?: number
   marketAsk?: number
 }
+
+// FundingArb — cross-leg spot+perp funding-rate arbitrage. Strategy
+// holds one spot leg and one perp leg in opposite directions, capturing
+// the funding rate. Dashboard panel shows per-leg state + the basis
+// spread that drives the entry/exit decision.
+export interface FundingArbStrategyState extends BaseStrategyState {
+  kind: 'FundingArb'
+  spotPx: number
+  perpPx: number
+  basisBps: number       // (perp - spot) / spot * 1e4
+  fundingRate: number    // annualised, decimal (0.0001 = 1 bp/funding-window)
+  fundingApr: number     // human-readable APR
+  spotQty: number        // signed; + = long spot
+  perpQty: number        // signed; + = long perp
+  hedgedDelta: number    // spotQty + perpQty; ~0 when balanced
+  legStatus: 'flat' | 'entering' | 'open' | 'exiting'
+}
+
+export type StrategyStateMsg = ASStrategyState | FundingArbStrategyState
 
 export type Msg =
   | SessionMsg

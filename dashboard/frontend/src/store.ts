@@ -5,8 +5,11 @@
 // every time any unrelated component was edited. Forcing a full page reload
 // on store edits is the correct behavior — you can't meaningfully hot-swap
 // a state container anyway.
+// Vite's HMR API doesn't expose .decline() in current types; cast-and-call
+// is the documented pattern. Forcing a full reload on store edits is the
+// only safe option: a fresh store would briefly zero every subscriber.
 if (import.meta.hot) {
-  import.meta.hot.decline()
+  ;(import.meta.hot as unknown as { decline: () => void }).decline()
 }
 
 import { create } from 'zustand'
@@ -15,7 +18,6 @@ import type {
   InstrumentType,
   Msg,
   OrderMsg,
-  PortfolioMsg,
   RunMode,
 } from './types/messages'
 import type { Fill } from './components/Blotter'
@@ -275,7 +277,7 @@ export const useStore = create<State>((set) => ({
         case 'portfolio': {
           const legs: OptionLeg[] = msg.legs
             .filter((l) => l.isOption)
-            .map((l, i) => ({
+            .map((l) => ({
               instrumentId: l.instrumentId,
               symbol: l.symbol,
               underlying: l.underlying,

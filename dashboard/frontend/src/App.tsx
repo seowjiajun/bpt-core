@@ -17,7 +17,7 @@ import { VolSurfaceHeatmap } from './components/VolSurfaceHeatmap'
 import { VolTermStructure } from './components/VolTermStructure'
 import { RiskLimitsPanel, MOCK_LIMITS } from './components/RiskLimitsPanel'
 import { ToxicityPanel } from './components/ToxicityPanel'
-import { StrategyStatePanel } from './components/StrategyStatePanel'
+import { STRATEGY_PANELS, GenericStrategyPanel } from './components/panels'
 import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
@@ -254,6 +254,9 @@ export default function App() {
   const storeGreeks = useStore((s) => s.portfolioGreeks)
   const storeSurface = useStore((s) => s.volSurface)
   const price = useStore((s) => s.price)
+  const symbol = useStore((s) => s.symbol)
+  const exchange = useStore((s) => s.exchange)
+  const strategyState = useStore((s) => s.strategyState)
 
   const hasLiveOptions = storeLegs.length > 0
   const optLegs = hasLiveOptions ? storeLegs : MOCK_LEGS
@@ -264,6 +267,16 @@ export default function App() {
   // Show options panels in mock mode (dev) or when live options data arrives.
   const showOptions = WS_URL === 'mock' || hasLiveOptions
 
+  // Per-strategy state panel — picks the right component for the active
+  // strategy's `kind`. Unknown kinds (or no state yet) fall back to the
+  // generic JSON-dump panel.
+  const strategyPanelNode = strategyState
+    ? (() => {
+        const Panel = STRATEGY_PANELS[strategyState.kind] ?? GenericStrategyPanel
+        return <Panel state={strategyState} />
+      })()
+    : <GenericStrategyPanel state={null} />
+
   return (
     <div className={`shell ${showOptions ? 'shell--options' : ''}`}>
       <TopBar />
@@ -272,8 +285,8 @@ export default function App() {
       <div className="main-row">
         <div className="panel">
           <div className="panel-header">
-            <span className="panel-title">BTC-USDT · 1m</span>
-            <span className="panel-badge">OKX</span>
+            <span className="panel-title">{symbol ? `${symbol} · 1m` : '— · 1m'}</span>
+            <span className="panel-badge">{exchange || '—'}</span>
           </div>
           <PriceChart />
         </div>
@@ -324,7 +337,7 @@ export default function App() {
         <EquityChart />
       </div>
 
-      <StrategyStatePanel />
+      {strategyPanelNode}
       <ToxicityPanel />
       <OpenOrdersPanel />
       <HoldingsPanel />
