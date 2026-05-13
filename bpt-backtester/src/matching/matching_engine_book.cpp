@@ -7,9 +7,8 @@
 /// definitions across .cpp files as long as the class declaration in the
 /// header stays single-sourced.
 
-#include "backtester/matching/matching_engine.h"
-
 #include "backtester/data/orderbook_record.h"
+#include "backtester/matching/matching_engine.h"
 
 #include <algorithm>
 #include <cmath>
@@ -64,13 +63,24 @@ void MatchingEngine::apply_queue_regen(const std::string& book_key, const data::
         if (cancels_at_price <= 0.0)
             continue;
 
-        // Uniform-cancel attribution: under the assumption each unit on the
-        // queue is equally likely to cancel, the expected number of cancels
-        // ahead of us is queue_ahead × (cancels / level_size). Real micro-
-        // structure is more nuanced — late-arriving size cancels less often,
-        // and large icebergs reload — but uniform is the standard first cut
-        // and the unbiased prior in the absence of per-order data.
-        const double cancel_share = order.queue_ahead * (cancels_at_price / old_size);
+        // End-weighted cancel attribution (linear): cancel rate at queue
+        // position i is proportional to i, so the CDF of cancel mass up to
+        // position X is X²/N². Empirically (Bouchaud, Gould, et al.)
+        // cancels concentrate near the back of the queue — stale orders
+        // that have survived this long are less likely to be cancelled
+        // than freshly-placed ones. This is the *queue-aging* effect.
+        //
+        // For us at venue position queue_ahead out of old_size:
+        //   share_of_cancels_in_front_of_us = (queue_ahead / old_size)²
+        //
+        // Compared to the uniform prior (share = queue_ahead / old_size),
+        // this attributes fewer cancels to in-front-of-us when we're near
+        // the front and roughly the same when we're at the back. Net effect
+        // on the backtest: maker fill rates drop slightly toward more
+        // realistic levels (uniform over-credited us with cancels that
+        // really happened behind us).
+        const double pos_frac = order.queue_ahead / old_size;
+        const double cancel_share = cancels_at_price * pos_frac * pos_frac;
         order.queue_ahead = std::max(0.0, order.queue_ahead - cancel_share);
     }
 

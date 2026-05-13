@@ -560,18 +560,20 @@ TEST(MatchingEngineQueueRegenTest, SubtractsTradeVolumeBeforeAttribution) {
 
     // 30 units traded at 101 between the two book updates.
     eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 30.0, 1500));
-    // queue_ahead now reduced by 30 from fill_against_trade → 70
+    // queue_ahead now reduced by 30 from fill_against_trade → 70.
 
     // Book drops to 50 (Δ=50). Trade-attributable=30 → cancels=20.
-    // queue_ahead expected = 70 - 70 * (20/100) = 70 - 14 = 56.
+    // End-weighted attribution: pos_frac = 70/100 = 0.7,
+    // cancel_share = 20 * 0.7² = 20 * 0.49 = 9.8.
+    // queue_ahead expected = 70 - 9.8 = 60.2.
     eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 50, /*ts=*/2000));
 
-    // A 56-unit print at 101 should still leave us unfilled (queue_ahead just covers).
-    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 56.0, 2500));
+    // A 60-unit print at 101 leaves us unfilled — queue_ahead 60.2 still covers.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 60.0, 2500));
     EXPECT_EQ(fills.size(), 0u);
 
-    // One more unit pushes through.
-    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 1.0, 3000));
+    // A 5-unit print drains the residual ~0.2 queue and partially fills us.
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 5.0, 3000));
     ASSERT_EQ(fills.size(), 1u);
 }
 
@@ -727,6 +729,44 @@ TEST(MatchingEngineTest, SamePriceFifo_SinglePrintConsumesVenueAFillsBStarts) {
     EXPECT_EQ(fills[1].order_id, "B");
     EXPECT_DOUBLE_EQ(fills[1].last_fill_qty, 1.0);
     EXPECT_FALSE(fills[1].is_fully_filled);
+}
+
+TEST(MatchingEngineQueueRegenTest, EndWeightedFavoursFrontOfQueue) {
+    // Demonstrates the key difference vs uniform attribution: an order at
+    // venue position 30/100 sees materially fewer cancels in front of it
+    // than an order at position 90/100 does, for the same cancel mass.
+    //
+    // Uniform would give the front order 30% of cancels and the back order
+    // 90%. End-weighted (linear) gives the front order 9% (0.3²) and the
+    // back order 81% (0.9²). The back-vs-front ratio is 9× steeper under
+    // end-weighted, which is what microstructure data actually looks like.
+    //
+    // We assert the front-positioned order survives a print that *would*
+    // have filled it under uniform but *doesn't* under end-weighted.
+
+    MatchingEngine eng;
+    std::vector<FillReport> fills;
+    eng.set_fill_callback([&](FillReport r) { fills.push_back(r); });
+
+    // Front-of-queue scenario: order placed when level was 100 sees 70
+    // units of venue volume drain via trade prints, leaving queue_ahead=30.
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 100));
+    eng.submit_order(make_order(OrderType::LIMIT, OrderSide::SELL, 5.0, 101.0, "sell-front"));
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 70.0, 1500));
+    EXPECT_EQ(fills.size(), 0u);  // not at the front yet — 30 venue still ahead
+
+    // Now book shrinks to 22. Decrease = 100-22 = 78. Trade-attributable = 70.
+    // Cancels = 8.
+    //   Uniform would: queue_ahead -= 30 * (8/100) = 2.4 → queue_ahead = 27.6
+    //   End-weighted: queue_ahead -= 8 * (30/100)² = 8 * 0.09 = 0.72 → queue_ahead = 29.28
+    eng.on_market_event(make_book_l1("BINANCE", "BTCUSDT", 100.0, 101.0, 10, 22, /*ts=*/2000));
+
+    // A 28-unit print at 101: under uniform attribution, queue_ahead=27.6
+    // would be drained and we'd fill 0.4. Under end-weighted, queue_ahead=
+    // 29.28 absorbs the whole print — no fill yet, which is the more
+    // realistic outcome (the 8 cancels were mostly behind us, not ahead).
+    eng.on_market_event(make_trade("BINANCE", "BTCUSDT", TradeSide::BUY, 101.0, 28.0, 2500));
+    EXPECT_EQ(fills.size(), 0u) << "End-weighted attribution should keep this print from reaching the front order";
 }
 
 TEST(MatchingEngineTest, SamePriceFifo_CancellingAClearsBQueue) {
