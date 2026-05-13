@@ -324,130 +324,152 @@ double ResultsCollector::compute_sharpe() const {
 
 void ResultsCollector::write() const {
     fs::create_directories(output_dir_);
+    copy_params_file();
+    write_trades_csv();
+    write_pnl_curve_csv();
+    write_summary_json();
+}
 
-    // ── params.toml ───────────────────────────────────────────────────────
-    // Copy the strategy params file into the run dir so the dashboard
-    // can render the actual param values (not just the hash) — needed
-    // for sweep visualisations that label each cell by its tuned param.
-    if (!metadata_.params_file.empty()) {
-        try {
-            fs::copy_file(metadata_.params_file, output_dir_ + "/params.toml", fs::copy_options::overwrite_existing);
-            bpt::common::log::info("[ResultsCollector] Copied params {} → {}/params.toml",
-                                   metadata_.params_file,
-                                   output_dir_);
-        } catch (const std::exception& e) {
-            bpt::common::log::warn("[ResultsCollector] Failed to copy params {} → {}/params.toml: {}",
-                                   metadata_.params_file,
-                                   output_dir_,
-                                   e.what());
-        }
-    }
-
-    // ── trades.csv ────────────────────────────────────────────────────────
-    {
-        std::ofstream f(output_dir_ + "/trades.csv");
-        if (!f)
-            throw std::runtime_error("Cannot open " + output_dir_ + "/trades.csv");
-        f << "simulation_ts,exchange,symbol,order_id,client_order_id,"
-             "side,type,liquidity,qty,price,realized_pnl,fee_paid,equity,"
-             "markout_50ms_bps,markout_1s_bps,markout_5s_bps,markout_30s_bps\n";
-        for (const auto& r : trades_) {
-            f << std::format("{},{},{},{},{},{},{},{},{:.10g},{:.10g},{:.10g},{:.10g},{:.10g}",
-                             r.simulation_ts,
-                             r.exchange,
-                             r.symbol,
-                             r.order_id,
-                             r.client_order_id,
-                             r.side,
-                             r.order_type,
-                             r.liquidity,
-                             r.qty,
-                             r.price,
-                             r.realized_pnl,
-                             r.fee_paid,
-                             r.equity);
-            // Empty cell instead of NaN for unresolved horizons — pandas
-            // and dashboard parsers both treat it as missing.
-            for (double mk : r.markouts_bps) {
-                if (mk == kUnresolved)
-                    f << ",";
-                else
-                    f << std::format(",{:.4f}", mk);
-            }
-            f << "\n";
-        }
-        bpt::common::log::info("[ResultsCollector] Wrote {}/trades.csv ({} rows)", output_dir_, trades_.size());
-    }
-
-    // ── pnl_curve.csv ─────────────────────────────────────────────────────
-    {
-        std::ofstream f(output_dir_ + "/pnl_curve.csv");
-        if (!f)
-            throw std::runtime_error("Cannot open " + output_dir_ + "/pnl_curve.csv");
-        f << "simulation_ts,equity\n";
-        for (const auto& pt : equity_curve_)
-            f << std::format("{},{:.10g}\n", pt.simulation_ts, pt.equity);
-        bpt::common::log::info("[ResultsCollector] Wrote {}/pnl_curve.csv ({} points)",
+// Copy the strategy params file into the run dir so the dashboard can render
+// the actual param values (not just the hash) — needed for sweep visualisations
+// that label each cell by its tuned param. Warn-only on failure: params is a
+// diagnostic, not a correctness input.
+void ResultsCollector::copy_params_file() const {
+    if (metadata_.params_file.empty())
+        return;
+    try {
+        fs::copy_file(metadata_.params_file, output_dir_ + "/params.toml", fs::copy_options::overwrite_existing);
+        bpt::common::log::info("[ResultsCollector] Copied params {} → {}/params.toml",
+                               metadata_.params_file,
+                               output_dir_);
+    } catch (const std::exception& e) {
+        bpt::common::log::warn("[ResultsCollector] Failed to copy params {} → {}/params.toml: {}",
+                               metadata_.params_file,
                                output_dir_,
-                               equity_curve_.size());
+                               e.what());
     }
+}
 
-    // ── summary.json ──────────────────────────────────────────────────────
-    {
-        double final_equity = equity_curve_.empty() ? starting_capital_ : equity_curve_.back().equity;
-        double total_pnl = final_equity - starting_capital_;
-        double return_pct = (starting_capital_ > 1e-12) ? (total_pnl / starting_capital_) * 100.0 : 0.0;
-        double max_drawdown = compute_max_drawdown();
-        double sharpe = compute_sharpe();
-
-        int win_trades = 0;
-        int buy_count = 0;
-        int sell_count = 0;
-        double buy_notional = 0.0;
-        double sell_notional = 0.0;
-        for (const auto& r : trades_) {
-            if (r.realized_pnl > 0.0)
-                ++win_trades;
-            const double notional = r.qty * r.price;
-            if (r.side == "BUY") {
-                ++buy_count;
-                buy_notional += notional;
-            } else {
-                ++sell_count;
-                sell_notional += notional;
-            }
+void ResultsCollector::write_trades_csv() const {
+    std::ofstream f(output_dir_ + "/trades.csv");
+    if (!f)
+        throw std::runtime_error("Cannot open " + output_dir_ + "/trades.csv");
+    f << "simulation_ts,exchange,symbol,order_id,client_order_id,"
+         "side,type,liquidity,qty,price,realized_pnl,fee_paid,equity,"
+         "markout_50ms_bps,markout_1s_bps,markout_5s_bps,markout_30s_bps\n";
+    for (const auto& r : trades_) {
+        f << std::format("{},{},{},{},{},{},{},{},{:.10g},{:.10g},{:.10g},{:.10g},{:.10g}",
+                         r.simulation_ts,
+                         r.exchange,
+                         r.symbol,
+                         r.order_id,
+                         r.client_order_id,
+                         r.side,
+                         r.order_type,
+                         r.liquidity,
+                         r.qty,
+                         r.price,
+                         r.realized_pnl,
+                         r.fee_paid,
+                         r.equity);
+        // Empty cell instead of NaN for unresolved horizons — pandas and the
+        // dashboard parser both treat it as missing.
+        for (double mk : r.markouts_bps) {
+            if (mk == kUnresolved)
+                f << ",";
+            else
+                f << std::format(",{:.4f}", mk);
         }
-        double win_rate = trades_.empty() ? 0.0 : static_cast<double>(win_trades) / trades_.size() * 100.0;
+        f << "\n";
+    }
+    bpt::common::log::info("[ResultsCollector] Wrote {}/trades.csv ({} rows)", output_dir_, trades_.size());
+}
 
-        const uint64_t wallclock_end_ns = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
-                .count());
-        const uint64_t wallclock_duration_ms =
-            (wallclock_end_ns > wallclock_start_ns_) ? (wallclock_end_ns - wallclock_start_ns_) / 1'000'000ULL : 0;
+void ResultsCollector::write_pnl_curve_csv() const {
+    std::ofstream f(output_dir_ + "/pnl_curve.csv");
+    if (!f)
+        throw std::runtime_error("Cannot open " + output_dir_ + "/pnl_curve.csv");
+    f << "simulation_ts,equity\n";
+    for (const auto& pt : equity_curve_)
+        f << std::format("{},{:.10g}\n", pt.simulation_ts, pt.equity);
+    bpt::common::log::info("[ResultsCollector] Wrote {}/pnl_curve.csv ({} points)", output_dir_, equity_curve_.size());
+}
 
-        namespace json = boost::json;
-        json::object obj;
-        obj["starting_capital"] = starting_capital_;
-        obj["final_equity"] = final_equity;
-        obj["total_pnl"] = total_pnl;
-        obj["return_pct"] = return_pct;
-        obj["max_drawdown_pct"] = max_drawdown * 100.0;
-        obj["sharpe_per_fill"] = sharpe;
-        obj["total_fills"] = static_cast<int64_t>(trades_.size());
-        obj["win_fills"] = static_cast<int64_t>(win_trades);
-        obj["win_rate_pct"] = win_rate;
+void ResultsCollector::write_summary_json() const {
+    namespace json = boost::json;
+    json::object obj;
 
-        // Universal-core metadata + per-side fill aggregates. Older runs
-        // without these fields will still parse — frontend treats them as
-        // optional.
-        obj["buy_count"] = static_cast<int64_t>(buy_count);
-        obj["sell_count"] = static_cast<int64_t>(sell_count);
-        obj["buy_notional_usd"] = buy_notional;
-        obj["sell_notional_usd"] = sell_notional;
-        obj["fees_paid_usd"] = total_fees_paid_;
-        // Per-venue fee table — both rates surfaced so reviewers can
-        // tell whether maker rebates or taker charges drove the fee
-        // total. Keys are venue names matching FillReport.exchange.
+    // ── Aggregate PnL + fill counts ──────────────────────────────────────────
+    const double final_equity = equity_curve_.empty() ? starting_capital_ : equity_curve_.back().equity;
+    const double total_pnl = final_equity - starting_capital_;
+    const double return_pct = (starting_capital_ > 1e-12) ? (total_pnl / starting_capital_) * 100.0 : 0.0;
+    const double max_drawdown = compute_max_drawdown();
+    const double sharpe = compute_sharpe();
+
+    int win_trades = 0;
+    int buy_count = 0;
+    int sell_count = 0;
+    int maker_fills = 0;
+    int taker_fills = 0;
+    double buy_notional = 0.0;
+    double sell_notional = 0.0;
+    for (const auto& r : trades_) {
+        if (r.realized_pnl > 0.0)
+            ++win_trades;
+        const double notional = r.qty * r.price;
+        if (r.side == "BUY") {
+            ++buy_count;
+            buy_notional += notional;
+        } else {
+            ++sell_count;
+            sell_notional += notional;
+        }
+        if (r.liquidity == "MAKER")
+            ++maker_fills;
+        else if (r.liquidity == "TAKER")
+            ++taker_fills;
+    }
+    const double win_rate = trades_.empty() ? 0.0 : static_cast<double>(win_trades) / trades_.size() * 100.0;
+
+    const uint64_t wallclock_end_ns = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count());
+    const uint64_t wallclock_duration_ms =
+        (wallclock_end_ns > wallclock_start_ns_) ? (wallclock_end_ns - wallclock_start_ns_) / 1'000'000ULL : 0;
+
+    obj["starting_capital"] = starting_capital_;
+    obj["final_equity"] = final_equity;
+    obj["total_pnl"] = total_pnl;
+    obj["return_pct"] = return_pct;
+    obj["max_drawdown_pct"] = max_drawdown * 100.0;
+    obj["sharpe_per_fill"] = sharpe;
+    obj["total_fills"] = static_cast<int64_t>(trades_.size());
+    obj["win_fills"] = static_cast<int64_t>(win_trades);
+    obj["win_rate_pct"] = win_rate;
+    obj["buy_count"] = static_cast<int64_t>(buy_count);
+    obj["sell_count"] = static_cast<int64_t>(sell_count);
+    obj["buy_notional_usd"] = buy_notional;
+    obj["sell_notional_usd"] = sell_notional;
+    obj["fees_paid_usd"] = total_fees_paid_;
+    obj["maker_fills"] = static_cast<int64_t>(maker_fills);
+    obj["taker_fills"] = static_cast<int64_t>(taker_fills);
+    obj["simulation_start"] = metadata_.simulation_start;
+    obj["simulation_end"] = metadata_.simulation_end;
+    obj["wallclock_duration_ms"] = static_cast<int64_t>(wallclock_duration_ms);
+    obj["strategy_name"] = metadata_.strategy_name;
+    obj["params_hash"] = metadata_.params_hash;
+    obj["git_sha"] = metadata_.git_sha;
+
+    // ── Instruments list ─────────────────────────────────────────────────────
+    json::array instruments_arr;
+    for (const auto& inst : metadata_.instruments)
+        instruments_arr.push_back(json::value(inst));
+    obj["instruments"] = std::move(instruments_arr);
+
+    // ── Per-venue fee table ──────────────────────────────────────────────────
+    // Both rates surfaced so reviewers can tell whether maker rebates or taker
+    // charges drove the fee total. Keys match FillReport.exchange.
+    {
         json::object fees_obj;
         for (const auto& [venue, rates] : fees_by_venue_) {
             json::object v;
@@ -456,42 +478,18 @@ void ResultsCollector::write() const {
             fees_obj[venue] = std::move(v);
         }
         obj["fees_by_venue"] = std::move(fees_obj);
-        // Per-liquidity fill counts so a reviewer can spot e.g. "100%
-        // taker fills on a market-making strategy" as a bug signal.
-        int maker_fills = 0;
-        int taker_fills = 0;
-        for (const auto& r : trades_) {
-            if (r.liquidity == "MAKER")
-                ++maker_fills;
-            else if (r.liquidity == "TAKER")
-                ++taker_fills;
-        }
-        obj["maker_fills"] = static_cast<int64_t>(maker_fills);
-        obj["taker_fills"] = static_cast<int64_t>(taker_fills);
-        obj["simulation_start"] = metadata_.simulation_start;
-        obj["simulation_end"] = metadata_.simulation_end;
-        obj["wallclock_duration_ms"] = static_cast<int64_t>(wallclock_duration_ms);
-        obj["strategy_name"] = metadata_.strategy_name;
-        obj["params_hash"] = metadata_.params_hash;
-        obj["git_sha"] = metadata_.git_sha;
-        json::array instruments_arr;
-        for (const auto& inst : metadata_.instruments)
-            instruments_arr.push_back(json::value(inst));
-        obj["instruments"] = std::move(instruments_arr);
+    }
 
-        // Aggregate markouts. Per horizon: avg over all resolved fills,
-        // plus avg restricted to BUY and SELL sides separately so a
-        // toxicity asymmetry (e.g. picked off only on BUYs) is visible.
-        // Resolved-fill count per horizon is also reported so a low
-        // sample size can be spotted.
+    // ── Markouts (50ms / 1s / 5s / 30s, with BUY/SELL split) ─────────────────
+    // Per horizon: avg over all resolved fills + avg restricted to BUY and
+    // SELL separately so a toxicity asymmetry (e.g. picked off only on BUYs)
+    // is visible. Resolved-fill count is reported per horizon so a low sample
+    // size can be spotted.
+    {
         json::object markouts_obj;
         for (std::size_t h = 0; h < kMarkoutHorizonsNs.size(); ++h) {
-            double sum_all = 0.0;
-            int n_all = 0;
-            double sum_buy = 0.0;
-            int n_buy = 0;
-            double sum_sell = 0.0;
-            int n_sell = 0;
+            double sum_all = 0.0, sum_buy = 0.0, sum_sell = 0.0;
+            int n_all = 0, n_buy = 0, n_sell = 0;
             for (const auto& t : trades_) {
                 const double mk = t.markouts_bps[h];
                 if (mk == kUnresolved)
@@ -514,11 +512,13 @@ void ResultsCollector::write() const {
             markouts_obj[kMarkoutHorizonLabels[h]] = std::move(horizon_obj);
         }
         obj["markouts"] = std::move(markouts_obj);
+    }
 
-        // Holding-period stats from closed round-trips. Open positions
-        // at end-of-data are intentionally excluded — they don't have a
-        // close ts, and including their elapsed time biases the average
-        // toward the longest possible duration.
+    // ── Round-trip holding-period stats ──────────────────────────────────────
+    // Open positions at end-of-data are intentionally excluded — they don't
+    // have a close ts, and including their elapsed time biases the average
+    // toward the longest possible duration.
+    {
         json::object rt_obj;
         rt_obj["closed_round_trips"] = static_cast<int64_t>(round_trips_.size());
         if (!round_trips_.empty()) {
@@ -545,21 +545,21 @@ void ResultsCollector::write() const {
             rt_obj["avg_round_trip_pnl"] = sum_pnl / round_trips_.size();
         }
         obj["round_trips"] = std::move(rt_obj);
-
-        std::ofstream f(output_dir_ + "/summary.json");
-        if (!f)
-            throw std::runtime_error("Cannot open " + output_dir_ + "/summary.json");
-        f << json::serialize(obj) << '\n';
-        bpt::common::log::info("[ResultsCollector] Wrote {}/summary.json", output_dir_);
-        bpt::common::log::info(
-            "[ResultsCollector] Total PnL: {:.2f}  Return: {:.2f}%  "
-            "MaxDD: {:.2f}%  Fills: {}  WinRate: {:.1f}%",
-            total_pnl,
-            return_pct,
-            max_drawdown * 100.0,
-            trades_.size(),
-            win_rate);
     }
+
+    // ── Serialise + log summary line ─────────────────────────────────────────
+    std::ofstream f(output_dir_ + "/summary.json");
+    if (!f)
+        throw std::runtime_error("Cannot open " + output_dir_ + "/summary.json");
+    f << json::serialize(obj) << '\n';
+    bpt::common::log::info("[ResultsCollector] Wrote {}/summary.json", output_dir_);
+    bpt::common::log::info(
+        "[ResultsCollector] Total PnL: {:.2f}  Return: {:.2f}%  MaxDD: {:.2f}%  Fills: {}  WinRate: {:.1f}%",
+        total_pnl,
+        return_pct,
+        max_drawdown * 100.0,
+        trades_.size(),
+        win_rate);
 }
 
 }  // namespace bpt::backtester::results

@@ -115,6 +115,17 @@ private:
     double total_realized_pnl() const;
     double total_unrealized_pnl() const;
 
+    // ── Output writers — called by write() in sequence ───────────────────
+    // Split out of the original 240-line write() so each output file owns
+    // a self-contained, ~30–60 line function. Failures in copy_params_file
+    // are swallowed (warn-only) because the strategy params file is a
+    // diagnostic aid, not a correctness input; the rest throw if the
+    // target file can't be opened.
+    void copy_params_file() const;
+    void write_trades_csv() const;
+    void write_pnl_curve_csv() const;
+    void write_summary_json() const;
+
     // ── Stored records ────────────────────────────────────────────────────
 
     struct TradeRow {
