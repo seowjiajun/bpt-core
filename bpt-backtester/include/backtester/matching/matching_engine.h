@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file
-/// \brief MatchingEngine — simulated per-exchange order book and fill engine.
+/// \brief MatchingEngine — backtest simulator with a synthetic L3 order book.
 
 #include "backtester/data/market_event.h"
 #include "backtester/latency/latency_model.h"
@@ -18,97 +18,125 @@ namespace bpt::backtester::matching {
 
 /// \brief Simulates a per-exchange order book and fills incoming orders against it.
 ///
-/// Thread safety:
-///   on_market_event() is called from the ClockMaster thread.
-///   submit_order() and cancel_order() are called from the BinanceOrderServer's
-///   io_context thread.  All public methods are protected by an internal mutex.
-///   The fill callback is invoked *outside* the mutex to prevent deadlocks.
+/// The engine takes the role of a venue's matching engine in a backtest
+/// run. It accepts orders from the simulated OrderGateway, consumes a
+/// stream of replayed market events (L2 snapshots and trade prints), and
+/// emits FillReports to a caller-supplied callback. Internally it
+/// maintains a per-(book, side, price) synthetic L3 deque reconstructed
+/// from the L2 stream — orders rest in their queue position and fill
+/// FIFO as trade prints walk the front of the deque.
+///
+/// Thread safety: on_market_event() is called from the ClockMaster
+/// thread; submit_order() and cancel_order() are called from the order
+/// server's io_context thread. All public methods take an internal
+/// mutex. The fill callback is invoked outside the mutex to prevent
+/// deadlocks if the callback re-enters the engine.
+///
+/// \par Example usage
+/// \code
+///   MatchingEngine eng;
+///   eng.set_fill_callback([](FillReport r) {
+///       // route fill to the strategy / results collector
+///   });
+///   eng.set_latency_model(&my_latency_model);   // optional
+///
+///   // Drive from ClockMaster on every replayed event
+///   eng.on_market_event(event);
+///
+///   // Submit / cancel orders from the simulated OrderGateway
+///   OpenOrder ack = eng.submit_order(order);
+///   if (ack.rejected) { /* venue rejected at submit time */ }
+///   eng.cancel_order(exchange, symbol, order_id);
+/// \endcode
+///
+/// \see OpenOrder, FillReport, latency::LatencyModel
 class MatchingEngine {
 public:
+    /// \brief Callback type invoked when the engine produces a fill report.
+    ///
+    /// Called from on_market_event() or submit_order() outside the engine's
+    /// mutex. Implementations may safely call back into the engine.
     using FillCallback = std::function<void(FillReport)>;
 
+    /// \brief Installs the callback that receives every produced FillReport.
+    /// \param cb Callable invoked with each FillReport. Replaces any prior
+    ///           callback. Pass an empty function to disable.
+    /// \see FillReport
     void set_fill_callback(FillCallback cb);
 
-    /// \brief Optional latency model.
+    /// \brief Installs an optional latency model controlling fill timing.
     ///
-    /// When null (default), submit_to_match and match_to_report delays are
-    /// zero — pre-Phase-3 behaviour. When set, every submitted order's
-    /// match is deferred until current_ts_ ≥ submitted_ts +
-    /// draw(SUBMIT_TO_MATCH); every produced fill's delivery to fill_cb_ is
-    /// deferred until current_ts_ ≥ match_ts + draw(MATCH_TO_REPORT).
+    /// When null (default), submit-to-match and match-to-report delays are
+    /// zero. When set, every submitted order's match is deferred until the
+    /// engine's current simulated timestamp reaches submitted_ts +
+    /// draw(SUBMIT_TO_MATCH); every produced fill is queued until
+    /// match_ts + draw(MATCH_TO_REPORT) before being handed to the
+    /// fill callback.
+    ///
+    /// \param model Non-owning pointer to a model. The model must outlive
+    ///              the engine. nullptr restores zero-latency behaviour.
+    /// \see latency::LatencyModel
     void set_latency_model(latency::LatencyModel* model);
 
-    /// \brief Called from ClockMaster on every tick.
+    /// \brief Processes a single replayed market event (L2 book or trade print).
     ///
-    /// Order: drain pending submits whose scheduled_match_ts ≤ event.ts,
-    /// then update book / run trade or crossing fills, then drain pending
-    /// fill deliveries whose scheduled_report_ts ≤ current_ts_.
+    /// Drives the engine's simulated clock forward. On every call:
+    ///   1. Pending submits whose scheduled_match_ts has arrived are
+    ///      executed (matched against the current book).
+    ///   2. The book / slot deque is updated:
+    ///      - ORDER_BOOK event: reconcile slot deques against the new L2
+    ///        snapshot. Crossing-LIMIT orders at the new touch may fill.
+    ///      - TRADE event: walk the slot deque at the trade price and
+    ///        consume slots FIFO.
+    ///   3. Pending fills whose scheduled_report_ts has arrived are
+    ///      delivered to the fill callback.
+    ///
+    /// \param event An ORDER_BOOK or TRADE event from the replay stream.
     void on_market_event(const data::MarketEvent& event);
 
-    /// \brief Called from the order WS/REST server when OrderGateway submits an order.
+    /// \brief Submits an order and returns the acknowledgement.
     ///
-    /// POST_ONLY orders that would cross the current book are synchronously
-    /// rejected (real exchanges return this in the ack); everything else
-    /// returns ACCEPTED immediately and the actual match is deferred per the
-    /// latency model. Fills come later via fill_cb_.
+    /// POST_ONLY orders that would cross the current book are rejected
+    /// synchronously — real venues return this in the ack frame (HL Alo,
+    /// OKX post_only, Binance LIMIT_MAKER). All other order types accept
+    /// immediately and their match is deferred per the latency model;
+    /// fills are delivered later via the fill callback.
+    ///
+    /// \param order An OpenOrder populated by the caller (order_id,
+    ///              client_order_id, exchange, symbol, type, side, price,
+    ///              quantity must be set; the engine sets submitted_ts).
+    /// \return A copy of `order` with submitted_ts set and `rejected` true
+    ///         iff the engine refused the order synchronously.
+    /// \see OpenOrder, cancel_order
     OpenOrder submit_order(OpenOrder order);
 
-    /// \brief Cancel an order by venue/symbol/id.
+    /// \brief Cancels a resting or yet-to-match order by venue/symbol/id.
     ///
-    /// Scans both pending_submits_ (orders waiting on submit_to_match) and
-    /// pending_ (resting limits awaiting fills).
-    /// \return True if the order was found and cancelled.
+    /// Searches both the pending-submit queue (orders waiting on
+    /// submit-to-match latency) and the resting-LIMIT pool (orders that
+    /// have a queue position).
+    ///
+    /// \param exchange Wire-format exchange name.
+    /// \param symbol Venue-native symbol.
+    /// \param order_id Engine-unique order id matching the original submit.
+    /// \return True if the order was found and removed; false otherwise.
+    /// \see submit_order
     bool cancel_order(const std::string& exchange, const std::string& symbol, const std::string& order_id);
 
 private:
     static std::string key(const std::string& exchange, const std::string& symbol);
 
-    /// \brief Fills a MARKET order against the book; appends fill reports to out.
-    ///
-    /// Caller must hold mutex_.
     void fill_market(OpenOrder& order, const data::OrderBookRecord& book, std::vector<FillReport>& out);
-
-    /// \brief Fills `order` aggressively against `book`, walking levels until
-    ///        either the order is fully filled or the next level's price is
-    ///        worse than `price_limit` (BUY: ask > price_limit, SELL: bid <
-    ///        price_limit).
-    ///
-    /// Used by both fill_market (no cap, +/- infinity) and the crossing-LIMIT
-    /// path at submit time (cap = limit price). Emitted FillReports are
-    /// tagged with `report_type` and TAKER. Caller must hold mutex_.
     void fill_book_until(OpenOrder& order,
                          const data::OrderBookRecord& book,
                          double price_limit,
                          OrderType report_type,
                          std::vector<FillReport>& out);
-
-    /// \brief Scans pending limit orders for key and fills crossing ones; appends to out.
-    ///
-    /// Caller must hold mutex_.
     void fill_crossing_limits(const std::string& book_key, std::vector<FillReport>& out);
-
-    /// \brief Walks the synthetic L3 slot deque at the trade price, consuming
-    ///        from the front in FIFO order until the print is exhausted.
-    ///
-    /// Caller must hold mutex_.
-    /// Counter-side semantics:
-    ///   trade.side == SELL → taker sold → consumed bid queue → our resting BUYs may fill
-    ///   trade.side == BUY  → taker bought → consumed ask queue → our resting SELLs may fill
     void fill_against_trade(const data::TradeRecord& trade, std::vector<FillReport>& out);
 
-    /// \brief Look up resting volume at a given price level on a given side.
-    ///
-    /// Returns 0.0 if the price isn't found in the L5 snapshot. Used to
-    /// seed queue_ahead at submit_order time.
     static double book_qty_at_price(const data::OrderBookRecord& book, OrderSide side, double price);
 
-    /// \brief Pending submit awaiting its scheduled match time.
-    ///
-    /// Synchronously enqueued at submit_order, drained at on_market_event
-    /// when current_ts_ catches up to scheduled_match_ts. The order's
-    /// submitted_ts (set in submit_order) is preserved; queue_ahead is
-    /// seeded at drain time against the book at scheduled_match_ts, which
-    /// is what makes Option-A latency capture stale-quote adverse selection.
     struct PendingSubmit {
         OpenOrder order;
         uint64_t scheduled_match_ts;
@@ -118,92 +146,37 @@ private:
         uint64_t scheduled_report_ts;
     };
 
-    /// \brief Runs the actual matching logic for a single order at its scheduled
-    ///        match time.
-    ///
-    /// Equivalent to the pre-Phase-3 body of submit_order (minus the
-    /// synchronous POST_ONLY-cross check, which fires earlier). Caller must
-    /// hold mutex_.
     void process_pending_submit(PendingSubmit& ps, std::vector<FillReport>& out);
-
-    /// \brief Pops all pending submits with scheduled_match_ts ≤ upto_ts, in
-    ///        chronological order, processing each through the match logic.
-    ///
-    /// Produced fills are scheduled for delivery via schedule_fill. Caller
-    /// must hold mutex_.
     void drain_pending_submits(uint64_t upto_ts);
-
-    /// \brief Schedules a fill for delivery at fill.simulation_ts + match_to_report.
-    ///
-    /// Caller must hold mutex_.
     void schedule_fill(FillReport fill);
-
-    /// \brief Pops all pending fills with scheduled_report_ts ≤ upto_ts and
-    ///        appends them to out.
-    ///
-    /// Caller must hold mutex_; fill_cb_ fires outside the lock by the caller.
     void drain_pending_fills(uint64_t upto_ts, std::vector<FillReport>& out);
-
-    /// \brief Synthetic-L3 reconciliation: walks each price level in the new
-    ///        L2 snapshot and adjusts the slot deque to match observed size.
-    ///
-    /// For every level present in the snapshot:
-    ///   - observed > expected (sum of slots): venue adds happened between
-    ///     snapshots — append a single new venue slot at the back.
-    ///   - observed < expected: cancels (trade prints already consumed slots
-    ///     in fill_against_trade). Distribute the shortfall across venue
-    ///     slots using end-weighted attribution — slots near the back of
-    ///     the queue are more likely to lose qty than slots near the front.
-    ///
-    /// Caller must hold mutex_; called between drain_pending_submits and the
-    /// books_[key] write.
     void reconcile_l2_snapshot(const std::string& book_key, const data::OrderBookRecord& new_book);
 
-    /// \brief Discrete key for a price level.
-    ///
-    /// Backed by round(price * 1e9) so we dodge double-keyed unordered_map
-    /// collision risk while keeping lookups exact for venue-tick-aligned prices.
     static int64_t price_key(double price);
 
-    /// \brief One unit in a price-level FIFO queue.
-    ///
-    /// is_ours==true means the slot is one of our OpenOrders, referenced by
-    /// our_order_id (matched against the OpenOrder in pending_). is_ours==
-    /// false means an inferred venue slot — qty came from an L2 add we
-    /// observed but we have no order-id and no further info about it.
+    /// One unit in a price-level FIFO queue. is_ours==true means the slot
+    /// is one of our OpenOrders (linked by our_order_id); is_ours==false
+    /// means an inferred venue slot whose qty came from an observed L2
+    /// add.
     struct Slot {
         double qty{0.0};
         bool is_ours{false};
         std::string our_order_id;
         uint64_t inferred_ts{0};
     };
-    /// Per-(book_key, side, price) FIFO queue of slots. Synthetic L3
-    /// reconstruction from L2 snapshots + trade prints + our own order
-    /// events. Mutated by reconcile_l2_snapshot, fill_against_trade,
-    /// process_pending_submit, and cancel_order.
     struct PriceQueues {
         std::unordered_map<int64_t, std::deque<Slot>> bid;
         std::unordered_map<int64_t, std::deque<Slot>> ask;
     };
     std::deque<Slot>& level_queue(const std::string& book_key, OrderSide side, double price);
     std::deque<Slot>* level_queue_if_exists(const std::string& book_key, OrderSide side, double price);
-
-    /// \brief Distributes `cancels` qty across the venue slots in `queue` using
-    ///        linear end-weighted attribution (slots deeper in the queue are
-    ///        proportionally more likely to lose qty than slots near the front).
-    ///
-    /// Walks the queue front-to-back computing each slot's cancel share from
-    /// its position range [d_start, d_end] under the linear-weight CDF
-    /// (d² / N²). Our own slots are skipped — we don't model spontaneous
-    /// cancellation of our own orders.
     static void distribute_cancels(std::deque<Slot>& queue, double cancels);
 
     std::mutex mutex_;
     std::unordered_map<std::string, data::OrderBookRecord> books_;
     std::unordered_map<std::string, std::vector<OpenOrder>> pending_;
-    std::vector<PendingSubmit> pending_submits_;  ///< sorted by scheduled_match_ts when drained.
-    std::vector<PendingFill> pending_fills_;      ///< sorted by scheduled_report_ts when drained.
-    /// Synthetic L3 — per-(book_key, side, price_key) FIFO slot queue.
+    std::vector<PendingSubmit> pending_submits_;
+    std::vector<PendingFill> pending_fills_;
     std::unordered_map<std::string, PriceQueues> slot_queues_;
     uint64_t current_ts_{0};
     FillCallback fill_cb_;
