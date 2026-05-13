@@ -1,5 +1,8 @@
 #pragma once
 
+/// \file
+/// \brief Trade-print record type for backtest replay.
+
 #include <cstdint>
 #include <string>
 

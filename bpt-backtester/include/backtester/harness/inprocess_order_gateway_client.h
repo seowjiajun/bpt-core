@@ -1,6 +1,8 @@
 #pragma once
 
-/// @file
+/// \file
+/// \brief InProcessOrderGatewayClient — synchronous bridge from Strategy to MatchingEngine.
+///
 /// InProcessOrderGatewayClient — synchronous bridge between
 /// bpt-strategy's IOrderGatewayClient and bpt-backtester's MatchingEngine.
 /// Replaces the entire Strategy → AeronOGW → OGW → venue-adapter →
@@ -44,7 +46,7 @@ namespace bpt::backtester::harness {
 
 class InProcessOrderGatewayClient : public bpt::strategy::order::IOrderGatewayClient {
 public:
-    /// @param matching shared engine the harness drives with market
+    /// \param matching shared engine the harness drives with market
     ///                 events; submit/cancel route through it.
     explicit InProcessOrderGatewayClient(matching::MatchingEngine& matching);
 
@@ -71,30 +73,34 @@ public:
 
     void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id, uint64_t correlation_id) override;
 
-    /// Push-driven by the harness — events arrive synchronously.
+    /// \brief Push-driven by the harness — events arrive synchronously.
     int poll(int /*fragment_limit*/ = 10) override { return 0; }
 
     [[nodiscard]] uint64_t last_heartbeat_ns() const override { return last_heartbeat_ns_; }
 
-    /// Harness-side. Called when the simulated time advances; updates
-    /// the timestamps the strategy's liveness watchdog reads.
+    /// \brief Harness-side. Called when the simulated time advances; updates
+    ///        the timestamps the strategy's liveness watchdog reads.
     void set_simulation_time(uint64_t now_ns);
 
-    /// Harness-side. Called once per heartbeat tick to fire on_heartbeat
-    /// at the simulated cadence (not wallclock).
+    /// \brief Harness-side. Called once per heartbeat tick to fire on_heartbeat
+    ///        at the simulated cadence (not wallclock).
     void push_heartbeat();
 
-    /// Harness-side. Called by the harness's tick loop after a market
-    /// event has been ingested by the matching engine — gives the
-    /// engine a chance to fill any pending LIMITs that just became
-    /// crossable. The matching engine fires its FillCallback (which
-    /// this client owns) as part of that fill loop.
+    /// \brief Harness-side. Called by the harness's tick loop after a market
+    ///        event has been ingested by the matching engine — gives the
+    ///        engine a chance to fill any pending LIMITs that just became
+    ///        crossable.
+    ///
+    /// The matching engine fires its FillCallback (which this client owns)
+    /// as part of that fill loop.
     void on_market_event_complete();
 
 private:
-    /// Per-tracked-order metadata. Strategy emits orders by uint64
-    /// order_id; matching engine identifies them by string. We keep
-    /// a forward + reverse map so both directions are O(1).
+    /// \brief Per-tracked-order metadata.
+    ///
+    /// Strategy emits orders by uint64 order_id; matching engine identifies
+    /// them by string. We keep a forward + reverse map so both directions
+    /// are O(1).
     struct LiveOrder {
         uint64_t strategy_order_id;
         bpt::messages::ExchangeId::Value exchange_id;
@@ -102,27 +108,30 @@ private:
         bpt::messages::OrderSide::Value side;
         bpt::messages::OrderType::Value order_type;
         bpt::messages::TimeInForce::Value tif;
-        int64_t price;      // strategy-side scaled
-        uint64_t quantity;  // strategy-side scaled
+        int64_t price;      ///< strategy-side scaled.
+        uint64_t quantity;  ///< strategy-side scaled.
         std::string exchange_symbol;
-        std::string exchange;               // upper-case e.g. "HYPERLIQUID"
-        uint64_t cumulative_filled_qty{0};  // scaled
+        std::string exchange;               ///< upper-case e.g. "HYPERLIQUID".
+        uint64_t cumulative_filled_qty{0};  ///< scaled.
         bool post_only{false};
     };
 
-    /// Translate strategy's ExchangeId enum to the upper-case string
-    /// MatchingEngine keys orders by.
+    /// \brief Translate strategy's ExchangeId enum to the upper-case string
+    ///        MatchingEngine keys orders by.
     static std::string exchange_id_string(bpt::messages::ExchangeId::Value id);
 
-    /// Convert a MatchingEngine FillReport to the SBE ExecutionReport
-    /// the strategy expects, then fire on_exec_report. Updates the
-    /// LiveOrder's cumulative_filled_qty so successive partial fills
-    /// produce a coherent FILLED status sequence.
+    /// \brief Convert a MatchingEngine FillReport to the SBE ExecutionReport
+    ///        the strategy expects, then fire on_exec_report.
+    ///
+    /// Updates the LiveOrder's cumulative_filled_qty so successive partial
+    /// fills produce a coherent FILLED status sequence.
     void publish_fill(const matching::FillReport& fr);
 
-    /// Build + fire a non-fill ExecutionReport (ACKED, CANCELLED,
-    /// REJECTED). Drives the strategy's order-state machine for events
-    /// that don't involve a fill.
+    /// \brief Build + fire a non-fill ExecutionReport (ACKED, CANCELLED,
+    ///        REJECTED).
+    ///
+    /// Drives the strategy's order-state machine for events that don't
+    /// involve a fill.
     void publish_exec_status(uint64_t order_id,
                              bpt::messages::ExchangeId::Value exchange_id,
                              uint64_t instrument_id,

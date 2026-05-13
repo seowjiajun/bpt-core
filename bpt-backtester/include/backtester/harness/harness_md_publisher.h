@@ -1,6 +1,8 @@
 #pragma once
 
-/// @file
+/// \file
+/// \brief HarnessMdPublisher — Pub side of the mdgw decoder chain for the backtest harness.
+///
 /// HarnessMdPublisher — the Pub side of the mdgw venue-decoder CRTP
 /// chain, redirected at the deterministic backtest harness's
 /// InProcessMdClient. Decoders fold like:
@@ -44,15 +46,16 @@ namespace bpt::backtester::harness {
 
 class HarnessMdPublisher {
 public:
-    /// Strategy-only ctor (no matching-engine fan-out — useful for
-    /// unit tests that want to assert the publisher → strategy hop).
+    /// \brief Strategy-only ctor (no matching-engine fan-out — useful for
+    ///        unit tests that want to assert the publisher → strategy hop).
     explicit HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client) : client_(client) {}
 
-    /// Production ctor for the harness — every published OrderBook/Trade
-    /// is also dispatched to the matching engine so resting LIMITs can
-    /// be filled. The instrument cache resolves instrument_id back to
-    /// venue (exchange, symbol) — MatchingEngine's API keys orders by
-    /// strings, not by canonical id.
+    /// \brief Production ctor for the harness — every published OrderBook/Trade
+    ///        is also dispatched to the matching engine so resting LIMITs can
+    ///        be filled.
+    ///
+    /// The instrument cache resolves instrument_id back to venue (exchange,
+    /// symbol) — MatchingEngine's API keys orders by strings, not by canonical id.
     HarnessMdPublisher(bpt::strategy::md::InProcessMdClient& client,
                        matching::MatchingEngine* matching,
                        const bpt::strategy::refdata::InstrumentCache* cache)
@@ -179,12 +182,13 @@ public:
         client_.push_order_book(msg);
     }
 
-    /// Drop counter — kept for API parity with mdgw's MdPublisher.
+    /// \brief Drop counter — kept for API parity with mdgw's MdPublisher.
+    ///
     /// The harness never drops (synchronous fan-out, no backpressure).
     [[nodiscard]] uint64_t drop_count() const { return 0; }
 
-    /// Diagnostic counters — useful for confirming trades reached the
-    /// matching engine when a backtest produces zero fills.
+    /// \brief Diagnostic counters — useful for confirming trades reached the
+    ///        matching engine when a backtest produces zero fills.
     [[nodiscard]] uint64_t trade_count() const { return trade_count_; }
     [[nodiscard]] uint64_t orderbook_count() const { return orderbook_count_; }
 

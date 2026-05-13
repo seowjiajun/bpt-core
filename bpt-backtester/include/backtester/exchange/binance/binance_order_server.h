@@ -1,5 +1,8 @@
 #pragma once
 
+/// \file
+/// \brief Mock Binance order REST + user-data-stream WS server for backtesting.
+
 #include "backtester/matching/matching_engine.h"
 #include "backtester/matching/open_order.h"
 
@@ -15,17 +18,17 @@ namespace bpt::backtester::exchange {
 
 class BinanceOrderSession;
 
-// Mock Binance order REST + user-data-stream WS server for backtesting.
-//
-// Listens on a configurable port and implements the subset of the Binance order
-// API that OrderGateway's BinanceOrderAdapter uses:
-//
-//   POST   /api/v3/userDataStream  → {"listenKey":"backtester-stream"}
-//   PUT    /api/v3/userDataStream  → 200 OK (keepalive)
-//   DELETE /api/v3/userDataStream  → 200 OK
-//   POST   /api/v3/order           → place order, returns Binance order JSON
-//   DELETE /api/v3/order           → cancel order
-//   WS     /ws/backtester-stream  → user data stream (executionReport events)
+/// \brief Mock Binance order REST + user-data-stream WS server for backtesting.
+///
+/// Listens on a configurable port and implements the subset of the Binance order
+/// API that OrderGateway's BinanceOrderAdapter uses:
+///
+///   POST   /api/v3/userDataStream  → {"listenKey":"backtester-stream"}
+///   PUT    /api/v3/userDataStream  → 200 OK (keepalive)
+///   DELETE /api/v3/userDataStream  → 200 OK
+///   POST   /api/v3/order           → place order, returns Binance order JSON
+///   DELETE /api/v3/order           → cancel order
+///   WS     /ws/backtester-stream  → user data stream (executionReport events)
 class BinanceOrderServer {
 public:
     BinanceOrderServer(uint16_t port, matching::MatchingEngine& engine);
@@ -34,7 +37,7 @@ public:
     void start();
     void stop();
 
-    // Thread-safe: push an execution report to all connected user-data WS sessions.
+    /// \brief Thread-safe: push an execution report to all connected user-data WS sessions.
     void push_fill(const matching::FillReport& fill);
 
 private:

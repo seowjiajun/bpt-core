@@ -1,5 +1,8 @@
 #pragma once
 
+/// \file
+/// \brief Tagged-union market event (trade or order book) for replay ordering.
+
 #include "backtester/data/orderbook_record.h"
 #include "backtester/data/trade_record.h"
 
@@ -12,11 +15,11 @@ struct MarketEvent {
     enum class Type { TRADE, ORDER_BOOK };
 
     Type type;
-    uint64_t timestamp_ns;  // hoisted for cheap heap comparison
+    uint64_t timestamp_ns;  ///< hoisted for cheap heap comparison.
 
     std::variant<TradeRecord, OrderBookRecord> payload;
 
-    // Min-heap ordering by timestamp.
+    /// Min-heap ordering by timestamp.
     bool operator>(const MarketEvent& other) const { return timestamp_ns > other.timestamp_ns; }
 
     static MarketEvent from_trade(TradeRecord t) {

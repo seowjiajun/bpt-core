@@ -1,5 +1,8 @@
 #pragma once
 
+/// \file
+/// \brief ClockMaster — drives the backtest event loop in timestamp order.
+
 #include "backtester/data/data_loader.h"
 #include "backtester/exchange/binance/binance_md_server.h"
 #include "backtester/exchange/hyperliquid/hyperliquid_md_server.h"
@@ -13,18 +16,18 @@
 
 namespace bpt::backtester::clock {
 
-// ClockMaster drives the backtest event loop.
-//
-// Iterates over all events from DataLoader in timestamp order, dispatches
-// each to the appropriate mock WS server (MdGateway picks them up) and to the
-// matching engine and results collector.
-//
-// When ctrl_pub and ack_sub are provided, ClockMaster gates each tick:
-//   1. dispatch event to WS server + matching engine
-//   2. send BacktestControl::START(seq, sim_ts) to Strategy
-//   3. block until Strategy sends BacktestAck(seq)
-// This ensures Strategy processes each tick and any resulting orders before
-// Backtester advances the simulated clock, eliminating lookahead bias.
+/// \brief ClockMaster drives the backtest event loop.
+///
+/// Iterates over all events from DataLoader in timestamp order, dispatches
+/// each to the appropriate mock WS server (MdGateway picks them up) and to the
+/// matching engine and results collector.
+///
+/// When ctrl_pub and ack_sub are provided, ClockMaster gates each tick:
+///   1. dispatch event to WS server + matching engine
+///   2. send BacktestControl::START(seq, sim_ts) to Strategy
+///   3. block until Strategy sends BacktestAck(seq)
+/// This ensures Strategy processes each tick and any resulting orders before
+/// Backtester advances the simulated clock, eliminating lookahead bias.
 class ClockMaster {
 public:
     ClockMaster(data::DataLoader& loader,
@@ -36,7 +39,7 @@ public:
                 messaging::BacktestControlPublisher* ctrl_pub = nullptr,
                 messaging::BacktestAckSubscriber* ack_sub = nullptr);
 
-    // Runs the simulation to completion.
+    /// \brief Runs the simulation to completion.
     void run();
 
 private:

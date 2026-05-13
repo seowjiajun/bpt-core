@@ -1,5 +1,8 @@
 #pragma once
 
+/// \file
+/// \brief Mock Binance WebSocket market-data server used in backtest mode.
+
 #include "backtester/data/market_event.h"
 
 #include <boost/asio/io_context.hpp>
@@ -13,19 +16,19 @@ namespace bpt::backtester::exchange {
 
 class BinanceSession;
 
-// Mock Binance WebSocket MD server for backtesting.
-//
-// Listens on a configurable port and serves Binance-format combined-stream
-// WebSocket messages (same protocol as stream.binance.com:9443/stream).
-// MdGateway's BinanceMdAdapter connects here instead of the real exchange when
-// backtest_mode is active.
-//
-// Usage:
-//   BinanceMdServer srv(9100);
-//   srv.start();
-//   // ... in event loop:
-//   srv.push(market_event);
-//   srv.stop();
+/// \brief Mock Binance WebSocket MD server for backtesting.
+///
+/// Listens on a configurable port and serves Binance-format combined-stream
+/// WebSocket messages (same protocol as stream.binance.com:9443/stream).
+/// MdGateway's BinanceMdAdapter connects here instead of the real exchange when
+/// backtest_mode is active.
+///
+/// Usage:
+///   BinanceMdServer srv(9100);
+///   srv.start();
+///   // ... in event loop:
+///   srv.push(market_event);
+///   srv.stop();
 class BinanceMdServer {
 public:
     explicit BinanceMdServer(uint16_t port);
@@ -34,9 +37,10 @@ public:
     void start();
     void stop();
 
-    // Thread-safe: deliver a market event to all subscribed sessions.
-    // Formats the event as Binance combined-stream JSON and dispatches to
-    // every session whose subscription set covers the event's symbol/type.
+    /// \brief Thread-safe: deliver a market event to all subscribed sessions.
+    ///
+    /// Formats the event as Binance combined-stream JSON and dispatches to
+    /// every session whose subscription set covers the event's symbol/type.
     void push(const data::MarketEvent& event);
 
 private:

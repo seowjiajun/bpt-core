@@ -1,5 +1,8 @@
 #pragma once
 
+/// \file
+/// \brief Mock OKX order WebSocket server for backtesting.
+
 #include "backtester/matching/matching_engine.h"
 #include "backtester/matching/open_order.h"
 
@@ -15,19 +18,19 @@ namespace bpt::backtester::exchange {
 
 class OkxOrderSession;
 
-// Mock OKX order WebSocket server for backtesting.
-//
-// Listens on a configurable port and implements the subset of the OKX order
-// API that OrderGateway's OKXAdapter uses:
-//
-//   WS /ws/v5/private  — single bidirectional channel for both order ops and fills
-//
-// Incoming op messages handled:
-//   {"op":"order",  "args":[{...}]}   → place order
-//   {"op":"cancel-order","args":[...]} → cancel order
-//
-// Outgoing push messages:
-//   {"arg":{"channel":"orders"},"data":[{...}]}  — fill / status update
+/// \brief Mock OKX order WebSocket server for backtesting.
+///
+/// Listens on a configurable port and implements the subset of the OKX order
+/// API that OrderGateway's OKXAdapter uses:
+///
+///   WS /ws/v5/private  — single bidirectional channel for both order ops and fills
+///
+/// Incoming op messages handled:
+///   {"op":"order",  "args":[{...}]}   → place order
+///   {"op":"cancel-order","args":[...]} → cancel order
+///
+/// Outgoing push messages:
+///   {"arg":{"channel":"orders"},"data":[{...}]}  — fill / status update
 class OkxOrderServer {
 public:
     OkxOrderServer(uint16_t port, matching::MatchingEngine& engine);
@@ -36,7 +39,7 @@ public:
     void start();
     void stop();
 
-    // Thread-safe: push an execution report to all connected sessions.
+    /// \brief Thread-safe: push an execution report to all connected sessions.
     void push_fill(const matching::FillReport& fill);
 
 private:

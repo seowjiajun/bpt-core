@@ -1,6 +1,8 @@
 #pragma once
 
-/// @file
+/// \file
+/// \brief StrategyHarness — single-threaded, deterministic backtest driver.
+///
 /// StrategyHarness — single-threaded, deterministic backtest driver.
 /// Constructs the strategy + InProcess clients + matching engine in
 /// one process, reads .wslog files directly, decodes via the existing
@@ -84,21 +86,24 @@ public:
     explicit StrategyHarness(Options opts);
     ~StrategyHarness();
 
-    /// Run the replay to completion and write results.
+    /// \brief Run the replay to completion and write results.
     void run();
 
 private:
-    /// Construct InProcess clients, load refdata snapshot, instantiate
-    /// the strategy, and wire every callback. After this returns,
-    /// strategy.start() has been called and it's ready to receive MD.
+    /// \brief Construct InProcess clients, load refdata snapshot, instantiate
+    ///        the strategy, and wire every callback.
+    ///
+    /// After this returns, strategy.start() has been called and it's ready
+    /// to receive MD.
     void initialize();
 
-    /// Drive each .wslog file in sequence: read records, decode WS_FRAMEs,
-    /// dispatch to the strategy via HarnessMdPublisher, advance the
-    /// matching engine. Returns the last simulated timestamp seen.
+    /// \brief Drive each .wslog file in sequence: read records, decode WS_FRAMEs,
+    ///        dispatch to the strategy via HarnessMdPublisher, advance the
+    ///        matching engine.
+    /// \return The last simulated timestamp seen.
     uint64_t replay();
 
-    /// Final flatten + write summary.json, trades.csv, pnl_curve.csv.
+    /// \brief Final flatten + write summary.json, trades.csv, pnl_curve.csv.
     void finalize(uint64_t end_ts_ns);
 
     Options opts_;

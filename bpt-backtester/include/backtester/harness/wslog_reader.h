@@ -1,6 +1,8 @@
 #pragma once
 
-/// @file
+/// \file
+/// \brief WslogReader — minimal sequential reader for .wslog binary records.
+///
 /// WslogReader — minimal sequential reader for the .wslog binary
 /// format owned by `bpt::common::recorder::Tape`. Each record is
 /// a fixed 13-byte header (recv_ts_ns u64 | record_type u8 | length u32)
@@ -40,8 +42,9 @@ public:
 
     [[nodiscard]] bool ok() const { return fp_ != nullptr; }
 
-    /// Read the next record. Returns std::nullopt at EOF or on a
-    /// truncated read. The buffer is owned by the returned record.
+    /// \brief Read the next record.
+    /// \return The next record, or std::nullopt at EOF or on a truncated read.
+    ///         The buffer is owned by the returned record.
     std::optional<WslogRecord> next() {
         if (!fp_)
             return std::nullopt;

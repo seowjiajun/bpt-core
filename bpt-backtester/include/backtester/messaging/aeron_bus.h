@@ -1,6 +1,8 @@
 #pragma once
 
-/// @file
+/// \file
+/// \brief Aeron pub/sub factory for bpt-backtester.
+///
 /// Bus boundary for bpt-backtester. Mirrors the shape used by
 /// bpt-refdata, bpt-md-gateway, bpt-order-gateway, bpt-strategy,
 /// bpt-pricer, and bpt-analytics: every Aeron pub/sub the app needs
@@ -32,9 +34,10 @@ struct BacktesterBus {
 
 class BacktesterAeronBus {
 public:
-    /// Build the two messaging objects the backtester needs to
-    /// tick-gate Strategy. Sole place that calls into `<Aeron.h>` from
-    /// the application layer.
+    /// \brief Build the two messaging objects the backtester needs to
+    ///        tick-gate Strategy.
+    ///
+    /// Sole place that calls into `<Aeron.h>` from the application layer.
     static BacktesterBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
 };
 
