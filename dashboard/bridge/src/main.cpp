@@ -1,7 +1,7 @@
 // bridge — Aeron → WebSocket forwarder for the dashboard.
 
-#include "bridge/bridge_app.h"
-#include "bridge/settings.h"
+#include "bridge/app/bridge_app.h"
+#include "bridge/config/settings.h"
 
 #include <CLI/CLI.hpp>
 #include <bpt_app/app.h>

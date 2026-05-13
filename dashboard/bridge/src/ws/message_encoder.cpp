@@ -1,4 +1,4 @@
-#include "bridge/message_encoder.h"
+#include "bridge/ws/message_encoder.h"
 
 #include <nlohmann/json.hpp>
 

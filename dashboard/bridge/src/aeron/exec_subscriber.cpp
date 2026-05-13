@@ -1,6 +1,6 @@
-#include "bridge/exec_subscriber.h"
+#include "bridge/aeron/exec_subscriber.h"
 
-#include "bridge/sbe_decode.h"
+#include "bridge/aeron/sbe_decode.h"
 
 #include <messages/ExecStatus.h>
 #include <messages/ExecutionReport.h>

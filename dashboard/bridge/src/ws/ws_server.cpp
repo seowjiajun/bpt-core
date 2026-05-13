@@ -1,4 +1,4 @@
-#include "bridge/ws_server.h"
+#include "bridge/ws/ws_server.h"
 
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>

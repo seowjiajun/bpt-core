@@ -1,4 +1,4 @@
-#include "bridge/settings.h"
+#include "bridge/config/settings.h"
 
 #include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/streams_map.h>

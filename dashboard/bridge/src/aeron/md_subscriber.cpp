@@ -1,6 +1,6 @@
-#include "bridge/md_subscriber.h"
+#include "bridge/aeron/md_subscriber.h"
 
-#include "bridge/sbe_decode.h"
+#include "bridge/aeron/sbe_decode.h"
 
 #include <messages/MdMarketData.h>
 

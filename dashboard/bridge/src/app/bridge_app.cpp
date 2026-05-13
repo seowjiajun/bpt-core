@@ -1,11 +1,11 @@
-#include "bridge/bridge_app.h"
+#include "bridge/app/bridge_app.h"
 
-#include "bridge/account_subscriber.h"
-#include "bridge/exec_subscriber.h"
-#include "bridge/md_subscriber.h"
-#include "bridge/message_encoder.h"
-#include "bridge/position_tracker.h"
-#include "bridge/ws_server.h"
+#include "bridge/aeron/account_subscriber.h"
+#include "bridge/aeron/exec_subscriber.h"
+#include "bridge/aeron/md_subscriber.h"
+#include "bridge/ws/message_encoder.h"
+#include "bridge/state/position_tracker.h"
+#include "bridge/ws/ws_server.h"
 
 #include <analytics/messaging/toxicity_update.h>
 #include <bpt_common/aeron/aeron_utils.h>

@@ -4,7 +4,7 @@
 // as a bpt::app::IService so main.cpp follows the same lifecycle
 // pattern as the rest of the bpt-core services.
 
-#include "bridge/settings.h"
+#include "bridge/config/settings.h"
 
 #include <Aeron.h>
 

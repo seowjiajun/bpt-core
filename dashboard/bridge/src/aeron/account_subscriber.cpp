@@ -1,6 +1,6 @@
-#include "bridge/account_subscriber.h"
+#include "bridge/aeron/account_subscriber.h"
 
-#include "bridge/sbe_decode.h"
+#include "bridge/aeron/sbe_decode.h"
 
 #include <messages/AccountSnapshot.h>
 
