@@ -7,6 +7,19 @@ risk_free_rate = 0.05
 newton_max_iterations = 100
 newton_tolerance = 1.0e-8
 
+[universe]
+# Narrows the option set pricer subscribes to. Deribit testnet rate-limits
+# per-connection channel count; front-month + ATM-window strike cap keeps
+# the subscribe batch tractable.
+#
+# Tuning notes for laptop dev: front_n_expiries=1 + max_strikes_per_expiry=20
+# gives ~40 strikes per underlying (call + put around ATM) — well under
+# Deribit testnet's channel cap, enough to demo IV term-structure / RR /
+# skew on the dashboard. Increase incrementally; observe md-gateway
+# reconnect cadence as the canary.
+front_n_expiries = 1
+max_strikes_per_expiry = 20
+
 # Shared aeron stream registry — see deploy/config/aeron/streams.toml.
 aeron_config = "../deploy/config/aeron/streams.toml"
 

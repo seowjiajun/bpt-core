@@ -156,11 +156,13 @@ void RefdataSubscriber::on_snapshot_fragment(::aeron::AtomicBuffer& buffer,
         if (instruments.instrumentType() == InstrumentType::PERPETUAL) {
             auto exchange_str = trim_null(instruments.exchange(), 8);
             auto underlying_str = trim_null(instruments.underlying(), 24);
+            auto symbol_str = trim_null(instruments.symbol(), 24);
             refdata::PerpInstrument pi{
                 .instrument_id = instruments.instrumentId(),
                 .underlying = underlying_str,
                 .exchange = exchange_str,
                 .exchange_id = exchange_from_string(exchange_str),
+                .venue_symbol = symbol_str,
             };
             bpt::common::log::info("[RefdataSubscriber] Perp instrument: {} id={} exchange={}",
                                    underlying_str,
@@ -181,6 +183,7 @@ void RefdataSubscriber::on_snapshot_fragment(::aeron::AtomicBuffer& buffer,
 
         auto exchange_str = trim_null(instruments.exchange(), 8);
         auto underlying_str = trim_null(instruments.underlying(), 24);
+        auto symbol_str = trim_null(instruments.symbol(), 24);
 
         surface::OptionInstrument oi{
             .instrument_id = instruments.instrumentId(),
@@ -190,6 +193,7 @@ void RefdataSubscriber::on_snapshot_fragment(::aeron::AtomicBuffer& buffer,
             .expiry_date = instruments.expiryDate(),
             .strike_price = instruments.strikePrice(),
             .is_call = (instruments.optionSide() == OptionSide::CALL),
+            .venue_symbol = symbol_str,
         };
 
         if (on_option_)
@@ -235,6 +239,7 @@ void RefdataSubscriber::on_delta_fragment(::aeron::AtomicBuffer& buffer,
 
     auto exchange_str = trim_null(delta.exchange(), 8);
     auto underlying_str = trim_null(delta.underlying(), 24);
+    auto symbol_str = trim_null(delta.symbol(), 24);
 
     surface::OptionInstrument oi{
         .instrument_id = delta.instrumentId(),
@@ -244,6 +249,7 @@ void RefdataSubscriber::on_delta_fragment(::aeron::AtomicBuffer& buffer,
         .expiry_date = delta.expiryDate(),
         .strike_price = delta.strikePrice(),
         .is_call = (delta.optionSide() == OptionSide::CALL),
+        .venue_symbol = symbol_str,
     };
 
     if (on_option_)

@@ -13,6 +13,7 @@
 /// offers no test-seam payoff today. Defer until a fake-bus test
 /// actually blocks. Same pragmatic call as bpt-strategy.
 
+#include "pricer/md/md_subscribe_client.h"
 #include "pricer/md/md_subscriber.h"
 #include "pricer/messaging/status_publisher.h"
 #include "pricer/messaging/vol_surface_publisher.h"
@@ -33,6 +34,7 @@ struct PricerBus {
     std::unique_ptr<VolSurfacePublisher> vol_pub;
     std::unique_ptr<StatusPublisher> status_pub;
     std::unique_ptr<md::MdSubscriber> md_sub;
+    std::unique_ptr<md::MdSubscribeClient> md_ctrl;  ///< pricer → md-gateway: subscribe batches
     std::unique_ptr<refdata::RefdataSubscriber> refdata_sub;
 };
 

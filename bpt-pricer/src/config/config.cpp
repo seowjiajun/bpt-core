@@ -41,6 +41,7 @@ Settings load(const std::string& path) {
 
     using bpt::common::config::resolve_stream;
     s.md_data = resolve_stream(shared_streams, "md_data", 2002);
+    s.md_control = resolve_stream(shared_streams, "md_control", 2001);
     s.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
     s.refdata_delta = resolve_stream(shared_streams, "refdata_delta", 1002);
     s.refdata_control = resolve_stream(shared_streams, "refdata_control", 1003);
@@ -68,6 +69,13 @@ Settings load(const std::string& path) {
         s.newton_max_iterations = static_cast<uint32_t>(*v);
     if (auto v = root["newton_tolerance"].value<double>())
         s.newton_tolerance = *v;
+
+    if (auto t = root["universe"].as_table()) {
+        if (auto v = (*t)["front_n_expiries"].value<int64_t>())
+            s.universe.front_n_expiries = static_cast<uint32_t>(*v);
+        if (auto v = (*t)["max_strikes_per_expiry"].value<int64_t>())
+            s.universe.max_strikes_per_expiry = static_cast<uint32_t>(*v);
+    }
 
     return s;
 }

@@ -19,6 +19,7 @@ struct PerpInstrument {
     std::string underlying;
     std::string exchange;
     bpt::messages::ExchangeId::Value exchange_id;
+    std::string venue_symbol;  ///< e.g. "BTC-PERPETUAL"; needed by MdSubscribeBatch
 };
 
 // Subscribes to Sindri refdata streams to discover option instruments.

@@ -26,37 +26,56 @@ void SubscriptionManager::apply_requests(uint64_t correlation_id,
                                          messaging::IAckPublisher& ack_pub) {
     using namespace bpt::messages;
 
-    // Compute to_remove = active - desired
-    std::unordered_set<uint64_t> desired_ids;
+    // Build this consumer's new desired set (by instrument_id).
+    std::unordered_set<uint64_t> new_set;
+    new_set.reserve(desired.size());
     for (const auto& d : desired)
-        desired_ids.insert(d.instrument_id);
+        new_set.insert(d.instrument_id);
 
-    for (auto it = active_.begin(); it != active_.end();) {
-        if (desired_ids.find(it->first) == desired_ids.end()) {
+    // Diff against this consumer's previous set: instruments it used to want
+    // but no longer wants must be removed from those instruments' wanters.
+    // If the wanters set becomes empty, the venue subscription drops.
+    auto& prev_set = per_consumer_[correlation_id];
+    for (uint64_t old_id : prev_set) {
+        if (new_set.find(old_id) != new_set.end())
+            continue;  // still wanted by this consumer
+        auto it = active_.find(old_id);
+        if (it == active_.end())
+            continue;
+        it->second.wanters.erase(correlation_id);
+        if (it->second.wanters.empty()) {
             adapter::IAdapter* adapter = find_adapter(it->second.exchange);
             if (adapter)
-                adapter->unsubscribe(it->first);
-            bpt::common::log::info("SubscriptionManager: unsubscribed {} on {}", it->first, it->second.exchange);
-            it = active_.erase(it);
-        } else {
-            ++it;
+                adapter->unsubscribe(old_id);
+            bpt::common::log::info("SubscriptionManager: unsubscribed {} on {} (last wanter dropped)",
+                                   old_id,
+                                   it->second.exchange);
+            active_.erase(it);
         }
     }
+    prev_set = new_set;  // commit this consumer's new desired set
 
-    // Compute to_add = desired - active; send ack for all in desired
+    // For each instrument in the new desired set: add this consumer to the
+    // wanters; if the wanters set was previously empty (or absent), this is
+    // a fresh venue subscription.
     for (const auto& d : desired) {
         adapter::IAdapter* adapter = find_adapter(d.exchange);
-
         if (!adapter) {
             bpt::common::log::warn("SubscriptionManager: no adapter for exchange {}", d.exchange);
             ack_pub.publish_ack(correlation_id, d.instrument_id, d.exchange.c_str(), AckStatus::NOT_FOUND);
             continue;
         }
 
-        if (active_.find(d.instrument_id) == active_.end()) {
+        auto [it, inserted] = active_.try_emplace(d.instrument_id);
+        if (inserted) {
+            it->second = SubscribedInstrument{d.instrument_id, d.exchange, d.symbol, d.depth, {}};
+        }
+        const bool first_wanter = it->second.wanters.empty();
+        it->second.wanters.insert(correlation_id);
+
+        if (first_wanter) {
             adapter->subscribe(d.instrument_id, d.symbol, d.depth);
-            active_[d.instrument_id] = {d.instrument_id, d.exchange, d.symbol, d.depth};
-            bpt::common::log::info("SubscriptionManager: subscribed {} ({}) on {} depth={}",
+            bpt::common::log::info("SubscriptionManager: subscribed {} ({}) on {} depth={} (refcount 0→1)",
                                    d.instrument_id,
                                    d.symbol,
                                    d.exchange,
@@ -68,10 +87,9 @@ void SubscriptionManager::apply_requests(uint64_t correlation_id,
 }
 
 void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, messaging::IAckPublisher& ack_pub) {
-    // The SBE exchange field is a fixed 8-char array, so long names like
-    // "HYPERLIQUID" arrive truncated to "HYPERLIQ". Restore the canonical
-    // full name to match the adapter registry. Remove once SBE schema is
-    // widened / migrated to ExchangeId enum.
+    // SBE exchange field is fixed Char8 — long names (e.g. "HYPERLIQUID")
+    // arrive truncated. Restore the canonical full name. Remove once SBE
+    // schema migrates to ExchangeId enum.
     auto canonicalize = [](std::string s) {
         if (s == "HYPERLIQ")
             return std::string("HYPERLIQUID");

@@ -21,6 +21,7 @@ struct OptionInstrument {
     uint32_t expiry_date;  // YYYYMMDD
     double strike_price;
     bool is_call;
+    std::string venue_symbol;  ///< e.g. "BTC-15MAY26-65000-C"; needed by MdSubscribeBatch
 };
 
 // Live market state for an option.

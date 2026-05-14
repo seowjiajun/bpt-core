@@ -101,6 +101,9 @@ TEST(SubscriptionManagerTest, ApplyBatchSubscribesNewInstrument) {
 }
 
 TEST(SubscriptionManagerTest, ApplyBatchUnsubscribesRemovedInstrument) {
+    // Same consumer (correlation_id=1) subscribes then replaces with empty
+    // batch. As the only wanter dropping its want, the venue subscription
+    // must unwind.
     auto mock = std::make_shared<MockAdapter>("BINANCE");
     EXPECT_CALL(*mock, subscribe(1001, _, _)).Times(1);
     EXPECT_CALL(*mock, unsubscribe(1001)).Times(1);
@@ -109,21 +112,61 @@ TEST(SubscriptionManagerTest, ApplyBatchUnsubscribesRemovedInstrument) {
     SubscriptionManager mgr;
     mgr.add_adapter(mock);
 
-    // Subscribe
     {
         BatchBuffer batch(1, {{1001, "BINANCE", "BTCUSDT", 0}});
         mgr.apply_batch(batch.decode(), ack);
     }
     EXPECT_EQ(mgr.active_count(), 1u);
 
-    // Replace with empty batch → unsubscribe
+    // Same consumer replaces with empty batch → last wanter drops → unsubscribe.
     ack.reset();
     {
-        BatchBuffer batch(2, {});
+        BatchBuffer batch(1, {});
         mgr.apply_batch(batch.decode(), ack);
     }
     EXPECT_EQ(mgr.active_count(), 0u);
-    EXPECT_EQ(ack.acks.size(), 0u);  // No acks for empty batch
+    EXPECT_EQ(ack.acks.size(), 0u);
+}
+
+TEST(SubscriptionManagerTest, RefcountingAcrossConsumers) {
+    // Two consumers each ask for the same instrument; venue is subscribed
+    // exactly once. When one consumer drops, the other still wants it →
+    // no unsubscribe. When the last consumer drops, unsubscribe fires.
+    auto mock = std::make_shared<MockAdapter>("BINANCE");
+    EXPECT_CALL(*mock, subscribe(1001, _, _)).Times(1);
+    EXPECT_CALL(*mock, unsubscribe(1001)).Times(1);
+
+    test::FakeAckPublisher ack;
+    SubscriptionManager mgr;
+    mgr.add_adapter(mock);
+
+    // Consumer A (correlation_id=10) subscribes — refcount 0→1, venue subscribe fires.
+    {
+        BatchBuffer batch(10, {{1001, "BINANCE", "BTCUSDT", 0}});
+        mgr.apply_batch(batch.decode(), ack);
+    }
+    EXPECT_EQ(mgr.active_count(), 1u);
+
+    // Consumer B (correlation_id=20) also subscribes — refcount 1→2, no venue call.
+    {
+        BatchBuffer batch(20, {{1001, "BINANCE", "BTCUSDT", 0}});
+        mgr.apply_batch(batch.decode(), ack);
+    }
+    EXPECT_EQ(mgr.active_count(), 1u);  // still one venue subscription
+
+    // Consumer A drops (empty batch) — refcount 2→1, no venue call.
+    {
+        BatchBuffer batch(10, {});
+        mgr.apply_batch(batch.decode(), ack);
+    }
+    EXPECT_EQ(mgr.active_count(), 1u);  // consumer B still wants it
+
+    // Consumer B drops — refcount 1→0, venue unsubscribe fires.
+    {
+        BatchBuffer batch(20, {});
+        mgr.apply_batch(batch.decode(), ack);
+    }
+    EXPECT_EQ(mgr.active_count(), 0u);
 }
 
 TEST(SubscriptionManagerTest, DuplicateSubscribeNotReissued) {
