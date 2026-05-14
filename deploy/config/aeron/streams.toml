@@ -40,8 +40,11 @@ pricer_status    = 4002
 # Analytics → strategy / bridge
 toxicity         = 5001
 
-# Bpt-book → consumers
+# Bpt-pms → consumers
 balance_snapshot = 6001
+
+# Bpt-radar → strategy / bridge
+market_color     = 6002
 
 # Backtester ↔ strategy
 backtest_ack     = 9001

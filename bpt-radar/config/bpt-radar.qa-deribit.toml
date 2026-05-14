@@ -1,0 +1,21 @@
+# bpt-radar — options market-color aggregator.
+# Subscribes to bpt-pricer's VolSurface (4001) and bpt-md-gateway's
+# InstrumentStats (2004); publishes MarketColor (6002) per (exchange, underlying).
+
+profile_config = "../deploy/config/profile/qa-deribit.toml"
+aeron_config = "../deploy/config/aeron/streams.toml"
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bpt"
+
+[radar]
+# Recompute + publish cadence. Pointless to compute faster than the upstream
+# VolSurface update cadence (~2s on Deribit by default).
+publish_interval_ms = 2000
+
+[logging]
+level = "info"
+dir   = "logs"
+
+[metrics]
+port = 9107

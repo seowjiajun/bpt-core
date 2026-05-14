@@ -1,0 +1,79 @@
+#pragma once
+
+/// \file
+/// \brief Lifecycle service for bpt-radar.
+///
+/// Owns:
+///   - The latest VolSurfaceGrid per (exchange_id, underlying) tuple.
+///   - A rolling map of instrument_id → latest OI from InstrumentStats.
+///
+/// Run loop polls both subscriptions; every `publish_interval_ms` it walks
+/// every cached surface, joins each strike's `instrument_id` against the OI
+/// map, computes the per-(exchange, underlying) MarketColor frame, and
+/// publishes one frame per tuple.
+
+#include "radar/analysis/surface_point.h"
+#include "radar/config/settings.h"
+#include "radar/messaging/aeron_bus.h"
+
+#include <messages/ExchangeId.h>
+#include <messages/InstrumentStats.h>
+#include <messages/VolSurface.h>
+
+#include <bpt_app/app.h>
+#include <cstdint>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+namespace bpt::radar {
+
+class RadarService : public bpt::app::IService {
+public:
+    RadarService(config::Settings settings, messaging::RadarBus bus);
+
+    void run() override;
+
+private:
+    /// \brief Snapshot of a surface keyed by (exchange, underlying).
+    ///
+    /// Held by value so the run loop can recompute color without re-decoding
+    /// the SBE buffer. Refreshed every time on_vol_surface fires.
+    struct SurfaceKey {
+        uint8_t exchange_id;
+        std::string underlying;
+
+        bool operator==(const SurfaceKey& o) const noexcept {
+            return exchange_id == o.exchange_id && underlying == o.underlying;
+        }
+    };
+    struct SurfaceKeyHash {
+        std::size_t operator()(const SurfaceKey& k) const noexcept {
+            // FNV-ish blend; not load-bearing for perf, only used at publish cadence.
+            std::size_t h = std::hash<std::string>{}(k.underlying);
+            h ^= static_cast<std::size_t>(k.exchange_id) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+
+    void on_vol_surface(bpt::messages::VolSurface& surface);
+    void on_instrument_stats(bpt::messages::InstrumentStats& stats);
+
+    void publish_all();
+    void publish_for(const SurfaceKey& key, std::vector<analysis::SurfacePoint>& cached);
+
+    config::Settings settings_;
+    messaging::RadarBus bus_;
+
+    /// Latest decoded surface per (exchange, underlying).
+    std::unordered_map<SurfaceKey, std::vector<analysis::SurfacePoint>, SurfaceKeyHash> surfaces_;
+
+    /// Latest OI per instrument_id. Stays sticky between updates so a stale
+    /// strike (gone from the surface for a tick) doesn't immediately drop
+    /// OI to NaN.
+    std::unordered_map<uint64_t, double> oi_by_instrument_;
+
+    uint64_t last_publish_ns_{0};
+};
+
+}  // namespace bpt::radar
