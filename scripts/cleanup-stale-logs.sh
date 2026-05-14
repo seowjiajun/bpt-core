@@ -27,7 +27,7 @@ LOG_DIRS=(
     "$BPT_ROOT/bpt-analytics/logs"
     "$BPT_ROOT/bpt-pricer/logs"
     "$BPT_ROOT/bpt-backtester/logs"
-    "$BPT_ROOT/dashboard/bridge/logs"
+    "$BPT_ROOT/bpt-bridge/logs"
     "$BPT_ROOT/transport/aeron/logs"
 )
 

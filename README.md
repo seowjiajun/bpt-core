@@ -27,7 +27,7 @@ Deeper diagrams (tick→fill sequence, config topology) live in [`docs/architect
 | `bpt-pms` | C++23 | Multi-venue balance + position aggregator |
 | `bpt-tape` | C++23 | Market-data recorder (Parquet → S3) for backtest replay |
 | `bpt-backtester` | C++23 | Exchange simulator — replays orderbook tape against the strategy + order-gateway path |
-| `dashboard/bridge` | C++23 | Aeron → WebSocket forwarder for the live dashboard |
+| `bpt-bridge` | C++23 | Aeron → WebSocket forwarder for the live dashboard |
 | `dashboard/frontend` | React + TypeScript | Real-time trading dashboard with per-strategy panel + chart registries |
 | `messages` | SBE | Zero-copy / zero-allocation wire schemas (v9+) |
 | `transport/aeron` | Java 17 | External Aeron MediaDriver (ZGC-tuned to isolate GC from the C++ hot path) |
@@ -96,9 +96,10 @@ bpt-<service>/                  one Bazel-built C++ service
   config/                       per-stack TOMLs
   tests/unit/                   googletest
   BUILD                         bazel
+bpt-bridge/                     C++ Aeron→WS forwarder (sibling of other bpt-* services)
 dashboard/
-  bridge/                       C++ Aeron→WS bridge
   frontend/                     Vite + React + TypeScript
+  scripts/                      run/smoke helpers
 deploy/
   config/aeron/streams.toml     shared stream registry
   config/profile/*.toml         deployment profiles

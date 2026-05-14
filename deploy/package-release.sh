@@ -90,7 +90,7 @@ declare -A SERVICES=(
     ["bpt-analytics/bpt-analytics"]="bpt-analytics"
     ["bpt-pricer/bpt-pricer"]="bpt-pricer"
     ["bpt-pms/bpt-pms"]="bpt-pms"
-    ["dashboard/bridge/bridge"]="bridge"
+    ["bpt-bridge/bpt-bridge"]="bridge"
 )
 for src in "${!SERVICES[@]}"; do
     dst="${SERVICES[$src]}"
@@ -150,8 +150,8 @@ copy_service_configs bpt-tape/config            "$STAGE/share/service-configs/ta
 copy_service_configs bpt-order-gateway/config   "$STAGE/share/service-configs/order-gateway"
 copy_service_configs bpt-strategy/config        "$STAGE/share/service-configs/strategy"
 copy_service_configs bpt-analytics/config       "$STAGE/share/service-configs/analytics"
-# Bridge lives under dashboard/bridge/config/
-copy_service_configs dashboard/bridge/config    "$STAGE/share/service-configs/bridge"
+# Bridge lives under bpt-bridge/config/
+copy_service_configs bpt-bridge/config    "$STAGE/share/service-configs/bridge"
 
 echo "--- Copying CPU-affinity topology profiles..."
 # deploy/topology/*.toml — per-host-class pinning profiles. Operator (or

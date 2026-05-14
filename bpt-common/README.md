@@ -2,7 +2,7 @@
 
 Shared C++ utility library for the bpt-core trading services.
 
-All C++ services (`bpt-order-gateway`, `bpt-md-gateway`, `bpt-strategy`, `bpt-pricer`, `bpt-analytics`, `bpt-refdata`, `bpt-backtester`, `dashboard/bridge`) link against this library for their common primitives.
+All C++ services (`bpt-order-gateway`, `bpt-md-gateway`, `bpt-strategy`, `bpt-pricer`, `bpt-analytics`, `bpt-refdata`, `bpt-backtester`, `bpt-bridge`) link against this library for their common primitives.
 
 ## Requirements
 

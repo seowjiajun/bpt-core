@@ -90,7 +90,7 @@ else
     BIN[bpt-strategy]="$BPT_BIN_ROOT/bpt-strategy/bpt-strategy"
     BIN[bpt-analytics]="$BPT_BIN_ROOT/bpt-analytics/bpt-analytics"
     BIN[bpt-pms]="$BPT_BIN_ROOT/bpt-pms/bpt-pms"
-    BIN[bpt-bridge]="$BPT_BIN_ROOT/dashboard/bridge/bridge"
+    BIN[bpt-bridge]="$BPT_BIN_ROOT/bpt-bridge/bpt-bridge"
 fi
 
 # ── Resource limits (per-service, tiered by trading criticality) ────────────

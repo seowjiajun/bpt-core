@@ -21,10 +21,10 @@
 set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-BRIDGE_BIN="$STACK_DIR/build/dashboard/bridge/bridge"
-BRIDGE_CFG="$STACK_DIR/dashboard/bridge/config/bridge.live.toml"
-BRIDGE_LOG_DIR="$STACK_DIR/dashboard/bridge/logs"
-BRIDGE_PID="$STACK_DIR/dashboard/bridge/.bridge.pid"
+BRIDGE_BIN="$STACK_DIR/build/bpt-bridge/bpt-bridge"
+BRIDGE_CFG="$STACK_DIR/bpt-bridge/config/bridge.live.toml"
+BRIDGE_LOG_DIR="$STACK_DIR/bpt-bridge/logs"
+BRIDGE_PID="$STACK_DIR/bpt-bridge/.bridge.pid"
 PAPER_SH="$STACK_DIR/scripts/paper.sh"
 FRONTEND_DIR="$STACK_DIR/dashboard/frontend"
 FRONTEND_BIN="$FRONTEND_DIR/node_modules/.bin/vite"

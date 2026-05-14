@@ -69,7 +69,7 @@ Logs:
   bpt-md-gateway   : tail -f $ROOT/bpt-md-gateway/logs/bpt-md-gateway.log
   bpt-refdata   : tail -f $ROOT/bpt-refdata/logs/bpt-refdata.log
   bpt-strategy   : tail -f $ROOT/bpt-strategy/logs/bpt-strategy.log
-  bridge   : tail -f $ROOT/dashboard/bridge/logs/bridge.stdout
+  bridge   : tail -f $ROOT/bpt-bridge/logs/bridge.stdout
   frontend : tail -f $ROOT/dashboard/frontend/logs/vite.stdout
 
 To stop: $ROOT/scripts/down.sh

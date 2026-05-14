@@ -62,7 +62,7 @@ bazel build \
     //bpt-refdata:bpt-refdata \
     //bpt-analytics:bpt-analytics \
     //bpt-pms:bpt-pms \
-    //dashboard/bridge:bridge
+    //bpt-bridge:bpt-bridge
 
 # ── Stage a default .env (HL testnet, funding-arb path) ──────────────────
 # Operator can switch envs later via ./deploy/switch-env.sh.

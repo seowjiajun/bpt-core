@@ -29,10 +29,10 @@
 set -euo pipefail
 
 STACK_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-BRIDGE_BIN="$STACK_DIR/build/dashboard/bridge/bridge"
-BRIDGE_CFG="$STACK_DIR/dashboard/bridge/config/bridge.live.toml"
-BRIDGE_LOG_DIR="$STACK_DIR/dashboard/bridge/logs"
-BRIDGE_PID="$STACK_DIR/dashboard/bridge/.bridge.pid"
+BRIDGE_BIN="$STACK_DIR/build/bpt-bridge/bpt-bridge"
+BRIDGE_CFG="$STACK_DIR/bpt-bridge/config/bridge.live.toml"
+BRIDGE_LOG_DIR="$STACK_DIR/bpt-bridge/logs"
+BRIDGE_PID="$STACK_DIR/bpt-bridge/.bridge.pid"
 BACKTEST_SH="$STACK_DIR/scripts/backtest.sh"
 RESULTS_DIR="$STACK_DIR/bpt-backtester/results"
 FRONTEND_DIR="$STACK_DIR/dashboard/frontend"
@@ -65,7 +65,7 @@ bridge_start() {
 
     if [ ! -x "$BRIDGE_BIN" ]; then
         echo "ERROR: bridge binary not found at $BRIDGE_BIN"
-        echo "       build it first: bazel build //dashboard/bridge:bridge"
+        echo "       build it first: bazel build //bpt-bridge:bpt-bridge"
         exit 1
     fi
 

@@ -28,7 +28,7 @@
 #   ├── previous        → releases/<old-ver>/     (for rollback.sh)
 #   ├── releases/<ver>/{bin,scripts,share,VERSION,MANIFEST,...}
 #   ├── bpt-<svc>/config/{*.toml,exchanges/,...}  (seeded once, left alone on upgrade)
-#   ├── dashboard/bridge/config/bridge.live.toml
+#   ├── bpt-bridge/config/bridge.live.toml
 #   ├── config/instruments → current/share/instruments/   (symlink, auto-follows current)
 #   ├── config/active/env                                 (operator-staged; deploy refuses to start without it)
 #
@@ -150,11 +150,13 @@ if [ "$FIRST_INSTALL" = "1" ]; then
             log "  seeded bpt-$svc/config/"
         fi
     done
-    # Bridge lives under dashboard/bridge/config, not bpt-bridge/
-    if [ ! -d "$BPT_DEPLOY_ROOT/dashboard/bridge/config" ]; then
-        run "mkdir -p '$BPT_DEPLOY_ROOT/dashboard/bridge/config'"
-        run "cp -r '$RELEASE_DIR/share/service-configs/bridge'/. '$BPT_DEPLOY_ROOT/dashboard/bridge/config/'"
-        log "  seeded dashboard/bridge/config/"
+    # bpt-bridge config seeding (separate from the loop above because the
+    # release stages bridge configs under share/service-configs/bridge/ —
+    # legacy name retained so existing release tarballs are still consumable).
+    if [ ! -d "$BPT_DEPLOY_ROOT/bpt-bridge/config" ]; then
+        run "mkdir -p '$BPT_DEPLOY_ROOT/bpt-bridge/config'"
+        run "cp -r '$RELEASE_DIR/share/service-configs/bridge'/. '$BPT_DEPLOY_ROOT/bpt-bridge/config/'"
+        log "  seeded bpt-bridge/config/"
     fi
 
     # config/instruments → current/share/instruments (relative ../ refs in service TOMLs).

@@ -44,7 +44,7 @@ BIN[bpt-md-gateway]="$BPT_ROOT/bazel-bin/bpt-md-gateway/bpt-md-gateway"
 BIN[bpt-order-gateway]="$BPT_ROOT/bazel-bin/bpt-order-gateway/bpt-order-gateway"
 BIN[bpt-strategy]="$BPT_ROOT/bazel-bin/bpt-strategy/bpt-strategy"
 BIN[bpt-analytics]="$BPT_ROOT/bazel-bin/bpt-analytics/bpt-analytics"
-BIN[bpt-bridge]="$BPT_ROOT/bazel-bin/dashboard/bridge/bridge"
+BIN[bpt-bridge]="$BPT_ROOT/bazel-bin/bpt-bridge/bpt-bridge"
 
 # ── bpt-dev-{refdata,md-gateway,order-gateway} ───────────────────────────────
 for svc in bpt-refdata bpt-md-gateway bpt-order-gateway; do
