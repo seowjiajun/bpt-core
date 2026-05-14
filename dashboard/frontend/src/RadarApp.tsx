@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
+import { CalendarPanel } from './components/CalendarPanel'
 import { OptionsPulsePanel } from './components/OptionsPulsePanel'
 import type { MarketColorMsg } from './types/messages'
 
@@ -81,6 +82,7 @@ export default function RadarApp() {
 
       <main className="radar-main">
         <OptionsPulsePanel underlying={selected} />
+        <CalendarPanel underlying={selected} />
 
         {/* Placeholder rows for future MarketColor domains. Each will become
             its own panel once the corresponding radar analysis module lands. */}
@@ -90,7 +92,6 @@ export default function RadarApp() {
             <li>Perp basis (perp mark vs spot mid, in bps)</li>
             <li>Flow color (buy/sell imbalance from trades)</li>
             <li>Vol regime (realized vol + classifier)</li>
-            <li>Calendar (funding tick + options expiry countdowns + macro events)</li>
           </ul>
         </section>
       </main>
