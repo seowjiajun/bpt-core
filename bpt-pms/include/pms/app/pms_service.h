@@ -10,9 +10,9 @@
 
 namespace bpt::pms {
 
-class PmsApp final : public bpt::app::IService {
+class PmsService final : public bpt::app::IService {
 public:
-    PmsApp(config::Settings settings, messaging::PmsBus bus);
+    PmsService(config::Settings settings, messaging::PmsBus bus);
 
     void run() override;
 

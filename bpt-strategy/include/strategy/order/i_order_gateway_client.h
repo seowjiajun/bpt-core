@@ -77,10 +77,10 @@ public:
     virtual int poll(int fragment_limit = 10) = 0;
 
     // Monotonic wall-clock ns of the most recent gateway heartbeat —
-    // consumed by StrategyApp's liveness gate.
+    // consumed by StrategyService's liveness gate.
     [[nodiscard]] virtual uint64_t last_heartbeat_ns() const = 0;
 
-    // Callbacks are shared data — set by StrategyApp once, fired by
+    // Callbacks are shared data — set by StrategyService once, fired by
     // whichever concrete impl actually received / generated the event.
     OnExecReportFn on_exec_report;
     OnHeartbeatFn on_heartbeat;

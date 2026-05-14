@@ -7,7 +7,7 @@
 /// (`settings.aeron.funding_rate.stream_id` — typically 1005) so that
 /// strategy can subscribe to them independently of the high-frequency
 /// BBO/Trade fan-out on stream 2002. Adapters surface funding-rate
-/// events via the `on_funding_rate` callback set by MdGatewayApp; that
+/// events via the `on_funding_rate` callback set by MdGatewayService; that
 /// callback ends up calling publish() on the implementation of this
 /// port.
 ///
@@ -34,7 +34,7 @@ struct FundingRateUpdate {
 /// \brief Per-event callback shape used inside the venue decoders.
 ///
 /// The decoder calls this to surface a parsed funding-rate event;
-/// MdGatewayApp wires the callback to forward into the bus's
+/// MdGatewayService wires the callback to forward into the bus's
 /// IFundingRatePublisher. Decoupled like this so the decoder doesn't
 /// depend on the publisher type.
 using FundingRateCallback = std::function<void(const FundingRateUpdate&)>;

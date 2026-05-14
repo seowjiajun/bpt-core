@@ -3,7 +3,7 @@
 /// @file
 /// Bus boundary for bpt-strategy. Mirrors the shape used by bpt-refdata,
 /// bpt-md-gateway, and bpt-order-gateway: every concrete Aeron pub/sub
-/// the strategy needs is constructed in one factory so `StrategyApp`
+/// the strategy needs is constructed in one factory so `StrategyService`
 /// doesn't have to include `<Aeron.h>` itself.
 ///
 /// Why this isn't a list of formal port interfaces (yet): strategy's

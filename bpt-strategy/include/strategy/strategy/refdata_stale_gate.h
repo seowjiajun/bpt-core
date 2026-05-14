@@ -28,7 +28,7 @@ namespace bpt::strategy::strategy {
 // then back to Ok on the one after.
 //
 // Header-only: simple state machine, no synchronization, called from
-// strategy_app's main loop only (single thread).
+// strategy_service's main loop only (single thread).
 //
 // Not coupled to RefdataClient — caller passes in last_heartbeat_ns()
 // and the current time. Keeps the gate trivially testable.
@@ -50,7 +50,7 @@ public:
 
         // Time after the most recent heartbeat that counts as "refdata
         // went silent mid-session." Default 25s = 5× the 5s heartbeat
-        // cadence in bpt-refdata/src/app/refdata_app.cpp. Three would
+        // cadence in bpt-refdata/src/app/refdata_service.cpp. Three would
         // flap on transient publisher delays.
         uint64_t stale_threshold_ns{25'000'000'000ULL};
     };

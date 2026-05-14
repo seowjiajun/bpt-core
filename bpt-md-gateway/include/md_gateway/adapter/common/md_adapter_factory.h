@@ -3,7 +3,7 @@
 /// @file
 /// Factory function that maps an ExchangeId enum value to the
 /// venue-specific MdAdapter subclass. Replaces the per-venue switch
-/// that used to live in MdGatewayApp's constructor; mirror of the
+/// that used to live in MdGatewayService's constructor; mirror of the
 /// bpt-tape `make_recording_adapter` extraction in the same spirit.
 ///
 /// Templated on Pub (the publisher type) so callers using

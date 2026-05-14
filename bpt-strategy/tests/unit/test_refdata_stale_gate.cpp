@@ -113,7 +113,7 @@ TEST(RefdataStaleGateTest, ThresholdBoundariesInclusive) {
 TEST(RefdataStaleGateTest, FlapResistance) {
     // Verify that crossing the threshold once and then immediately recovering
     // produces a clean GoneStale → Recovered → Ok sequence with no spurious
-    // re-edges. This is the property StrategyApp depends on for its
+    // re-edges. This is the property StrategyService depends on for its
     // log/metric edge-trigger semantics.
     RefdataStaleGate gate({.stale_threshold_ns = 25 * SEC});
 

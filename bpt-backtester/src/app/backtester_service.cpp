@@ -1,4 +1,4 @@
-#include "backtester/app/backtester_app.h"
+#include "backtester/app/backtester_service.h"
 
 #include <messages/ExchangeRegistry.h>
 
@@ -34,7 +34,7 @@ std::unique_ptr<latency::ParametricLatencyModel> build_latency_model(const confi
         model->set_spec(venue, Leg::SUBMIT_TO_MATCH, {spec.submit_to_match_base_ns, spec.submit_to_match_jitter_ns});
         model->set_spec(venue, Leg::MATCH_TO_REPORT, {spec.match_to_report_base_ns, spec.match_to_report_jitter_ns});
     }
-    bpt::common::log::info("[BacktesterApp] LatencyModel installed (seed={}, {} venue overrides)",
+    bpt::common::log::info("[BacktesterService] LatencyModel installed (seed={}, {} venue overrides)",
                            cfg.seed,
                            cfg.per_venue.size());
     return model;
@@ -42,7 +42,7 @@ std::unique_ptr<latency::ParametricLatencyModel> build_latency_model(const confi
 
 }  // namespace
 
-BacktesterApp::BacktesterApp(config::Settings settings, messaging::BacktesterBus bus)
+BacktesterService::BacktesterService(config::Settings settings, messaging::BacktesterBus bus)
     : settings_(std::move(settings)),
       bus_(std::move(bus)) {
     bpt::common::log::info("Initialising — window: {} → {}, {} instrument(s)",
@@ -106,11 +106,11 @@ BacktesterApp::BacktesterApp(config::Settings settings, messaging::BacktesterBus
                 hl_universe.push_back(inst.symbol);
         }
         bpt::common::log::warn(
-            "[BacktesterApp] HL asset universe empty from snapshot — "
+            "[BacktesterService] HL asset universe empty from snapshot — "
             "fell back to [[instruments]] config ({} entries)",
             hl_universe.size());
     } else {
-        bpt::common::log::info("[BacktesterApp] HL asset universe: {} coins from snapshot", hl_universe.size());
+        bpt::common::log::info("[BacktesterService] HL asset universe: {} coins from snapshot", hl_universe.size());
     }
     hyperliquid_order_server_ =
         std::make_unique<exchange::HyperliquidOrderServer>(settings_.endpoints.hyperliquid_order_port,
@@ -156,11 +156,11 @@ BacktesterApp::BacktesterApp(config::Settings settings, messaging::BacktesterBus
     bpt::common::log::info("Ready — results will be written to {}", out_dir);
 }
 
-void BacktesterApp::on_fill(const matching::FillReport& fill) {
+void BacktesterService::on_fill(const matching::FillReport& fill) {
     results_->on_fill(fill);
     const auto exch_id = bpt::messages::ExchangeRegistry::from_name(fill.exchange);
     if (!exch_id) {
-        bpt::common::log::warn("[BacktesterApp] Unknown exchange '{}' on fill — dropped", fill.exchange);
+        bpt::common::log::warn("[BacktesterService] Unknown exchange '{}' on fill — dropped", fill.exchange);
         return;
     }
     switch (*exch_id) {
@@ -174,12 +174,12 @@ void BacktesterApp::on_fill(const matching::FillReport& fill) {
             hyperliquid_order_server_->push_fill(fill);
             break;
         default:
-            bpt::common::log::warn("[BacktesterApp] No order server for exchange '{}' — fill dropped", fill.exchange);
+            bpt::common::log::warn("[BacktesterService] No order server for exchange '{}' — fill dropped", fill.exchange);
             break;
     }
 }
 
-void BacktesterApp::run() {
+void BacktesterService::run() {
     // Wait for at least one MdGateway subscriber to connect before releasing data.
     // Without this gate, Backtester would exhaust all data before MdGateway has
     // had a chance to connect and subscribe.

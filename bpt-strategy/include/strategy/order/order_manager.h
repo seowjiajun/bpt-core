@@ -52,7 +52,7 @@ public:
                                        double quantity,
                                        uint8_t exec_inst = 0);
 
-    // Called by StrategyApp to measure MD-to-order latency. Set before strategy callbacks.
+    // Called by StrategyService to measure MD-to-order latency. Set before strategy callbacks.
     // Invoked synchronously inside place_order on success, before returning to the caller.
     std::function<void(uint64_t order_id)> on_order_placed;
 

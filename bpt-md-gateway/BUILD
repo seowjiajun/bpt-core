@@ -9,7 +9,7 @@ cc_library(
         "src/md/md_encoder.cpp",
         "src/md/md_validator.cpp",
         "src/md/validation_drop_breaker.cpp",
-        "src/app/md_gateway_app.cpp",
+        "src/app/md_gateway_service.cpp",
         "src/messaging/aeron_bus.cpp",
         "src/messaging/md_control_subscriber.cpp",
         "src/messaging/md_publisher.cpp",

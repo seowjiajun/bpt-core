@@ -3,7 +3,7 @@
 /// \file
 /// \brief Composition root that wires the Aeron-backed implementations of the messaging ports.
 ///
-/// OrderGatewayApp talks to the four messaging ports (IOrderControlSource +
+/// OrderGatewayService talks to the four messaging ports (IOrderControlSource +
 /// IExecReportPublisher + IAccountSnapshotPublisher + IHeartbeatPublisher)
 /// without knowing how they are implemented. `AeronBus::build()` is
 /// the single place that constructs the Aeron-backed concrete classes
@@ -14,7 +14,7 @@
 /// Mirrors the bpt-md-gateway and bpt-refdata bus shape.
 ///
 /// Lifetime: AeronBus owns the publisher and subscriber objects but
-/// hands ownership to OrderGatewayApp at construction; AeronBus itself
+/// hands ownership to OrderGatewayService at construction; AeronBus itself
 /// is a value type that can be moved out at the wiring site in main.cpp.
 
 #include "order_gateway/messaging/i_account_snapshot_publisher.h"
@@ -32,7 +32,7 @@ struct Settings;
 
 namespace bpt::order_gateway::messaging {
 
-/// \brief Bundle of messaging-port implementations handed to OrderGatewayApp.
+/// \brief Bundle of messaging-port implementations handed to OrderGatewayService.
 ///
 /// All four ports are exposed via interface type so alternate
 /// implementations (test fakes, replay drivers) can substitute without
@@ -41,7 +41,7 @@ struct AeronBus {
     /// \brief Inbound: NewOrder / Cancel / CancelAll / Modify /
     ///        AccountSnapshotRequest fragments from strategy.
     ///
-    /// Polled from OrderGatewayApp::run(); each fragment dispatched to
+    /// Polled from OrderGatewayService::run(); each fragment dispatched to
     /// the matching OrderProcessor handler via the public callbacks.
     std::shared_ptr<IOrderControlSource> control_source;
 

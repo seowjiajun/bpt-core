@@ -1,4 +1,4 @@
-#include "md_gateway/app/md_gateway_app.h"
+#include "md_gateway/app/md_gateway_service.h"
 #include "md_gateway/config/settings.h"
 #include "md_gateway/messaging/aeron_bus.h"
 
@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
                              std::move(cfg),
                              [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                                  auto bus = bpt::md_gateway::messaging::AeronBus::build(ctx.aeron, settings);
-                                 return std::make_unique<bpt::md_gateway::MdGatewayApp>(std::move(settings),
+                                 return std::make_unique<bpt::md_gateway::MdGatewayService>(std::move(settings),
                                                                                         std::move(bus.control_source),
                                                                                         std::move(bus.md_sink),
                                                                                         std::move(bus.ack_sink),

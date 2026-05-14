@@ -24,7 +24,7 @@ namespace bpt::md_gateway::subscription {
 
 /// \brief Diff-based subscription dispatcher.
 ///
-/// Single-threaded — only call from MdGatewayApp's main poll thread.
+/// Single-threaded — only call from MdGatewayService's main poll thread.
 /// Cross-thread interaction with the per-venue adapters happens
 /// internally inside each adapter's own subscribe/unsubscribe
 /// implementation; the manager itself never spawns threads.

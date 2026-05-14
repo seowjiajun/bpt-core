@@ -61,7 +61,7 @@ public:
     [[nodiscard]] uint64_t current_seq() const { return seq_.load(std::memory_order_relaxed); }
 
     /// \brief Count of messages dropped due to back-pressure or oversize payload.
-    ///        Sampled by MdGatewayApp's idle-loop reporter every ~10µs.
+    ///        Sampled by MdGatewayService's idle-loop reporter every ~10µs.
     [[nodiscard]] uint64_t drop_count() const { return drops_.load(std::memory_order_relaxed); }
 
 private:
@@ -70,7 +70,7 @@ private:
     bpt::common::aeron::Publisher publisher_;
 
     /// Cache-line isolated. The publisher thread does a `lock add` on
-    /// seq_ every publish; MdGatewayApp's reporter reads drop_count()
+    /// seq_ every publish; MdGatewayService's reporter reads drop_count()
     /// every ~10µs idle iteration. Separating them keeps the reporter's
     /// read out of the publisher's hot cache line.
     alignas(64) std::atomic<uint64_t> seq_{0};

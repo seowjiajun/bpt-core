@@ -37,7 +37,7 @@ cc_binary(
     name = "bpt-analytics",
     srcs = [
         "src/main.cpp",
-        "src/app/tyr_app.cpp",
+        "src/app/analytics_service.cpp",
         "src/config/config.cpp",
         "src/messaging/aeron_bus.cpp",
         "src/messaging/exec_report_subscriber.cpp",

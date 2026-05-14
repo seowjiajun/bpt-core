@@ -7,7 +7,7 @@
 /// NewOrder, CancelOrder, CancelAll, ModifyOrder, AccountSnapshotRequest.
 /// Each fragment is dispatched to the appropriate user-supplied
 /// callback. The poll() loop is driven from the main poll thread
-/// inside OrderGatewayApp::run().
+/// inside OrderGatewayService::run().
 ///
 /// Implementations: OrderSubscriber (Aeron-backed) in prod; a fake
 /// implementation can drive the five message types directly into the
@@ -31,7 +31,7 @@ using OnAccountSnapshotRequestFn = std::function<void(const bpt::messages::Accou
 
 /// \brief Contract for the inbound order-control source.
 ///
-/// Single-threaded: poll() is called from OrderGatewayApp's main loop
+/// Single-threaded: poll() is called from OrderGatewayService's main loop
 /// only. Implementations need not be thread-safe.
 ///
 /// Callbacks are public std::function members rather than virtual

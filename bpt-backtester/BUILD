@@ -3,7 +3,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 # NOTE: `data/data_loader.cpp` + `clock/clock_master.cpp` + `exchange/*` +
-# `messaging/*` + `app/backtester_app.cpp` + `main.cpp` are NOT included —
+# `messaging/*` + `app/backtester_service.cpp` + `main.cpp` are NOT included —
 # they pull in Arrow/Parquet (no BCR module, rules_foreign_cc CMake build of
 # Arrow is multi-GB and slow) or the Aeron-coupled messaging layer. The three
 # testable pieces (config, matching, results_collector) don't touch any of

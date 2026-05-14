@@ -1,6 +1,6 @@
 #pragma once
 
-// BridgeApp — Aeron → WebSocket forwarder for the dashboard. Wrapped
+// BridgeService — Aeron → WebSocket forwarder for the dashboard. Wrapped
 // as a bpt::app::IService so main.cpp follows the same lifecycle
 // pattern as the rest of the bpt-core services.
 
@@ -13,9 +13,9 @@
 
 namespace bridge {
 
-class BridgeApp : public bpt::app::IService {
+class BridgeService : public bpt::app::IService {
 public:
-    BridgeApp(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron)
+    BridgeService(config::Settings settings, std::shared_ptr<aeron::Aeron> aeron)
         : settings_(std::move(settings)),
           aeron_(std::move(aeron)) {}
 

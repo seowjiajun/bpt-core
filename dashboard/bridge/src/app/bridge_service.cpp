@@ -1,4 +1,4 @@
-#include "bridge/app/bridge_app.h"
+#include "bridge/app/bridge_service.h"
 
 #include "bridge/aeron/account_subscriber.h"
 #include "bridge/aeron/exec_subscriber.h"
@@ -19,7 +19,7 @@
 
 namespace bridge {
 
-void BridgeApp::run() {
+void BridgeService::run() {
     bpt::common::log::info("bridge starting — ws :{}  aeron {}", settings_.ws_port, settings_.base.media_driver_dir);
     bpt::common::log::info("md_data stream={}  exec_report stream={}  control stream={}",
                            settings_.md_data.stream_id,

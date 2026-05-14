@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SERVICE=pricer_app
+SERVICE=pricer_service
 DISPLAY_NAME=pricer
 PID_FILE="$PROJECT_DIR/.$DISPLAY_NAME.pid"
 CONFIG="${1:-$PROJECT_DIR/config/pricer.qa-okx.toml}"
@@ -33,7 +33,7 @@ fi
 # ── Check binary ──────────────────────────────────────────────────
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: Binary not found: $BINARY"
-    echo "Run: cmake --build build --target pricer_app"
+    echo "Run: cmake --build build --target pricer_service"
     exit 1
 fi
 

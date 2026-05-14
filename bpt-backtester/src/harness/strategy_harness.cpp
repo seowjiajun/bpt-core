@@ -83,7 +83,7 @@ void StrategyHarness::initialize() {
         /*fee_schedules_loaded=*/true,
         /*funding_rates_loaded=*/true);
 
-    // Strategy config — uses the same loader StrategyApp does, so
+    // Strategy config — uses the same loader StrategyService does, so
     // params land identically.
     strategy_cfg_ = bpt::strategy::config::AppConfig::load(opts_.strategy_config_path);
 
@@ -98,7 +98,7 @@ void StrategyHarness::initialize() {
                                                                  order_mgr_.get(),
                                                                  /*vol_client=*/nullptr);
 
-    // Wire strategy callbacks. These mirror StrategyApp::wire_*_callbacks()
+    // Wire strategy callbacks. These mirror StrategyService::wire_*_callbacks()
     // but are simpler because we don't need the latency histograms,
     // dashboard publish, or watchdog logic — those are integration
     // concerns that belong on the multi-process path.

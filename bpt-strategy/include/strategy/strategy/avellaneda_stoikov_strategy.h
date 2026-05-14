@@ -675,7 +675,7 @@ private:
     // on_account_snapshot call (bpt-order-gateway polls every 5s).
     int64_t last_equity_e8_{0};
 
-    // Strategy-wide refdata-staleness flag, set by StrategyApp via
+    // Strategy-wide refdata-staleness flag, set by StrategyService via
     // on_refdata_stale_changed(). When true, on_bbo / on_order_book
     // skip new-quote computation early (existing cancels still flow)
     // because fee_cache.get() will return nullopt without a fresh

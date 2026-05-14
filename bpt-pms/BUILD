@@ -22,7 +22,7 @@ cc_binary(
     name = "bpt-pms",
     srcs = [
         "src/main.cpp",
-        "src/app/pms_app.cpp",
+        "src/app/pms_service.cpp",
         "src/adapter/hyperliquid_balance_adapter.cpp",
         "src/messaging/aeron_bus.cpp",
         "src/messaging/balance_snapshot_publisher.cpp",

@@ -3,7 +3,7 @@
 /// \file
 /// \brief Composition root that wires the Aeron-backed implementations of the messaging ports.
 ///
-/// MdGatewayApp talks to the four messaging ports (IMdControlSource +
+/// MdGatewayService talks to the four messaging ports (IMdControlSource +
 /// IAckPublisher + IFundingRatePublisher + concrete MdPublisher) without
 /// knowing how they are implemented. `AeronBus::build()` is the single
 /// place that constructs the Aeron-backed concrete classes and bundles
@@ -19,7 +19,7 @@
 /// instantiate the adapters with), not a runtime polymorphism.
 ///
 /// Lifetime: AeronBus owns the publisher and subscriber objects but
-/// hands ownership to MdGatewayApp at construction; AeronBus itself is
+/// hands ownership to MdGatewayService at construction; AeronBus itself is
 /// a value type that can be moved out at the wiring site.
 
 #include "md_gateway/messaging/i_ack_publisher.h"
@@ -37,7 +37,7 @@ struct Settings;
 
 namespace bpt::md_gateway::messaging {
 
-/// \brief Bundle of messaging-port implementations handed to MdGatewayApp.
+/// \brief Bundle of messaging-port implementations handed to MdGatewayService.
 ///
 /// Each field is one port. Three are exposed via interface type so that
 /// alternate implementations (test fakes, recorder no-ops) can substitute
@@ -46,7 +46,7 @@ namespace bpt::md_gateway::messaging {
 struct AeronBus {
     /// \brief Inbound: SBE `MdSubscribeBatch` control fragments from strategy.
     ///
-    /// Polled from MdGatewayApp::run(); each fragment dispatched to the
+    /// Polled from MdGatewayService::run(); each fragment dispatched to the
     /// SubscriptionManager.
     std::unique_ptr<IMdControlSource> control_source;
 
@@ -64,7 +64,7 @@ struct AeronBus {
 
     /// \brief Outbound: per-instrument funding-rate updates on stream 1005.
     ///
-    /// Wired into each adapter's `on_funding_rate` callback by MdGatewayApp;
+    /// Wired into each adapter's `on_funding_rate` callback by MdGatewayService;
     /// adapter threads call publish() directly off their IO thread.
     std::shared_ptr<IFundingRatePublisher> funding_sink;
 

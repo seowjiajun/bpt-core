@@ -55,7 +55,7 @@ private:
     std::string client_secret_;
 
     /// Shared HTTPS client — reuses SSL context across calls and retries
-    /// on transient failures. Injected at construction; refdata_app picks
+    /// on transient failures. Injected at construction; refdata_service picks
     /// the host (defaulting to test.deribit.com when cfg_.rest_host empty).
     std::shared_ptr<bpt::refdata::http::RestClient> rest_client_;
 

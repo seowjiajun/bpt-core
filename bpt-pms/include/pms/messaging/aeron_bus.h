@@ -4,7 +4,7 @@
 /// Bus boundary for bpt-book. Tiny — book has a single output stream
 /// (the balance snapshot publisher) and no inbound subscriptions, so
 /// the bus is mostly ceremony. Kept for symmetry with the rest of the
-/// services and so `PmsApp` doesn't take `<Aeron.h>` in its
+/// services and so `PmsService` doesn't take `<Aeron.h>` in its
 /// constructor.
 
 #include "pms/messaging/balance_snapshot_publisher.h"

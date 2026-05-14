@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file
-/// \brief BacktesterApp — orchestrates the backtest run loop and venue mocks.
+/// \brief BacktesterService — orchestrates the backtest run loop and venue mocks.
 
 #include "backtester/clock/clock_master.h"
 #include "backtester/config/settings.h"
@@ -23,9 +23,9 @@
 
 namespace bpt::backtester {
 
-class BacktesterApp : public bpt::app::IService {
+class BacktesterService : public bpt::app::IService {
 public:
-    BacktesterApp(config::Settings settings, messaging::BacktesterBus bus);
+    BacktesterService(config::Settings settings, messaging::BacktesterBus bus);
 
     /// \brief Blocking run loop — feeds ticks until the backtest window is exhausted or a signal fires.
     void run() override;

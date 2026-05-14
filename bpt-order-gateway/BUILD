@@ -52,7 +52,7 @@ cc_binary(
     name = "bpt-order-gateway",
     srcs = [
         "src/main.cpp",
-        "src/app/gateway_app.cpp",
+        "src/app/order_gateway_service.cpp",
         "src/messaging/account_snapshot_publisher.cpp",
         "src/messaging/aeron_bus.cpp",
         "src/messaging/exec_report_publisher.cpp",

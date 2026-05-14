@@ -13,9 +13,9 @@
 
 namespace bpt::pricer {
 
-class PricerApp : public bpt::app::IService {
+class PricerService : public bpt::app::IService {
 public:
-    PricerApp(config::Settings settings, messaging::PricerBus bus);
+    PricerService(config::Settings settings, messaging::PricerBus bus);
     void run() override;
 
 private:

@@ -17,7 +17,7 @@ namespace bpt::md_gateway::messaging {
 
 /// \brief Contract for the ACK / heartbeat outbound port.
 ///
-/// All methods are called from MdGatewayApp::run() on the main poll
+/// All methods are called from MdGatewayService::run() on the main poll
 /// thread. No thread-safety contract is required from implementations.
 class IAckPublisher {
 public:

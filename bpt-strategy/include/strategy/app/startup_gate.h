@@ -15,7 +15,7 @@ namespace bpt::strategy::app {
 //
 // The original ad-hoc gate (refdata_ready_ / account_snapshot_requests_sent_
 // / account_snapshot_ready_ / strategy_started_ / strategy_md_started_)
-// sprawled across StrategyApp's run loop and several callbacks, which is the
+// sprawled across StrategyService's run loop and several callbacks, which is the
 // kind of layout where bugs hide — e.g. the AccountSnapshot-only-fires-once
 // class of issues we just chased through the dashboard.
 //
@@ -74,7 +74,7 @@ public:
     bool is_active() const noexcept { return phase_ == Phase::Active; }
 
     // Force a fresh AccountSnapshotRequest to every configured exchange.
-    // Used by the graceful shutdown path in StrategyApp so the dashboard
+    // Used by the graceful shutdown path in StrategyService so the dashboard
     // HoldingsPanel reflects post-flatten state without waiting for the
     // next order-gateway periodic republish.
     void refresh_account_snapshots() { send_account_snapshot_requests(); }

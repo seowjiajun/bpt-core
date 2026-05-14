@@ -4,7 +4,7 @@
 /// Bus boundary for bpt-analytics. Mirrors the shape used by
 /// bpt-refdata, bpt-md-gateway, bpt-order-gateway, bpt-strategy, and
 /// bpt-pricer: every concrete Aeron pub/sub the app needs is built in
-/// one factory so `AnalyticsApp` doesn't take `<Aeron.h>` in its
+/// one factory so `AnalyticsService` doesn't take `<Aeron.h>` in its
 /// constructor.
 
 #include "analytics/messaging/exec_report_subscriber.h"

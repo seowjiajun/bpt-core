@@ -9,7 +9,7 @@ RefdataMetrics::RefdataMetrics(uint16_t port) {
     registry = std::make_shared<prometheus::Registry>();
 
     // port==0 disables the HTTP exposer — used by tests so a fixture
-    // can spin up RefdataApp without binding a TCP socket.
+    // can spin up RefdataService without binding a TCP socket.
     if (port != 0) {
         exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
         exposer->RegisterCollectable(registry);

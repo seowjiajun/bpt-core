@@ -15,7 +15,7 @@ namespace bpt::order_gateway::messaging {
 ///
 /// Publishes OrderGatewayHeartbeat on its own Aeron stream. Driven
 /// from the main poll thread on a fixed cadence (see
-/// OrderGatewayApp::run heartbeat path).
+/// OrderGatewayService::run heartbeat path).
 class HeartbeatPublisher final : public IHeartbeatPublisher {
 public:
     HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);

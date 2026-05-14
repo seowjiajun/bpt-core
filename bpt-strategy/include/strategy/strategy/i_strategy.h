@@ -17,7 +17,7 @@
 
 namespace bpt::strategy::strategy {
 
-// Snapshot of current portfolio state — queried by StrategyApp to publish
+// Snapshot of current portfolio state — queried by StrategyService to publish
 // to the dashboard bridge.  Options strategies populate this; linear
 // strategies return the default (empty legs, zero Greeks).
 struct PortfolioState {
@@ -97,7 +97,7 @@ public:
     // Default no-op — only strategies that want live toxicity feedback override this.
     virtual void on_toxicity_update(const bpt::analytics::messaging::ToxicityUpdate& /*update*/) {}
 
-    // Fired by StrategyApp when the refdata heartbeat staleness state
+    // Fired by StrategyService when the refdata heartbeat staleness state
     // changes. true → refdata heartbeat aged past the configured
     // threshold, strategy should stop emitting NEW quotes (cancels of
     // existing orders should still flow). false → fresh heartbeat
@@ -115,7 +115,7 @@ public:
     //
     // Returns the count of reconciliation divergences observed against
     // this snapshot (0 if the strategy doesn't reconcile or found none).
-    // StrategyApp mirrors this into the strategy_reconciliation_divergences_total
+    // StrategyService mirrors this into the strategy_reconciliation_divergences_total
     // Prometheus counter for alerting. A non-zero return = silent fill lost, scale
     // bug, or exchange state drift — worth waking someone up.
     virtual std::size_t on_account_snapshot(bpt::messages::AccountSnapshot& /*snap*/) { return 0; }
@@ -142,12 +142,12 @@ public:
     // see something while the dedicated panel is being built.
     virtual std::string get_strategy_state_json() { return {}; }
 
-    // Called by StrategyApp on graceful shutdown (SIGTERM/SIGINT) after
+    // Called by StrategyService on graceful shutdown (SIGTERM/SIGINT) after
     // the main poll loop exits. Implementations should cancel any
     // resting orders and fire offsetting market IOCs to flatten every
     // non-zero position. This runs on the main thread with the order
     // path still wired up, so fires go through the normal OrderManager
-    // → OrderGateway → exchange path. StrategyApp drains exec reports for a
+    // → OrderGateway → exchange path. StrategyService drains exec reports for a
     // short window after this returns so fills have a chance to be
     // acked before the process exits.
     //
@@ -158,7 +158,7 @@ public:
     virtual void on_shutdown_flatten() {}
 
     // True if the strategy has resting orders or in-flight unwind
-    // orders that haven't reached a terminal state yet. StrategyApp's
+    // orders that haven't reached a terminal state yet. StrategyService's
     // shutdown drain loops on this to exit early once everything is
     // clean, instead of blindly sleep-spinning for the full timeout
     // budget. A strategy that doesn't override it returns false —
@@ -166,7 +166,7 @@ public:
     [[nodiscard]] virtual bool has_pending_flatten() const { return false; }
 
     // Persist warm-start state (EWMA estimators, regime detector, etc.)
-    // to `path`. StrategyApp calls this on graceful shutdown AFTER the
+    // to `path`. StrategyService calls this on graceful shutdown AFTER the
     // flatten drain completes, so positions are flat and state is
     // stable. Default no-op — strategies with no expensive warmup don't
     // need to persist anything.

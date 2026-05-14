@@ -3,7 +3,7 @@
 // publishes normalized snapshots on Aeron. Owns nothing that places
 // orders — if this process dies, trading doesn't stop.
 
-#include "pms/app/pms_app.h"
+#include "pms/app/pms_service.h"
 #include "pms/config/settings.h"
 #include "pms/messaging/aeron_bus.h"
 
@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
                              std::move(settings),
                              [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                                  auto bus = bpt::pms::messaging::PmsAeronBus::build(ctx.aeron, cfg);
-                                 return std::make_unique<bpt::pms::PmsApp>(std::move(cfg), std::move(bus));
+                                 return std::make_unique<bpt::pms::PmsService>(std::move(cfg), std::move(bus));
                              });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

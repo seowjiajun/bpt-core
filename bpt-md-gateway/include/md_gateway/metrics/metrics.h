@@ -63,7 +63,7 @@ struct MdGatewayMetrics {
     /// \brief Construct + start the HTTP exposer on `host:port`.
     MdGatewayMetrics(const std::string& host, uint16_t port);
 
-    /// \brief Mark the service as unhealthy. Called from MdGatewayApp::stop().
+    /// \brief Mark the service as unhealthy. Called from MdGatewayService::stop().
     void shutdown() {
         if (healthy)
             healthy->Set(0.0);

@@ -1,4 +1,4 @@
-#include "pricer/app/pricer_app.h"
+#include "pricer/app/pricer_service.h"
 
 #include <bpt_common/logging.h>
 #include <bpt_common/signal.h>
@@ -22,7 +22,7 @@ namespace bpt::pricer {
 
 using bpt::common::util::WallClock;
 
-PricerApp::PricerApp(config::Settings settings, messaging::PricerBus bus)
+PricerService::PricerService(config::Settings settings, messaging::PricerBus bus)
     : settings_(std::move(settings)),
       builder_(settings_.risk_free_rate, settings_.newton_max_iterations, settings_.newton_tolerance),
       bus_(std::move(bus)) {
@@ -65,7 +65,7 @@ PricerApp::PricerApp(config::Settings settings, messaging::PricerBus bus)
     bpt::common::log::info("Ready — entering main loop");
 }
 
-void PricerApp::run() {
+void PricerService::run() {
     constexpr auto idle_sleep = std::chrono::microseconds(100);
     const auto publish_interval = std::chrono::milliseconds(settings_.publish_interval_ms);
     constexpr auto heartbeat_interval = std::chrono::seconds(5);

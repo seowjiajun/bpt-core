@@ -103,7 +103,7 @@ public:
     void check_stale_orders(uint64_t stale_timeout_ns);
 
     // Expose the reject-rate breaker latch so the heartbeat sampler in
-    // OrderGatewayApp can mirror it into a Prometheus gauge for alerting.
+    // OrderGatewayService can mirror it into a Prometheus gauge for alerting.
     // Read-only accessor; the breaker itself latches through the fill path.
     [[nodiscard]] bool reject_rate_breaker_tripped() const noexcept { return reject_rate_breaker_.tripped(); }
 

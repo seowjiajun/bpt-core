@@ -1,17 +1,17 @@
-#include "strategy/app/strategy_app.h"
+#include "strategy/app/strategy_service.h"
 
 #include <bpt_common/util/tsc_clock.h>
 #include <chrono>
 #include <filesystem>
 
-// Shutdown-flatten orchestration. Extracted from strategy_app.cpp so
+// Shutdown-flatten orchestration. Extracted from strategy_service.cpp so
 // the top-level file stays focused on lifecycle; this is self-contained
 // enough to read top-to-bottom as a single "here's what the process
 // does on SIGTERM" story.
 
 namespace bpt::strategy {
 
-void StrategyApp::shutdown_flatten() {
+void StrategyService::shutdown_flatten() {
     if (!strategy_) {
         return;
     }

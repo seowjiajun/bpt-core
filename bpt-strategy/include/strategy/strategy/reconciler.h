@@ -12,7 +12,7 @@
 // unexplained P&L delta.
 //
 // This module is pure logic — no I/O, no refdata coupling. Callers
-// (strategy_app) supply the instrument_id → exchange_symbol mapping
+// (strategy_service) supply the instrument_id → exchange_symbol mapping
 // already resolved from refdata. That keeps the diff trivially
 // unit-testable with synthetic maps + AccountSnapshot.
 

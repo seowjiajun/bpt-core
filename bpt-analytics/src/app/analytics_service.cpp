@@ -1,4 +1,4 @@
-#include "analytics/app/tyr_app.h"
+#include "analytics/app/analytics_service.h"
 
 #include "analytics/messaging/toxicity_update.h"
 
@@ -14,7 +14,7 @@ namespace bpt::analytics {
 
 using namespace bpt::messages;
 
-AnalyticsApp::AnalyticsApp(config::Settings settings, messaging::AnalyticsBus bus)
+AnalyticsService::AnalyticsService(config::Settings settings, messaging::AnalyticsBus bus)
     : settings_(std::move(settings)),
       bus_(std::move(bus)) {
     // Configure analysis components
@@ -51,7 +51,7 @@ AnalyticsApp::AnalyticsApp(config::Settings settings, messaging::AnalyticsBus bu
                            settings_.toxicity.stream_id);
 }
 
-AnalyticsApp::InstrumentState& AnalyticsApp::get_or_create(uint64_t instrument_id) {
+AnalyticsService::InstrumentState& AnalyticsService::get_or_create(uint64_t instrument_id) {
     auto it = state_.find(instrument_id);
     if (it != state_.end())
         return it->second;
@@ -59,7 +59,7 @@ AnalyticsApp::InstrumentState& AnalyticsApp::get_or_create(uint64_t instrument_i
     return inserted->second;
 }
 
-void AnalyticsApp::on_bbo(uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns) {
+void AnalyticsService::on_bbo(uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns) {
     if (bid <= 0.0 || ask <= 0.0 || ask <= bid)
         return;
 
@@ -84,7 +84,7 @@ void AnalyticsApp::on_bbo(uint64_t instrument_id, double bid, double ask, uint64
     }
 }
 
-void AnalyticsApp::on_exec_fill(uint64_t instrument_id, int side_sign, double fill_price, uint64_t timestamp_ns) {
+void AnalyticsService::on_exec_fill(uint64_t instrument_id, int side_sign, double fill_price, uint64_t timestamp_ns) {
     // Some exchanges (HL, OKX) send instrumentId=0 in exec reports.
     // Fall back to the last-seen mid from any instrument we're tracking.
     double mid = 0.0;
@@ -104,7 +104,7 @@ void AnalyticsApp::on_exec_fill(uint64_t instrument_id, int side_sign, double fi
                            st.last_mid);
 }
 
-void AnalyticsApp::on_exec_report(const ExecutionReport& rpt) {
+void AnalyticsService::on_exec_report(const ExecutionReport& rpt) {
     const auto status = rpt.status();
     const int side_sign = (rpt.side() == OrderSide::BUY) ? +1 : -1;
     const uint64_t now_ns = static_cast<uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -127,7 +127,7 @@ void AnalyticsApp::on_exec_report(const ExecutionReport& rpt) {
     }
 }
 
-void AnalyticsApp::maybe_publish(uint64_t now_ns) {
+void AnalyticsService::maybe_publish(uint64_t now_ns) {
     const uint64_t interval_ns = static_cast<uint64_t>(settings_.publish_interval_ms) * 1'000'000ULL;
     if (now_ns - last_publish_ns_ < interval_ns)
         return;
@@ -187,7 +187,7 @@ void AnalyticsApp::maybe_publish(uint64_t now_ns) {
     }
 }
 
-void AnalyticsApp::run() {
+void AnalyticsService::run() {
     bpt::common::log::info("Starting main loop (publish every {}ms, window={} fills, min_samples={})",
                            settings_.publish_interval_ms,
                            settings_.scorer_window_size,
@@ -204,7 +204,7 @@ void AnalyticsApp::run() {
         maybe_publish(now_ns);
 
         // Pause hint when idle — relinquishes pipeline resources to the SMT
-        // sibling and avoids a hot busy-spin. Matches strategy_app.cpp's
+        // sibling and avoids a hot busy-spin. Matches strategy_service.cpp's
         // pattern; analytics is downstream so a tighter spin here brings no
         // latency benefit.
         if (frags == 0)

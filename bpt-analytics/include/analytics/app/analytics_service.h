@@ -12,9 +12,9 @@
 
 namespace bpt::analytics {
 
-class AnalyticsApp : public bpt::app::IService {
+class AnalyticsService : public bpt::app::IService {
 public:
-    AnalyticsApp(config::Settings settings, messaging::AnalyticsBus bus);
+    AnalyticsService(config::Settings settings, messaging::AnalyticsBus bus);
     void run() override;
 
 private:

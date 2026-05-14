@@ -1,7 +1,7 @@
 // bpt-order-gateway — order routing + risk enforcement.
 
 #include "order_gateway/adapter/common/credentials.h"
-#include "order_gateway/app/gateway_app.h"
+#include "order_gateway/app/order_gateway_service.h"
 #include "order_gateway/config/settings.h"
 #include "order_gateway/messaging/aeron_bus.h"
 
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
                              [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                                  auto creds = load_credentials(settings.gateway.adapters, settings.base.environment);
                                  auto bus = bpt::order_gateway::messaging::AeronBus::build(ctx.aeron, settings);
-                                 return std::make_unique<bpt::order_gateway::OrderGatewayApp>(
+                                 return std::make_unique<bpt::order_gateway::OrderGatewayService>(
                                      std::move(settings),
                                      std::move(bus.control_source),
                                      std::move(bus.exec_sink),

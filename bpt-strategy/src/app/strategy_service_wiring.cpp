@@ -1,4 +1,4 @@
-#include "strategy/app/strategy_app.h"
+#include "strategy/app/strategy_service.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -9,9 +9,9 @@
 #include <filesystem>
 
 // Callback wiring for the four upstream subscriptions (refdata, md,
-// vol, order). Split out of strategy_app.cpp so the top-level file
+// vol, order). Split out of strategy_service.cpp so the top-level file
 // stays focused on lifecycle (ctor, run, stop). These functions are
-// member functions on StrategyApp — they share private state with
+// member functions on StrategyService — they share private state with
 // the rest of the class.
 
 using bpt::messages::ExchangeId;
@@ -22,7 +22,7 @@ using namespace std::chrono_literals;
 
 namespace bpt::strategy {
 
-void StrategyApp::wire_refdata_callbacks() {
+void StrategyService::wire_refdata_callbacks() {
     bus_.refdata->on_ready = [this](uint8_t exchanges_loaded,
                                     uint16_t instrument_count,
                                     bool fee_schedules_loaded,
@@ -60,7 +60,7 @@ void StrategyApp::wire_refdata_callbacks() {
     };
 }
 
-void StrategyApp::wire_md_callbacks() {
+void StrategyService::wire_md_callbacks() {
     if (!bus_.md)
         return;
 
@@ -131,7 +131,7 @@ void StrategyApp::wire_md_callbacks() {
     };
 }
 
-void StrategyApp::wire_vol_callbacks() {
+void StrategyService::wire_vol_callbacks() {
     if (!bus_.vol)
         return;
 
@@ -151,7 +151,7 @@ void StrategyApp::wire_vol_callbacks() {
     };
 }
 
-void StrategyApp::wire_order_callbacks() {
+void StrategyService::wire_order_callbacks() {
     if (order_mgr_) {
         order_mgr_->on_order_placed = [this](uint64_t /*order_id*/) {
             // curr_tick_ts_ns_ is WallClock-sourced (stamped by bpt-md-gateway and

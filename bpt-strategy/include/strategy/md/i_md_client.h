@@ -8,7 +8,7 @@
 ///   AeronMdClient  — production path. Publishes MdSubscribeBatch on the
 ///                    control stream and consumes MdMarketData / MdTrade /
 ///                    MdOrderBook from the data stream over Aeron IPC.
-///                    Today's strategy_app uses this for both live trading
+///                    Today's strategy_service uses this for both live trading
 ///                    and the multi-process backtest stack.
 ///
 ///   InProcessMdClient — deterministic backtest path. Driven directly off
@@ -73,7 +73,7 @@ public:
     OnOrderBookFn on_order_book;
 
     /// Fired each time a MdServiceHeartbeat is received from MdGateway.
-    /// Used by StrategyApp to track local receipt time for the liveness watchdog.
+    /// Used by StrategyService to track local receipt time for the liveness watchdog.
     OnServiceHeartbeatFn on_service_heartbeat;
 };
 

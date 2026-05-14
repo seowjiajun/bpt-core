@@ -31,7 +31,7 @@ public:
     // the same clock the caller uses for throttling decisions (TscClock).
     void publish_if_due(const strategy::PortfolioState& state, uint64_t now_ns);
 
-    // Offer a raw buffer on the same publication. Used by StrategyApp to
+    // Offer a raw buffer on the same publication. Used by StrategyService to
     // publish strategy state JSON alongside portfolio snapshots.
     void offer_raw(aeron::AtomicBuffer& buf, int32_t length) {
         if (pub_)

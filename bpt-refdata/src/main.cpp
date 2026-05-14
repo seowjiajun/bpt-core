@@ -1,5 +1,5 @@
 #include "refdata/adapter/credentials.h"
-#include "refdata/app/refdata_app.h"
+#include "refdata/app/refdata_service.h"
 #include "refdata/config/settings.h"
 #include "refdata/messaging/aeron_bus.h"
 
@@ -82,10 +82,10 @@ int main(int argc, char** argv) {
                                  auto creds = load_credentials(cfg.adapters, cfg.base.environment);
 
                                  // Composition root: build the Aeron-backed bus adapters
-                                 // as one unit, then hand the ports to RefdataApp.
+                                 // as one unit, then hand the ports to RefdataService.
                                  auto bus = bpt::refdata::messaging::AeronBus::build(ctx.aeron, cfg);
 
-                                 return std::make_unique<bpt::refdata::RefdataApp>(std::move(cfg),
+                                 return std::make_unique<bpt::refdata::RefdataService>(std::move(cfg),
                                                                                    std::move(bus.control_source),
                                                                                    std::move(bus.snapshot_sink),
                                                                                    std::move(bus.delta_sink),

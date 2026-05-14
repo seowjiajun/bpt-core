@@ -1,4 +1,4 @@
-#include "strategy/app/strategy_app.h"
+#include "strategy/app/strategy_service.h"
 
 #include "strategy/strategy/strategy_factory.h"
 
@@ -23,7 +23,7 @@ using bpt::messages::RejectReason;
 
 namespace bpt::strategy {
 
-StrategyApp::StrategyApp(config::AppConfig cfg, messaging::StrategyBus bus, const bpt::common::util::Topology& topology)
+StrategyService::StrategyService(config::AppConfig cfg, messaging::StrategyBus bus, const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),
       metrics_(cfg_.base.metrics_port),
       bus_(std::move(bus)),
@@ -53,7 +53,7 @@ StrategyApp::StrategyApp(config::AppConfig cfg, messaging::StrategyBus bus, cons
     wire_order_callbacks();
 }
 
-void StrategyApp::run() {
+void StrategyService::run() {
     // Pin the main poll loop to the topology's "strategy.main" role.
     // Strategy has no legacy io_cpu TOML knob, so unassigned → unpinned
     // (the helper logs at INFO, matching other services).
@@ -185,7 +185,7 @@ void StrategyApp::run() {
     }
 }
 
-void StrategyApp::stop() {
+void StrategyService::stop() {
     // Called by bpt::app::run() after run() exits on signal. Graceful
     // shutdown does two things in order: (1) cancel resting orders and
     // flatten inventory while the dashboard can still observe, (2) drain
@@ -194,7 +194,7 @@ void StrategyApp::stop() {
     metrics_.shutdown();
 }
 
-void StrategyApp::check_service_liveness() {
+void StrategyService::check_service_liveness() {
     const uint64_t now_ns = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
             .count());
@@ -238,7 +238,7 @@ void StrategyApp::check_service_liveness() {
     }
 }
 
-void StrategyApp::check_refdata_watchdog() {
+void StrategyService::check_refdata_watchdog() {
     // Refdata's heartbeat lives on a 5s cadence
     // (RefdataDeltaPublisher::publish_heartbeat) and its failure mode
     // is silent fee_cache staleness, not lost MD/exec flow — separate
@@ -296,7 +296,7 @@ void StrategyApp::check_refdata_watchdog() {
     }
 }
 
-void StrategyApp::report_latency_stats() {
+void StrategyService::report_latency_stats() {
     constexpr uint64_t kReportIntervalNs = 30'000'000'000ULL;  // 30 s
 
     const uint64_t now = bpt::common::util::TscClock::now_epoch_ns();

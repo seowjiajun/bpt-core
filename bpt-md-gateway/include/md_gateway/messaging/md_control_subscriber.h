@@ -9,7 +9,7 @@
 /// AeronBus::build() at the prod composition root.
 ///
 /// Threading: the underlying Aeron Subscriber is single-poll-thread;
-/// poll() is invoked from MdGatewayApp's main thread only.
+/// poll() is invoked from MdGatewayService's main thread only.
 
 #include "md_gateway/messaging/i_md_control_source.h"
 

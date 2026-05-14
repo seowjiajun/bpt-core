@@ -51,7 +51,7 @@ namespace bpt::backtester::harness {
 class StrategyHarness {
 public:
     struct Options {
-        /// Path to the strategy config (the same one StrategyApp would
+        /// Path to the strategy config (the same one StrategyService would
         /// consume — the harness reads it via the standard config
         /// loader so params are byte-equivalent to a live or
         /// multi-process backtest run).

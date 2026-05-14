@@ -4,7 +4,7 @@
 /// Subscriber for the bpt-md-gateway BBO stream. Decodes SBE
 /// `MdMarketData` and exposes a domain-shaped callback (instrument_id,
 /// bid, ask, timestamp_ns). Lifts the inline subscriber + handle_md
-/// combo from `tyr_app.cpp` so the app stops pulling `<Aeron.h>` into
+/// combo from `analytics_service.cpp` so the app stops pulling `<Aeron.h>` into
 /// its header.
 
 #include <bpt_common/aeron/subscriber.h>

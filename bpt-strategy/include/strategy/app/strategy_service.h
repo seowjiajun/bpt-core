@@ -17,9 +17,9 @@
 
 namespace bpt::strategy {
 
-class StrategyApp : public bpt::app::IService {
+class StrategyService : public bpt::app::IService {
 public:
-    StrategyApp(config::AppConfig cfg, messaging::StrategyBus bus, const bpt::common::util::Topology& topology);
+    StrategyService(config::AppConfig cfg, messaging::StrategyBus bus, const bpt::common::util::Topology& topology);
     void run() override;
     void stop() override;
 

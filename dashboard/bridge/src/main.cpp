@@ -1,6 +1,6 @@
 // bridge — Aeron → WebSocket forwarder for the dashboard.
 
-#include "bridge/app/bridge_app.h"
+#include "bridge/app/bridge_service.h"
 #include "bridge/config/settings.h"
 
 #include <CLI/CLI.hpp>
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
         return bpt::app::run(service_name,
                              std::move(settings),
                              [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
-                                 return std::make_unique<bridge::BridgeApp>(std::move(cfg), ctx.aeron);
+                                 return std::make_unique<bridge::BridgeService>(std::move(cfg), ctx.aeron);
                              });
     } catch (const std::exception& e) {
         bpt::common::log::error("Fatal: {}", e.what());

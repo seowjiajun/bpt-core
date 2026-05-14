@@ -220,7 +220,7 @@ void HyperliquidInfoServer::load_snapshot() {
         return;
     }
 
-    // Populate asset_universe_ from the meta response so BacktesterApp can
+    // Populate asset_universe_ from the meta response so BacktesterService can
     // wire it into HyperliquidOrderServer.
     try {
         auto meta = json::parse(meta_response_body_);

@@ -59,10 +59,10 @@ cc_test(
 cc_library(
     name = "strategy_lib",
     srcs = [
-        "src/app/strategy_app.cpp",
-        "src/app/strategy_app_wiring.cpp",
-        "src/app/strategy_app_shutdown.cpp",
-        "src/app/strategy_app_backtest.cpp",
+        "src/app/strategy_service.cpp",
+        "src/app/strategy_service_wiring.cpp",
+        "src/app/strategy_service_shutdown.cpp",
+        "src/app/strategy_service_backtest.cpp",
         "src/app/startup_gate.cpp",
         "src/backtest/backtest_client.cpp",
         "src/config/config.cpp",

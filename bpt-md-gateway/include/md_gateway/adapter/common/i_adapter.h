@@ -62,7 +62,7 @@ public:
 
     /// \brief True if the ValidationDropBreaker has latched on this adapter.
     ///
-    /// Exposed for the periodic Prometheus gauge sampler in MdGatewayApp.
+    /// Exposed for the periodic Prometheus gauge sampler in MdGatewayService.
     [[nodiscard]] virtual bool validation_drop_breaker_tripped() const noexcept { return false; }
 
     /// Called from the adapter's IO thread when a funding-rate update arrives. Set before start().

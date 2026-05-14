@@ -1,4 +1,4 @@
-#include "pms/app/pms_app.h"
+#include "pms/app/pms_service.h"
 
 #include "pms/adapter/hyperliquid_balance_adapter.h"
 
@@ -39,7 +39,7 @@ std::unique_ptr<adapter::IBalanceAdapter> make_adapter(const config::AdapterConf
 
 }  // namespace
 
-PmsApp::PmsApp(config::Settings settings, messaging::PmsBus bus)
+PmsService::PmsService(config::Settings settings, messaging::PmsBus bus)
     : settings_(std::move(settings)),
       bus_(std::move(bus)) {
     bpt::common::log::info("Balance publication ready: {} stream {}",
@@ -54,7 +54,7 @@ PmsApp::PmsApp(config::Settings settings, messaging::PmsBus bus)
         bpt::common::log::warn("No balance adapters configured — bpt-pms will publish empty snapshots");
 }
 
-void PmsApp::run() {
+void PmsService::run() {
     const auto interval = std::chrono::milliseconds(settings_.pms.poll_interval_ms);
     bpt::common::log::info("bpt-pms poll loop starting, interval={} ms", settings_.pms.poll_interval_ms);
 

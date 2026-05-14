@@ -104,7 +104,7 @@ private:
     const char* adapter_name_;
     ValidationDropBreaker breaker_;
     /// Cache-line isolated. `published_` is incremented every successful
-    /// forward (the 99 %+ path). MdGatewayApp's reporter reads both
+    /// forward (the 99 %+ path). MdGatewayService's reporter reads both
     /// counters every ~5 s; separating them from each other and from
     /// the upstream class state keeps the producer's hot line untouched
     /// by reporter polling.

@@ -9,7 +9,7 @@ cc_library(
         "src/aeron/account_subscriber.cpp",
         "src/aeron/exec_subscriber.cpp",
         "src/aeron/md_subscriber.cpp",
-        "src/app/bridge_app.cpp",
+        "src/app/bridge_service.cpp",
         "src/config/config_loader.cpp",
         "src/state/position_tracker.cpp",
         "src/ws/message_encoder.cpp",

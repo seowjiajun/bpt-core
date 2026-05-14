@@ -4,7 +4,7 @@
 /// \brief Inbound port: SBE `MdSubscribeBatch` control fragments from strategy.
 ///
 /// Strategy publishes subscribe / unsubscribe batches on the control
-/// channel (`settings.aeron.md_control.stream_id`). MdGatewayApp::run()
+/// channel (`settings.aeron.md_control.stream_id`). MdGatewayService::run()
 /// drains them every iteration of its main loop by calling poll();
 /// each decoded batch is handed off to SubscriptionManager.
 ///
@@ -28,7 +28,7 @@ namespace bpt::md_gateway::messaging {
 
 /// \brief Contract for the inbound control source.
 ///
-/// Single-threaded contract: poll() is called from MdGatewayApp's main
+/// Single-threaded contract: poll() is called from MdGatewayService's main
 /// loop only. Implementations need not be thread-safe.
 class IMdControlSource {
 public:

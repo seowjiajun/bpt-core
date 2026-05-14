@@ -24,9 +24,9 @@
 
 namespace bpt::refdata {
 
-class RefdataApp : public bpt::app::IService {
+class RefdataService : public bpt::app::IService {
 public:
-    RefdataApp(config::Settings settings,
+    RefdataService(config::Settings settings,
                std::unique_ptr<port::IRefdataControlSource> control_source,
                std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
                std::shared_ptr<port::IRefdataDeltaSink> delta_sink,

@@ -1752,7 +1752,7 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
     // nothing to cancel because bid_order_id / ask_order_id had already
     // been cleared locally. Individual cancels below stay — they provide
     // the has_pending_flatten() drain signal; cancel_all is fire-and-
-    // forget from the strategy side (see strategy_app_shutdown for the
+    // forget from the strategy side (see strategy_service_shutdown for the
     // minimum drain window that gives the async round-trip time to land).
     for (const auto& [instrument_id, st] : state_) {
         bpt::common::log::warn(kLog(),
@@ -1851,7 +1851,7 @@ std::size_t AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::Accoun
     // parent message, so positions must be drained before
     // currencyBalances. Both helpers are non-const on snap.
     //
-    // Rewind the cursor up front — strategy_app's log line calls
+    // Rewind the cursor up front — strategy_service's log line calls
     // snap.positions().count() before handing us the message, which
     // advances the group cursor past the positions header. Without
     // rewinding, extract_exchange_positions reads the currencyBalances

@@ -35,7 +35,7 @@ cc_binary(
     name = "bpt-pricer",
     srcs = [
         "src/main.cpp",
-        "src/app/pricer_app.cpp",
+        "src/app/pricer_service.cpp",
         "src/config/config.cpp",
         "src/surface/surface_builder.cpp",
         "src/messaging/aeron_bus.cpp",

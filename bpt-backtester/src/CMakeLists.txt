@@ -1,5 +1,5 @@
 add_library(backtester_lib
-    app/backtester_app.cpp
+    app/backtester_service.cpp
     clock/clock_master.cpp
     config/loader.cpp
     data/data_loader.cpp

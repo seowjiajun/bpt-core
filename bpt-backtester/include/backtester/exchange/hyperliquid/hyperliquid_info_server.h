@@ -37,7 +37,7 @@ public:
     ///                          If empty or missing on disk, server returns 503 for every
     ///                          request — caller can detect this and fall back / fail loudly.
     /// \param starting_capital  Equity to report from clearinghouseState queries. Static
-    ///                          for now (matches BacktesterApp's settings.results.starting_capital).
+    ///                          for now (matches BacktesterService's settings.results.starting_capital).
     ///                          When MatchingEngine integration lands, this will be replaced
     ///                          by a live read from ResultsCollector.
     /// \param port              TCP port to listen on.
@@ -49,7 +49,7 @@ public:
 
     /// \brief Returns the parsed universe (asset_idx → coin name) from the snapshot.
     ///
-    /// Empty if snapshot wasn't loaded successfully. Used by BacktesterApp to
+    /// Empty if snapshot wasn't loaded successfully. Used by BacktesterService to
     /// populate HyperliquidOrderServer's asset_universe.
     const std::vector<std::string>& asset_universe() const { return asset_universe_; }
 

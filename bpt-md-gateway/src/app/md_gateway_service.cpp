@@ -1,4 +1,4 @@
-#include "md_gateway/app/md_gateway_app.h"
+#include "md_gateway/app/md_gateway_service.h"
 
 #include "md_gateway/adapter/common/md_adapter_factory.h"
 
@@ -13,7 +13,7 @@ using namespace std::chrono_literals;
 
 namespace bpt::md_gateway {
 
-MdGatewayApp::MdGatewayApp(config::Settings cfg,
+MdGatewayService::MdGatewayService(config::Settings cfg,
                            std::unique_ptr<messaging::IMdControlSource> control_source,
                            std::shared_ptr<messaging::MdPublisher> md_sink,
                            std::unique_ptr<messaging::IAckPublisher> ack_sink,
@@ -47,7 +47,7 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
         };
 
         // Use raw pointers into the metrics families — these are stable for the
-        // lifetime of MdGatewayApp (metrics_ is a member).
+        // lifetime of MdGatewayService (metrics_ is a member).
         prometheus::Gauge* connected_gauge = &metrics_.exchange_connected(a_cfg.exchange);
         prometheus::Counter* disconnect_ctr = &metrics_.adapter_disconnects(a_cfg.exchange);
         connected_gauge->Set(0.0);  // initialise to 0 before the thread connects
@@ -72,7 +72,7 @@ MdGatewayApp::MdGatewayApp(config::Settings cfg,
     bpt::common::log::info("MdGateway ready — polling control stream {}", cfg_.aeron.md_control.stream_id);
 }
 
-void MdGatewayApp::run() {
+void MdGatewayService::run() {
     const auto svc_hb_interval = std::chrono::milliseconds(cfg_.service_heartbeat_interval_ms);
     const auto sub_hb_interval = std::chrono::milliseconds(cfg_.subscription_heartbeat_interval_ms);
     const auto lat_report_interval = std::chrono::seconds(5);
@@ -123,7 +123,7 @@ void MdGatewayApp::run() {
     }
 }
 
-void MdGatewayApp::stop() {
+void MdGatewayService::stop() {
     // Called by bpt::app::run() after our run() loop exits on signal.
     // Adapter WS threads + Prometheus exposer are drained here so the
     // startup-log side-effects remain symmetric with teardown.

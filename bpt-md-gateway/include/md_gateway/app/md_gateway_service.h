@@ -3,7 +3,7 @@
 /// \file
 /// \brief Top-level lifecycle owner for the `bpt-md-gateway` process.
 ///
-/// MdGatewayApp is the `bpt::app::IService` the process entry point
+/// MdGatewayService is the `bpt::app::IService` the process entry point
 /// hands to `bpt::app::run()`. It owns:
 ///   - the loaded `Settings`,
 ///   - the Aeron-port objects (built by AeronBus::build in main),
@@ -42,7 +42,7 @@ namespace bpt::md_gateway {
 /// Constructor takes everything pre-built — the bus ports, topology,
 /// settings — so the app itself contains no Aeron / port construction
 /// logic. That stays in main.cpp via `messaging::AeronBus::build`.
-class MdGatewayApp : public bpt::app::IService {
+class MdGatewayService : public bpt::app::IService {
 public:
     /// \brief Construct.
     /// \param cfg              loaded settings (ownership taken)
@@ -51,7 +51,7 @@ public:
     /// \param ack_sink         publisher for acks + heartbeats
     /// \param funding_sink     publisher for funding-rate updates
     /// \param topology         CPU-affinity map for IO/main thread pinning
-    MdGatewayApp(config::Settings cfg,
+    MdGatewayService(config::Settings cfg,
                  std::unique_ptr<messaging::IMdControlSource> control_source,
                  std::shared_ptr<messaging::MdPublisher> md_sink,
                  std::unique_ptr<messaging::IAckPublisher> ack_sink,

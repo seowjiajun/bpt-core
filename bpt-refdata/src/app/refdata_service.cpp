@@ -1,4 +1,4 @@
-#include "refdata/app/refdata_app.h"
+#include "refdata/app/refdata_service.h"
 
 #include "refdata/adapter/binance/binance_refdata_adapter.h"
 #include "refdata/adapter/deribit/deribit_refdata_adapter.h"
@@ -42,7 +42,7 @@ uint8_t exchange_id_to_bit(bpt::messages::ExchangeId::Value id) {
 
 }  // namespace
 
-RefdataApp::RefdataApp(config::Settings settings,
+RefdataService::RefdataService(config::Settings settings,
                        std::unique_ptr<port::IRefdataControlSource> control_source,
                        std::unique_ptr<port::IRefdataSnapshotSink> snapshot_sink,
                        std::shared_ptr<port::IRefdataDeltaSink> delta_sink,
@@ -158,7 +158,7 @@ RefdataApp::RefdataApp(config::Settings settings,
                            settings_.refdata_control.stream_id);
 }
 
-void RefdataApp::handle_request(const messaging::RefdataRequest& request) {
+void RefdataService::handle_request(const messaging::RefdataRequest& request) {
     bpt::common::log::info("Request correlation_id={} filters={}", request.correlation_id, request.instruments.size());
     sub_manager_.upsert(request);
     snapshot_pub_->publish(*registry_, request, delta_pub_->current_sequence());
@@ -166,7 +166,7 @@ void RefdataApp::handle_request(const messaging::RefdataRequest& request) {
     metrics_.last_update_ns->Set(static_cast<double>(bpt::common::util::WallClock::now_ns()));
 }
 
-void RefdataApp::run() {
+void RefdataService::run() {
     // Empty adapters is legal at construction (tests construct that way);
     // fail fast at run() so production misconfiguration still surfaces.
     if (adapters_.empty())
@@ -296,7 +296,7 @@ void RefdataApp::run() {
     }
 }
 
-void RefdataApp::stop() {
+void RefdataService::stop() {
     // Called by bpt::app::run() after the poll loop exits on signal.
     // Adapter REST/WS threads + Prometheus exposer drained here so
     // teardown is symmetric with the startup side-effects in run().

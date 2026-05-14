@@ -35,7 +35,7 @@ class HyperliquidOrderSession;
 /// Asset index `a` is HL's universe-positional ID. This sim doesn't run a
 /// /info REST endpoint, so order-gateway's inst_id_codes map starts empty
 /// and all orders arrive with a=0. The simulator takes an asset_universe
-/// vector at construction (typically populated from BacktesterApp's
+/// vector at construction (typically populated from BacktesterService's
 /// [[instruments]] list) so a=0 → universe[0] etc.
 ///
 /// Signatures are NOT validated — backtest signers and prod signers diverge

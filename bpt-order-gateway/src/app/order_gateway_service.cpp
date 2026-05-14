@@ -1,4 +1,4 @@
-#include "order_gateway/app/gateway_app.h"
+#include "order_gateway/app/order_gateway_service.h"
 
 #include "order_gateway/adapter/common/order_adapter_factory.h"
 
@@ -19,7 +19,7 @@ using bpt::messages::ExchangeId;
 
 namespace bpt::order_gateway {
 
-OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
+OrderGatewayService::OrderGatewayService(config::Settings cfg,
                                  std::shared_ptr<messaging::IOrderControlSource> control_source,
                                  std::shared_ptr<messaging::IExecReportPublisher> exec_sink,
                                  std::shared_ptr<messaging::IAccountSnapshotPublisher> account_snapshot_sink,
@@ -140,7 +140,7 @@ OrderGatewayApp::OrderGatewayApp(config::Settings cfg,
     bpt::common::log::info("Ready — polling order stream {}", cfg_.aeron.order.stream_id);
 }
 
-void OrderGatewayApp::run() {
+void OrderGatewayService::run() {
     bpt::common::util::TscClock::calibrate();
     // Pin the main poll loop. Prefer topology role "ogw.poll"; fall
     // back to legacy cfg_.gateway.poll_cpu knob when no role is set.
@@ -231,7 +231,7 @@ void OrderGatewayApp::run() {
     }
 }
 
-void OrderGatewayApp::stop() {
+void OrderGatewayService::stop() {
     // Called by bpt::app::run() after the poll loop exits. Drains
     // adapter WS/REST threads + Prometheus exposer so teardown is
     // symmetric with the startup side-effects.

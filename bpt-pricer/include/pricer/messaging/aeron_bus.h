@@ -4,7 +4,7 @@
 /// Bus boundary for bpt-pricer. Mirrors the shape used by bpt-refdata,
 /// bpt-md-gateway, bpt-order-gateway, and bpt-strategy: every concrete
 /// Aeron pub/sub the pricer needs is constructed in one factory so
-/// `PricerApp` doesn't have to take `<Aeron.h>` in its constructor.
+/// `PricerService` doesn't have to take `<Aeron.h>` in its constructor.
 ///
 /// Pricer's existing concrete classes (VolSurfacePublisher,
 /// StatusPublisher, MdSubscriber, RefdataSubscriber) already encapsulate

@@ -65,7 +65,7 @@ bridge_start() {
 
     if [ ! -x "$BRIDGE_BIN" ]; then
         echo "ERROR: bridge binary not found at $BRIDGE_BIN"
-        echo "       build it first: cmake --build build -j\$(nproc) --target bridge_app"
+        echo "       build it first: bazel build //dashboard/bridge:bridge"
         exit 1
     fi
 

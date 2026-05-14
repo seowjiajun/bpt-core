@@ -51,7 +51,7 @@ cc_library(
 cc_library(
     name = "refdata_lib",
     srcs = [
-        "src/app/refdata_app.cpp",
+        "src/app/refdata_service.cpp",
         "src/registry/instrument_registry.cpp",
         "src/resolver/instrument_resolver.cpp",
         "src/messaging/aeron_bus.cpp",

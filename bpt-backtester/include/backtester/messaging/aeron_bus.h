@@ -6,7 +6,7 @@
 /// Bus boundary for bpt-backtester. Mirrors the shape used by
 /// bpt-refdata, bpt-md-gateway, bpt-order-gateway, bpt-strategy,
 /// bpt-pricer, and bpt-analytics: every Aeron pub/sub the app needs
-/// is built in one factory so `BacktesterApp` doesn't take
+/// is built in one factory so `BacktesterService` doesn't take
 /// `<Aeron.h>` in its constructor.
 ///
 /// Backtester only talks to Strategy through two streams: outbound

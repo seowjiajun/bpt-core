@@ -1,6 +1,6 @@
 // Backtester — replay-driven backtest runner.
 
-#include "backtester/app/backtester_app.h"
+#include "backtester/app/backtester_service.h"
 #include "backtester/config/settings.h"
 #include "backtester/messaging/aeron_bus.h"
 
@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
                              [](auto& cfg, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                                  bpt::common::log::info("starting_capital=${:.2f}", cfg.results.starting_capital);
                                  auto bus = bpt::backtester::messaging::BacktesterAeronBus::build(ctx.aeron, cfg);
-                                 return std::make_unique<bpt::backtester::BacktesterApp>(std::move(cfg),
+                                 return std::make_unique<bpt::backtester::BacktesterService>(std::move(cfg),
                                                                                          std::move(bus));
                              });
     } catch (const std::exception& e) {

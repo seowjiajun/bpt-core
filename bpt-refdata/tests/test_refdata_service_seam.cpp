@@ -1,12 +1,12 @@
 /// \file
-/// \brief Drives RefdataApp's bus seam through fake port implementations.
+/// \brief Drives RefdataService's bus seam through fake port implementations.
 ///
-/// Locks in the hexagonal flip: RefdataApp depends only on the IRefdata*Sink
+/// Locks in the hexagonal flip: RefdataService depends only on the IRefdata*Sink
 /// / IRefdataControlSource interfaces, not on Aeron. If a future change leaks
-/// a concrete Aeron type back into RefdataApp's public surface, this test stops
+/// a concrete Aeron type back into RefdataService's public surface, this test stops
 /// compiling.
 
-#include "refdata/app/refdata_app.h"
+#include "refdata/app/refdata_service.h"
 #include "refdata/config/settings.h"
 #include "refdata/messaging/messages.h"
 #include "refdata/port/i_fee_schedule_sink.h"
@@ -91,7 +91,7 @@ config::Settings make_test_settings() {
 
 }  // namespace
 
-TEST(RefdataAppSeamTest, HandleRequestForwardsToSnapshotSink) {
+TEST(RefdataServiceSeamTest, HandleRequestForwardsToSnapshotSink) {
     auto control = std::make_unique<FakeRefdataControlSource>();
     auto snapshot = std::make_unique<FakeRefdataSnapshotSink>();
     auto delta = std::make_shared<FakeRefdataDeltaSink>();
@@ -101,7 +101,7 @@ TEST(RefdataAppSeamTest, HandleRequestForwardsToSnapshotSink) {
     auto* snapshot_obs = snapshot.get();
     const uint64_t expected_seq = delta->seq;
 
-    RefdataApp app(make_test_settings(), std::move(control), std::move(snapshot), delta, fee, status, {});
+    RefdataService app(make_test_settings(), std::move(control), std::move(snapshot), delta, fee, status, {});
 
     messaging::RefdataRequest req{};
     req.correlation_id = 7777;
@@ -115,8 +115,8 @@ TEST(RefdataAppSeamTest, HandleRequestForwardsToSnapshotSink) {
     EXPECT_EQ(snapshot_obs->calls[0].seq_start, expected_seq);
 }
 
-TEST(RefdataAppSeamTest, ConstructsWithoutAeron) {
-    // If anything in RefdataApp's public surface starts pulling Aeron
+TEST(RefdataServiceSeamTest, ConstructsWithoutAeron) {
+    // If anything in RefdataService's public surface starts pulling Aeron
     // headers transitively, this TU stops compiling — we never include
     // <Aeron.h> here.
     auto control = std::make_unique<FakeRefdataControlSource>();
@@ -126,5 +126,5 @@ TEST(RefdataAppSeamTest, ConstructsWithoutAeron) {
     auto status = std::make_shared<FakeRefdataStatusSink>();
 
     EXPECT_NO_THROW(
-        { RefdataApp app(make_test_settings(), std::move(control), std::move(snapshot), delta, fee, status, {}); });
+        { RefdataService app(make_test_settings(), std::move(control), std::move(snapshot), delta, fee, status, {}); });
 }

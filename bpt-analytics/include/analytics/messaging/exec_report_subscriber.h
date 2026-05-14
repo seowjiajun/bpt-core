@@ -4,7 +4,7 @@
 /// Subscriber for the order-gateway exec-report stream. Decodes the
 /// SBE `ExecutionReport` once and dispatches via a std::function
 /// callback. Lifts the inline subscriber + handle_exec_report combo
-/// from `tyr_app.cpp` so the app stops pulling `<Aeron.h>` into its
+/// from `analytics_service.cpp` so the app stops pulling `<Aeron.h>` into its
 /// header.
 
 #include <messages/ExecutionReport.h>

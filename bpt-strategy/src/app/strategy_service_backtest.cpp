@@ -1,4 +1,4 @@
-#include "strategy/app/strategy_app.h"
+#include "strategy/app/strategy_service.h"
 #include "strategy/clock/sim_clock.h"
 
 #include <messages/BacktestCommand.h>
@@ -7,7 +7,7 @@
 #include <chrono>
 #include <thread>
 
-// Backtest-mode tick-gating loop. Extracted from strategy_app.cpp —
+// Backtest-mode tick-gating loop. Extracted from strategy_service.cpp —
 // the live and backtest main loops share no polling state (backtest
 // is driven by explicit TICK commands from bpt-backtester, live runs
 // a busy poll loop), so keeping them separate keeps each one readable
@@ -17,7 +17,7 @@ using namespace std::chrono_literals;
 
 namespace bpt::strategy {
 
-void StrategyApp::run_backtest_loop() {
+void StrategyService::run_backtest_loop() {
     bpt::common::log::info("Backtest: strategy ready — entering tick-gating loop");
 
     bool stop_received = false;

@@ -22,9 +22,9 @@
 
 namespace bpt::order_gateway {
 
-class OrderGatewayApp : public bpt::app::IService {
+class OrderGatewayService : public bpt::app::IService {
 public:
-    OrderGatewayApp(config::Settings cfg,
+    OrderGatewayService(config::Settings cfg,
                     std::shared_ptr<messaging::IOrderControlSource> control_source,
                     std::shared_ptr<messaging::IExecReportPublisher> exec_sink,
                     std::shared_ptr<messaging::IAccountSnapshotPublisher> account_snapshot_sink,
