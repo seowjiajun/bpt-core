@@ -24,6 +24,7 @@ const VALID_TYPES = new Set<string>([
   'portfolio',
   'account',
   'toxicity',
+  'marketColor',
   'strategyState',
 ])
 
