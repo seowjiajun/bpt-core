@@ -42,6 +42,8 @@ declare -A BIN
 BIN[bpt-refdata]="$BPT_ROOT/bazel-bin/bpt-refdata/bpt-refdata"
 BIN[bpt-md-gateway]="$BPT_ROOT/bazel-bin/bpt-md-gateway/bpt-md-gateway"
 BIN[bpt-order-gateway]="$BPT_ROOT/bazel-bin/bpt-order-gateway/bpt-order-gateway"
+BIN[bpt-pricer]="$BPT_ROOT/bazel-bin/bpt-pricer/bpt-pricer"
+BIN[bpt-radar]="$BPT_ROOT/bazel-bin/bpt-radar/bpt-radar"
 BIN[bpt-strategy]="$BPT_ROOT/bazel-bin/bpt-strategy/bpt-strategy"
 BIN[bpt-analytics]="$BPT_ROOT/bazel-bin/bpt-analytics/bpt-analytics"
 BIN[bpt-bridge]="$BPT_ROOT/bazel-bin/bpt-bridge/bpt-bridge"
@@ -74,6 +76,50 @@ TimeoutStopSec=15
 WantedBy=bpt-dev-stack.target
 EOF
 done
+
+# ── bpt-dev-pricer ───────────────────────────────────────────────────────────
+# Consumes refdata (option instrument defs) + md-gateway (option BBOs for IV +
+# spot/perp BBOs for forward prices). Publishes VolSurface on stream 4001.
+cat > "$UNIT_DIR/bpt-dev-pricer.service" <<EOF
+[Unit]
+Description=BPT Pricer — IV surface builder (dev)
+After=bpt-dev-md-gateway.service bpt-dev-refdata.service
+Requires=bpt-dev-transport.service
+PartOf=bpt-dev-stack.target bpt-dev-transport.service
+
+[Service]
+Type=simple
+EnvironmentFile=$ENV_FILE
+WorkingDirectory=$BPT_ROOT/bpt-pricer
+ExecStart=${BIN[bpt-pricer]} --config \${BPT_PRICER_CONFIG}
+Restart=no
+TimeoutStopSec=15
+
+[Install]
+WantedBy=bpt-dev-stack.target
+EOF
+
+# ── bpt-dev-radar ────────────────────────────────────────────────────────────
+# Consumes pricer's VolSurface (4001) + md-gateway's InstrumentStats (2004),
+# publishes MarketColor (6002). Last hop before the bridge.
+cat > "$UNIT_DIR/bpt-dev-radar.service" <<EOF
+[Unit]
+Description=BPT Radar — market-color aggregator (dev)
+After=bpt-dev-pricer.service bpt-dev-md-gateway.service
+Requires=bpt-dev-transport.service
+PartOf=bpt-dev-stack.target bpt-dev-transport.service
+
+[Service]
+Type=simple
+EnvironmentFile=$ENV_FILE
+WorkingDirectory=$BPT_ROOT/bpt-radar
+ExecStart=${BIN[bpt-radar]} --config \${BPT_RADAR_CONFIG}
+Restart=no
+TimeoutStopSec=10
+
+[Install]
+WantedBy=bpt-dev-stack.target
+EOF
 
 # ── bpt-dev-strategy ─────────────────────────────────────────────────────────
 cat > "$UNIT_DIR/bpt-dev-strategy.service" <<EOF
@@ -135,11 +181,25 @@ TimeoutStopSec=10
 WantedBy=bpt-dev-stack.target
 EOF
 
-# ── bpt-dev-stack target ─────────────────────────────────────────────────────
+# ── bpt-dev-stack target (full trading stack) ────────────────────────────────
 cat > "$UNIT_DIR/bpt-dev-stack.target" <<EOF
 [Unit]
 Description=BPT Trading Stack (dev — Bazel-built, isolated from prod)
-Wants=bpt-dev-transport.service bpt-dev-refdata.service bpt-dev-md-gateway.service bpt-dev-order-gateway.service bpt-dev-strategy.service bpt-dev-analytics.service bpt-dev-bridge.service
+Wants=bpt-dev-transport.service bpt-dev-refdata.service bpt-dev-md-gateway.service bpt-dev-order-gateway.service bpt-dev-pricer.service bpt-dev-radar.service bpt-dev-strategy.service bpt-dev-analytics.service bpt-dev-bridge.service
+
+[Install]
+WantedBy=default.target
+EOF
+
+# ── bpt-dev-radar-stack target (lean subset — radar path only) ───────────────
+# Brings up only what's needed for the Options Pulse dashboard:
+#   transport → refdata → md-gateway → pricer → radar → bridge
+# Skips order-gateway, strategy, analytics. Use this when you want to see
+# market-color signals without spinning up the trading half.
+cat > "$UNIT_DIR/bpt-dev-radar-stack.target" <<EOF
+[Unit]
+Description=BPT Radar Stack (dev — market color path only)
+Wants=bpt-dev-transport.service bpt-dev-refdata.service bpt-dev-md-gateway.service bpt-dev-pricer.service bpt-dev-radar.service bpt-dev-bridge.service
 
 [Install]
 WantedBy=default.target
@@ -156,7 +216,8 @@ echo "     (copy from config.yaml, change the aeron.dir to /dev/shm/aeron-bpt-de
 echo "  3. Ensure $ENV_FILE exists (see deploy/env/dev.env template)"
 echo
 echo "Usage:"
-echo "  systemctl --user start bpt-dev-stack.target    # start dev stack"
+echo "  systemctl --user start bpt-dev-stack.target          # full dev stack"
+echo "  systemctl --user start bpt-dev-radar-stack.target    # radar path only (no trading)"
 echo "  systemctl --user stop  bpt-dev-stack.target    # stop"
 echo "  systemctl --user status 'bpt-dev-*'            # check all"
 echo "  journalctl --user -u bpt-dev-strategy -f       # tail strategy logs"
