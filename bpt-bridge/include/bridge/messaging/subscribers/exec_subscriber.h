@@ -1,5 +1,10 @@
 #pragma once
 
+/// @file
+/// Subscribes to OrderGateway's exec report stream and delivers decoded fills
+/// and order lifecycle events. Strips SBE off the hot path so BridgeService
+/// works in domain types.
+
 #include "bridge/ws/message_encoder.h"
 
 #include <Aeron.h>
@@ -10,10 +15,8 @@
 #include <memory>
 #include <string>
 
-namespace bpt::bridge {
+namespace bpt::bridge::messaging {
 
-// Subscribes to OrderGateway's exec report stream and delivers decoded fills
-// and order lifecycle events.
 class ExecSubscriber {
 public:
     struct Fill {
@@ -21,24 +24,22 @@ public:
         uint64_t order_id;
         uint64_t instrument_id;
         encode::Side side;
-        uint8_t order_type;  // raw OrderType enum (0=MARKET, 1=LIMIT). The
-                             // POST_ONLY constraint lives in NewOrder.execInst,
-                             // not here; the fill's MAKER/TAKER role is on liquidity.
-        double qty;          // natural units
-        double price;        // natural units
-        double fee;          // in quote currency (natural units, signed — positive = paid)
+        uint8_t order_type;  ///< raw OrderType enum (0=MARKET, 1=LIMIT)
+        double qty;
+        double price;
+        double fee;
     };
 
-    // Full order lifecycle event — includes all exec report statuses.
+    /// Full order lifecycle event — includes all exec report statuses.
     struct OrderEvent {
         uint64_t ts_ns;
         uint64_t order_id;
         uint64_t instrument_id;
         encode::Side side;
-        uint8_t status;      // ExecStatus raw value
-        uint8_t order_type;  // OrderType raw value
+        uint8_t status;      ///< ExecStatus raw value
+        uint8_t order_type;  ///< OrderType raw value
         double price;
-        double qty;  // original order qty
+        double qty;
         double filled_qty;
         double remaining_qty;
     };
@@ -64,4 +65,4 @@ private:
     OrderHandler order_handler_;
 };
 
-}  // namespace bpt::bridge
+}  // namespace bpt::bridge::messaging

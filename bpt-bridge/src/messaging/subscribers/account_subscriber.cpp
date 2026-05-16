@@ -1,4 +1,4 @@
-#include "bridge/aeron/account_subscriber.h"
+#include "bridge/messaging/subscribers/account_subscriber.h"
 
 #include "bridge/aeron/sbe_decode.h"
 
@@ -6,7 +6,7 @@
 
 #include <bpt_common/logging.h>
 
-namespace bpt::bridge {
+namespace bpt::bridge::messaging {
 
 namespace {
 constexpr double kE8 = 1e8;
@@ -46,11 +46,8 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
             if (s.total_equity == 0.0)
                 s.total_equity = s.available_balance;
 
-            // Decode the positions repeating group. SBE group iterators are
-            // stateful — calling .next() advances the read cursor, so the order
-            // we call it matters. Empty positions (net_qty == 0) are skipped by
-            // the publisher on order-gateway's side but we also filter defensively
-            // in case a dead leg shows up.
+            // SBE group iterators are stateful — calling .next() advances the
+            // read cursor, so the order we call it matters.
             auto& positions = msg.positions();
             const std::size_t n = positions.count();
             s.positions.reserve(n);
@@ -66,10 +63,7 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
                 s.positions.push_back(std::move(p));
             }
 
-            // SBE repeating groups share a read cursor with the parent message;
-            // positions must be fully iterated above before accessing the next
-            // group. currencyBalances is gated on acting version ≥ 13 — older
-            // serialized snapshots decode cleanly with an empty group.
+            // currencyBalances is gated on acting version ≥ 13.
             if (msg.currencyBalancesInActingVersion()) {
                 auto& ccy_group = msg.currencyBalances();
                 const std::size_t m = ccy_group.count();
@@ -91,4 +85,4 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
         });
 }
 
-}  // namespace bpt::bridge
+}  // namespace bpt::bridge::messaging

@@ -1,4 +1,4 @@
-#include "bridge/aeron/exec_subscriber.h"
+#include "bridge/messaging/subscribers/exec_subscriber.h"
 
 #include "bridge/aeron/sbe_decode.h"
 
@@ -8,7 +8,7 @@
 
 #include <bpt_common/logging.h>
 
-namespace bpt::bridge {
+namespace bpt::bridge::messaging {
 
 using bpt::messages::ExecStatus;
 using bpt::messages::ExecutionReport;
@@ -16,7 +16,7 @@ using bpt::messages::OrderSide;
 
 namespace {
 constexpr double kPriceScale = 1e8;
-constexpr double kQtyScale = 1e8;  // filled_qty = natural * 1e8
+constexpr double kQtyScale = 1e8;
 constexpr double kFeeScale = 1e8;
 }  // namespace
 
@@ -89,4 +89,4 @@ void ExecSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
         });
 }
 
-}  // namespace bpt::bridge
+}  // namespace bpt::bridge::messaging

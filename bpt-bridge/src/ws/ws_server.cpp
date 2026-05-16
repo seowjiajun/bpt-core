@@ -81,9 +81,9 @@ private:
             auto j = nlohmann::json::parse(data);
             if (j.value("type", "") == "command") {
                 std::string cmd = j.value("cmd", "");
-                if (!cmd.empty() && server_.on_command) {
+                if (!cmd.empty()) {
                     bpt::common::log::info(kWsSessionLog(), "received command: {}", cmd);
-                    server_.on_command(cmd);
+                    server_.dispatch_command(cmd);
                 }
             }
         } catch (const std::exception& e) {
@@ -279,6 +279,22 @@ void WsServer::add_session(std::shared_ptr<WsSession> session) {
 void WsServer::remove_session(const std::shared_ptr<WsSession>& session) {
     std::lock_guard<std::mutex> lock(sessions_mutex_);
     sessions_.erase(session);
+}
+
+void WsServer::set_command_handler(CommandHandler h) {
+    std::lock_guard<std::mutex> lock(cmd_mutex_);
+    cmd_handler_ = std::move(h);
+}
+
+void WsServer::dispatch_command(const std::string& cmd) {
+    // Snapshot under the lock so handler invocation runs without holding it.
+    CommandHandler h;
+    {
+        std::lock_guard<std::mutex> lock(cmd_mutex_);
+        h = cmd_handler_;
+    }
+    if (h)
+        h(cmd);
 }
 
 }  // namespace bpt::bridge

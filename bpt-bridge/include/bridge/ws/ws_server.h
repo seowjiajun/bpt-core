@@ -1,5 +1,8 @@
 #pragma once
 
+#include "bridge/ws/i_broadcaster.h"
+#include "bridge/ws/msg_kind.h"
+
 #include <boost/asio.hpp>
 #include <cstdint>
 #include <deque>
@@ -14,19 +17,6 @@ namespace bpt::bridge {
 
 class WsSession;
 
-// Tagged message kinds — the server needs to know what kind of message it is
-// so it can update its session-replay snapshot correctly.
-enum class MsgKind : uint8_t {
-    Session,   // latest wins
-    Status,    // latest wins
-    Tick,      // latest wins (per symbol — single-symbol for now)
-    Fill,      // appended to rolling buffer
-    Position,  // latest wins (per symbol)
-    Order,     // not snapshotted — transient lifecycle events
-    Toxicity,     // latest wins — analytics toxicity scores
-    MarketColor,  // latest wins (per underlying) — radar market-color snapshot
-};
-
 // Minimal broadcast-style WebSocket server with session replay.
 //
 // Clients that connect mid-run get a snapshot burst (session, status, latest
@@ -36,10 +26,10 @@ enum class MsgKind : uint8_t {
 // Threading: the snapshot is mutated only on the io_context thread (via
 // net::post).  The sessions set is protected by sessions_mutex_ so that
 // any thread can check connection count / close sessions on shutdown.
-class WsServer {
+class WsServer : public ws::IBroadcaster {
 public:
     explicit WsServer(uint16_t port);
-    ~WsServer();
+    ~WsServer() override;
 
     WsServer(const WsServer&) = delete;
     WsServer& operator=(const WsServer&) = delete;
@@ -47,14 +37,18 @@ public:
     void start();
     void stop();
 
-    // Callback invoked on the IO thread when a connected client sends a
-    // valid command (e.g. "halt", "resume").  The bridge's main() wires
-    // this to publish on the control Aeron stream + broadcast status.
-    std::function<void(const std::string& cmd)> on_command;
-
     // Publish a typed message.  Updates the replay snapshot and broadcasts
     // to every connected session.  Thread-safe; callable from any thread.
-    void publish(MsgKind kind, std::string message);
+    void publish(MsgKind kind, std::string message) override;
+
+    // IBroadcaster: install the command-from-client handler. WsServer fires
+    // this on its IO thread.  Lifetime is managed by BridgeService:
+    // service calls set_command_handler(nullptr) before shutdown.
+    void set_command_handler(CommandHandler h) override;
+
+    // Internal — invoked by WsSession on the IO thread when a command frame
+    // arrives. Forwards to the handler installed via set_command_handler.
+    void dispatch_command(const std::string& cmd);
 
     // Called by sessions on the io_context thread after the WebSocket
     // handshake completes.  Pushes the current snapshot to the new session
@@ -89,6 +83,14 @@ private:
 
     std::mutex sessions_mutex_;
     std::unordered_set<std::shared_ptr<WsSession>> sessions_;
+
+    // Command handler installed via set_command_handler().  Read-only on the
+    // IO thread once start() returns; written from the main thread before
+    // start() and during shutdown — those two windows don't race the IO
+    // thread because the IO thread isn't running yet (start) or has been
+    // joined (after stop). Held under cmd_mutex_ defensively.
+    std::mutex cmd_mutex_;
+    CommandHandler cmd_handler_;
 };
 
 }  // namespace bpt::bridge
