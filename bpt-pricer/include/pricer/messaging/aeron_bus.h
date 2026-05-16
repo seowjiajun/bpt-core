@@ -6,17 +6,19 @@
 /// Aeron pub/sub the pricer needs is constructed in one factory so
 /// `PricerService` doesn't have to take `<Aeron.h>` in its constructor.
 ///
-/// Pricer's existing concrete classes (VolSurfacePublisher,
-/// StatusPublisher, MdSubscriber, RefdataSubscriber) already encapsulate
-/// their Aeron plumbing behind narrow domain APIs. Promoting each to a
-/// formal port adds vtable on poll() — fine off the hot path — but
-/// offers no test-seam payoff today. Defer until a fake-bus test
-/// actually blocks. Same pragmatic call as bpt-strategy.
+/// VolSurfacePublisher is promoted to a port (IVolSurfacePublisher,
+/// concrete AeronVolSurfacePublisher) so the deterministic backtester
+/// can substitute an InProcessVolSurfacePublisher that bypasses SBE
+/// encode + Aeron offer entirely. Off-hot-path vtable cost is invisible
+/// at the ~Hz cadence of vol-surface rebuilds. The remaining publishers
+/// + subscribers stay as concrete classes — promote each individually
+/// when a non-Aeron consumer materialises (same pragmatic call as
+/// bpt-strategy / bpt-analytics).
 
 #include "pricer/md/md_subscribe_client.h"
 #include "pricer/md/md_subscriber.h"
+#include "pricer/messaging/publishers/i_vol_surface_publisher.h"
 #include "pricer/messaging/publishers/status_publisher.h"
-#include "pricer/messaging/publishers/vol_surface_publisher.h"
 #include "pricer/refdata/refdata_subscriber.h"
 
 #include <Aeron.h>
@@ -31,7 +33,7 @@ struct Settings;
 namespace messaging {
 
 struct PricerBus {
-    std::unique_ptr<VolSurfacePublisher> vol_pub;
+    std::unique_ptr<IVolSurfacePublisher> vol_pub;  ///< port; AeronVolSurfacePublisher in prod
     std::unique_ptr<StatusPublisher> status_pub;
     std::unique_ptr<md::MdSubscriber> md_sub;
     std::unique_ptr<md::MdSubscribeClient> md_ctrl;  ///< pricer → md-gateway: subscribe batches

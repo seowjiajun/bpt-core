@@ -1,4 +1,4 @@
-#include "pricer/messaging/publishers/vol_surface_publisher.h"
+#include "pricer/messaging/publishers/aeron_vol_surface_publisher.h"
 
 #include <messages/MessageHeader.h>
 #include <messages/VolSurface.h>
@@ -12,14 +12,14 @@ namespace bpt::pricer::messaging {
 using bpt::messages::MessageHeader;
 using bpt::messages::VolSurface;
 
-VolSurfacePublisher::VolSurfacePublisher(std::shared_ptr<aeron::Aeron> aeron,
-                                         const std::string& channel,
-                                         int32_t stream_id) {
+AeronVolSurfacePublisher::AeronVolSurfacePublisher(std::shared_ptr<aeron::Aeron> aeron,
+                                                   const std::string& channel,
+                                                   int32_t stream_id) {
     pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-    bpt::common::log::info("[VolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
+    bpt::common::log::info("[AeronVolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
 }
 
-void VolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t timestamp_ns) {
+void AeronVolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t timestamp_ns) {
     if (!pub_)
         return;
 
@@ -27,7 +27,6 @@ void VolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t 
     constexpr size_t kMaxBuf = 65536;
     alignas(8) char buf[kMaxBuf];
     std::memset(buf, 0, kMaxBuf);
-
 
     MessageHeader hdr;
     VolSurface msg;

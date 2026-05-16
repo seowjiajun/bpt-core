@@ -41,7 +41,7 @@ cc_binary(
         "src/config/config.cpp",
         "src/surface/surface_builder.cpp",
         "src/messaging/aeron_bus.cpp",
-        "src/messaging/publishers/vol_surface_publisher.cpp",
+        "src/messaging/publishers/aeron_vol_surface_publisher.cpp",
         "src/messaging/publishers/status_publisher.cpp",
         "src/md/md_subscribe_client.cpp",
         "src/md/md_subscriber.cpp",
