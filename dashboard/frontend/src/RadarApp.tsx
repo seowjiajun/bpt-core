@@ -13,7 +13,10 @@ import './App.css'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
 import { CalendarPanel } from './components/CalendarPanel'
+import { FlowPulsePanel } from './components/FlowPulsePanel'
 import { OptionsPulsePanel } from './components/OptionsPulsePanel'
+import { PerpPulsePanel } from './components/PerpPulsePanel'
+import { VolRegimePanel } from './components/VolRegimePanel'
 import type { MarketColorMsg } from './types/messages'
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:8080'
@@ -82,18 +85,10 @@ export default function RadarApp() {
 
       <main className="radar-main">
         <OptionsPulsePanel underlying={selected} />
+        <PerpPulsePanel underlying={selected} />
+        <FlowPulsePanel underlying={selected} />
+        <VolRegimePanel underlying={selected} />
         <CalendarPanel underlying={selected} />
-
-        {/* Placeholder rows for future MarketColor domains. Each will become
-            its own panel once the corresponding radar analysis module lands. */}
-        <section className="radar-coming-soon">
-          <h3>Coming soon</h3>
-          <ul>
-            <li>Perp basis (perp mark vs spot mid, in bps)</li>
-            <li>Flow color (buy/sell imbalance from trades)</li>
-            <li>Vol regime (realized vol + classifier)</li>
-          </ul>
-        </section>
       </main>
     </div>
   )

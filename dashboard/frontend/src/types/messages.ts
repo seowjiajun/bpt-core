@@ -371,6 +371,27 @@ export interface OptionsMarketColor {
 export interface PerpMarketColor {
   fundingRate8h: number | null   // decimal (e.g. 0.0001 = 1 bps)
   nextFundingTs: number | null   // ns since epoch; null = not yet known
+  basisBps: number | null        // (mark - index) / index * 1e4; null if stale or missing
+  markPrice: number | null       // perp mark from md-gateway InstrumentStats
+  indexPrice: number | null      // index/spot from md-gateway InstrumentStats
+}
+
+// Flow section — perp-side aggressor flow over a 5min rolling window.
+// All notional fields are in quote currency (USD-equivalent for crypto perps).
+// Nulls when no trades observed yet for the joined perp.
+export interface FlowMarketColor {
+  buyNotional5m: number | null   // Σ price × qty where aggressor lifted offer
+  sellNotional5m: number | null  // Σ price × qty where aggressor hit bid
+  imbalance5m: number | null     // (buy − sell) / total; range [−1, +1]
+  tradeCount5m: number           // # of trades inside the window
+}
+
+// Vol-regime section — annualised realized vol of the joined perp's mid over
+// a 1h window. Frontend joins this with `options.frontAtmIv` to surface the
+// variance risk premium and label the regime.
+export interface RegimeMarketColor {
+  realizedVol1h: number | null   // annualised, decimal (0.5 = 50%); null < 2 samples
+  sampleCount: number            // # mid samples used
 }
 
 export interface MarketColorMsg {
@@ -380,8 +401,8 @@ export interface MarketColorMsg {
   underlying: string // e.g. "BTC"
   options: OptionsMarketColor
   perp: PerpMarketColor
-  // Future: flow?, regime? — sections light up as the corresponding
-  // radar analysis modules get built.
+  flow: FlowMarketColor
+  regime: RegimeMarketColor
 }
 
 export type Msg =
