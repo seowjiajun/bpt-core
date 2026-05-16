@@ -26,7 +26,7 @@ namespace bpt::order_gateway::adapter {
 inline std::shared_ptr<IOrderAdapter> make_order_adapter(bpt::messages::ExchangeId::Value exch_id,
                                                          const bpt::order_gateway::config::AdapterConfig& cfg,
                                                          const ExchangeCredentials& creds) {
-    using namespace bpt::messages;
+    using bpt::messages::ExchangeId;
     switch (exch_id) {
         case ExchangeId::BINANCE:
             return std::make_shared<BinanceOrderAdapter>(cfg, creds);
@@ -48,7 +48,7 @@ inline std::shared_ptr<IOrderAdapter> make_order_adapter(bpt::messages::Exchange
 /// Returns 0 for unknown / unmapped venues (caller can decide whether
 /// to error or just skip).
 inline uint8_t exchange_status_bit(bpt::messages::ExchangeId::Value exch_id) {
-    using namespace bpt::messages;
+    using bpt::messages::ExchangeId;
     switch (exch_id) {
         case ExchangeId::BINANCE:
             return 0x01;

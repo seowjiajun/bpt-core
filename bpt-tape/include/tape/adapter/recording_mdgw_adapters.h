@@ -90,7 +90,7 @@ inline std::shared_ptr<::bpt::md_gateway::adapter::IAdapter> make_recording_adap
     std::shared_ptr<::bpt::tape::io::Tape> tape,
     const ::bpt::md_gateway::config::AdapterConfig& cfg,
     std::shared_ptr<Pub> md_pub) {
-    using namespace bpt::messages;
+    using bpt::messages::ExchangeId;
     switch (exch_id) {
         case ExchangeId::BINANCE:
             return std::make_shared<RecordingBinanceMdAdapter<Pub>>(tape, cfg, md_pub);

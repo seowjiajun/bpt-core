@@ -32,7 +32,7 @@ template <class Pub>
 inline std::shared_ptr<IAdapter> make_md_adapter(bpt::messages::ExchangeId::Value exch_id,
                                                  const bpt::md_gateway::config::AdapterConfig& cfg,
                                                  std::shared_ptr<Pub> md_pub) {
-    using namespace bpt::messages;
+    using bpt::messages::ExchangeId;
     switch (exch_id) {
         case ExchangeId::BINANCE:
             return std::make_shared<BinanceMdAdapter<Pub>>(cfg, md_pub);
