@@ -20,11 +20,11 @@
 
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "md_gateway/config/settings.h"
-#include "md_gateway/messaging/i_ack_publisher.h"
-#include "md_gateway/messaging/i_funding_rate_publisher.h"
-#include "md_gateway/messaging/i_md_control_source.h"
-#include "md_gateway/messaging/i_instrument_stats_publisher.h"
-#include "md_gateway/messaging/md_publisher.h"
+#include "md_gateway/messaging/publishers/i_ack_publisher.h"
+#include "md_gateway/messaging/publishers/i_funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/md_publisher.h"
+#include "md_gateway/messaging/subscribers/i_md_control_source.h"
 #include "md_gateway/metrics/metrics.h"
 #include "md_gateway/subscription/subscription_manager.h"
 

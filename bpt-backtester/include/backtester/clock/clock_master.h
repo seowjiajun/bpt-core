@@ -8,8 +8,8 @@
 #include "backtester/exchange/hyperliquid/hyperliquid_md_server.h"
 #include "backtester/exchange/okx/okx_md_server.h"
 #include "backtester/matching/matching_engine.h"
-#include "backtester/messaging/backtest_ack_subscriber.h"
-#include "backtester/messaging/backtest_control_publisher.h"
+#include "backtester/messaging/publishers/backtest_control_publisher.h"
+#include "backtester/messaging/subscribers/backtest_ack_subscriber.h"
 #include "backtester/results/results_collector.h"
 
 #include <chrono>

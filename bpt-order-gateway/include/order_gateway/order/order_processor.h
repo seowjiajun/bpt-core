@@ -1,7 +1,7 @@
 #pragma once
 
 #include "order_gateway/adapter/common/i_order_adapter.h"
-#include "order_gateway/messaging/exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/exec_report_publisher.h"
 #include "order_gateway/metrics/metrics.h"
 #include "order_gateway/order/order_state_manager.h"
 #include "order_gateway/risk/pnl_tracker.h"

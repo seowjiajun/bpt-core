@@ -1,6 +1,6 @@
 #pragma once
 
-#include "md_gateway/messaging/i_ack_publisher.h"
+#include "md_gateway/messaging/publishers/i_ack_publisher.h"
 
 #include <messages/AckStatus.h>
 

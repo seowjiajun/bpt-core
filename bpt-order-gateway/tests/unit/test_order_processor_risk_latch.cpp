@@ -12,7 +12,7 @@
 // the OrderProcessor glue that flips trading_enabled on breach. This
 // does.
 
-#include "order_gateway/messaging/i_exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/i_exec_report_publisher.h"
 #include "order_gateway/metrics/metrics.h"
 #include "order_gateway/order/order_processor.h"
 #include "order_gateway/order/order_state_manager.h"

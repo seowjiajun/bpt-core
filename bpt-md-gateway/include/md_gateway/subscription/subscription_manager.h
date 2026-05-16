@@ -25,7 +25,7 @@
 /// correlation_id only — other consumers don't see them).
 
 #include "md_gateway/adapter/common/i_adapter.h"
-#include "md_gateway/messaging/i_ack_publisher.h"
+#include "md_gateway/messaging/publishers/i_ack_publisher.h"
 
 #include <messages/MdSubscribeBatch.h>
 

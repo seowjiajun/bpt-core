@@ -5,7 +5,7 @@
 #include "fake_md_publisher.h"
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_decoder.h"
-#include "md_gateway/messaging/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
 
 #include <messages/ExchangeId.h>
 

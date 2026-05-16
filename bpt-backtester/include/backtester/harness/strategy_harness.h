@@ -33,7 +33,7 @@
 #include "backtester/results/results_collector.h"
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_decoder.h"
-#include "md_gateway/messaging/i_funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/i_funding_rate_publisher.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 #include "strategy/config/config.h"
 #include "strategy/md/inprocess_md_client.h"
