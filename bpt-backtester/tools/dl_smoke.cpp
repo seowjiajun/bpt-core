@@ -16,7 +16,11 @@
 #include <stdexcept>
 #include <string>
 
-using namespace bpt::backtester;
+using bpt::backtester::config::DataConfig;
+using bpt::backtester::config::InstrumentConfig;
+using bpt::backtester::config::SimulationConfig;
+using bpt::backtester::data::DataLoader;
+using bpt::backtester::data::MarketEvent;
 
 int main(int argc, char** argv) {
     CLI::App cli{"DataLoader smoke test"};
@@ -29,18 +33,18 @@ int main(int argc, char** argv) {
     cli.add_option("--cache", cache, "Parquet root");
     CLI11_PARSE(cli, argc, argv);
 
-    config::DataConfig data_cfg;
+    DataConfig data_cfg;
     data_cfg.local_cache = cache;
 
-    config::SimulationConfig sim_cfg;
+    SimulationConfig sim_cfg;
     sim_cfg.start = start_day + "T00:00:00Z";
     sim_cfg.end = end_day + "T23:59:59Z";
     sim_cfg.allow_partial_data = true;
 
-    std::vector<config::InstrumentConfig> instruments{{exchange, symbol}};
+    std::vector<InstrumentConfig> instruments{{exchange, symbol}};
 
     try {
-        data::DataLoader loader(data_cfg, sim_cfg, instruments);
+        DataLoader loader(data_cfg, sim_cfg, instruments);
         loader.validate();
 
         uint64_t trade_count = 0, book_count = 0;
@@ -51,9 +55,9 @@ int main(int argc, char** argv) {
                 first_ts = ev->timestamp_ns;
             last_ts = ev->timestamp_ns;
 
-            if (ev->type == data::MarketEvent::Type::TRADE)
+            if (ev->type == MarketEvent::Type::TRADE)
                 ++trade_count;
-            else if (ev->type == data::MarketEvent::Type::ORDER_BOOK)
+            else if (ev->type == MarketEvent::Type::ORDER_BOOK)
                 ++book_count;
         }
 

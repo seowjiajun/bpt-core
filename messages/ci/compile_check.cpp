@@ -34,7 +34,25 @@
 #include <cstring>
 #include <string>
 
-using namespace bpt::messages;
+using bpt::messages::AckStatus;
+using bpt::messages::BacktestAck;
+using bpt::messages::BacktestCommand;
+using bpt::messages::BacktestControl;
+using bpt::messages::DeltaUpdateType;
+using bpt::messages::InstrumentStatus;
+using bpt::messages::InstrumentType;
+using bpt::messages::MdMarketData;
+using bpt::messages::MdServiceHeartbeat;
+using bpt::messages::MdSubscribeBatch;
+using bpt::messages::MdSubscriptionAck;
+using bpt::messages::MdSubscriptionHeartbeat;
+using bpt::messages::MdTrade;
+using bpt::messages::MessageHeader;
+using bpt::messages::OptionSide;
+using bpt::messages::RefDataDelta;
+using bpt::messages::RefDataSnapshot;
+using bpt::messages::RefDataSubscriptionRequest;
+using bpt::messages::TradeSide;
 
 // Verify static metadata for all message types.
 static_assert(RefDataSubscriptionRequest::SBE_TEMPLATE_ID == 1);

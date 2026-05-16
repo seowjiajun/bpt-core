@@ -70,7 +70,8 @@ int main() {
         channel,
         kStreamId,
         [](::aeron::AtomicBuffer& buf, ::aeron::util::index_t offset, ::aeron::util::index_t length, ::aeron::Header&) {
-            using namespace bpt::messages;
+            using bpt::messages::BalanceSnapshot;
+            using bpt::messages::MessageHeader;
 
             auto* data = reinterpret_cast<char*>(buf.buffer() + offset);
             MessageHeader hdr;

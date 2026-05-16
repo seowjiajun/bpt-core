@@ -15,7 +15,13 @@
 namespace bpt::backtester::data {
 
 namespace fs = std::filesystem;
-using namespace std::chrono;
+using std::chrono::day;
+using std::chrono::duration_cast;
+using std::chrono::month;
+using std::chrono::nanoseconds;
+using std::chrono::sys_days;
+using std::chrono::year;
+using std::chrono::year_month_day;
 
 namespace {
 quill::Logger* kLog() {
