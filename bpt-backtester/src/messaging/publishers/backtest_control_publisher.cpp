@@ -11,7 +11,8 @@
 
 namespace bpt::backtester::messaging {
 
-using namespace bpt::messages;
+using bpt::messages::BacktestCommand;
+using bpt::messages::BacktestControl;
 using namespace std::chrono_literals;
 
 BacktestControlPublisher::BacktestControlPublisher(std::shared_ptr<aeron::Publication> pub) : pub_(std::move(pub)) {}

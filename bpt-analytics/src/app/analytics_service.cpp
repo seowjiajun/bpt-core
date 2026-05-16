@@ -12,7 +12,9 @@
 
 namespace bpt::analytics {
 
-using namespace bpt::messages;
+using bpt::messages::ExecStatus;
+using bpt::messages::ExecutionReport;
+using bpt::messages::OrderSide;
 
 AnalyticsService::AnalyticsService(config::Settings settings, messaging::AnalyticsBus bus)
     : settings_(std::move(settings)),

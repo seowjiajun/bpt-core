@@ -10,9 +10,11 @@
 #include <stdexcept>
 #include <x86intrin.h>
 
-using namespace bpt::messages;
-
 namespace bpt::strategy::backtest {
+
+using bpt::messages::BacktestAck;
+using bpt::messages::BacktestControl;
+using bpt::messages::MessageHeader;
 
 BacktestClient::BacktestClient(std::shared_ptr<aeron::Aeron> aeron,
                                const std::string& channel,

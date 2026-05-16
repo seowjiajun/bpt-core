@@ -12,7 +12,8 @@
 
 namespace bpt::backtester::messaging {
 
-using namespace bpt::messages;
+using bpt::messages::BacktestAck;
+using bpt::messages::MessageHeader;
 using namespace std::chrono_literals;
 
 BacktestAckSubscriber::BacktestAckSubscriber(std::shared_ptr<aeron::Subscription> sub) : sub_(std::move(sub)) {}
