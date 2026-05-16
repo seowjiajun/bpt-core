@@ -8,6 +8,8 @@
 
 namespace bpt::pms::messaging {
 
+using bpt::messages::BalanceSnapshot;
+using bpt::messages::MessageHeader;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 BalanceSnapshotPublisher::BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
@@ -19,8 +21,6 @@ BalanceSnapshotPublisher::BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aero
     : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
 
 void BalanceSnapshotPublisher::publish(const adapter::BalanceSnapshot& snapshot) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kMaxRows = 256;
     constexpr std::size_t kRowSize = 1 + 8 + 8 + 8 + 8 + 8;
     constexpr std::size_t kBufSize =

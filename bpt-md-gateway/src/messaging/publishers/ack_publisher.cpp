@@ -8,6 +8,10 @@
 namespace bpt::md_gateway::messaging {
 
 using bpt::common::util::WallClock;
+using bpt::messages::MdServiceHeartbeat;
+using bpt::messages::MdSubscriptionAck;
+using bpt::messages::MdSubscriptionHeartbeat;
+using bpt::messages::MessageHeader;
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
@@ -20,8 +24,6 @@ void AckPublisher::publish_ack(uint64_t correlation_id,
                                uint64_t instrument_id,
                                const char* exchange,
                                bpt::messages::AckStatus::Value status) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + MdSubscriptionAck::sbeBlockLength();
     char buf[kBufSize]{};
 
@@ -41,8 +43,6 @@ void AckPublisher::publish_ack(uint64_t correlation_id,
 }
 
 void AckPublisher::publish_subscription_heartbeat(uint64_t instrument_id) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + MdSubscriptionHeartbeat::sbeBlockLength();
     char buf[kBufSize]{};
 
@@ -57,8 +57,6 @@ void AckPublisher::publish_subscription_heartbeat(uint64_t instrument_id) {
 }
 
 void AckPublisher::publish_service_heartbeat() {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + MdServiceHeartbeat::sbeBlockLength();
     char buf[kBufSize]{};
 

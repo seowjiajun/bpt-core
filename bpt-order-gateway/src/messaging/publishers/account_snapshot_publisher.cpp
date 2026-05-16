@@ -8,6 +8,9 @@
 
 namespace bpt::order_gateway::messaging {
 
+using bpt::messages::AccountSnapshot;
+using bpt::messages::ExchangeId;
+using bpt::messages::MessageHeader;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 AccountSnapshotPublisher::AccountSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
@@ -16,8 +19,6 @@ AccountSnapshotPublisher::AccountSnapshotPublisher(std::shared_ptr<::aeron::Aero
     : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
 
 void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snapshot) {
-    using namespace bpt::messages;
-
     // AccountSnapshot has two variable-length groups: positions + currency
     // balances. Buffer sizing is a worst-case ceiling.
     //   positions:    up to 500 × 56 bytes (32-char symbol + 3×int64) + 4-byte header

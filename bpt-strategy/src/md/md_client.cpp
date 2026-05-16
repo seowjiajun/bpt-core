@@ -16,6 +16,15 @@
 
 namespace bpt::strategy::md {
 
+using bpt::messages::MdMarketData;
+using bpt::messages::MdOrderBook;
+using bpt::messages::MdServiceHeartbeat;
+using bpt::messages::MdSubscribeBatch;
+using bpt::messages::MdSubscriptionAck;
+using bpt::messages::MdSubscriptionHeartbeat;
+using bpt::messages::MdTrade;
+using bpt::messages::MessageHeader;
+
 AeronMdClient::AeronMdClient(std::shared_ptr<aeron::Aeron> aeron,
                              const std::string& channel,
                              int control_stream,
@@ -45,8 +54,6 @@ AeronMdClient::AeronMdClient(std::shared_ptr<aeron::Aeron> aeron,
 }
 
 void AeronMdClient::subscribe(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) {
-    using namespace bpt::messages;
-
     const auto n = static_cast<uint16_t>(instruments.size());
 
     std::size_t buf_size = MessageHeader::encodedLength() + MdSubscribeBatch::sbeBlockLength() +
@@ -80,8 +87,6 @@ void AeronMdClient::handle_data_fragment(aeron::AtomicBuffer& buffer,
                                          aeron::util::index_t offset,
                                          aeron::util::index_t length,
                                          aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 
@@ -139,8 +144,6 @@ void AeronMdClient::handle_ack_hb_fragment(aeron::AtomicBuffer& buffer,
                                            aeron::util::index_t offset,
                                            aeron::util::index_t length,
                                            aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 

@@ -12,6 +12,18 @@
 
 namespace bpt::backtester::harness {
 
+using bpt::messages::AccountSnapshot;
+using bpt::messages::ExchangeId;
+using bpt::messages::ExecStatus;
+using bpt::messages::ExecutionReport;
+using bpt::messages::MessageHeader;
+using bpt::messages::OrderGatewayHeartbeat;
+using bpt::messages::OrderSide;
+using bpt::messages::OrderType;
+using bpt::messages::RejectReason;
+using bpt::messages::RejectSource;
+using bpt::messages::TimeInForce;
+
 namespace {
 
 // SBE-side scaling — mirrors strategy/order-gateway constants. Strategy
@@ -373,7 +385,6 @@ void InProcessOrderGatewayClient::publish_exec_status(uint64_t order_id,
     if (!on_exec_report)
         return;
 
-    using namespace bpt::messages;
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + ExecutionReport::sbeBlockLength();
     char buf[kBufSize]{};
     char ccy_pad[8] = {0};

@@ -10,6 +10,10 @@
 
 namespace bpt::pricer::messaging {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::PricerHeartbeat;
+using bpt::messages::PricerReady;
+
 StatusPublisher::StatusPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
     pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
     bpt::common::log::info("[StatusPublisher] Publication ready on {} stream {}", channel, stream_id);
@@ -22,7 +26,6 @@ void StatusPublisher::publish_heartbeat(uint64_t timestamp_ns, uint64_t seq_num)
     alignas(8) char buf[128];
     std::memset(buf, 0, sizeof(buf));
 
-    using namespace bpt::messages;
 
     MessageHeader hdr;
     PricerHeartbeat msg;
@@ -52,7 +55,6 @@ void StatusPublisher::publish_ready(uint64_t timestamp_ns,
     alignas(8) char buf[128];
     std::memset(buf, 0, sizeof(buf));
 
-    using namespace bpt::messages;
 
     MessageHeader hdr;
     PricerReady msg;

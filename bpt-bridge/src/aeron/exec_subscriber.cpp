@@ -10,6 +10,10 @@
 
 namespace bpt::bridge {
 
+using bpt::messages::ExecStatus;
+using bpt::messages::ExecutionReport;
+using bpt::messages::OrderSide;
+
 namespace {
 constexpr double kPriceScale = 1e8;
 constexpr double kQtyScale = 1e8;  // filled_qty = natural * 1e8
@@ -40,8 +44,6 @@ void ExecSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
         offset,
         length,
         [this](bpt::messages::ExecutionReport& msg) {
-            using namespace bpt::messages;
-
             const auto status = msg.status();
             const auto side = (msg.side() == OrderSide::BUY) ? encode::Side::Buy : encode::Side::Sell;
             const double price = static_cast<double>(msg.price()) / kPriceScale;

@@ -12,6 +12,13 @@
 
 namespace bpt::order_gateway::messaging {
 
+using bpt::messages::AccountSnapshotRequest;
+using bpt::messages::CancelAll;
+using bpt::messages::CancelOrder;
+using bpt::messages::MessageHeader;
+using bpt::messages::ModifyOrder;
+using bpt::messages::NewOrder;
+
 OrderSubscriber::OrderSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id) {
     subscription_ = std::make_unique<bpt::common::aeron::Subscriber>(
         std::move(aeron),
@@ -27,8 +34,6 @@ void OrderSubscriber::handle_fragment(aeron::AtomicBuffer& buf,
                                       aeron::util::index_t offset,
                                       aeron::util::index_t length,
                                       aeron::Header& /*hdr*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 

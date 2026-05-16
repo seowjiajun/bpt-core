@@ -9,6 +9,10 @@
 
 namespace bpt::md_gateway::subscription {
 
+using bpt::messages::AckStatus;
+using bpt::messages::MdSubscribeBatch;
+using bpt::messages::MessageHeader;
+
 void SubscriptionManager::add_adapter(std::shared_ptr<adapter::IAdapter> adapter) {
     adapters_.push_back(std::move(adapter));
 }
@@ -24,8 +28,6 @@ adapter::IAdapter* SubscriptionManager::find_adapter(const std::string& exchange
 void SubscriptionManager::apply_requests(uint64_t correlation_id,
                                          const std::vector<SubscribeRequest>& desired,
                                          messaging::IAckPublisher& ack_pub) {
-    using namespace bpt::messages;
-
     // Build this consumer's new desired set (by instrument_id).
     std::unordered_set<uint64_t> new_set;
     new_set.reserve(desired.size());

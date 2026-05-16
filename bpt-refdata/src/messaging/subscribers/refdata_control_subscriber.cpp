@@ -8,6 +8,9 @@
 
 namespace bpt::refdata::messaging {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::RefDataSubscriptionRequest;
+
 RefdataControlSubscriber::RefdataControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                                    const std::string& channel,
                                                    int stream_id) {
@@ -19,8 +22,6 @@ RefdataControlSubscriber::RefdataControlSubscriber(std::shared_ptr<::aeron::Aero
                ::aeron::util::index_t offset,
                ::aeron::util::index_t length,
                ::aeron::Header&) {
-            using namespace bpt::messages;
-
             if (static_cast<std::size_t>(length) <
                 MessageHeader::encodedLength() + RefDataSubscriptionRequest::sbeBlockLength()) {
                 bpt::common::log::warn("Control: short fragment ({} bytes), ignoring", length);

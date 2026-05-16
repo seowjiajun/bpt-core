@@ -7,6 +7,9 @@
 
 namespace bpt::radar::messaging {
 
+using bpt::messages::InstrumentStats;
+using bpt::messages::MessageHeader;
+
 InstrumentStatsSubscriber::InstrumentStatsSubscriber(std::shared_ptr<aeron::Aeron> aeron,
                                                      const std::string& channel,
                                                      int stream_id) {
@@ -29,8 +32,6 @@ void InstrumentStatsSubscriber::handle_fragment(aeron::AtomicBuffer& buffer,
                                                 aeron::util::index_t offset,
                                                 aeron::util::index_t length,
                                                 aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 

@@ -7,6 +7,9 @@
 
 namespace bpt::radar::messaging {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::VolSurface;
+
 VolSurfaceSubscriber::VolSurfaceSubscriber(std::shared_ptr<aeron::Aeron> aeron,
                                            const std::string& channel,
                                            int stream_id) {
@@ -30,8 +33,6 @@ void VolSurfaceSubscriber::handle_fragment(aeron::AtomicBuffer& buffer,
                                            aeron::util::index_t offset,
                                            aeron::util::index_t length,
                                            aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 

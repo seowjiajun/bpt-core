@@ -8,6 +8,9 @@
 
 namespace bpt::md_gateway::messaging {
 
+using bpt::messages::MdSubscribeBatch;
+using bpt::messages::MessageHeader;
+
 MdControlSubscriber::MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                          const std::string& channel,
                                          int stream_id) {
@@ -19,8 +22,6 @@ MdControlSubscriber::MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                ::aeron::util::index_t offset,
                ::aeron::util::index_t length,
                ::aeron::Header& /*hdr*/) {
-            using namespace bpt::messages;
-
             if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
                 return;
 

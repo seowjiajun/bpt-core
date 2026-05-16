@@ -20,6 +20,15 @@
 
 namespace bpt::pricer::refdata {
 
+using bpt::messages::DeltaUpdateType;
+using bpt::messages::ExchangeId;
+using bpt::messages::InstrumentType;
+using bpt::messages::MessageHeader;
+using bpt::messages::OptionSide;
+using bpt::messages::RefDataDelta;
+using bpt::messages::RefDataSnapshot;
+using bpt::messages::RefDataSubscriptionRequest;
+
 static bpt::messages::ExchangeId::Value exchange_from_string(const std::string& ex) {
     using EX = bpt::messages::ExchangeId;
     if (ex == "BINANCE")
@@ -78,7 +87,6 @@ void RefdataSubscriber::send_subscription_request(uint64_t correlation_id) {
         return;
     }
 
-    using namespace bpt::messages;
 
     // Empty filters — request all instruments, like bpt-strategy does.
     std::size_t buf_size = MessageHeader::encodedLength() + RefDataSubscriptionRequest::sbeBlockLength() +
@@ -126,8 +134,6 @@ void RefdataSubscriber::on_snapshot_fragment(::aeron::AtomicBuffer& buffer,
                                              aeron::util::index_t offset,
                                              aeron::util::index_t length,
                                              ::aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 
@@ -206,8 +212,6 @@ void RefdataSubscriber::on_delta_fragment(::aeron::AtomicBuffer& buffer,
                                           aeron::util::index_t offset,
                                           aeron::util::index_t length,
                                           ::aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 

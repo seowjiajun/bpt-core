@@ -18,7 +18,9 @@ FundingRatePublisher::FundingRatePublisher(std::shared_ptr<::aeron::Aeron> aeron
     : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
 
 void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
-    using namespace bpt::messages;
+    using bpt::messages::ExchangeId;
+    using bpt::messages::FundingRate;
+    using bpt::messages::MessageHeader;
 
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + FundingRate::sbeBlockLength();
     char buf[kBufSize] = {};

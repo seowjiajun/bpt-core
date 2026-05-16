@@ -7,6 +7,8 @@
 
 namespace bpt::order_gateway::messaging {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::OrderGatewayHeartbeat;
 using bpt::common::util::WallClock;
 
 using Policy = bpt::common::aeron::Publisher::Policy;
@@ -17,8 +19,6 @@ HeartbeatPublisher::HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, co
     : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
 
 void HeartbeatPublisher::publish(uint8_t service_id, uint16_t orders_in_flight, uint8_t exchange_status) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + OrderGatewayHeartbeat::sbeBlockLength();
     char buf[kBufSize]{};
 

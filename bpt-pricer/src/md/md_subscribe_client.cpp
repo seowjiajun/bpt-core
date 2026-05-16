@@ -10,6 +10,8 @@
 
 namespace bpt::pricer::md {
 
+using bpt::messages::MdSubscribeBatch;
+using bpt::messages::MessageHeader;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 MdSubscribeClient::MdSubscribeClient(std::shared_ptr<::aeron::Aeron> aeron,
@@ -23,8 +25,6 @@ MdSubscribeClient::MdSubscribeClient(std::shared_ptr<::aeron::Aeron> aeron,
 }
 
 void MdSubscribeClient::publish(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) {
-    using namespace bpt::messages;
-
     const auto n = static_cast<uint16_t>(instruments.size());
 
     const std::size_t buf_size = MessageHeader::encodedLength() + MdSubscribeBatch::sbeBlockLength() +

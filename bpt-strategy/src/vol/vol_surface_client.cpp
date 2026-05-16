@@ -10,6 +10,11 @@
 
 namespace bpt::strategy::vol {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::PricerHeartbeat;
+using bpt::messages::PricerReady;
+using bpt::messages::VolSurface;
+
 VolSurfaceClient::VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
                                    const std::string& channel,
                                    int vol_surface_stream,
@@ -48,8 +53,6 @@ void VolSurfaceClient::handle_surface_fragment(aeron::AtomicBuffer& buffer,
                                                aeron::util::index_t offset,
                                                aeron::util::index_t length,
                                                aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 
@@ -76,8 +79,6 @@ void VolSurfaceClient::handle_status_fragment(aeron::AtomicBuffer& buffer,
                                               aeron::util::index_t offset,
                                               aeron::util::index_t length,
                                               aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 

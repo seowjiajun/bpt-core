@@ -8,6 +8,10 @@
 
 namespace bpt::pricer::md {
 
+using bpt::messages::MdMarketData;
+using bpt::messages::MdTrade;
+using bpt::messages::MessageHeader;
+
 MdSubscriber::MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
     sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
         std::move(aeron),
@@ -28,8 +32,6 @@ void MdSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
                                ::aeron::util::index_t offset,
                                ::aeron::util::index_t length,
                                ::aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<::aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 

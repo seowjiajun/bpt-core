@@ -8,6 +8,13 @@
 
 namespace bpt::order_gateway::messaging {
 
+using bpt::messages::ExchangeId;
+using bpt::messages::ExecStatus;
+using bpt::messages::ExecutionReport;
+using bpt::messages::MessageHeader;
+using bpt::messages::OrderSide;
+using bpt::messages::OrderType;
+using bpt::messages::RejectReason;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 ExecReportPublisher::ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron,
@@ -33,8 +40,6 @@ void ExecReportPublisher::publish(uint64_t order_id,
                                   std::string_view fee_currency,
                                   uint64_t exchange_ts_ns,
                                   uint64_t local_ts_ns) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + ExecutionReport::sbeBlockLength();
     char buf[kBufSize]{};
 

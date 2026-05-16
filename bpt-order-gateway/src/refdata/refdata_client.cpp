@@ -13,6 +13,11 @@
 
 namespace bpt::order_gateway::refdata {
 
+using bpt::messages::DeltaUpdateType;
+using bpt::messages::MessageHeader;
+using bpt::messages::RefDataDelta;
+using bpt::messages::RefDataSnapshot;
+using bpt::messages::RefDataSubscriptionRequest;
 using bpt::common::util::WallClock;
 
 RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
@@ -49,7 +54,6 @@ RefdataClient::RefdataClient(std::shared_ptr<aeron::Aeron> aeron,
 void RefdataClient::subscribe(uint64_t correlation_id, std::vector<CanonicalFilter> filters) {
     correlation_id_ = correlation_id;
 
-    using namespace bpt::messages;
     const uint16_t nf = static_cast<uint16_t>(filters.size());
 
     std::size_t buf_size = MessageHeader::encodedLength() + RefDataSubscriptionRequest::sbeBlockLength() +
@@ -87,8 +91,6 @@ void RefdataClient::handle_snapshot_fragment(aeron::AtomicBuffer& buffer,
                                              aeron::util::index_t offset,
                                              aeron::util::index_t length,
                                              aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 
@@ -119,8 +121,6 @@ void RefdataClient::handle_delta_fragment(aeron::AtomicBuffer& buffer,
                                           aeron::util::index_t offset,
                                           aeron::util::index_t length,
                                           aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (!cache_.snapshot_received())
         return;
 

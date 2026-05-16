@@ -10,6 +10,10 @@
 
 namespace bpt::refdata::messaging {
 
+using bpt::messages::ExchangeId;
+using bpt::messages::FeeSchedule;
+using bpt::messages::MessageHeader;
+
 FeeSchedulePublisher::FeeSchedulePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                            const std::string& channel,
                                            int stream_id) {
@@ -17,8 +21,6 @@ FeeSchedulePublisher::FeeSchedulePublisher(std::shared_ptr<aeron::Aeron> aeron,
 }
 
 void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + FeeSchedule::sbeBlockLength();
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     char buf[kBufSize];

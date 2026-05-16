@@ -12,6 +12,12 @@
 
 namespace bpt::refdata::messaging {
 
+using bpt::messages::ExchangeId;
+using bpt::messages::MessageHeader;
+using bpt::messages::RefDataError;
+using bpt::messages::RefDataErrorType;
+using bpt::messages::RefDataReady;
+
 RefdataStatusPublisher::RefdataStatusPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                                const std::string& channel,
                                                int stream_id) {
@@ -21,8 +27,6 @@ RefdataStatusPublisher::RefdataStatusPublisher(std::shared_ptr<aeron::Aeron> aer
 void RefdataStatusPublisher::publish_ready(uint8_t exchanges_loaded,
                                            uint16_t instrument_count,
                                            bool fee_schedules_loaded) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + RefDataReady::sbeBlockLength();
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     char buf[kBufSize];
@@ -49,8 +53,6 @@ void RefdataStatusPublisher::publish_ready(uint8_t exchanges_loaded,
 void RefdataStatusPublisher::publish_error(bpt::messages::RefDataErrorType::Value error_type,
                                            bpt::messages::ExchangeId::Value exchange_id,
                                            uint64_t instrument_id) {
-    using namespace bpt::messages;
-
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + RefDataError::sbeBlockLength();
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     char buf[kBufSize];

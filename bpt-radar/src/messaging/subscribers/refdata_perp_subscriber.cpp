@@ -10,6 +10,11 @@
 
 namespace bpt::radar::messaging {
 
+using bpt::messages::ExchangeId;
+using bpt::messages::InstrumentType;
+using bpt::messages::MessageHeader;
+using bpt::messages::RefDataSnapshot;
+
 namespace {
 // Truncate a fixed-width Char-N field at the first null byte.
 std::string trim_null(const char* p, std::size_t n) {
@@ -40,8 +45,6 @@ void RefdataPerpSubscriber::handle_fragment(aeron::AtomicBuffer& buffer,
                                             aeron::util::index_t offset,
                                             aeron::util::index_t length,
                                             aeron::Header& /*header*/) {
-    using namespace bpt::messages;
-
     if (length < static_cast<aeron::util::index_t>(MessageHeader::encodedLength()))
         return;
 

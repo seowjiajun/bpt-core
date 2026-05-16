@@ -12,6 +12,11 @@
 
 namespace bpt::refdata::messaging {
 
+using bpt::messages::DeltaUpdateType;
+using bpt::messages::MessageHeader;
+using bpt::messages::OptionSide;
+using bpt::messages::RefDataDelta;
+
 RefdataDeltaPublisher::RefdataDeltaPublisher(std::shared_ptr<aeron::Aeron> aeron,
                                              const std::string& channel,
                                              int stream_id) {
@@ -22,7 +27,6 @@ void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value 
                                           const refdata::Instrument& inst) {
     ++seq_;
 
-    using namespace bpt::messages;
 
     // Fixed-size buffer: SBE header (8) + RefDataDelta block (136)
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + RefDataDelta::sbeBlockLength();
@@ -65,7 +69,6 @@ void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value 
 void RefdataDeltaPublisher::publish_heartbeat() {
     ++seq_;
 
-    using namespace bpt::messages;
 
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + RefDataDelta::sbeBlockLength();
     // Zero-init: heartbeat only sets a handful of fields (updateType, seq,

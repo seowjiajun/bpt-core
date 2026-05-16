@@ -13,6 +13,10 @@
 
 namespace bpt::refdata::messaging {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::OptionSide;
+using bpt::messages::RefDataSnapshot;
+
 namespace {
 
 // The SBE exchange field is a fixed 8-char array. Exchange names longer than
@@ -82,7 +86,6 @@ void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& regis
 
     bpt::common::log::info("Snapshot correlation_id={}: {} instrument(s)", request.correlation_id, matched.size());
 
-    using namespace bpt::messages;
 
     // Allocate buffer: header + fixed block + group header + N × instrument block
     std::size_t n = matched.size();

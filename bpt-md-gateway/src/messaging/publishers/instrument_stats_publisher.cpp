@@ -15,7 +15,9 @@ InstrumentStatsPublisher::InstrumentStatsPublisher(std::shared_ptr<::aeron::Aero
     : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
 
 void InstrumentStatsPublisher::publish(const InstrumentStatsUpdate& stats) {
-    using namespace bpt::messages;
+    using bpt::messages::ExchangeId;
+    using bpt::messages::InstrumentStats;
+    using bpt::messages::MessageHeader;
 
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + InstrumentStats::sbeBlockLength();
     char buf[kBufSize] = {};

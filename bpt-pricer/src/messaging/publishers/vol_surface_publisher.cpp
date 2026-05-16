@@ -9,6 +9,9 @@
 
 namespace bpt::pricer::messaging {
 
+using bpt::messages::MessageHeader;
+using bpt::messages::VolSurface;
+
 VolSurfacePublisher::VolSurfacePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                          const std::string& channel,
                                          int32_t stream_id) {
@@ -25,7 +28,6 @@ void VolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t 
     alignas(8) char buf[kMaxBuf];
     std::memset(buf, 0, kMaxBuf);
 
-    using namespace bpt::messages;
 
     MessageHeader hdr;
     VolSurface msg;

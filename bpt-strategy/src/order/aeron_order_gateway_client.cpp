@@ -16,6 +16,20 @@
 
 namespace bpt::strategy::order {
 
+using bpt::messages::AccountSnapshot;
+using bpt::messages::AccountSnapshotRequest;
+using bpt::messages::CancelAll;
+using bpt::messages::CancelOrder;
+using bpt::messages::ExchangeId;
+using bpt::messages::ExecutionReport;
+using bpt::messages::MessageHeader;
+using bpt::messages::ModifyOrder;
+using bpt::messages::NewOrder;
+using bpt::messages::OrderGatewayHeartbeat;
+using bpt::messages::OrderSide;
+using bpt::messages::OrderType;
+using bpt::messages::TimeInForce;
+
 AeronOrderGatewayClient::AeronOrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
                                                  const std::string& channel,
                                                  int order_stream,
@@ -64,8 +78,6 @@ bool AeronOrderGatewayClient::send_new_order(uint64_t order_id,
                                              uint64_t quantity,
                                              uint8_t exec_inst,
                                              const std::string& exchange_symbol) {
-    using namespace bpt::messages;
-
     if (quantity == 0) {
         bpt::common::log::warn("[OrderGW] Rejected order_id={}: quantity is zero", order_id);
         return false;
@@ -100,8 +112,6 @@ bool AeronOrderGatewayClient::send_new_order(uint64_t order_id,
 void AeronOrderGatewayClient::send_cancel(uint64_t order_id,
                                           bpt::messages::ExchangeId::Value exchange_id,
                                           uint64_t instrument_id) {
-    using namespace bpt::messages;
-
     order_pub_->publish<CancelOrder>([&](CancelOrder& msg) {
         msg.orderId(order_id)
             .exchangeId(exchange_id)
@@ -111,8 +121,6 @@ void AeronOrderGatewayClient::send_cancel(uint64_t order_id,
 }
 
 void AeronOrderGatewayClient::send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) {
-    using namespace bpt::messages;
-
     order_pub_->publish<CancelAll>([&](CancelAll& msg) {
         msg.exchangeId(exchange_id)
             .instrumentId(instrument_id)
@@ -125,8 +133,6 @@ void AeronOrderGatewayClient::send_modify(uint64_t order_id,
                                           uint64_t instrument_id,
                                           int64_t new_price,
                                           uint64_t new_quantity) {
-    using namespace bpt::messages;
-
     order_pub_->publish<ModifyOrder>([&](ModifyOrder& msg) {
         msg.orderId(order_id)
             .exchangeId(exchange_id)
@@ -139,8 +145,6 @@ void AeronOrderGatewayClient::send_modify(uint64_t order_id,
 
 void AeronOrderGatewayClient::send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
                                                             uint64_t correlation_id) {
-    using namespace bpt::messages;
-
     order_pub_->publish<AccountSnapshotRequest>([&](AccountSnapshotRequest& msg) {
         msg.exchangeId(exchange_id)
             .correlationId(correlation_id)
@@ -161,8 +165,6 @@ void AeronOrderGatewayClient::handle_exec_report_fragment(aeron::AtomicBuffer& b
                                                           aeron::util::index_t offset,
                                                           aeron::util::index_t length,
                                                           aeron::Header& /*hdr*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 
@@ -187,8 +189,6 @@ void AeronOrderGatewayClient::handle_heartbeat_fragment(aeron::AtomicBuffer& buf
                                                         aeron::util::index_t offset,
                                                         aeron::util::index_t length,
                                                         aeron::Header& /*hdr*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 
@@ -215,8 +215,6 @@ void AeronOrderGatewayClient::handle_account_snapshot_fragment(aeron::AtomicBuff
                                                                aeron::util::index_t offset,
                                                                aeron::util::index_t length,
                                                                aeron::Header& /*hdr*/) {
-    using namespace bpt::messages;
-
     if (static_cast<std::size_t>(length) < MessageHeader::encodedLength())
         return;
 
