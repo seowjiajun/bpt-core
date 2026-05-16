@@ -169,6 +169,21 @@ void BridgeService::on_market_color(const bpt::radar::messaging::MarketColor& mc
     encode::PerpMarketColor perp{
         .funding_rate_8h = mc.perp_funding_rate_8h,
         .next_funding_ts = mc.perp_next_funding_ts_ns,
+        .basis_bps = mc.perp_basis_bps,
+        .mark_price = mc.perp_mark_price,
+        .index_price = mc.perp_index_price,
+    };
+
+    encode::FlowMarketColor flow{
+        .buy_notional_5m = mc.flow_buy_notional_5m,
+        .sell_notional_5m = mc.flow_sell_notional_5m,
+        .imbalance_5m = mc.flow_imbalance_5m,
+        .trade_count_5m = mc.flow_trade_count_5m,
+    };
+
+    encode::RegimeMarketColor regime{
+        .realized_vol_1h = mc.regime_realized_vol_1h,
+        .sample_count = mc.regime_sample_count,
     };
 
     // For market_color the venue can differ per underlying (BTC on Deribit,
@@ -178,7 +193,7 @@ void BridgeService::on_market_color(const bpt::radar::messaging::MarketColor& mc
     const char* venue = (mc.exchange_id < 5) ? kVenue[mc.exchange_id] : "UNKNOWN";
 
     broadcaster_->publish(MsgKind::MarketColor,
-                          encode::market_color(mc.timestamp_ns, venue, mc.underlying, opts, perp));
+                          encode::market_color(mc.timestamp_ns, venue, mc.underlying, opts, perp, flow, regime));
 }
 
 void BridgeService::on_dashboard_command(const std::string& cmd) {

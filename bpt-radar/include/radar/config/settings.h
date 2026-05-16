@@ -19,6 +19,7 @@ struct Settings {
     bpt::common::config::StreamConfig instrument_stats;  ///< bpt-md-gateway → stream 2004
     bpt::common::config::StreamConfig funding_rate;      ///< bpt-md-gateway → stream 1005
     bpt::common::config::StreamConfig refdata_snapshot;  ///< bpt-refdata → stream 1001 (perp lookup)
+    bpt::common::config::StreamConfig md_data;           ///< bpt-md-gateway → stream 2002 (MdTrade only)
 
     // Output
     bpt::common::config::StreamConfig market_color;  ///< bpt-radar → stream 6002

@@ -19,10 +19,13 @@
 #include <messages/ExchangeId.h>
 #include <messages/FundingRate.h>
 #include <messages/InstrumentStats.h>
+#include <messages/MdMarketData.h>
+#include <messages/MdTrade.h>
 #include <messages/VolSurface.h>
 
 #include <bpt_app/app.h>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -61,6 +64,8 @@ private:
     void on_instrument_stats(bpt::messages::InstrumentStats& stats);
     void on_funding(bpt::messages::FundingRate& fr);
     void on_refdata_perp(uint64_t instrument_id, const std::string& underlying, uint8_t exchange_id);
+    void on_trade(bpt::messages::MdTrade& trade);
+    void on_bbo(bpt::messages::MdMarketData& bbo);
 
     void publish_all();
     void publish_for(const SurfaceKey& key, std::vector<analysis::SurfacePoint>& cached);
@@ -84,10 +89,47 @@ private:
     };
     std::unordered_map<uint64_t, FundingState> funding_by_instrument_;
 
+    /// Mark + index quotes per instrument_id, from InstrumentStats. Kept for
+    /// every instrument we see (cheap — one row per perp/spot per venue), the
+    /// lookup at publish time only retrieves perp rows via perp_id_by_key_.
+    /// last_seen_ns lets publish_for() drop stale quotes to NaN basis.
+    struct PerpQuote {
+        double mark{0.0};
+        double index{0.0};
+        uint64_t last_seen_ns{0};
+    };
+    std::unordered_map<uint64_t, PerpQuote> perp_quote_by_instrument_;
+
     /// (exchange_id, underlying) → perp instrument_id. Populated by refdata
     /// snapshot; consulted during publish_for() to attach funding rate to
     /// the right MarketColor entry.
     std::unordered_map<SurfaceKey, uint64_t, SurfaceKeyHash> perp_id_by_key_;
+
+    /// Reverse lookup: perp instrument_id → SurfaceKey. Kept in sync with
+    /// perp_id_by_key_ so MdTrade's instrument_id can find the right flow
+    /// bucket without scanning the perp_id_by_key_ map per trade.
+    std::unordered_map<uint64_t, SurfaceKey> perp_key_by_id_;
+
+    /// One MdTrade fragment for a perp we know about. Kept short-lived in the
+    /// flow window; pruned on insert and on publish.
+    struct TradeEntry {
+        uint64_t ts_ns;
+        bool buy;       ///< true = aggressor lifted offer (BUY); false = hit bid (SELL)
+        double notional;  ///< price × qty
+    };
+
+    /// Rolling per-(exchange, underlying) flow window. Fixed 5min lookback —
+    /// short enough to react to flow shifts, long enough that majors hit
+    /// statistical mass on the perp.
+    std::unordered_map<SurfaceKey, std::deque<TradeEntry>, SurfaceKeyHash> flow_window_by_key_;
+
+    /// One BBO mid sample, throttled to ~5s spacing per perp. 1h window of
+    /// these feeds the realized-vol calculation in publish_for().
+    struct MidSample {
+        uint64_t ts_ns;
+        double mid;
+    };
+    std::unordered_map<SurfaceKey, std::deque<MidSample>, SurfaceKeyHash> mid_window_by_key_;
 
     uint64_t last_publish_ns_{0};
 };

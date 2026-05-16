@@ -71,18 +71,33 @@ struct __attribute__((packed)) MarketColor {
     // underlying or the venue hasn't yet published a funding update.
     double perp_funding_rate_8h{kNan};      ///< 8-hour funding rate, decimal (e.g. 0.0001 = 1 bp)
     uint64_t perp_next_funding_ts_ns{0};    ///< wall-time ns of next funding tick (0 = unknown)
-    // Future: perp_basis_bps, perp_mark_price, etc. when we wire pricer-side basis math
+    /// (mark - index) / index × 1e4. Positive = perp trades premium to spot
+    /// (contango / longs paying for leverage). Negative = backwardation /
+    /// shorts paying. NaN when md-gateway hasn't pushed mark+index for this
+    /// underlying's perp, or when the snapshot is stale (>30s).
+    double perp_basis_bps{kNan};
+    double perp_mark_price{kNan};           ///< mark price from md-gateway InstrumentStats
+    double perp_index_price{kNan};          ///< index/spot price from md-gateway InstrumentStats
 
     // ─── Flow ───────────────────────────────────────────────────────────
-    // (not yet computed)
-    // double flow_buy_imbalance_5m{kNan};  ///< (buys − sells) / total, rolling 5m
-    // double flow_aggressor_ratio_5m{kNan};
+    // Per-perp aggressor flow over a fixed rolling window (5 min). Populated
+    // by joining MdTrade frames against perp_id_by_key_; NaN/0 when the perp
+    // hasn't traded in the window or refdata hasn't joined a perp yet.
+    double flow_buy_notional_5m{kNan};   ///< Σ (price × qty) where side = BUY (aggressor hit ask)
+    double flow_sell_notional_5m{kNan};  ///< Σ (price × qty) where side = SELL (aggressor hit bid)
+    /// (buy − sell) / (buy + sell) notional, range [−1, +1]. Positive = aggressors
+    /// lifting offers more than hitting bids. NaN when notional total is 0.
+    double flow_imbalance_5m{kNan};
+    uint32_t flow_trade_count_5m{0};     ///< # trades inside the window
 
-    // ─── Vol / liquidity regime ─────────────────────────────────────────
-    // (not yet computed)
-    // double regime_realized_vol_1h{kNan};
-    // double regime_spread_bps_p50{kNan};
-    // uint8_t regime_class{0};             ///< 0=unknown 1=calm 2=trending 3=chaotic
+    // ─── Vol regime ─────────────────────────────────────────────────────
+    // Annualised realized vol of the joined perp's mid, computed over a
+    // 1h rolling window of ~5s-throttled samples. Frontend joins this with
+    // options_front_atm_iv to surface the variance risk premium and a
+    // human-friendly regime label, so the classifier stays out of the wire
+    // schema and can evolve without forcing consumers to re-deploy.
+    double regime_realized_vol_1h{kNan};   ///< annualised, decimal (0.5 = 50%)
+    uint32_t regime_sample_count{0};       ///< # mid samples inside the window
 };
 
 }  // namespace bpt::radar::messaging

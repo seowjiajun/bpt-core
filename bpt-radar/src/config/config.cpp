@@ -41,6 +41,7 @@ Settings load(const std::string& path) {
     s.instrument_stats = resolve_stream(shared_streams, "instrument_stats", 2004);
     s.funding_rate = resolve_stream(shared_streams, "funding_rate", 1005);
     s.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
+    s.md_data = resolve_stream(shared_streams, "md_data", 2002);
     s.market_color = resolve_stream(shared_streams, "market_color", 6002);
 
     if (auto t = tbl["radar"])

@@ -136,12 +136,34 @@ struct OptionsMarketColor {
 struct PerpMarketColor {
     double funding_rate_8h;     ///< NaN = not yet seen
     uint64_t next_funding_ts;   ///< ns epoch; 0 = not yet known
+    double basis_bps;           ///< (mark - index) / index × 1e4; NaN if quote missing/stale
+    double mark_price;          ///< NaN if md-gateway hasn't pushed InstrumentStats
+    double index_price;         ///< NaN if md-gateway hasn't pushed InstrumentStats
+};
+
+// Flow section — perp-side aggressor flow over a fixed 5min window.
+// NaN/0 when no trades observed yet for the joined perp.
+struct FlowMarketColor {
+    double buy_notional_5m;     ///< NaN if zero trades in window
+    double sell_notional_5m;    ///< NaN if zero trades in window
+    double imbalance_5m;        ///< (buy − sell) / total notional, range [−1, +1]
+    uint32_t trade_count_5m;    ///< # trades inside the window
+};
+
+// Vol-regime section — annualised realized vol of the joined perp's mid.
+// Frontend joins this with options.front_atm_iv to compute the variance
+// risk premium and assign a regime label.
+struct RegimeMarketColor {
+    double realized_vol_1h;     ///< annualised, decimal (0.5 = 50%); NaN if < 2 samples
+    uint32_t sample_count;      ///< # mid samples used
 };
 
 std::string market_color(uint64_t ts_ns,
                          std::string_view exchange,
                          std::string_view underlying,
                          const OptionsMarketColor& options,
-                         const PerpMarketColor& perp);
+                         const PerpMarketColor& perp,
+                         const FlowMarketColor& flow,
+                         const RegimeMarketColor& regime);
 
 }  // namespace bpt::bridge::encode

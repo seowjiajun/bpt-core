@@ -43,6 +43,8 @@ cc_library(
         "src/messaging/publishers/market_color_publisher.cpp",
         "src/messaging/subscribers/funding_rate_subscriber.cpp",
         "src/messaging/subscribers/instrument_stats_subscriber.cpp",
+        "src/messaging/subscribers/md_market_data_subscriber.cpp",
+        "src/messaging/subscribers/md_trade_subscriber.cpp",
         "src/messaging/subscribers/refdata_perp_subscriber.cpp",
         "src/messaging/subscribers/vol_surface_subscriber.cpp",
     ],

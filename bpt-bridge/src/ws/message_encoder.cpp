@@ -182,7 +182,9 @@ std::string market_color(uint64_t ts_ns,
                          std::string_view exchange,
                          std::string_view underlying,
                          const OptionsMarketColor& o,
-                         const PerpMarketColor& p) {
+                         const PerpMarketColor& p,
+                         const FlowMarketColor& f,
+                         const RegimeMarketColor& r) {
     json options = {
         {"frontExpiry", o.front_expiry_yyyymmdd},
         {"frontTimeToExpiryY", finite_or_null(o.front_time_to_expiry_y)},
@@ -206,6 +208,19 @@ std::string market_color(uint64_t ts_ns,
         // nextFundingTs of 0 → "not yet known" → encode as null so the
         // frontend can render "—" instead of "1970-01-01".
         {"nextFundingTs", p.next_funding_ts == 0 ? json(nullptr) : json(p.next_funding_ts)},
+        {"basisBps", finite_or_null(p.basis_bps)},
+        {"markPrice", finite_or_null(p.mark_price)},
+        {"indexPrice", finite_or_null(p.index_price)},
+    };
+    json flow = {
+        {"buyNotional5m", finite_or_null(f.buy_notional_5m)},
+        {"sellNotional5m", finite_or_null(f.sell_notional_5m)},
+        {"imbalance5m", finite_or_null(f.imbalance_5m)},
+        {"tradeCount5m", f.trade_count_5m},
+    };
+    json regime = {
+        {"realizedVol1h", finite_or_null(r.realized_vol_1h)},
+        {"sampleCount", r.sample_count},
     };
     return json{
         {"type", "marketColor"},
@@ -214,6 +229,8 @@ std::string market_color(uint64_t ts_ns,
         {"underlying", underlying},
         {"options", std::move(options)},
         {"perp", std::move(perp)},
+        {"flow", std::move(flow)},
+        {"regime", std::move(regime)},
     }
         .dump();
 }

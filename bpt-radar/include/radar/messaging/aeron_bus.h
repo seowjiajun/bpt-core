@@ -9,6 +9,8 @@
 #include "radar/messaging/publishers/market_color_publisher.h"
 #include "radar/messaging/subscribers/funding_rate_subscriber.h"
 #include "radar/messaging/subscribers/instrument_stats_subscriber.h"
+#include "radar/messaging/subscribers/md_market_data_subscriber.h"
+#include "radar/messaging/subscribers/md_trade_subscriber.h"
 #include "radar/messaging/subscribers/refdata_perp_subscriber.h"
 #include "radar/messaging/subscribers/vol_surface_subscriber.h"
 
@@ -28,6 +30,8 @@ struct RadarBus {
     std::unique_ptr<InstrumentStatsSubscriber> stats_sub;
     std::unique_ptr<FundingRateSubscriber> funding_sub;
     std::unique_ptr<RefdataPerpSubscriber> refdata_perp_sub;
+    std::unique_ptr<MdTradeSubscriber> trade_sub;
+    std::unique_ptr<MdMarketDataSubscriber> bbo_sub;
     std::unique_ptr<MarketColorPublisher> color_pub;
 };
 
