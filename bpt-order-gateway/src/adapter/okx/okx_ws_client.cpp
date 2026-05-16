@@ -76,7 +76,7 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
                                                         /*connect_timeout_ms=*/30000,
                                                         /*user_agent=*/"bpt-order-gateway/0.1");
         bpt::common::log::info("OKXWsClient connected (plain), waiting for login");
-        RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
+        RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), ioc_, stop_flag, connected);
         return;
     }
 
@@ -95,7 +95,7 @@ void OKXWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& connected
     // RunLoop's per-read timeout. Leave stream_base::timeout unset on
     // the TLS path too — RunLoop drives both timing and heartbeat.
     bpt::common::log::info("OKXWsClient connected (tls), waiting for login");
-    RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
+    RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), ioc_, stop_flag, connected);
 }
 
 }  // namespace bpt::order_gateway::adapter::okx

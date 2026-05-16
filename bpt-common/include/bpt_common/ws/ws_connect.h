@@ -75,6 +75,19 @@ public:
         visit([&](auto& ws) { ws.read(buf, ec); });
     }
 
+    // Async read. The Beast version currently vendored ignores
+    // expires_after for SYNCHRONOUS ws.read(), which makes the
+    // timeout-driven on_tick() in RunLoop unreliable. Switching to
+    // async_read + an explicit steady_timer in RunLoop is the proper
+    // fix; this overload is the AnyWsStream side of that change.
+    //
+    // Handler signature is the Beast websocket async_read contract:
+    //   void(boost::beast::error_code ec, std::size_t bytes_transferred)
+    template <typename Handler>
+    void async_read(boost::beast::flat_buffer& buf, Handler&& handler) {
+        visit([&](auto& ws) { ws.async_read(buf, std::forward<Handler>(handler)); });
+    }
+
     void close(boost::beast::websocket::close_code code) {
         visit([code](auto& ws) {
             boost::beast::error_code ec;
@@ -90,6 +103,16 @@ public:
 
     void expires_never() {
         visit([](auto& ws) { boost::beast::get_lowest_layer(ws).expires_never(); });
+    }
+
+    // Cancel any pending async operations on the underlying TCP socket.
+    // Used by RunLoop to wake the pumping loop out of a pending
+    // async_read on shutdown — the read handler sees
+    // operation_aborted and returns without re-arming.
+    void lowest_layer_cancel(boost::beast::error_code& ec) {
+        visit([&ec](auto& ws) {
+            boost::beast::get_lowest_layer(ws).socket().cancel(ec);
+        });
     }
 };
 

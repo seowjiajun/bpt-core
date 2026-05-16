@@ -57,7 +57,7 @@ void DeribitWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& conne
     });
 
     bpt::common::log::info("DeribitWsClient connected, waiting for auth");
-    RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), stop_flag, connected);
+    RunLoop::run(bpt::common::ws::AnyWsStream(std::move(ws_ptr)), ioc_, stop_flag, connected);
 }
 
 }  // namespace bpt::order_gateway::adapter::deribit

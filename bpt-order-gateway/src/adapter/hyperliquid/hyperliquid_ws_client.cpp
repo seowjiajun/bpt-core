@@ -288,7 +288,7 @@ void HyperliquidWsClient::run(std::atomic<bool>& stop_flag, std::atomic<bool>& c
     } pending_guard{this};
 
     bpt::common::log::info("HyperliquidWsClient connected");
-    RunLoop::run(std::move(ws), stop_flag, connected);
+    RunLoop::run(std::move(ws), ioc_, stop_flag, connected);
 }
 
 }  // namespace bpt::order_gateway::adapter::hyperliquid

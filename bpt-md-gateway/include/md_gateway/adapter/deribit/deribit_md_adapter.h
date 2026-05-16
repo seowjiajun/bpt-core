@@ -113,6 +113,7 @@ protected:
 
     void read_loop(bpt::common::ws::AnyWsStream& ws) override {
         ws_client_.run(std::move(ws),
+                       this->ioc_,
                        this->stop_flag_,
                        rl_connected_,
                        std::chrono::milliseconds(this->cfg_.ws_read_timeout_ms),

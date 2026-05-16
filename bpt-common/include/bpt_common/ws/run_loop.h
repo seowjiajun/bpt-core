@@ -47,9 +47,12 @@
 #include "bpt_common/ws/ws_connect.h"
 
 #include <atomic>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <chrono>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -83,9 +86,19 @@ public:
     // connected is set true after on_handshake_complete() returns, and
     // false on exit (normal or exceptional).
     //
+    // ioc is the io_context the WebSocket stream was constructed with;
+    // RunLoop drives it via run_one() to dispatch async_read + steady_timer
+    // callbacks. The previous sync-read implementation didn't need ioc
+    // because Beast's expires_after worked on synchronous reads — except
+    // it doesn't in the version we vendor (sync ws.read ignores the
+    // timeout while traffic is flowing), so on_tick() was unreliable.
+    // Async read + a separate steady_timer makes on_tick deterministic
+    // again.
+    //
     // See the file header for read_timeout vs liveness_timeout
     // semantics. liveness_timeout == 0 disables the watchdog.
     void run(AnyWsStream ws,
+             boost::asio::io_context& ioc,
              std::atomic<bool>& stop_flag,
              std::atomic<bool>& connected,
              std::chrono::milliseconds read_timeout = std::chrono::seconds(30),
@@ -114,6 +127,7 @@ private:
 };
 
 inline void RunLoop::run(AnyWsStream ws,
+                         boost::asio::io_context& ioc,
                          std::atomic<bool>& stop_flag,
                          std::atomic<bool>& connected,
                          std::chrono::milliseconds read_timeout,
@@ -121,6 +135,8 @@ inline void RunLoop::run(AnyWsStream ws,
     namespace beast = boost::beast;
 
     ws.text(true);
+    // Clear any sync-read deadline — async_read drives its own timer.
+    ws.expires_never();
     {
         std::lock_guard<std::mutex> lk(send_mu_);
         ws_ = &ws;
@@ -190,49 +206,137 @@ inline void RunLoop::run(AnyWsStream ws,
     uint64_t last_recv_ns = bpt::common::util::WallClock::now_ns();
     const uint64_t liveness_ns = static_cast<uint64_t>(liveness_timeout.count()) * 1'000'000ULL;
 
-    try {
-        beast::flat_buffer buf;
-        while (!stop_flag.load(std::memory_order_relaxed)) {
-            ws.expires_after(read_timeout);
-            beast::error_code ec;
-            ws.read(buf, ec);
+    // Permanent-pending async pattern: one async_read sits on the WS,
+    // a separate steady_timer drives on_tick at read_timeout cadence.
+    // Both re-arm themselves from their handlers. The outer loop just
+    // pumps run_one() until something signals exit (stop_flag, ws
+    // error, on_frame / on_tick throw, or liveness watchdog).
+    //
+    // Why not the previous sync-read pattern: Beast's expires_after
+    // applies to the underlying TCP stream's timeouts, but in this
+    // vendored version it doesn't actually time out a SYNC ws.read()
+    // while frames are flowing. on_tick() therefore stopped firing
+    // whenever the WS saw any traffic at all (pings, pongs, fast frame
+    // bursts), and three adapters had to override subscribe() to push
+    // subscribes immediately rather than wait for the next tick. async
+    // I/O fixes this for every periodic-tick use uniformly.
+    beast::flat_buffer buf;
+    beast::error_code stored_ec;
+    std::exception_ptr stored_exc;
+    boost::asio::steady_timer tick_timer(ioc);
 
-            if (ec == beast::error::timeout) {
-                // No frame within read_timeout. Drain, fire the
-                // subclass tick hook, check liveness, and continue so
-                // stop_flag can be observed on quiet connections.
-                buf.consume(buf.size());
+    std::function<void()> arm_read;
+    std::function<void()> arm_tick;
 
-                if (liveness_ns > 0) {
-                    const uint64_t now_ns = bpt::common::util::WallClock::now_ns();
-                    if (now_ns - last_recv_ns > liveness_ns) {
-                        // Escalate to the outer reconnect loop — a
-                        // silent stream is treated the same as an
-                        // explicit WS error.
-                        throw beast::system_error(beast::error::timeout);
-                    }
-                }
+    auto trigger_exit = [&]() {
+        // Cancel both pending ops so the outer run_one() loop drains
+        // and exits. Each cancel races safely with the other handler;
+        // whichever fires first sees operation_aborted and returns
+        // without re-arming.
+        beast::error_code ce;
+        tick_timer.cancel();
+        ws.lowest_layer_cancel(ce);
+    };
 
-                on_tick();
-                continue;
+    arm_read = [&]() {
+        ws.async_read(buf, [&](beast::error_code ec, std::size_t /*n*/) {
+            // operation_aborted only happens when we cancelled — exit path.
+            if (ec == boost::asio::error::operation_aborted)
+                return;
+            if (ec) {
+                if (!stored_ec && !stored_exc)
+                    stored_ec = ec;
+                trigger_exit();
+                return;
             }
-            if (ec)
-                throw beast::system_error(ec);
-
             const uint64_t recv_ns = bpt::common::util::WallClock::now_ns();
             last_recv_ns = recv_ns;
             std::string_view payload(static_cast<const char*>(buf.data().data()), buf.data().size());
-            on_frame(payload, recv_ns);
+            try {
+                on_frame(payload, recv_ns);
+            } catch (...) {
+                stored_exc = std::current_exception();
+                trigger_exit();
+                return;
+            }
             buf.consume(buf.size());
+            if (stop_flag.load(std::memory_order_relaxed))
+                return;  // shutdown — don't re-arm
+            arm_read();
+        });
+    };
+
+    arm_tick = [&]() {
+        tick_timer.expires_after(read_timeout);
+        tick_timer.async_wait([&](beast::error_code ec) {
+            if (ec)
+                return;  // cancelled by trigger_exit / shutdown
+            if (stop_flag.load(std::memory_order_relaxed))
+                return;
+
+            if (liveness_ns > 0) {
+                const uint64_t now_ns = bpt::common::util::WallClock::now_ns();
+                if (now_ns - last_recv_ns > liveness_ns) {
+                    // Escalate to the outer reconnect loop — a silent
+                    // stream is treated the same as an explicit WS error.
+                    if (!stored_ec && !stored_exc)
+                        stored_ec = beast::error::timeout;
+                    trigger_exit();
+                    return;
+                }
+            }
+
+            try {
+                on_tick();
+            } catch (...) {
+                stored_exc = std::current_exception();
+                trigger_exit();
+                return;
+            }
+            arm_tick();
+        });
+    };
+
+    arm_read();
+    arm_tick();
+
+    // Drive the io_context until shutdown or an error signal. Using
+    // run_one (rather than run) keeps each handler invocation in this
+    // thread without nested-handler surprises; the outer loop re-checks
+    // exit conditions between handler invocations.
+    while (!stop_flag.load(std::memory_order_relaxed) && !stored_ec && !stored_exc) {
+        if (ioc.stopped())
+            break;
+        if (ioc.run_one() == 0)
+            break;  // io_context drained — handlers are done re-arming
+    }
+
+    // Outer loop exited. Cancel any still-pending op so the io_context
+    // can be re-used by the adapter's reconnect path. The handlers will
+    // see operation_aborted; we drain them with poll() so they don't
+    // fire on a later io_context iteration.
+    {
+        beast::error_code ce;
+        tick_timer.cancel();
+        ws.lowest_layer_cancel(ce);
+        while (ioc.poll_one() > 0) {
         }
-    } catch (...) {
-        connected.store(false, std::memory_order_relaxed);
-        // send_guard clears ws_, ping_guard joins the ping thread.
-        throw;
     }
 
     connected.store(false, std::memory_order_relaxed);
-    ws.close(boost::beast::websocket::close_code::normal);
+
+    // Best-effort close. Most error paths leave the socket in a state
+    // where close fails — that's fine, the destructor of `ws` will
+    // shut down the TCP socket cleanly anyway.
+    try {
+        ws.close(boost::beast::websocket::close_code::normal);
+    } catch (...) {
+    }
+
+    if (stored_exc)
+        std::rethrow_exception(stored_exc);
+    if (stored_ec)
+        throw beast::system_error(stored_ec);
 }
 
 inline bool RunLoop::send(const std::string& msg) {
