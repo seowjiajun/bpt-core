@@ -13,6 +13,7 @@ cc_library(
     includes = ["include"],
     visibility = ["//visibility:public"],
     deps = [
+        "//bpt-common",
         "//messages",
         "@fmt",
     ],
@@ -42,7 +43,7 @@ cc_binary(
         "src/messaging/aeron_bus.cpp",
         "src/messaging/subscribers/exec_report_subscriber.cpp",
         "src/messaging/subscribers/md_bbo_subscriber.cpp",
-        "src/messaging/publishers/toxicity_publisher.cpp",
+        "src/messaging/publishers/aeron_toxicity_publisher.cpp",
     ],
     deps = [
         ":analytics_core",

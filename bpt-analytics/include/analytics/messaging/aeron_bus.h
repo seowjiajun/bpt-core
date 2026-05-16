@@ -7,7 +7,7 @@
 /// one factory so `AnalyticsService` doesn't take `<Aeron.h>` in its
 /// constructor.
 
-#include "analytics/messaging/publishers/toxicity_publisher.h"
+#include "analytics/messaging/publishers/i_toxicity_publisher.h"
 #include "analytics/messaging/subscribers/exec_report_subscriber.h"
 #include "analytics/messaging/subscribers/md_bbo_subscriber.h"
 
@@ -25,7 +25,7 @@ namespace messaging {
 struct AnalyticsBus {
     std::unique_ptr<ExecReportSubscriber> exec_sub;
     std::unique_ptr<MdBboSubscriber> md_sub;
-    std::unique_ptr<ToxicityPublisher> tox_pub;
+    std::unique_ptr<IToxicityPublisher> tox_pub;  ///< port; AeronToxicityPublisher in prod
 };
 
 class AnalyticsAeronBus {
