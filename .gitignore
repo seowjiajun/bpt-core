@@ -77,3 +77,14 @@ infra/terraform/**/*.tfplan
 
 # MkDocs build output
 site/_build/
+
+# IDE / editor caches
+.clwb/
+
+# Editor backup files
+*.bak
+
+# Local research workspace — scratch scripts + market-data parquet files.
+# Scripts that mature into shared tooling get explicitly moved to scripts/
+# and committed from there; the working dir stays local-only.
+research/
