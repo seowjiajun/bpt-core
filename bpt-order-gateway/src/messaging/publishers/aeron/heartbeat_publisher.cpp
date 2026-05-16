@@ -1,9 +1,9 @@
-#include "order_gateway/messaging/publishers/heartbeat_publisher.h"
+#include "order_gateway/messaging/publishers/aeron/heartbeat_publisher.h"
 
 #include <bpt_common/util/tsc_clock.h>
 #include <cstddef>
 
-namespace bpt::order_gateway::messaging {
+namespace bpt::order_gateway::messaging::aeron {
 
 using bpt::common::util::WallClock;
 using Policy = bpt::common::aeron::Publisher::Policy;
@@ -22,4 +22,4 @@ void HeartbeatPublisher::publish(uint8_t service_id, uint16_t orders_in_flight, 
     publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(bytes.size()));
 }
 
-}  // namespace bpt::order_gateway::messaging
+}  // namespace bpt::order_gateway::messaging::aeron

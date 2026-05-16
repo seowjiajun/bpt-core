@@ -17,7 +17,7 @@ inline uint64_t now_ns() noexcept {
 
 namespace bpt::order_gateway::order {
 
-OrderProcessor::OrderProcessor(messaging::IExecReportPublisher& exec_pub,
+OrderProcessor::OrderProcessor(messaging::api::ExecReportPublisher& exec_pub,
                                OrderStateManager& state_mgr,
                                risk::RiskChecker& risk_checker,
                                risk::PnlTracker& pnl_tracker,

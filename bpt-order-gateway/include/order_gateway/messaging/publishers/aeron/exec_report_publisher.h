@@ -1,7 +1,7 @@
 #pragma once
 
 #include "order_gateway/messaging/codecs/sbe_execution_report_codec.h"
-#include "order_gateway/messaging/publishers/i_exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/api/exec_report_publisher.h"
 
 #include <Aeron.h>
 
@@ -9,16 +9,16 @@
 #include <memory>
 #include <string>
 
-namespace bpt::order_gateway::messaging {
+namespace bpt::order_gateway::messaging::aeron {
 
-/// \brief Aeron-backed concrete for IExecReportPublisher.
+/// \brief Aeron-backed concrete for api::ExecReportPublisher.
 ///
 /// Publishes ExecutionReport (SBE) on the exec-report stream toward
 /// strategy. Back-pressure policy is `kRetryOnBackpressure` — exec
 /// reports drive position tracking, so we'd rather block briefly than
 /// drop them. If no subscriber is connected at all, drop instead of
 /// hang (strategy down → gateway can't be useful anyway).
-class ExecReportPublisher final : public IExecReportPublisher {
+class ExecReportPublisher final : public api::ExecReportPublisher {
 public:
     ExecReportPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
@@ -43,4 +43,4 @@ private:
     SbeExecutionReportCodec       codec_;
 };
 
-}  // namespace bpt::order_gateway::messaging
+}  // namespace bpt::order_gateway::messaging::aeron

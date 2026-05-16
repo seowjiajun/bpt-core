@@ -20,10 +20,10 @@ using bpt::messages::ExchangeId;
 namespace bpt::order_gateway {
 
 OrderGatewayService::OrderGatewayService(config::Settings cfg,
-                                 std::shared_ptr<messaging::IOrderControlSource> control_source,
-                                 std::shared_ptr<messaging::IExecReportPublisher> exec_sink,
-                                 std::shared_ptr<messaging::IAccountSnapshotPublisher> account_snapshot_sink,
-                                 std::shared_ptr<messaging::IHeartbeatPublisher> heartbeat_sink,
+                                 std::shared_ptr<messaging::api::OrderSubscriber> control_source,
+                                 std::shared_ptr<messaging::api::ExecReportPublisher> exec_sink,
+                                 std::shared_ptr<messaging::api::AccountSnapshotPublisher> account_snapshot_sink,
+                                 std::shared_ptr<messaging::api::HeartbeatPublisher> heartbeat_sink,
                                  std::map<std::string, adapter::ExchangeCredentials> creds,
                                  const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),

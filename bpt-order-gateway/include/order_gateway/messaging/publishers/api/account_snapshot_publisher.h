@@ -9,12 +9,12 @@
 /// shutdown_flatten, dashboard HoldingsPanel) can attach without
 /// touching the higher-rate exec_report stream.
 ///
-/// Implementations: AccountSnapshotPublisher (Aeron-backed) in prod;
-/// fakes in unit tests if/when needed.
+/// Implementations: aeron::AccountSnapshotPublisher in prod; fakes in
+/// unit tests if/when needed.
 
 #include "order_gateway/adapter/common/account_snapshot_data.h"
 
-namespace bpt::order_gateway::messaging {
+namespace bpt::order_gateway::messaging::api {
 
 /// \brief Contract for the AccountSnapshot outbound port.
 ///
@@ -22,13 +22,13 @@ namespace bpt::order_gateway::messaging {
 /// AccountSnapshotRequest (REST fetch is blocking — must not run on
 /// the poll loop). Implementations must be thread-safe for concurrent
 /// publish() across worker threads from different adapters.
-class IAccountSnapshotPublisher {
+class AccountSnapshotPublisher {
 public:
-    virtual ~IAccountSnapshotPublisher() = default;
+    virtual ~AccountSnapshotPublisher() = default;
 
     /// \brief Encode and publish one snapshot. May log + drop on
     ///        no-subscriber rather than block.
     virtual void publish(const adapter::AccountSnapshotData& snapshot) = 0;
 };
 
-}  // namespace bpt::order_gateway::messaging
+}  // namespace bpt::order_gateway::messaging::api

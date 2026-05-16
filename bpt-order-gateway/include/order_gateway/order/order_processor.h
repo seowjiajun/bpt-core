@@ -1,7 +1,7 @@
 #pragma once
 
 #include "order_gateway/adapter/common/i_order_adapter.h"
-#include "order_gateway/messaging/publishers/exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/aeron/exec_report_publisher.h"
 #include "order_gateway/metrics/metrics.h"
 #include "order_gateway/order/order_state_manager.h"
 #include "order_gateway/risk/pnl_tracker.h"
@@ -36,7 +36,7 @@ public:
     // All dependencies are non-owning references.  The adapters vector is also
     // referenced rather than copied so that the processor always sees the live
     // set without needing to be rebuilt if an adapter is added at runtime.
-    OrderProcessor(messaging::IExecReportPublisher& exec_pub,
+    OrderProcessor(messaging::api::ExecReportPublisher& exec_pub,
                    OrderStateManager& state_mgr,
                    risk::RiskChecker& risk_checker,
                    risk::PnlTracker& pnl_tracker,
@@ -121,7 +121,7 @@ private:
     static const char* lifecycle_str(OrderLifecycle lc);
     static const char* exchange_str(bpt::messages::ExchangeId::Value id);
 
-    messaging::IExecReportPublisher& exec_pub_;
+    messaging::api::ExecReportPublisher& exec_pub_;
     OrderStateManager& state_mgr_;
     risk::RiskChecker& risk_checker_;
     risk::PnlTracker& pnl_tracker_;

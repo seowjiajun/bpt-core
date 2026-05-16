@@ -9,7 +9,7 @@
 /// callback. The poll() loop is driven from the main poll thread
 /// inside OrderGatewayService::run().
 ///
-/// Implementations: OrderSubscriber (Aeron-backed) in prod; a fake
+/// Implementations: aeron::OrderSubscriber in prod; a fake
 /// implementation can drive the five message types directly into the
 /// callbacks for seam testing without an Aeron MediaDriver.
 
@@ -29,6 +29,8 @@ using OnCancelAllFn = std::function<void(const bpt::messages::CancelAll&)>;
 using OnModifyFn = std::function<void(const bpt::messages::ModifyOrder&)>;
 using OnAccountSnapshotRequestFn = std::function<void(const bpt::messages::AccountSnapshotRequest&)>;
 
+namespace api {
+
 /// \brief Contract for the inbound order-control source.
 ///
 /// Single-threaded: poll() is called from OrderGatewayService's main loop
@@ -38,9 +40,9 @@ using OnAccountSnapshotRequestFn = std::function<void(const bpt::messages::Accou
 /// setters to match the existing OrderSubscriber surface. They must be
 /// set before the first poll() call; references handed to the
 /// callbacks are only valid for the duration of the call.
-class IOrderControlSource {
+class OrderSubscriber {
 public:
-    virtual ~IOrderControlSource() = default;
+    virtual ~OrderSubscriber() = default;
 
     /// \brief Drain up to `fragment_limit` control fragments, dispatching
     ///        each to the matching handler.
@@ -56,5 +58,7 @@ public:
     OnAccountSnapshotRequestFn on_account_snapshot_request;
     /// \}
 };
+
+}  // namespace api
 
 }  // namespace bpt::order_gateway::messaging

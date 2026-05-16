@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bpt_common/codec/codec.h"
-#include "order_gateway/messaging/publishers/i_account_snapshot_publisher.h"  // adapter::AccountSnapshotData
+#include "order_gateway/messaging/publishers/api/account_snapshot_publisher.h"  // adapter::AccountSnapshotData
 
 #include <cstddef>
 #include <span>

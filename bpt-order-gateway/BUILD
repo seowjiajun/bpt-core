@@ -4,7 +4,7 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 # Core order-gateway components needed by tests — no network adapters.
 # OrderProcessor lives here (not in the binary srcs) because it depends
-# only on the IExecReportPublisher interface, so tests can drop in a
+# only on the api::ExecReportPublisher interface, so tests can drop in a
 # capturing fake without bringing up Aeron.
 cc_library(
     name = "order_gateway_core",
@@ -57,10 +57,10 @@ cc_binary(
         "src/messaging/codecs/sbe_account_snapshot_codec.cpp",
         "src/messaging/codecs/sbe_execution_report_codec.cpp",
         "src/messaging/codecs/sbe_order_gateway_heartbeat_codec.cpp",
-        "src/messaging/publishers/account_snapshot_publisher.cpp",
-        "src/messaging/publishers/exec_report_publisher.cpp",
-        "src/messaging/publishers/heartbeat_publisher.cpp",
-        "src/messaging/subscribers/order_subscriber.cpp",
+        "src/messaging/publishers/aeron/account_snapshot_publisher.cpp",
+        "src/messaging/publishers/aeron/exec_report_publisher.cpp",
+        "src/messaging/publishers/aeron/heartbeat_publisher.cpp",
+        "src/messaging/subscribers/aeron/order_subscriber.cpp",
         "src/refdata/instrument_cache.cpp",
         "src/refdata/refdata_client.cpp",
         "src/adapter/common/beast_https_client.cpp",

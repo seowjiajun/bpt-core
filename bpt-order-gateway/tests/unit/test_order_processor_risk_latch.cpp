@@ -12,7 +12,7 @@
 // the OrderProcessor glue that flips trading_enabled on breach. This
 // does.
 
-#include "order_gateway/messaging/publishers/i_exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/api/exec_report_publisher.h"
 #include "order_gateway/metrics/metrics.h"
 #include "order_gateway/order/order_processor.h"
 #include "order_gateway/order/order_state_manager.h"
@@ -38,7 +38,7 @@ namespace {
 
 using bpt::order_gateway::adapter::ExecEvent;
 using bpt::order_gateway::adapter::IOrderAdapter;
-using bpt::order_gateway::messaging::IExecReportPublisher;
+using bpt::order_gateway::messaging::api::ExecReportPublisher;
 using bpt::order_gateway::metrics::OrderGatewayMetrics;
 using bpt::order_gateway::order::OrderProcessor;
 using bpt::order_gateway::order::OrderStateManager;
@@ -54,7 +54,7 @@ using bpt::messages::TimeInForce;
 
 // Capturing fake: stores every publish() call in-memory so the test
 // can assert post-conditions without a real Aeron publication.
-struct CapturingExecReportPublisher final : public IExecReportPublisher {
+struct CapturingExecReportPublisher final : public ExecReportPublisher {
     struct Entry {
         uint64_t order_id;
         ExecStatus::Value status;

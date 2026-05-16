@@ -9,26 +9,27 @@
 #include "order_gateway/messaging/aeron_bus.h"
 
 #include "order_gateway/config/settings.h"
-#include "order_gateway/messaging/publishers/account_snapshot_publisher.h"
-#include "order_gateway/messaging/publishers/exec_report_publisher.h"
-#include "order_gateway/messaging/publishers/heartbeat_publisher.h"
-#include "order_gateway/messaging/subscribers/order_subscriber.h"
+#include "order_gateway/messaging/publishers/aeron/account_snapshot_publisher.h"
+#include "order_gateway/messaging/publishers/aeron/exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/aeron/heartbeat_publisher.h"
+#include "order_gateway/messaging/subscribers/aeron/order_subscriber.h"
 
 namespace bpt::order_gateway::messaging {
 
-AeronBus AeronBus::build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings) {
+AeronBus AeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
     AeronBus bus;
     bus.control_source =
-        std::make_shared<OrderSubscriber>(aeron, settings.aeron.order.channel, settings.aeron.order.stream_id);
-    bus.exec_sink = std::make_shared<ExecReportPublisher>(aeron,
-                                                          settings.aeron.exec_report.channel,
-                                                          settings.aeron.exec_report.stream_id);
-    bus.account_snapshot_sink = std::make_shared<AccountSnapshotPublisher>(aeron,
-                                                                           settings.aeron.account_snapshot.channel,
-                                                                           settings.aeron.account_snapshot.stream_id);
-    bus.heartbeat_sink = std::make_shared<HeartbeatPublisher>(aeron,
-                                                              settings.aeron.heartbeat.channel,
-                                                              settings.aeron.heartbeat.stream_id);
+        std::make_shared<aeron::OrderSubscriber>(aeron, settings.aeron.order.channel, settings.aeron.order.stream_id);
+    bus.exec_sink = std::make_shared<aeron::ExecReportPublisher>(aeron,
+                                                                 settings.aeron.exec_report.channel,
+                                                                 settings.aeron.exec_report.stream_id);
+    bus.account_snapshot_sink = std::make_shared<aeron::AccountSnapshotPublisher>(
+        aeron,
+        settings.aeron.account_snapshot.channel,
+        settings.aeron.account_snapshot.stream_id);
+    bus.heartbeat_sink = std::make_shared<aeron::HeartbeatPublisher>(aeron,
+                                                                     settings.aeron.heartbeat.channel,
+                                                                     settings.aeron.heartbeat.stream_id);
     return bus;
 }
 

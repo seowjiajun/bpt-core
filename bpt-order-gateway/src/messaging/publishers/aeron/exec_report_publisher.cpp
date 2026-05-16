@@ -1,8 +1,8 @@
-#include "order_gateway/messaging/publishers/exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/aeron/exec_report_publisher.h"
 
 #include <cstddef>
 
-namespace bpt::order_gateway::messaging {
+namespace bpt::order_gateway::messaging::aeron {
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
@@ -53,4 +53,4 @@ void ExecReportPublisher::publish(uint64_t order_id,
     publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(bytes.size()));
 }
 
-}  // namespace bpt::order_gateway::messaging
+}  // namespace bpt::order_gateway::messaging::aeron

@@ -3,16 +3,16 @@
 /// \file
 /// \brief Outbound port: ExecutionReport emission toward strategy.
 ///
-/// Carved out of the concrete ExecReportPublisher so OrderProcessor can
-/// be constructed in unit tests against a capturing or null
+/// Carved out of the concrete aeron::ExecReportPublisher so OrderProcessor
+/// can be constructed in unit tests against a capturing or null
 /// implementation without bringing up an Aeron MediaDriver.
 ///
-/// Implementations: ExecReportPublisher (Aeron-backed) in prod;
+/// Implementations: aeron::ExecReportPublisher in prod;
 /// CapturingExecReportPublisher in unit tests.
 ///
 /// The 15-argument publish() signature is preserved verbatim from the
 /// pre-port-extraction ExecReportPublisher. Callers upcast the concrete
-/// instance to `IExecReportPublisher&` at the OrderProcessor boundary.
+/// instance to `api::ExecReportPublisher&` at the OrderProcessor boundary.
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace bpt::order_gateway::messaging {
+namespace bpt::order_gateway::messaging::api {
 
 /// \brief Contract for the exec-report outbound port.
 ///
@@ -32,9 +32,9 @@ namespace bpt::order_gateway::messaging {
 /// reject) and on synthetic events (cancellations of stale orders,
 /// risk-rejected NewOrders). Single-threaded contract — implementations
 /// need not be thread-safe.
-class IExecReportPublisher {
+class ExecReportPublisher {
 public:
-    virtual ~IExecReportPublisher() = default;
+    virtual ~ExecReportPublisher() = default;
 
     virtual void publish(uint64_t order_id,
                          uint64_t exchange_order_id,
@@ -53,4 +53,4 @@ public:
                          uint64_t local_ts_ns) = 0;
 };
 
-}  // namespace bpt::order_gateway::messaging
+}  // namespace bpt::order_gateway::messaging::api

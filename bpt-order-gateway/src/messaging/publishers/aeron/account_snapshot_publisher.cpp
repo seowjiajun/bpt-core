@@ -1,11 +1,11 @@
-#include "order_gateway/messaging/publishers/account_snapshot_publisher.h"
+#include "order_gateway/messaging/publishers/aeron/account_snapshot_publisher.h"
 
 #include <messages/ExchangeId.h>
 
 #include <bpt_common/logging.h>
 #include <cstddef>
 
-namespace bpt::order_gateway::messaging {
+namespace bpt::order_gateway::messaging::aeron {
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
@@ -33,4 +33,4 @@ void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snaps
                                publisher_.stream_id());
 }
 
-}  // namespace bpt::order_gateway::messaging
+}  // namespace bpt::order_gateway::messaging::aeron
