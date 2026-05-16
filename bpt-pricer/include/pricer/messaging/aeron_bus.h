@@ -15,8 +15,8 @@
 
 #include "pricer/md/md_subscribe_client.h"
 #include "pricer/md/md_subscriber.h"
-#include "pricer/messaging/status_publisher.h"
-#include "pricer/messaging/vol_surface_publisher.h"
+#include "pricer/messaging/publishers/status_publisher.h"
+#include "pricer/messaging/publishers/vol_surface_publisher.h"
 #include "pricer/refdata/refdata_subscriber.h"
 
 #include <Aeron.h>
