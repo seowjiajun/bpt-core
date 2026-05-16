@@ -8,6 +8,7 @@ cc_library(
         "src/pricing/black_scholes.cpp",
         "src/pricing/forward_curve.cpp",
         "src/pricing/iv_solver.cpp",
+        "src/pricing/svi.cpp",
     ],
     hdrs = glob(["include/pricer/**/*.h"]),
     includes = ["include"],
@@ -24,6 +25,7 @@ cc_test(
         "tests/test_black_scholes.cpp",
         "tests/test_forward_curve.cpp",
         "tests/test_iv_solver.cpp",
+        "tests/test_svi.cpp",
     ],
     deps = [
         ":pricer_core",

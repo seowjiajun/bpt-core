@@ -3,6 +3,11 @@
 #include "pricer/pricing/black_scholes.h"
 #include "pricer/pricing/forward_curve.h"
 #include "pricer/pricing/iv_solver.h"
+#include "pricer/pricing/svi.h"
+
+#include <cmath>
+#include <set>
+#include <unordered_set>
 
 namespace bpt::pricer::surface {
 
@@ -165,6 +170,122 @@ std::vector<VolSurfaceGrid> SurfaceBuilder::build(uint32_t current_date) {
             .vega = greeks.vega,
             .theta = greeks.theta,
         });
+    }
+
+    // ── SVI smile-fitting pass ────────────────────────────────────────────
+    //
+    // The observed-IV loop above only emits a surface point for options with
+    // a venue BBO. Strikes without a maker quote are silent — strategies and
+    // dashboards see a hole exactly when they need it most (orphan positions,
+    // illiquid wings).
+    //
+    // Per-expiry SVI fit on observed (k, total_var) data gives us a continuous
+    // IV(k) callable. We evaluate it at every refdata strike for the underlying
+    // and emit an "interpolated" surface point. Bid/ask IV stay 0 to signal
+    // "no market data; from model".
+    //
+    // Slices with <3 observed points are skipped (under-determined fit).
+    for (auto& [key, grid] : grids) {
+        // Collect observed (k, total_var) per expiry inside this grid.
+        std::unordered_map<uint32_t, std::vector<pricing::SviFitInput>> by_expiry;
+        std::unordered_set<uint64_t> observed_ids;
+        observed_ids.reserve(grid.points.size());
+        for (const auto& pt : grid.points) {
+            observed_ids.insert(pt.instrument_id);
+            const double k = std::log(pt.strike_price / pt.forward_price);
+            const double total_var = pt.implied_vol * pt.implied_vol * pt.time_to_expiry;
+            by_expiry[pt.expiry_date].push_back({k, total_var});
+        }
+
+        // Fit SVI per expiry slice.
+        std::unordered_map<uint32_t, pricing::SviParams> fitted;
+        for (const auto& [expiry, points] : by_expiry) {
+            auto res = pricing::svi_fit(points);
+            if (!res)
+                continue;
+            // Reject obvious mis-fits — rms residual much larger than typical
+            // IV (e.g. > 0.5 total variance means the smile is broken).
+            if (res->rms_residual > 0.5)
+                continue;
+            fitted[expiry] = res->params;
+        }
+
+        // Re-project observed points onto the fitted smile. Pre-fit, each
+        // observed point's `implied_vol` and Greeks come from the raw venue
+        // mid via Newton-Raphson — a per-strike IV with no cross-strike
+        // smoothness. Strategies that anchor theo on this IV inherit any
+        // venue-mid noise. Re-projecting onto the SVI fit gives every
+        // observed point a smile-consistent IV (and Greeks); the dislocation
+        // signal is still recoverable downstream as `implied_vol -
+        // 0.5*(bid_iv + ask_iv)`, since bid_iv/ask_iv remain raw venue-derived.
+        for (auto& pt : grid.points) {
+            auto fit_it = fitted.find(pt.expiry_date);
+            if (fit_it == fitted.end())
+                continue;
+            const double k = std::log(pt.strike_price / pt.forward_price);
+            const double iv_fit = pricing::svi_iv(k, pt.time_to_expiry, fit_it->second);
+            if (!std::isfinite(iv_fit) || iv_fit <= 0.0)
+                continue;
+            pt.implied_vol = iv_fit;
+            const bool is_call = (pt.option_side == bpt::messages::OptionSide::CALL);
+            const auto greeks = is_call
+                ? pricing::bs_call(pt.forward_price, pt.strike_price, pt.time_to_expiry, risk_free_rate_, iv_fit)
+                : pricing::bs_put(pt.forward_price, pt.strike_price, pt.time_to_expiry, risk_free_rate_, iv_fit);
+            pt.delta = greeks.delta;
+            pt.gamma = greeks.gamma;
+            pt.vega = greeks.vega;
+            pt.theta = greeks.theta;
+        }
+
+        // Find every refdata option matching this (exchange, underlying) and
+        // emit an interpolated point if we don't already have an observed
+        // one for it AND its expiry has a fitted slice.
+        for (const auto& [iid, inst] : instruments_) {
+            if (observed_ids.count(iid))
+                continue;
+            if (inst.exchange_id != grid.exchange_id || inst.underlying != grid.underlying)
+                continue;
+            auto fit_it = fitted.find(inst.expiry_date);
+            if (fit_it == fitted.end())
+                continue;
+
+            const std::string fc_key = curve_key(inst.exchange_id, inst.underlying);
+            auto fc_it = forward_curves_.find(fc_key);
+            if (fc_it == forward_curves_.end())
+                continue;
+            const double fwd = fc_it->second.get_forward(inst.expiry_date, current_date);
+            const double T = pricing::ForwardCurve::time_to_expiry(inst.expiry_date, current_date);
+            if (T <= 0.0 || fwd <= 0.0)
+                continue;
+
+            const double k = std::log(inst.strike_price / fwd);
+            const double iv = pricing::svi_iv(k, T, fit_it->second);
+            if (!std::isfinite(iv) || iv <= 0.0)
+                continue;
+
+            const auto greeks = inst.is_call ? pricing::bs_call(fwd, inst.strike_price, T, risk_free_rate_, iv)
+                                             : pricing::bs_put(fwd, inst.strike_price, T, risk_free_rate_, iv);
+
+            grid.points.push_back(IvPoint{
+                .instrument_id = inst.instrument_id,
+                .expiry_date = inst.expiry_date,
+                .strike_price = inst.strike_price,
+                .option_side = inst.is_call ? bpt::messages::OptionSide::CALL : bpt::messages::OptionSide::PUT,
+                .implied_vol = iv,
+                .forward_price = fwd,
+                .time_to_expiry = T,
+                // bid_iv / ask_iv / bid_price / ask_price stay zero — sentinel
+                // that this point is model-derived, not observed.
+                .bid_iv = 0.0,
+                .ask_iv = 0.0,
+                .bid_price = 0.0,
+                .ask_price = 0.0,
+                .delta = greeks.delta,
+                .gamma = greeks.gamma,
+                .vega = greeks.vega,
+                .theta = greeks.theta,
+            });
+        }
     }
 
     std::vector<VolSurfaceGrid> result;
