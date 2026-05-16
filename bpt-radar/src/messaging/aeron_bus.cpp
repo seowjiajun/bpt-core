@@ -1,10 +1,11 @@
 #include "radar/messaging/aeron_bus.h"
 
 #include "radar/config/settings.h"
+#include "radar/messaging/publishers/aeron/market_color_publisher.h"
 
 namespace bpt::radar::messaging {
 
-RadarBus RadarAeronBus::build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings) {
+RadarBus RadarAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
     RadarBus bus;
     bus.surface_sub =
         std::make_unique<VolSurfaceSubscriber>(aeron, settings.vol_surface.channel, settings.vol_surface.stream_id);
@@ -22,8 +23,9 @@ RadarBus RadarAeronBus::build(std::shared_ptr<aeron::Aeron> aeron, const config:
     bus.bbo_sub = std::make_unique<MdMarketDataSubscriber>(aeron,
                                                            settings.md_data.channel,
                                                            settings.md_data.stream_id);
-    bus.color_pub =
-        std::make_unique<MarketColorPublisher>(aeron, settings.market_color.channel, settings.market_color.stream_id);
+    bus.color_pub = std::make_unique<aeron::MarketColorPublisher>(aeron,
+                                                                  settings.market_color.channel,
+                                                                  settings.market_color.stream_id);
     return bus;
 }
 

@@ -1,13 +1,13 @@
-#include "radar/messaging/publishers/market_color_publisher.h"
+#include "radar/messaging/publishers/aeron/market_color_publisher.h"
 
 #include <Aeron.h>
 #include <cstddef>
 
-namespace bpt::radar::messaging {
+namespace bpt::radar::messaging::aeron {
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
-MarketColorPublisher::MarketColorPublisher(std::shared_ptr<aeron::Aeron> aeron,
+MarketColorPublisher::MarketColorPublisher(std::shared_ptr<::aeron::Aeron> aeron,
                                            const std::string& channel,
                                            int stream_id)
     // kBoundedRetry mirrors ToxicityPublisher's policy — periodic snapshot
@@ -21,8 +21,9 @@ MarketColorPublisher::MarketColorPublisher(std::shared_ptr<aeron::Aeron> aeron,
 bool MarketColorPublisher::publish(const MarketColor& color) {
     alignas(8) std::byte scratch[PodMarketColorCodec::kRecommendedScratchSize];
     const auto bytes = codec_.encode(color, scratch);
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(scratch), static_cast<aeron::util::index_t>(bytes.size()));
-    return pub_->offer(ab, 0, static_cast<aeron::util::index_t>(bytes.size()));
+    ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(scratch),
+                             static_cast<::aeron::util::index_t>(bytes.size()));
+    return pub_->offer(ab, 0, static_cast<::aeron::util::index_t>(bytes.size()));
 }
 
-}  // namespace bpt::radar::messaging
+}  // namespace bpt::radar::messaging::aeron

@@ -6,7 +6,7 @@
 /// Mirror of bpt-analytics: every Aeron pub/sub the service needs is built in
 /// one factory so `RadarService` doesn't depend on `<Aeron.h>` directly.
 
-#include "radar/messaging/publishers/market_color_publisher.h"
+#include "radar/messaging/publishers/api/market_color_publisher.h"
 #include "radar/messaging/subscribers/funding_rate_subscriber.h"
 #include "radar/messaging/subscribers/instrument_stats_subscriber.h"
 #include "radar/messaging/subscribers/md_market_data_subscriber.h"
@@ -32,12 +32,12 @@ struct RadarBus {
     std::unique_ptr<RefdataPerpSubscriber> refdata_perp_sub;
     std::unique_ptr<MdTradeSubscriber> trade_sub;
     std::unique_ptr<MdMarketDataSubscriber> bbo_sub;
-    std::unique_ptr<MarketColorPublisher> color_pub;
+    std::unique_ptr<api::MarketColorPublisher> color_pub;  ///< port; aeron::MarketColorPublisher in prod
 };
 
 class RadarAeronBus {
 public:
-    static RadarBus build(std::shared_ptr<aeron::Aeron> aeron, const config::Settings& settings);
+    static RadarBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace messaging
