@@ -20,11 +20,11 @@
 
 #include "md_gateway/adapter/common/i_adapter.h"
 #include "md_gateway/config/settings.h"
-#include "md_gateway/messaging/publishers/i_ack_publisher.h"
-#include "md_gateway/messaging/publishers/i_funding_rate_publisher.h"
-#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/api/ack_publisher.h"
+#include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
 #include "md_gateway/messaging/publishers/md_publisher.h"
-#include "md_gateway/messaging/subscribers/i_md_control_source.h"
+#include "md_gateway/messaging/subscribers/api/md_control_subscriber.h"
 #include "md_gateway/metrics/metrics.h"
 #include "md_gateway/subscription/subscription_manager.h"
 
@@ -54,11 +54,11 @@ public:
     /// \param stats_sink          publisher for open-interest updates
     /// \param topology         CPU-affinity map for IO/main thread pinning
     MdGatewayService(config::Settings cfg,
-                 std::unique_ptr<messaging::IMdControlSource> control_source,
+                 std::unique_ptr<messaging::api::MdControlSubscriber> control_source,
                  std::shared_ptr<messaging::MdPublisher> md_sink,
-                 std::unique_ptr<messaging::IAckPublisher> ack_sink,
-                 std::shared_ptr<messaging::IFundingRatePublisher> funding_sink,
-                 std::shared_ptr<messaging::IInstrumentStatsPublisher> stats_sink,
+                 std::unique_ptr<messaging::api::AckPublisher> ack_sink,
+                 std::shared_ptr<messaging::api::FundingRatePublisher> funding_sink,
+                 std::shared_ptr<messaging::api::InstrumentStatsPublisher> stats_sink,
                  const bpt::common::util::Topology& topology);
 
     /// \brief Block running the main poll loop until stop() is called.
@@ -71,10 +71,10 @@ private:
     config::Settings cfg_;
     metrics::MdGatewayMetrics metrics_;
     std::shared_ptr<messaging::MdPublisher> md_pub_;
-    std::shared_ptr<messaging::IFundingRatePublisher> funding_pub_;
-    std::shared_ptr<messaging::IInstrumentStatsPublisher> stats_pub_;
-    std::unique_ptr<messaging::IAckPublisher> ack_pub_;
-    std::unique_ptr<messaging::IMdControlSource> ctrl_sub_;
+    std::shared_ptr<messaging::api::FundingRatePublisher> funding_pub_;
+    std::shared_ptr<messaging::api::InstrumentStatsPublisher> stats_pub_;
+    std::unique_ptr<messaging::api::AckPublisher> ack_pub_;
+    std::unique_ptr<messaging::api::MdControlSubscriber> ctrl_sub_;
     subscription::SubscriptionManager sub_mgr_;
 
     /// \name Reporter wiring

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bpt_common/codec/codec.h"
-#include "md_gateway/messaging/publishers/i_funding_rate_publisher.h"  // FundingRateUpdate
+#include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"  // FundingRateUpdate
 
 #include <cstddef>
 #include <span>

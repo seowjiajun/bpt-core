@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bpt_common/codec/codec.h"
-#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"  // InstrumentStatsUpdate
+#include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"  // InstrumentStatsUpdate
 
 #include <cstddef>
 #include <span>

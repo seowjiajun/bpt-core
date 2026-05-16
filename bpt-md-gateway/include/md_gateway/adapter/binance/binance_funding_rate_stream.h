@@ -13,7 +13,7 @@
 
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/config/settings.h"
-#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
 
 #include <atomic>
 #include <boost/asio/io_context.hpp>

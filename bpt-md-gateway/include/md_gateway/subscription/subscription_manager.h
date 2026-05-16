@@ -25,7 +25,7 @@
 /// correlation_id only — other consumers don't see them).
 
 #include "md_gateway/adapter/common/i_adapter.h"
-#include "md_gateway/messaging/publishers/i_ack_publisher.h"
+#include "md_gateway/messaging/publishers/api/ack_publisher.h"
 
 #include <messages/MdSubscribeBatch.h>
 
@@ -56,11 +56,11 @@ public:
     /// instrument in `desired`.
     void apply_requests(uint64_t correlation_id,
                         const std::vector<SubscribeRequest>& desired,
-                        messaging::IAckPublisher& ack_pub);
+                        messaging::api::AckPublisher& ack_pub);
 
-    void apply_batch(bpt::messages::MdSubscribeBatch& msg, messaging::IAckPublisher& ack_pub);
+    void apply_batch(bpt::messages::MdSubscribeBatch& msg, messaging::api::AckPublisher& ack_pub);
 
-    void publish_subscription_heartbeats(messaging::IAckPublisher& ack_pub);
+    void publish_subscription_heartbeats(messaging::api::AckPublisher& ack_pub);
 
     void stop_all();
 

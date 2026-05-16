@@ -3,8 +3,8 @@
 /// \file
 /// \brief Pure interface every md-gateway venue adapter implements.
 
-#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
-#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
 
 #include <bpt_common/util/latency_histogram.h>
 #include <bpt_common/util/topology.h>

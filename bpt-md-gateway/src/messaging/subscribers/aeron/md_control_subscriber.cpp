@@ -1,4 +1,4 @@
-#include "md_gateway/messaging/subscribers/md_control_subscriber.h"
+#include "md_gateway/messaging/subscribers/aeron/md_control_subscriber.h"
 
 #include <messages/MdSubscribeBatch.h>
 #include <messages/MessageHeader.h>
@@ -6,7 +6,7 @@
 #include <bpt_common/logging.h>
 #include <cstddef>
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::aeron {
 
 using bpt::messages::MdSubscribeBatch;
 using bpt::messages::MessageHeader;
@@ -53,4 +53,4 @@ int MdControlSubscriber::poll(BatchHandler handler) {
     return fragments;
 }
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::aeron

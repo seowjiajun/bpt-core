@@ -1,9 +1,9 @@
-#include "md_gateway/messaging/publishers/ack_publisher.h"
+#include "md_gateway/messaging/publishers/aeron/ack_publisher.h"
 
 #include <bpt_common/util/tsc_clock.h>
 #include <cstddef>
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::aeron {
 
 using bpt::common::util::WallClock;
 using Policy = bpt::common::aeron::Publisher::Policy;
@@ -42,4 +42,4 @@ void AckPublisher::publish_service_heartbeat() {
     publisher_.offer(ab, 0, static_cast<::aeron::util::index_t>(bytes.size()));
 }
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::aeron

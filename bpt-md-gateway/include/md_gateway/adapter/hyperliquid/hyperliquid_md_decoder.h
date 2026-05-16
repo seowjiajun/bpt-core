@@ -6,8 +6,8 @@
 #include "md_gateway/adapter/common/json_decoder_base.h"
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/md/md_types.h"
-#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
-#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/TradeSide.h>

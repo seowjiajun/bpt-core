@@ -14,9 +14,9 @@
 /// domain struct here would just translate twice. Same shape refdata
 /// uses on its inbound port.
 ///
-/// Implementations: MdControlSubscriber (Aeron-backed) in prod. A
-/// fake implementation can drive subscribe-batches directly from a
-/// test for seam testing without an Aeron MediaDriver.
+/// Implementations: aeron::MdControlSubscriber in prod. A fake
+/// implementation can drive subscribe-batches directly from a test for
+/// seam testing without an Aeron MediaDriver.
 
 #include <functional>
 
@@ -24,13 +24,13 @@ namespace bpt::messages {
 class MdSubscribeBatch;
 }
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::api {
 
 /// \brief Contract for the inbound control source.
 ///
 /// Single-threaded contract: poll() is called from MdGatewayService's main
 /// loop only. Implementations need not be thread-safe.
-class IMdControlSource {
+class MdControlSubscriber {
 public:
     /// \brief Per-fragment handler invoked by poll() for each decoded batch.
     ///
@@ -39,7 +39,7 @@ public:
     /// underlying Aeron buffer slot may be reclaimed).
     using BatchHandler = std::function<void(bpt::messages::MdSubscribeBatch&)>;
 
-    virtual ~IMdControlSource() = default;
+    virtual ~MdControlSubscriber() = default;
 
     /// \brief Drain available control fragments, dispatching each to `handler`.
     ///
@@ -51,4 +51,4 @@ public:
     virtual int poll(BatchHandler handler) = 0;
 };
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::api

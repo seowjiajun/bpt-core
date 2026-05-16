@@ -1,6 +1,6 @@
 #pragma once
 
-#include "md_gateway/messaging/publishers/i_ack_publisher.h"
+#include "md_gateway/messaging/publishers/api/ack_publisher.h"
 
 #include <messages/AckStatus.h>
 
@@ -18,7 +18,7 @@ struct AckEvent {
     bpt::messages::AckStatus::Value status{};
 };
 
-class FakeAckPublisher : public messaging::IAckPublisher {
+class FakeAckPublisher : public messaging::api::AckPublisher {
 public:
     void publish_ack(uint64_t correlation_id,
                      uint64_t instrument_id,

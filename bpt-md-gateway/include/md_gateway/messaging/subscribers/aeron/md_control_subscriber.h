@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file
-/// \brief Aeron-backed implementation of IMdControlSource.
+/// \brief Aeron-backed implementation of api::MdControlSubscriber.
 ///
 /// Wraps a `bpt::common::aeron::Subscriber` over the control channel
 /// and decodes each delivered fragment as an SBE `MdSubscribeBatch`
@@ -11,7 +11,7 @@
 /// Threading: the underlying Aeron Subscriber is single-poll-thread;
 /// poll() is invoked from MdGatewayService's main thread only.
 
-#include "md_gateway/messaging/subscribers/i_md_control_source.h"
+#include "md_gateway/messaging/subscribers/api/md_control_subscriber.h"
 
 #include <Aeron.h>
 
@@ -19,18 +19,18 @@
 #include <memory>
 #include <string>
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::aeron {
 
-/// \brief Aeron-backed concrete for IMdControlSource.
+/// \brief Aeron-backed concrete for api::MdControlSubscriber.
 ///
 /// Marked `final` — there is one prod implementation; no further
 /// derivation is intended.
-class MdControlSubscriber final : public IMdControlSource {
+class MdControlSubscriber final : public api::MdControlSubscriber {
 public:
     /// \brief Open an Aeron Subscriber on the given control channel + stream.
     MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
-    /// \copydoc IMdControlSource::poll
+    /// \copydoc api::MdControlSubscriber::poll
     int poll(BatchHandler handler) override;
 
 private:
@@ -41,4 +41,4 @@ private:
     BatchHandler current_handler_;
 };
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::aeron

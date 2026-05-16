@@ -27,7 +27,7 @@ adapter::IAdapter* SubscriptionManager::find_adapter(const std::string& exchange
 
 void SubscriptionManager::apply_requests(uint64_t correlation_id,
                                          const std::vector<SubscribeRequest>& desired,
-                                         messaging::IAckPublisher& ack_pub) {
+                                         messaging::api::AckPublisher& ack_pub) {
     // Build this consumer's new desired set (by instrument_id).
     std::unordered_set<uint64_t> new_set;
     new_set.reserve(desired.size());
@@ -88,7 +88,7 @@ void SubscriptionManager::apply_requests(uint64_t correlation_id,
     }
 }
 
-void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, messaging::IAckPublisher& ack_pub) {
+void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, messaging::api::AckPublisher& ack_pub) {
     // SBE exchange field is fixed Char8 — long names (e.g. "HYPERLIQUID")
     // arrive truncated. Restore the canonical full name. Remove once SBE
     // schema migrates to ExchangeId enum.
@@ -113,7 +113,7 @@ void SubscriptionManager::apply_batch(bpt::messages::MdSubscribeBatch& msg, mess
     apply_requests(msg.correlationId(), desired, ack_pub);
 }
 
-void SubscriptionManager::publish_subscription_heartbeats(messaging::IAckPublisher& ack_pub) {
+void SubscriptionManager::publish_subscription_heartbeats(messaging::api::AckPublisher& ack_pub) {
     for (const auto& [id, _] : active_) {
         ack_pub.publish_subscription_heartbeat(id);
     }

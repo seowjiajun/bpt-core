@@ -1,11 +1,11 @@
-#include "md_gateway/messaging/publishers/instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/aeron/instrument_stats_publisher.h"
 
 #include <messages/ExchangeId.h>
 
 #include <bpt_common/logging.h>
 #include <cstddef>
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::aeron {
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
@@ -29,4 +29,4 @@ void InstrumentStatsPublisher::publish(const InstrumentStatsUpdate& stats) {
                             stats.mark_price);
 }
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::aeron

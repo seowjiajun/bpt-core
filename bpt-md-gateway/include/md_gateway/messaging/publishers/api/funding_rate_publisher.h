@@ -11,9 +11,9 @@
 /// callback ends up calling publish() on the implementation of this
 /// port.
 ///
-/// Implementations: FundingRatePublisher (Aeron-backed) in prod. There
-/// is no test fake yet — funding-rate paths are exercised end-to-end
-/// via the venue decoder component tests.
+/// Implementations: aeron::FundingRatePublisher in prod. There is no
+/// test fake yet — funding-rate paths are exercised end-to-end via the
+/// venue decoder component tests.
 
 #include <messages/ExchangeId.h>
 
@@ -23,6 +23,11 @@
 namespace bpt::md_gateway::messaging {
 
 /// \brief Domain struct passed across the port — venue-agnostic shape.
+///
+/// Lives in the parent `messaging` namespace (not `api`) so it can be
+/// referenced from decoder templates and codec utilities without an
+/// extra `api::` qualifier — it is a value type shared by both sides
+/// of the port.
 struct FundingRateUpdate {
     uint64_t instrument_id;                        ///< canonical refdata ID
     bpt::messages::ExchangeId::Value exchange_id;  ///< source venue tag for downstream filtering
@@ -35,21 +40,25 @@ struct FundingRateUpdate {
 ///
 /// The decoder calls this to surface a parsed funding-rate event;
 /// MdGatewayService wires the callback to forward into the bus's
-/// IFundingRatePublisher. Decoupled like this so the decoder doesn't
+/// api::FundingRatePublisher. Decoupled like this so the decoder doesn't
 /// depend on the publisher type.
 using FundingRateCallback = std::function<void(const FundingRateUpdate&)>;
+
+namespace api {
 
 /// \brief Contract for the funding-rate outbound port.
 ///
 /// Called from each adapter's IO thread (one writer per adapter), but
 /// multiple adapter threads may publish concurrently — implementations
 /// must be thread-safe for publish().
-class IFundingRatePublisher {
+class FundingRatePublisher {
 public:
-    virtual ~IFundingRatePublisher() = default;
+    virtual ~FundingRatePublisher() = default;
 
     /// \brief Encode and publish one funding-rate update on the funding stream.
     virtual void publish(const FundingRateUpdate& fr) = 0;
 };
+
+}  // namespace api
 
 }  // namespace bpt::md_gateway::messaging

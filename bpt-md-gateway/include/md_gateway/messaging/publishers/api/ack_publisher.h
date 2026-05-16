@@ -6,22 +6,22 @@
 /// Three message types share this port because they are all small,
 /// low-frequency notifications strategy needs to know about and they
 /// all ride the same Aeron stream (`settings.aeron.md_ack_hb.stream_id`).
-/// Implementations: AckPublisher (Aeron-backed) in prod;
-/// FakeAckPublisher in component tests.
+/// Implementations: aeron::AckPublisher in prod; FakeAckPublisher in
+/// component tests.
 
 #include <messages/AckStatus.h>
 
 #include <cstdint>
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::api {
 
 /// \brief Contract for the ACK / heartbeat outbound port.
 ///
 /// All methods are called from MdGatewayService::run() on the main poll
 /// thread. No thread-safety contract is required from implementations.
-class IAckPublisher {
+class AckPublisher {
 public:
-    virtual ~IAckPublisher() = default;
+    virtual ~AckPublisher() = default;
 
     /// \brief One ACK per (subscribe, instrument) pair after a control batch is applied.
     ///
@@ -43,4 +43,4 @@ public:
     virtual void publish_service_heartbeat() = 0;
 };
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::api

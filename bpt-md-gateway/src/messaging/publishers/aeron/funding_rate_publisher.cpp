@@ -1,11 +1,11 @@
-#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/aeron/funding_rate_publisher.h"
 
 #include <messages/ExchangeId.h>
 
 #include <bpt_common/logging.h>
 #include <cstddef>
 
-namespace bpt::md_gateway::messaging {
+namespace bpt::md_gateway::messaging::aeron {
 
 using Policy = bpt::common::aeron::Publisher::Policy;
 
@@ -30,4 +30,4 @@ void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
                             fr.rate_bps);
 }
 
-}  // namespace bpt::md_gateway::messaging
+}  // namespace bpt::md_gateway::messaging::aeron

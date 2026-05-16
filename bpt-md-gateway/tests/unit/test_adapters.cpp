@@ -6,8 +6,8 @@
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_decoder.h"
 #include "md_gateway/adapter/okx/okx_md_decoder.h"
 #include "md_gateway/md/md_types.h"
-#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
-#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
 
 #include <cstdint>
 #include <gtest/gtest.h>

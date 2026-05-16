@@ -14,11 +14,11 @@ using namespace std::chrono_literals;
 namespace bpt::md_gateway {
 
 MdGatewayService::MdGatewayService(config::Settings cfg,
-                           std::unique_ptr<messaging::IMdControlSource> control_source,
+                           std::unique_ptr<messaging::api::MdControlSubscriber> control_source,
                            std::shared_ptr<messaging::MdPublisher> md_sink,
-                           std::unique_ptr<messaging::IAckPublisher> ack_sink,
-                           std::shared_ptr<messaging::IFundingRatePublisher> funding_sink,
-                           std::shared_ptr<messaging::IInstrumentStatsPublisher> stats_sink,
+                           std::unique_ptr<messaging::api::AckPublisher> ack_sink,
+                           std::shared_ptr<messaging::api::FundingRatePublisher> funding_sink,
+                           std::shared_ptr<messaging::api::InstrumentStatsPublisher> stats_sink,
                            const bpt::common::util::Topology& topology)
     : cfg_(std::move(cfg)),
       metrics_(cfg_.metrics_host, cfg_.base.metrics_port),

@@ -30,11 +30,10 @@ namespace bpt::md_gateway::messaging {
 
 /// \brief Domain struct passed across the port — venue-agnostic shape.
 ///
-/// Units are venue-native: contracts on Deribit options + HL perps, base
-/// currency on Binance perps. Consumers reconcile via bpt-refdata metadata.
-/// Doubles default to NaN — the absent-field sentinel — so a decoder that
-/// only populates a subset of fields leaves the rest correctly marked
-/// absent rather than appearing as zero.
+/// Lives in the parent `messaging` namespace (not `api`) so it can be
+/// referenced from decoder templates and codec utilities without an
+/// extra `api::` qualifier — it is a value type shared by both sides
+/// of the port.
 struct InstrumentStatsUpdate {
     uint64_t instrument_id;                        ///< canonical refdata ID
     bpt::messages::ExchangeId::Value exchange_id;  ///< source venue tag for downstream filtering
@@ -51,21 +50,25 @@ struct InstrumentStatsUpdate {
 /// \brief Per-event callback shape used inside the venue decoders.
 ///
 /// The decoder calls this to surface a parsed stats event; MdGatewayService
-/// wires the callback to forward into the bus's IInstrumentStatsPublisher.
+/// wires the callback to forward into the bus's api::InstrumentStatsPublisher.
 /// Decoupled so the decoder doesn't depend on the publisher type.
 using InstrumentStatsCallback = std::function<void(const InstrumentStatsUpdate&)>;
+
+namespace api {
 
 /// \brief Contract for the instrument-stats outbound port.
 ///
 /// Called from each adapter's IO thread (one writer per adapter), but
 /// multiple adapter threads may publish concurrently — implementations
 /// must be thread-safe for publish().
-class IInstrumentStatsPublisher {
+class InstrumentStatsPublisher {
 public:
-    virtual ~IInstrumentStatsPublisher() = default;
+    virtual ~InstrumentStatsPublisher() = default;
 
     /// \brief Encode and publish one stats update on the instrument-stats stream.
     virtual void publish(const InstrumentStatsUpdate& stats) = 0;
 };
+
+}  // namespace api
 
 }  // namespace bpt::md_gateway::messaging
