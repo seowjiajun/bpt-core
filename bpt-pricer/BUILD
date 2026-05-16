@@ -26,6 +26,7 @@ cc_test(
     srcs = [
         "tests/test_black_scholes.cpp",
         "tests/test_forward_curve.cpp",
+        "tests/test_in_process_vol_surface_publisher.cpp",
         "tests/test_iv_solver.cpp",
         "tests/test_sbe_vol_surface_codec.cpp",
         "tests/test_svi.cpp",
