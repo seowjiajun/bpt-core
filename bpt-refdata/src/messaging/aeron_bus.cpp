@@ -1,11 +1,11 @@
 #include "refdata/messaging/aeron_bus.h"
 
 #include "refdata/config/settings.h"
-#include "refdata/messaging/fee_schedule_publisher.h"
-#include "refdata/messaging/refdata_control_subscriber.h"
-#include "refdata/messaging/refdata_delta_publisher.h"
-#include "refdata/messaging/refdata_snapshot_publisher.h"
-#include "refdata/messaging/refdata_status_publisher.h"
+#include "refdata/messaging/publishers/fee_schedule_publisher.h"
+#include "refdata/messaging/publishers/refdata_delta_publisher.h"
+#include "refdata/messaging/publishers/refdata_snapshot_publisher.h"
+#include "refdata/messaging/publishers/refdata_status_publisher.h"
+#include "refdata/messaging/subscribers/refdata_control_subscriber.h"
 
 namespace bpt::refdata::messaging {
 

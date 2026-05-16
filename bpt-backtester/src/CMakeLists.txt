@@ -14,8 +14,8 @@ add_library(backtester_lib
     matching/matching_engine_book.cpp
     matching/matching_engine_fills.cpp
     messaging/aeron_bus.cpp
-    messaging/backtest_ack_subscriber.cpp
-    messaging/backtest_control_publisher.cpp
+    messaging/subscribers/backtest_ack_subscriber.cpp
+    messaging/publishers/backtest_control_publisher.cpp
     results/results_collector.cpp
 )
 

@@ -7,7 +7,7 @@
 /// services and so `PmsService` doesn't take `<Aeron.h>` in its
 /// constructor.
 
-#include "pms/messaging/balance_snapshot_publisher.h"
+#include "pms/messaging/publishers/balance_snapshot_publisher.h"
 
 #include <Aeron.h>
 

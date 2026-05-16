@@ -7,9 +7,9 @@
 /// one factory so `AnalyticsService` doesn't take `<Aeron.h>` in its
 /// constructor.
 
-#include "analytics/messaging/exec_report_subscriber.h"
-#include "analytics/messaging/md_bbo_subscriber.h"
-#include "analytics/messaging/toxicity_publisher.h"
+#include "analytics/messaging/publishers/toxicity_publisher.h"
+#include "analytics/messaging/subscribers/exec_report_subscriber.h"
+#include "analytics/messaging/subscribers/md_bbo_subscriber.h"
 
 #include <Aeron.h>
 

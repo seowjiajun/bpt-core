@@ -9,11 +9,11 @@
 #include "md_gateway/messaging/aeron_bus.h"
 
 #include "md_gateway/config/settings.h"
-#include "md_gateway/messaging/ack_publisher.h"
-#include "md_gateway/messaging/funding_rate_publisher.h"
-#include "md_gateway/messaging/md_control_subscriber.h"
-#include "md_gateway/messaging/md_publisher.h"
-#include "md_gateway/messaging/instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/ack_publisher.h"
+#include "md_gateway/messaging/publishers/funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/md_publisher.h"
+#include "md_gateway/messaging/subscribers/md_control_subscriber.h"
 
 namespace bpt::md_gateway::messaging {
 

@@ -17,10 +17,10 @@
 /// hands ownership to OrderGatewayService at construction; AeronBus itself
 /// is a value type that can be moved out at the wiring site in main.cpp.
 
-#include "order_gateway/messaging/i_account_snapshot_publisher.h"
-#include "order_gateway/messaging/i_exec_report_publisher.h"
-#include "order_gateway/messaging/i_heartbeat_publisher.h"
-#include "order_gateway/messaging/i_order_control_source.h"
+#include "order_gateway/messaging/publishers/i_account_snapshot_publisher.h"
+#include "order_gateway/messaging/publishers/i_exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/i_heartbeat_publisher.h"
+#include "order_gateway/messaging/subscribers/i_order_control_source.h"
 
 #include <Aeron.h>
 

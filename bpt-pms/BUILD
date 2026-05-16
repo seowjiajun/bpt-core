@@ -25,7 +25,7 @@ cc_binary(
         "src/app/pms_service.cpp",
         "src/adapter/hyperliquid_balance_adapter.cpp",
         "src/messaging/aeron_bus.cpp",
-        "src/messaging/balance_snapshot_publisher.cpp",
+        "src/messaging/publishers/balance_snapshot_publisher.cpp",
     ],
     deps = [
         ":pms_core",

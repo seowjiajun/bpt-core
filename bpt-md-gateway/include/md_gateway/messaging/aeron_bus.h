@@ -22,11 +22,11 @@
 /// hands ownership to MdGatewayService at construction; AeronBus itself is
 /// a value type that can be moved out at the wiring site.
 
-#include "md_gateway/messaging/i_ack_publisher.h"
-#include "md_gateway/messaging/i_funding_rate_publisher.h"
-#include "md_gateway/messaging/i_md_control_source.h"
-#include "md_gateway/messaging/i_instrument_stats_publisher.h"
-#include "md_gateway/messaging/md_publisher.h"
+#include "md_gateway/messaging/publishers/i_ack_publisher.h"
+#include "md_gateway/messaging/publishers/i_funding_rate_publisher.h"
+#include "md_gateway/messaging/publishers/i_instrument_stats_publisher.h"
+#include "md_gateway/messaging/publishers/md_publisher.h"
+#include "md_gateway/messaging/subscribers/i_md_control_source.h"
 
 #include <Aeron.h>
 

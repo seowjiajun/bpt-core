@@ -9,10 +9,10 @@
 #include "order_gateway/messaging/aeron_bus.h"
 
 #include "order_gateway/config/settings.h"
-#include "order_gateway/messaging/account_snapshot_publisher.h"
-#include "order_gateway/messaging/exec_report_publisher.h"
-#include "order_gateway/messaging/heartbeat_publisher.h"
-#include "order_gateway/messaging/order_subscriber.h"
+#include "order_gateway/messaging/publishers/account_snapshot_publisher.h"
+#include "order_gateway/messaging/publishers/exec_report_publisher.h"
+#include "order_gateway/messaging/publishers/heartbeat_publisher.h"
+#include "order_gateway/messaging/subscribers/order_subscriber.h"
 
 namespace bpt::order_gateway::messaging {
 

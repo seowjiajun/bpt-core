@@ -13,8 +13,8 @@
 /// `BacktestControl` (tick command) and inbound `BacktestAck`. Tiny
 /// surface but the same shape applies.
 
-#include "backtester/messaging/backtest_ack_subscriber.h"
-#include "backtester/messaging/backtest_control_publisher.h"
+#include "backtester/messaging/publishers/backtest_control_publisher.h"
+#include "backtester/messaging/subscribers/backtest_ack_subscriber.h"
 
 #include <Aeron.h>
 

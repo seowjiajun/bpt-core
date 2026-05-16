@@ -40,9 +40,9 @@ cc_binary(
         "src/app/analytics_service.cpp",
         "src/config/config.cpp",
         "src/messaging/aeron_bus.cpp",
-        "src/messaging/exec_report_subscriber.cpp",
-        "src/messaging/md_bbo_subscriber.cpp",
-        "src/messaging/toxicity_publisher.cpp",
+        "src/messaging/subscribers/exec_report_subscriber.cpp",
+        "src/messaging/subscribers/md_bbo_subscriber.cpp",
+        "src/messaging/publishers/toxicity_publisher.cpp",
     ],
     deps = [
         ":analytics_core",

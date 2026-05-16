@@ -6,11 +6,11 @@
 /// Mirror of bpt-analytics: every Aeron pub/sub the service needs is built in
 /// one factory so `RadarService` doesn't depend on `<Aeron.h>` directly.
 
-#include "radar/messaging/funding_rate_subscriber.h"
-#include "radar/messaging/instrument_stats_subscriber.h"
-#include "radar/messaging/market_color_publisher.h"
-#include "radar/messaging/refdata_perp_subscriber.h"
-#include "radar/messaging/vol_surface_subscriber.h"
+#include "radar/messaging/publishers/market_color_publisher.h"
+#include "radar/messaging/subscribers/funding_rate_subscriber.h"
+#include "radar/messaging/subscribers/instrument_stats_subscriber.h"
+#include "radar/messaging/subscribers/refdata_perp_subscriber.h"
+#include "radar/messaging/subscribers/vol_surface_subscriber.h"
 
 #include <Aeron.h>
 
