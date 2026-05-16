@@ -2,17 +2,12 @@
 
 #include "refdata/messaging/sbe_utils.h"
 
-#include <messages/FeeSchedule.h>
-#include <messages/MessageHeader.h>
-
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
+#include <cstddef>
+#include <messages/ExchangeId.h>
 
 namespace bpt::refdata::messaging {
-
-using bpt::messages::ExchangeId;
-using bpt::messages::FeeSchedule;
-using bpt::messages::MessageHeader;
 
 FeeSchedulePublisher::FeeSchedulePublisher(std::shared_ptr<aeron::Aeron> aeron,
                                            const std::string& channel,
@@ -21,24 +16,14 @@ FeeSchedulePublisher::FeeSchedulePublisher(std::shared_ptr<aeron::Aeron> aeron,
 }
 
 void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
-    constexpr std::size_t kBufSize = MessageHeader::encodedLength() + FeeSchedule::sbeBlockLength();
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    char buf[kBufSize];
+    alignas(8) std::byte scratch[SbeFeeScheduleCodec::kRecommendedScratchSize];
+    const auto bytes = codec_.encode(fs, scratch);
 
-    FeeSchedule msg;
-    msg.wrapAndApplyHeader(buf, 0, kBufSize)
-        .exchangeId(fs.exchange_id)
-        .instrumentId(fs.instrument_id)
-        .instrumentType(fs.instrument_type)
-        .makerFeeBps(fs.maker_fee_bps)
-        .takerFeeBps(fs.taker_fee_bps)
-        .updatedTs(fs.updated_ts);
-
-    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf), kBufSize);
-    aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(kBufSize), "fee_schedule");
+    aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(scratch), static_cast<aeron::util::index_t>(bytes.size()));
+    aeron_offer(*publication_, ab, static_cast<aeron::util::index_t>(bytes.size()), "fee_schedule");
 
     bpt::common::log::debug("FeeSchedule published exchange={} instrument_id={} maker={}bps taker={}bps",
-                            ExchangeId::c_str(fs.exchange_id),
+                            bpt::messages::ExchangeId::c_str(fs.exchange_id),
                             fs.instrument_id,
                             fs.maker_fee_bps,
                             fs.taker_fee_bps);

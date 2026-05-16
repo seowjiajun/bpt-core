@@ -1,5 +1,6 @@
 #pragma once
 
+#include "refdata/messaging/codecs/sbe_fee_schedule_codec.h"
 #include "refdata/port/i_fee_schedule_sink.h"
 #include "refdata/refdata/funding_rate.h"
 
@@ -18,6 +19,7 @@ public:
 
 private:
     std::shared_ptr<aeron::Publication> publication_;
+    SbeFeeScheduleCodec                 codec_;
 };
 
 }  // namespace bpt::refdata::messaging

@@ -55,6 +55,7 @@ cc_library(
         "src/registry/instrument_registry.cpp",
         "src/resolver/instrument_resolver.cpp",
         "src/messaging/aeron_bus.cpp",
+        "src/messaging/codecs/sbe_fee_schedule_codec.cpp",
         "src/messaging/subscription_manager.cpp",
         "src/messaging/publishers/fee_schedule_publisher.cpp",
         "src/messaging/publishers/refdata_delta_publisher.cpp",
