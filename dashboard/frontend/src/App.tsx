@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import { TopBar } from './components/TopBar'
 import { PositionPanel } from './components/PositionPanel'
@@ -22,6 +22,7 @@ import { startMockReplay } from './mock/replay'
 import { connectWebSocket } from './ws/client'
 import { useStore } from './store'
 import { MOCK_LEGS, MOCK_GREEKS, MOCK_VOL_SURFACE, MOCK_SPOT } from './mock/options'
+import type { PortfolioGreeks } from './types/options'
 
 // VITE_WS_URL selects the data source:
 //   unset or "mock"           → in-memory mock replay of trades.csv
@@ -249,21 +250,57 @@ export default function App() {
 
   const finalEquity = fills.length ? fills[fills.length - 1].equity : 0
 
-  // Options data — use live store data if available, fall back to mock.
+  // Options data — strictly live store data. Mock fallback removed because
+  // mocked smile/heatmap silently overlaid mock IV curves under real position
+  // markers, which was confusing for multi-underlying ops. If you want a
+  // dashboard demo without live services, use the bridge's `mock` URL mode.
   const storeLegs = useStore((s) => s.optionLegs)
   const storeGreeks = useStore((s) => s.portfolioGreeks)
   const storeSurface = useStore((s) => s.volSurface)
   const price = useStore((s) => s.price)
   const strategyState = useStore((s) => s.strategyState)
 
+  const isMockMode = WS_URL === 'mock'
   const hasLiveOptions = storeLegs.length > 0
-  const optLegs = hasLiveOptions ? storeLegs : MOCK_LEGS
-  const optGreeks = storeGreeks ?? MOCK_GREEKS
-  const optSurface = storeSurface.length > 0 ? storeSurface : MOCK_VOL_SURFACE
-  const spot = price || MOCK_SPOT
+  const optLegs = isMockMode && !hasLiveOptions ? MOCK_LEGS : storeLegs
+  // Zero-init greeks until the first portfolio frame lands — keeps GreeksPanel
+  // non-null without falling back to fabricated mock values when running live.
+  const ZERO_GREEKS: PortfolioGreeks = {
+    netDelta: 0,
+    netGamma: 0,
+    netVega: 0,
+    netTheta: 0,
+    totalUnrealizedPnl: 0,
+    totalRealizedPnl: 0,
+  }
+  const optGreeks = storeGreeks ?? (isMockMode ? MOCK_GREEKS : ZERO_GREEKS)
+  const optSurface = isMockMode && storeSurface.length === 0 ? MOCK_VOL_SURFACE : storeSurface
+  const spot = price || (isMockMode ? MOCK_SPOT : 0)
+
+  // Underlying selector for vol surface + smile panels — derived from the
+  // surface data so it auto-populates with whatever underlyings the strategy
+  // emits. Default picks the underlying with the most surface points (so the
+  // initial view always lands on a populated smile rather than a chain with
+  // 2 stale strikes).
+  const underlyingsSorted = Array.from(new Set(optSurface.map((s) => s.underlying))).sort()
+  const pointCountByUnderlying = new Map<string, number>()
+  for (const s of optSurface) {
+    pointCountByUnderlying.set(s.underlying, (pointCountByUnderlying.get(s.underlying) ?? 0) + s.points.length)
+  }
+  const underlyings = underlyingsSorted
+  const defaultUnderlying =
+    [...pointCountByUnderlying.entries()].sort(([, a], [, b]) => b - a)[0]?.[0] ?? underlyings[0] ?? null
+  const [selectedUnderlying, setSelectedUnderlying] = useState<string | null>(null)
+  const activeUnderlying = selectedUnderlying ?? defaultUnderlying
+  const filteredSurface = activeUnderlying
+    ? optSurface.filter((s) => s.underlying === activeUnderlying)
+    : optSurface
+  const filteredLegs = activeUnderlying
+    ? optLegs.filter((l) => l.underlying === activeUnderlying)
+    : optLegs
 
   // Show options panels in mock mode (dev) or when live options data arrives.
-  const showOptions = WS_URL === 'mock' || hasLiveOptions
+  const showOptions = isMockMode || hasLiveOptions
 
   // Per-strategy state panel — picks the right component for the active
   // strategy's `kind`. Unknown kinds (or no state yet) fall back to the
@@ -288,7 +325,7 @@ export default function App() {
   }
 
   return (
-    <div className={`shell ${showOptions ? 'shell--options' : ''}`}>
+    <div className={`shell ${showOptions ? 'shell--options' : ''} ${strategyState?.kind === 'OptionsMaker' ? 'shell--no-toxicity' : ''}`}>
       <TopBar />
       <HaltedBanner />
 
@@ -317,15 +354,41 @@ export default function App() {
           <div className="panel">
             <div className="panel-header">
               <span className="panel-title">Vol Surface</span>
-              <span className="panel-badge">{optSurface.length} expiries</span>
+              <span className="panel-badge">
+                {underlyings.length > 1 ? (
+                  <span style={{ display: 'inline-flex', gap: 4 }}>
+                    {underlyings.map((u) => (
+                      <button
+                        key={u}
+                        onClick={() => setSelectedUnderlying(u)}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          border: '1px solid var(--border)',
+                          background: u === activeUnderlying ? 'var(--accent)' : 'transparent',
+                          color: u === activeUnderlying ? 'var(--bg)' : 'var(--text-primary)',
+                          borderRadius: 3,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </span>
+                ) : (
+                  `${activeUnderlying ?? '—'} · ${filteredSurface.length} expiries`
+                )}
+              </span>
             </div>
-            <VolSurfaceHeatmap slices={optSurface} legs={optLegs} />
+            <VolSurfaceHeatmap slices={filteredSurface} legs={filteredLegs} />
           </div>
           <div className="panel">
             <div className="panel-header">
               <span className="panel-title">Vol Smile</span>
+              <span className="panel-badge">{activeUnderlying ?? '—'}</span>
             </div>
-            <VolSmileChart slices={optSurface} legs={optLegs} />
+            <VolSmileChart slices={filteredSurface} legs={filteredLegs} />
           </div>
           <OptionsPositionPanel legs={optLegs} />
         </div>
@@ -342,7 +405,7 @@ export default function App() {
       </div>
 
       {strategyPanelNode}
-      <ToxicityPanel />
+      {strategyState?.kind !== 'OptionsMaker' && <ToxicityPanel />}
       <OpenOrdersPanel />
       <HoldingsPanel />
       <Blotter />

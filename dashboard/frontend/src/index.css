@@ -213,14 +213,46 @@ body,
 
 /* ── Options shell variant ─────────────────────────────────────────────────── */
 /* Expands the grid to include a row for vol smile + options positions
- * between the main row and the equity curve. */
+ * between the main row and the equity curve. `stratstate` and `toxicity`
+ * are present so panels with those gridAreas have a home in options
+ * layout too. OptionsMaker hides ToxicityPanel via JSX (not relevant to
+ * options); AS keeps it. */
 .shell--options {
-  grid-template-rows: var(--header-h) 1fr 240px 130px 130px 150px 160px;
+  grid-template-rows: var(--header-h) 1fr 240px 130px auto 90px 130px 150px 160px;
   grid-template-areas:
     'topbar'
     'main'
     'options'
     'equity'
+    'stratstate'
+    'toxicity'
+    'orders'
+    'holdings'
+    'blotter';
+}
+
+/* Variant: toxicity row dropped entirely for strategies that don't compute
+ * it (OptionsMaker). Without this, the toxicity row reserves 90px and the
+ * grid renders a grey gap-coloured bar where the missing panel would sit. */
+.shell--no-toxicity.shell--options {
+  grid-template-rows: var(--header-h) 1fr 240px 130px auto 130px 150px 160px;
+  grid-template-areas:
+    'topbar'
+    'main'
+    'options'
+    'equity'
+    'stratstate'
+    'orders'
+    'holdings'
+    'blotter';
+}
+.shell--no-toxicity:not(.shell--options) {
+  grid-template-rows: var(--header-h) 1fr 140px auto 140px 160px 180px;
+  grid-template-areas:
+    'topbar'
+    'main'
+    'equity'
+    'stratstate'
     'orders'
     'holdings'
     'blotter';
@@ -648,6 +680,15 @@ body,
 }
 .blotter-table tbody tr:nth-child(even):hover td {
   background: var(--bg-row-hover);
+}
+
+/* Numeric columns inside blotter-table — right-aligned with tabular-nums so
+ * digits stack column-cleanly. Mirrors the archive-table treatment. Needed
+ * by OptionsMakerPanel where `.num` was previously a no-op here. */
+.blotter-table th.num,
+.blotter-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .side-buy {

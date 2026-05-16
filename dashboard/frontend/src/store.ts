@@ -330,12 +330,18 @@ export const useStore = create<State>((set) => ({
             totalRealizedPnl: msg.realizedPnl,
           }
 
-          // Group surface points by expiry into VolSmileSlice[]
-          const byExpiry = new Map<number, VolSurfacePoint[]>()
+          // Group surface points by (underlying, expiry) into VolSmileSlice[].
+          // Each slice belongs to exactly one underlying — downstream charts
+          // filter by selected underlying before rendering, so BTC's $80k
+          // strikes and ETH's $3k strikes never share an axis.
+          const byKey = new Map<string, VolSurfacePoint[]>()
           for (const sp of msg.surface) {
-            const pts = byExpiry.get(sp.expiry) ?? []
+            const ul = (sp as { underlying?: string }).underlying ?? 'UNKNOWN'
+            const key = `${ul}|${sp.expiry}`
+            const pts = byKey.get(key) ?? []
             pts.push({
               instrumentId: sp.instrumentId,
+              underlying: ul,
               strike: sp.strike,
               expiry: sp.expiry,
               optionSide: sp.isCall ? 'CALL' : 'PUT',
@@ -345,17 +351,19 @@ export const useStore = create<State>((set) => ({
               delta: sp.delta,
               timeToExpiry: sp.tte,
             })
-            byExpiry.set(sp.expiry, pts)
+            byKey.set(key, pts)
           }
-          const surface: VolSmileSlice[] = [...byExpiry.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([expiry, points]) => {
+          const surface: VolSmileSlice[] = [...byKey.entries()]
+            .map(([key, points]) => {
+              const [underlying, expiryStr] = key.split('|')
+              const expiry = Number(expiryStr)
               const tte = points[0]?.timeToExpiry ?? 0
               const dte = Math.round(tte * 365)
               const d = String(expiry)
               const label = `${d.slice(6, 8)} ${['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(d.slice(4, 6))] ?? d.slice(4, 6)}`
-              return { expiry, label, daysToExpiry: dte, points }
+              return { underlying, expiry, label, daysToExpiry: dte, points }
             })
+            .sort((a, b) => a.underlying.localeCompare(b.underlying) || a.expiry - b.expiry)
 
           return { optionLegs: legs, portfolioGreeks: greeks, volSurface: surface }
         }

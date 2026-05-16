@@ -17,6 +17,7 @@ import type { StrategyKind, StrategyStateMsg } from '../../types/messages'
 import { AvellanedaStoikovPanel } from './AvellanedaStoikovPanel'
 import { FundingArbPanel } from './FundingArbPanel'
 import { GenericStrategyPanel } from './GenericStrategyPanel'
+import { OptionsMakerPanel } from './OptionsMakerPanel'
 
 // Each panel accepts the narrowed strategy state for its kind. The
 // registry erases that narrowing — the dispatcher in App.tsx narrows
@@ -26,6 +27,7 @@ type AnyPanel = FC<{ state: StrategyStateMsg }>
 export const STRATEGY_PANELS: Record<StrategyKind, AnyPanel> = {
   AS: AvellanedaStoikovPanel as AnyPanel,
   FundingArb: FundingArbPanel as AnyPanel,
+  OptionsMaker: OptionsMakerPanel as AnyPanel,
 }
 
 export { GenericStrategyPanel }

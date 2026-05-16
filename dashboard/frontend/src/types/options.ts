@@ -38,6 +38,7 @@ export interface PortfolioGreeks {
 // A single point on the vol surface — matches bpt-pricer's VolSurface grid point.
 export interface VolSurfacePoint {
   instrumentId: number
+  underlying: string // "BTC", "ETH", etc. — required for multi-underlying strategies
   strike: number
   expiry: number // YYYYMMDD
   optionSide: OptionSide
@@ -48,8 +49,11 @@ export interface VolSurfacePoint {
   timeToExpiry: number // years
 }
 
-// Grouped by expiry for rendering smile curves.
+// Grouped by (underlying, expiry) for rendering smile curves. One slice
+// belongs to exactly one underlying — charts filter by selected underlying
+// before processing.
 export interface VolSmileSlice {
+  underlying: string
   expiry: number // YYYYMMDD
   label: string // e.g. "20 Jun"
   daysToExpiry: number

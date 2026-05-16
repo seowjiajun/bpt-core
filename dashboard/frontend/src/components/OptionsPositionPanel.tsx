@@ -76,6 +76,7 @@ export function OptionsPositionPanel({ legs }: Props) {
         <table className="blotter-table">
           <thead>
             <tr>
+              <th>UL</th>
               <th onClick={() => toggleSort('expiry')} className="th-sortable">
                 Expiry{arrow('expiry')}
               </th>
@@ -103,6 +104,7 @@ export function OptionsPositionPanel({ legs }: Props) {
           <tbody>
             {sorted.map((l) => (
               <tr key={l.instrumentId}>
+                <td style={{ fontWeight: 600 }}>{l.underlying}</td>
                 <td>{fmtExpiry(l.expiry)}</td>
                 <td className="num">{fmtPrice(l.strike)}</td>
                 <td className={l.optionSide === 'CALL' ? 'side-buy' : 'side-sell'}>
@@ -126,8 +128,8 @@ export function OptionsPositionPanel({ legs }: Props) {
               </tr>
             ))}
             <tr className="options-agg-row">
-              <td colSpan={7} style={{ textAlign: 'right', fontWeight: 600 }}>
-                Portfolio
+              <td colSpan={8} style={{ textAlign: 'right', fontWeight: 600 }}>
+                Portfolio (mixed UL — Δ/Γ/V are per-underlying, sum is informational only)
               </td>
               <td className={`num ${pnlClass(agg.delta)}`} style={{ fontWeight: 600 }}>
                 {agg.delta.toFixed(3)}

@@ -73,15 +73,20 @@ export function VolSurfaceHeatmap({ slices, legs = [] }: Props) {
 
     if (strikes.length === 0 || expiries.length === 0) return
 
-    // Build IV lookup: calls only (puts have near-identical IV)
+    // Build IV lookup. Prefer CALLs (cleaner OTM convention for the heatmap)
+    // but accept PUTs when CALLs are missing — testnet venues like Deribit
+    // sometimes only have makers on the put side, which previously left the
+    // heatmap entirely blank.
     const ivMap = new Map<string, number>()
     let minIv = Infinity,
       maxIv = -Infinity
     for (const s of slices) {
       for (const p of s.points) {
-        if (p.optionSide !== 'CALL') continue
         const key = `${p.expiry}:${p.strike}`
-        ivMap.set(key, p.iv)
+        // CALL wins over PUT at the same strike; otherwise take whatever's there.
+        if (!ivMap.has(key) || p.optionSide === 'CALL') {
+          ivMap.set(key, p.iv)
+        }
         if (p.iv < minIv) minIv = p.iv
         if (p.iv > maxIv) maxIv = p.iv
       }

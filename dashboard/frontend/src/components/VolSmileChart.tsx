@@ -89,14 +89,20 @@ export function VolSmileChart({ slices, legs = [] }: Props) {
       content += `<text x="${x}" y="${MARGIN.top + h + 18}" fill="#768390" font-size="10" font-family="monospace" text-anchor="middle">${(strike / 1000).toFixed(0)}K</text>`
     }
 
-    // Smile lines — one per expiry, calls only (puts have near-identical IV)
+    // Smile lines — one per expiry. IV on the smile is the same for CALL and
+    // PUT at the same strike, so we'd typically prefer CALLs. On venues where
+    // only one side has makers (e.g. Deribit testnet puts-only), we fall back
+    // to whichever side exists. Dedupe by strike — first occurrence wins.
     slices.forEach((slice, si) => {
-      const calls = slice.points
-        .filter((p) => p.optionSide === 'CALL')
-        .sort((a, b) => a.strike - b.strike)
-      if (calls.length < 2) return
+      const byStrike = new Map<number, (typeof slice.points)[number]>()
+      for (const p of slice.points) {
+        if (!byStrike.has(p.strike)) byStrike.set(p.strike, p)
+        else if (p.optionSide === 'CALL') byStrike.set(p.strike, p)  // prefer CALL when both present
+      }
+      const pts = [...byStrike.values()].sort((a, b) => a.strike - b.strike)
+      if (pts.length < 2) return
 
-      const d = calls
+      const d = pts
         .map(
           (p, i) =>
             `${i === 0 ? 'M' : 'L'} ${MARGIN.left + xScale(p.strike)} ${MARGIN.top + yScale(p.iv)}`
@@ -105,7 +111,7 @@ export function VolSmileChart({ slices, legs = [] }: Props) {
       content += `<path d="${d}" fill="none" stroke="${COLORS[si % COLORS.length]}" stroke-width="1.5" opacity="0.9"/>`
 
       // Legend label at last point
-      const last = calls[calls.length - 1]
+      const last = pts[pts.length - 1]
       content += `<text x="${MARGIN.left + xScale(last.strike) + 4}" y="${MARGIN.top + yScale(last.iv) - 6}" fill="${COLORS[si % COLORS.length]}" font-size="10" font-family="monospace">${slice.label}</text>`
     })
 

@@ -125,6 +125,7 @@ function smile(expiry: number, daysToExpiry: number, label: string): VolSmileSli
 
     points.push({
       instrumentId: expiry * 1000 + Math.round(strike / 1000),
+      underlying: 'BTC',
       strike,
       expiry,
       optionSide: 'CALL',
@@ -136,6 +137,7 @@ function smile(expiry: number, daysToExpiry: number, label: string): VolSmileSli
     })
     points.push({
       instrumentId: expiry * 1000 + Math.round(strike / 1000) + 500,
+      underlying: 'BTC',
       strike,
       expiry,
       optionSide: 'PUT',
@@ -147,7 +149,7 @@ function smile(expiry: number, daysToExpiry: number, label: string): VolSmileSli
     })
   }
 
-  return { expiry, label, daysToExpiry, points }
+  return { underlying: 'BTC', expiry, label, daysToExpiry, points }
 }
 
 function normalCdf(x: number): number {

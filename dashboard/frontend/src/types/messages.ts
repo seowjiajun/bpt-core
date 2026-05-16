@@ -190,7 +190,7 @@ export interface ToxicityMsg {
 // To add a new strategy: add its kind below, extend StrategyStateMsg
 // with a new interface, write the C++ JSON emitter, and register a
 // panel component. Unknown kinds fall back to GenericStrategyPanel.
-export type StrategyKind = 'AS' | 'FundingArb'
+export type StrategyKind = 'AS' | 'FundingArb' | 'OptionsMaker'
 
 interface BaseStrategyState {
   type: 'strategyState'
@@ -288,7 +288,55 @@ export interface FundingArbStrategyState extends BaseStrategyState {
   legStatus: 'flat' | 'entering' | 'open' | 'exiting'
 }
 
-export type StrategyStateMsg = ASStrategyState | FundingArbStrategyState
+// OptionsMakerStrategy — two-sided POST_ONLY option-chain MM with embedded
+// IOC perp delta hedger. State is a list of per-(exchange, underlying)
+// summaries; each carries option-side Greeks, the perp hedge position, the
+// net book delta, and whether a hedge order is currently in flight.
+
+// Per-strike row inside a per-underlying state. Included for any strike in
+// the active universe OR any strike where we hold inventory (so reconciled
+// orphan positions are visible even after rolling out of the universe).
+export interface OptionsMakerStrike {
+  strike: number
+  expiry: number       // YYYYMMDD
+  is_call: boolean
+  theo: number         // smile-fitted BS theo in native units (BTC for Deribit)
+  venue_mid: number    // 0 if no observed venue BBO (synthetic strike)
+  our_bid: number      // 0 if no resting bid; else the limit price we posted
+  our_ask: number
+  position: number     // signed; + long
+  delta: number
+  vega: number
+}
+
+export interface OptionsMakerUnderlyingState {
+  underlying: string
+  exchange: string
+  option_count: number
+  portfolio_delta: number // sum of qty × delta across option positions
+  portfolio_vega: number
+  portfolio_gamma: number
+  portfolio_theta: number
+  perp_position: number   // signed; + long perp / − short
+  book_delta: number      // portfolio_delta + perp_position (≈ 0 when hedged)
+  hedge_in_flight: boolean
+  active_strikes: OptionsMakerStrike[]
+}
+
+// OptionsMaker spans multiple (exchange, underlying) tuples concurrently, so
+// the per-state-msg `symbol` / `exchange` shape that AS and FundingArb carry
+// at the top level doesn't apply. The dashboard reads the per-underlying list
+// directly. `risk_halted` is the global sanity-ceiling latch (set when book
+// delta ever exceeds book_delta_sanity_ceiling_mult × max_hedge_abs_delta);
+// when true the strategy is silently refusing to quote OR hedge until restart.
+export interface OptionsMakerStrategyState {
+  type: 'strategyState'
+  kind: 'OptionsMaker'
+  risk_halted: boolean
+  underlyings: OptionsMakerUnderlyingState[]
+}
+
+export type StrategyStateMsg = ASStrategyState | FundingArbStrategyState | OptionsMakerStrategyState
 
 // Market-color snapshot from bpt-radar via the bridge. One message per
 // (exchange, underlying) every ~2s. Fields are grouped by domain so the
