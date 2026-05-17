@@ -21,12 +21,12 @@ architecture-beta
     service strat(server)[strategy] in bpt
     service tape(database)[tape] in bpt
 
-    service prom(logos:prometheus)[Prometheus] in monitor
-    service graf(logos:grafana)[Grafana] in monitor
-    service alert(logos:alertmanager)[Alertmanager] in monitor
+    service prom(database)[Prometheus] in monitor
+    service graf(cloud)[Grafana] in monitor
+    service alert(cloud)[Alertmanager] in monitor
 
-    service s3(logos:aws-s3)[AWS S3 Tokyo]
-    service ops(logos:linux-tux)[on call]
+    service s3(disk)[AWS S3 Tokyo]
+    service ops(server)[on call]
 
     mdgw:R --> L:prom
     ogw:R --> L:prom

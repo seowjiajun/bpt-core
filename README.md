@@ -25,21 +25,21 @@ architecture-beta
     group archive(cloud)[Archive]
     group local(disk)[Operator laptop]
 
-    service mediadriver(logos:java)[Aeron MediaDriver] in trading
-    service mdgw(logos:cplusplus)[md gateway] in trading
-    service ogw(logos:cplusplus)[order gateway] in trading
-    service rdata(logos:cplusplus)[refdata] in trading
-    service strat(logos:cplusplus)[strategy] in trading
-    service bridge(logos:cplusplus)[bridge] in trading
-    service tape(logos:cplusplus)[tape] in trading
+    service mediadriver(server)[Aeron MediaDriver Java] in trading
+    service mdgw(server)[md gateway] in trading
+    service ogw(server)[order gateway] in trading
+    service rdata(server)[refdata] in trading
+    service strat(server)[strategy] in trading
+    service bridge(server)[bridge] in trading
+    service tape(server)[tape] in trading
 
-    service prom(logos:prometheus)[Prometheus] in obs
-    service graf(logos:grafana)[Grafana] in obs
+    service prom(database)[Prometheus] in obs
+    service graf(cloud)[Grafana] in obs
 
-    service s3(logos:aws-s3)[S3 Tokyo] in archive
+    service s3(disk)[S3 Tokyo] in archive
 
-    service console(logos:react)[React console] in local
-    service ssh(logos:gnu-bash)[ops shell] in local
+    service console(internet)[React console] in local
+    service ssh(server)[ops shell] in local
 
     mdgw:R --> L:mediadriver
     ogw:R --> L:mediadriver
