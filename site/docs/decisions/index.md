@@ -8,6 +8,7 @@ a real alternative, with a tradeoff acknowledged.
 |---|---|---|
 | [IPC fabric](aeron.md) | Aeron over shared memory | nanomsg, ZeroMQ, Chronicle Queue, gRPC |
 | [Service boundaries](hexagonal-bus.md) | Hexagonal — port interfaces at the bus seam | Direct Aeron coupling in app code |
+| [Port layout](api-aeron-sim-layout.md) | `api/aeron/sim` folder + namespace split, no I-prefix | Flat layout with `I-` / `Aeron-` / `InProcess-` prefixes |
 | [Hot-path dispatch](crtp-hot-path.md) | CRTP through `decoder → ValidatingPublisher<Inner> → Inner` | Virtual interfaces |
 | [Orchestration](systemd-over-k8s.md) | systemd user units + tarball deploy | Kubernetes / Nomad |
 | [Fill simulation](testnet-over-paper.md) | Real testnet capital; no synthetic fill engine | In-process paper-mode (removed after 45h trial) |
