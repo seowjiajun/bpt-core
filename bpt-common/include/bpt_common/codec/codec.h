@@ -27,10 +27,14 @@
 namespace bpt::common::codec {
 
 /// A type C is an Encoder<T> if it can serialise a T into a caller-supplied
-/// scratch buffer and return the populated subspan.
+/// scratch buffer and return the populated subspan, AND advertises a
+/// worst-case scratch size as a compile-time constant. The kRecommendedScratchSize
+/// requirement closes the "I forgot to declare the size" footgun — every
+/// codec callsite needs the constant to size its stack buffer.
 template <class C, class T>
 concept Encoder = requires(C c, const T& obj, std::span<std::byte> scratch) {
     { c.encode(obj, scratch) } -> std::convertible_to<std::span<const std::byte>>;
+    { C::kRecommendedScratchSize } -> std::convertible_to<std::size_t>;
 };
 
 /// A type C is a Decoder<T> if it can deserialise a byte span into a T.
