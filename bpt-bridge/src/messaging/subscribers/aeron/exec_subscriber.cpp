@@ -1,4 +1,4 @@
-#include "bridge/messaging/subscribers/exec_subscriber.h"
+#include "bridge/messaging/subscribers/aeron/exec_subscriber.h"
 
 #include "bridge/aeron/sbe_decode.h"
 
@@ -8,7 +8,7 @@
 
 #include <bpt_common/logging.h>
 
-namespace bpt::bridge::messaging {
+namespace bpt::bridge::messaging::aeron {
 
 using bpt::messages::ExecStatus;
 using bpt::messages::ExecutionReport;
@@ -89,4 +89,4 @@ void ExecSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
         });
 }
 
-}  // namespace bpt::bridge::messaging
+}  // namespace bpt::bridge::messaging::aeron

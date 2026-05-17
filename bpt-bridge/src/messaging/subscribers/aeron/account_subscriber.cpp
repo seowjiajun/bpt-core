@@ -1,4 +1,4 @@
-#include "bridge/messaging/subscribers/account_subscriber.h"
+#include "bridge/messaging/subscribers/aeron/account_subscriber.h"
 
 #include "bridge/aeron/sbe_decode.h"
 
@@ -6,7 +6,7 @@
 
 #include <bpt_common/logging.h>
 
-namespace bpt::bridge::messaging {
+namespace bpt::bridge::messaging::aeron {
 
 namespace {
 constexpr double kE8 = 1e8;
@@ -85,4 +85,4 @@ void AccountSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
         });
 }
 
-}  // namespace bpt::bridge::messaging
+}  // namespace bpt::bridge::messaging::aeron

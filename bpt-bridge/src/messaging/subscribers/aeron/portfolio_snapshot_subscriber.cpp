@@ -1,9 +1,9 @@
-#include "bridge/messaging/subscribers/portfolio_snapshot_subscriber.h"
+#include "bridge/messaging/subscribers/aeron/portfolio_snapshot_subscriber.h"
 
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 
-namespace bpt::bridge::messaging {
+namespace bpt::bridge::messaging::aeron {
 
 PortfolioSnapshotSubscriber::PortfolioSnapshotSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                                          const std::string& channel,
@@ -32,4 +32,4 @@ int PortfolioSnapshotSubscriber::poll(int fragment_limit) {
     return sub_->poll(assembler_->handler(), fragment_limit);
 }
 
-}  // namespace bpt::bridge::messaging
+}  // namespace bpt::bridge::messaging::aeron

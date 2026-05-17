@@ -52,7 +52,7 @@ void BridgeService::on_md_tick(uint64_t instrument_id, double mid, uint64_t ts_n
         broadcaster_->publish(MsgKind::Tick, encode::tick(ts_ns, settings_.symbol, mid));
 }
 
-void BridgeService::on_exec_fill(const messaging::ExecSubscriber::Fill& f) {
+void BridgeService::on_exec_fill(const messaging::api::ExecSubscriber::Fill& f) {
     if (settings_.instrument_id != 0 && f.instrument_id != settings_.instrument_id)
         return;
 
@@ -80,7 +80,7 @@ void BridgeService::on_exec_fill(const messaging::ExecSubscriber::Fill& f) {
     }
 }
 
-void BridgeService::on_exec_order_event(const messaging::ExecSubscriber::OrderEvent& ev) {
+void BridgeService::on_exec_order_event(const messaging::api::ExecSubscriber::OrderEvent& ev) {
     if (settings_.instrument_id != 0 && ev.instrument_id != settings_.instrument_id)
         return;
 
@@ -104,7 +104,7 @@ void BridgeService::on_exec_order_event(const messaging::ExecSubscriber::OrderEv
                                             status_s));
 }
 
-void BridgeService::on_account_snapshot(const messaging::AccountSubscriber::Snapshot& s) {
+void BridgeService::on_account_snapshot(const messaging::api::AccountSubscriber::Snapshot& s) {
     if (!broadcaster_)
         return;
     std::vector<encode::AccountPosition> positions;
@@ -238,12 +238,12 @@ void BridgeService::run() {
         });
     if (bus_.exec_sub) {
         bus_.exec_sub->set_order_handler(
-            [this](const messaging::ExecSubscriber::OrderEvent& ev) { on_exec_order_event(ev); });
-        bus_.exec_sub->set_handler([this](const messaging::ExecSubscriber::Fill& f) { on_exec_fill(f); });
+            [this](const messaging::api::ExecSubscriber::OrderEvent& ev) { on_exec_order_event(ev); });
+        bus_.exec_sub->set_handler([this](const messaging::api::ExecSubscriber::Fill& f) { on_exec_fill(f); });
     }
     if (bus_.account_sub)
         bus_.account_sub->set_handler(
-            [this](const messaging::AccountSubscriber::Snapshot& s) { on_account_snapshot(s); });
+            [this](const messaging::api::AccountSubscriber::Snapshot& s) { on_account_snapshot(s); });
     if (bus_.portfolio_sub)
         bus_.portfolio_sub->set_handler([this](std::string_view json) { on_portfolio_json(json); });
     if (bus_.tox_sub)

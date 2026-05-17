@@ -1,11 +1,11 @@
-#include "bridge/messaging/subscribers/market_color_subscriber.h"
+#include "bridge/messaging/subscribers/aeron/market_color_subscriber.h"
 
 #include <bpt_common/aeron/aeron_utils.h>
 #include <bpt_common/logging.h>
 
 #include <cstring>
 
-namespace bpt::bridge::messaging {
+namespace bpt::bridge::messaging::aeron {
 
 MarketColorSubscriber::MarketColorSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
                                              const std::string& channel,
@@ -32,4 +32,4 @@ int MarketColorSubscriber::poll(int fragment_limit) {
         fragment_limit);
 }
 
-}  // namespace bpt::bridge::messaging
+}  // namespace bpt::bridge::messaging::aeron

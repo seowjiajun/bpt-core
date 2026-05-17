@@ -13,12 +13,12 @@
 
 #include "bridge/config/settings.h"
 #include "bridge/messaging/publishers/aeron/dashboard_control_publisher.h"
-#include "bridge/messaging/subscribers/account_subscriber.h"
-#include "bridge/messaging/subscribers/exec_subscriber.h"
-#include "bridge/messaging/subscribers/market_color_subscriber.h"
-#include "bridge/messaging/subscribers/md_subscriber.h"
-#include "bridge/messaging/subscribers/portfolio_snapshot_subscriber.h"
-#include "bridge/messaging/subscribers/toxicity_subscriber.h"
+#include "bridge/messaging/subscribers/api/account_subscriber.h"
+#include "bridge/messaging/subscribers/api/exec_subscriber.h"
+#include "bridge/messaging/subscribers/api/market_color_subscriber.h"
+#include "bridge/messaging/subscribers/api/md_subscriber.h"
+#include "bridge/messaging/subscribers/api/portfolio_snapshot_subscriber.h"
+#include "bridge/messaging/subscribers/api/toxicity_subscriber.h"
 
 #include <Aeron.h>
 
@@ -27,12 +27,12 @@
 namespace bpt::bridge::messaging {
 
 struct BridgeBus {
-    std::unique_ptr<MdSubscriber> md_sub;
-    std::unique_ptr<ExecSubscriber> exec_sub;
-    std::unique_ptr<AccountSubscriber> account_sub;
-    std::unique_ptr<PortfolioSnapshotSubscriber> portfolio_sub;  ///< optional (null if stream_id == 0)
-    std::unique_ptr<ToxicitySubscriber> tox_sub;                 ///< optional
-    std::unique_ptr<MarketColorSubscriber> color_sub;            ///< optional
+    std::unique_ptr<api::MdSubscriber> md_sub;                       ///< port
+    std::unique_ptr<api::ExecSubscriber> exec_sub;                   ///< port
+    std::unique_ptr<api::AccountSubscriber> account_sub;             ///< port
+    std::unique_ptr<api::PortfolioSnapshotSubscriber> portfolio_sub; ///< optional port (null if stream_id == 0)
+    std::unique_ptr<api::ToxicitySubscriber> tox_sub;                ///< optional port
+    std::unique_ptr<api::MarketColorSubscriber> color_sub;           ///< optional port
     /// Shared rather than unique so main can hand a `shared_ptr<api::DashboardControlPublisher>`
     /// view of the same object to BridgeService while the bus still owns it.
     std::shared_ptr<aeron::DashboardControlPublisher> ctrl_pub;         ///< optional

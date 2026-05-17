@@ -17,8 +17,8 @@
 #include "bridge/config/settings.h"
 #include "bridge/messaging/aeron_bus.h"
 #include "bridge/messaging/publishers/api/dashboard_control_publisher.h"
-#include "bridge/messaging/subscribers/account_subscriber.h"
-#include "bridge/messaging/subscribers/exec_subscriber.h"
+#include "bridge/messaging/subscribers/api/account_subscriber.h"
+#include "bridge/messaging/subscribers/api/exec_subscriber.h"
 #include "bridge/state/position_tracker.h"
 #include "bridge/ws/i_broadcaster.h"
 
@@ -52,14 +52,14 @@ public:
 
     /// OrderGateway exec-report fill (FILLED or PARTIAL with qty > 0). Updates
     /// position tracker, broadcasts Fill + Position messages.
-    void on_exec_fill(const messaging::ExecSubscriber::Fill& f);
+    void on_exec_fill(const messaging::api::ExecSubscriber::Fill& f);
 
     /// OrderGateway exec-report lifecycle event (all statuses). Broadcasts
     /// an Order message so the dashboard can track working/cancelled orders.
-    void on_exec_order_event(const messaging::ExecSubscriber::OrderEvent& ev);
+    void on_exec_order_event(const messaging::api::ExecSubscriber::OrderEvent& ev);
 
     /// OrderGateway AccountSnapshot — equity / balance / per-currency rows.
-    void on_account_snapshot(const messaging::AccountSubscriber::Snapshot& s);
+    void on_account_snapshot(const messaging::api::AccountSubscriber::Snapshot& s);
 
     /// Strategy portfolio-snapshot JSON, already reassembled if it spanned
     /// multiple Aeron fragments.

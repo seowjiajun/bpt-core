@@ -1,4 +1,4 @@
-#include "bridge/messaging/subscribers/md_subscriber.h"
+#include "bridge/messaging/subscribers/aeron/md_subscriber.h"
 
 #include "bridge/aeron/sbe_decode.h"
 
@@ -6,7 +6,7 @@
 
 #include <bpt_common/logging.h>
 
-namespace bpt::bridge::messaging {
+namespace bpt::bridge::messaging::aeron {
 
 MdSubscriber::MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
     sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
@@ -38,4 +38,4 @@ void MdSubscriber::on_fragment(::aeron::AtomicBuffer& buffer,
     });
 }
 
-}  // namespace bpt::bridge::messaging
+}  // namespace bpt::bridge::messaging::aeron

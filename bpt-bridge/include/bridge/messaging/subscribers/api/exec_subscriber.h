@@ -1,21 +1,15 @@
 #pragma once
 
 /// @file
-/// Subscribes to OrderGateway's exec report stream and delivers decoded fills
-/// and order lifecycle events. Strips SBE off the hot path so BridgeService
-/// works in domain types.
+/// Port: ExecutionReport subscriber. Dispatches decoded fills and order
+/// lifecycle events. Aeron concrete in `aeron/exec_subscriber.h`.
 
 #include "bridge/ws/message_encoder.h"
 
-#include <Aeron.h>
-
-#include <bpt_common/aeron/subscriber.h>
 #include <cstdint>
 #include <functional>
-#include <memory>
-#include <string>
 
-namespace bpt::bridge::messaging {
+namespace bpt::bridge::messaging::api {
 
 class ExecSubscriber {
 public:
@@ -47,22 +41,16 @@ public:
     using FillHandler = std::function<void(const Fill&)>;
     using OrderHandler = std::function<void(const OrderEvent&)>;
 
-    ExecSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
+    virtual ~ExecSubscriber() = default;
 
     void set_handler(FillHandler h) { handler_ = std::move(h); }
     void set_order_handler(OrderHandler h) { order_handler_ = std::move(h); }
 
-    int poll(int fragment_limit = 32);
+    virtual int poll(int fragment_limit = 32) = 0;
 
-private:
-    void on_fragment(::aeron::AtomicBuffer& buffer,
-                     ::aeron::util::index_t offset,
-                     ::aeron::util::index_t length,
-                     ::aeron::Header& header);
-
-    std::unique_ptr<bpt::common::aeron::Subscriber> sub_;
+protected:
     FillHandler handler_;
     OrderHandler order_handler_;
 };
 
-}  // namespace bpt::bridge::messaging
+}  // namespace bpt::bridge::messaging::api

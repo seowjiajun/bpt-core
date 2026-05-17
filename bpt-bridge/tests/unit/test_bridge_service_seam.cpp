@@ -13,7 +13,7 @@
 #include "bridge/app/bridge_service.h"
 #include "bridge/messaging/aeron_bus.h"
 #include "bridge/messaging/publishers/api/dashboard_control_publisher.h"
-#include "bridge/messaging/subscribers/exec_subscriber.h"
+#include "bridge/messaging/subscribers/api/exec_subscriber.h"
 #include "bridge/ws/i_broadcaster.h"
 #include "bridge/ws/message_encoder.h"
 #include "bridge/ws/msg_kind.h"
@@ -27,7 +27,7 @@ namespace {
 
 using bpt::bridge::BridgeService;
 using bpt::bridge::MsgKind;
-using bpt::bridge::messaging::ExecSubscriber;
+using bpt::bridge::messaging::api::ExecSubscriber;
 namespace ctrl_api = bpt::bridge::messaging::api;
 using bpt::bridge::ws::IBroadcaster;
 
