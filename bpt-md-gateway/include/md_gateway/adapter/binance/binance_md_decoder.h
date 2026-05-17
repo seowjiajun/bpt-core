@@ -5,6 +5,7 @@
 
 #include "md_gateway/adapter/common/json_decoder_base.h"
 #include "md_gateway/adapter/common/subscription_map.h"
+#include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_types.h"
 #include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
 #include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
@@ -30,7 +31,7 @@ namespace bpt::md_gateway::adapter {
 ///
 /// Funding rates arrive on a separate BinanceMdAdapter thread
 /// (fstream.binance.com) and are not handled here.
-template <class Pub>
+template <md::MdSink Pub>
 class BinanceMdDecoder : public JsonDecoderBase {
 public:
     explicit BinanceMdDecoder(const SubscriptionMap& subs) : subs_(subs) {}

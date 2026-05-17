@@ -17,6 +17,7 @@
 /// (schema drift, crossed ladders) is suppressed instead of being
 /// forwarded as corrupt data.
 
+#include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_validator.h"
 #include "md_gateway/md/validation_drop_breaker.h"
 
@@ -27,17 +28,15 @@
 
 namespace bpt::md_gateway::md {
 
-/// \brief CRTP decorator: validate-then-forward + drop-rate breaker.
+/// \brief Template-composed decorator: validate-then-forward + drop-rate breaker.
 ///
 /// Not thread-safe for the validator state — one instance per adapter
 /// (publisher) thread, matching the single-writer guarantee of MdValidator.
 ///
-/// `Inner` must expose:
-///     - `void publish(const MdBbo&)`
-///     - `void publish(const MdTrade&)`
-///     - `void publish(const MdOrderBook&)`
-///     - `uint64_t drop_count() const`
-template <class Inner>
+/// `Inner` is constrained on the `MdPublisher` concept (three publish
+/// overloads + drop_count). The decorator chains its own drop counter
+/// on top of `Inner::drop_count()`.
+template <MdPublisher Inner>
 class ValidatingPublisher {
 public:
     ValidatingPublisher(Inner& inner, MdValidator& validator, const char* adapter_name = "unknown")

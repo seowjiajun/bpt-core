@@ -5,6 +5,7 @@
 
 #include "md_gateway/adapter/common/json_decoder_base.h"
 #include "md_gateway/adapter/common/subscription_map.h"
+#include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_types.h"
 #include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
 #include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
@@ -38,7 +39,7 @@ namespace bpt::md_gateway::adapter {
 /// test_request_pending is set from decode() and consumed by the adapter
 /// read loop via take_test_request(). Both are called sequentially on the
 /// IO thread so no locking is needed.
-template <class Pub>
+template <md::MdSink Pub>
 class DeribitMdDecoder : public JsonDecoderBase {
 public:
     explicit DeribitMdDecoder(SubscriptionMap& subs) : subs_(subs) {}

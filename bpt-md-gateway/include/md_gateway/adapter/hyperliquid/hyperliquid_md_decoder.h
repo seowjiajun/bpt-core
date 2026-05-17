@@ -5,6 +5,7 @@
 
 #include "md_gateway/adapter/common/json_decoder_base.h"
 #include "md_gateway/adapter/common/subscription_map.h"
+#include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_types.h"
 #include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
 #include "md_gateway/messaging/publishers/api/instrument_stats_publisher.h"
@@ -30,7 +31,7 @@ namespace bpt::md_gateway::adapter {
 ///   - l2Book         → publish_bbo (top of book only)
 ///   - trades         → publish_trade (one publish per trade in the array)
 ///   - activeAssetCtx → on_funding_rate callback (no nextFundingTime from HL)
-template <class Pub>
+template <md::MdSink Pub>
 class HyperliquidMdDecoder : public JsonDecoderBase {
 public:
     explicit HyperliquidMdDecoder(const SubscriptionMap& subs) : subs_(subs) {}

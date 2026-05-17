@@ -5,6 +5,7 @@
 
 #include "md_gateway/adapter/common/json_decoder_base.h"
 #include "md_gateway/adapter/common/subscription_map.h"
+#include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_types.h"
 #include "md_gateway/md/sorted_ladder.h"
 #include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
@@ -45,7 +46,7 @@ namespace bpt::md_gateway::adapter {
 /// (JsonDecoderBase) for zero-allocation hot-path parsing. Decode
 /// latency (parse + field extraction + Aeron offer) is recorded into
 /// decode_lat_ for Prometheus export.
-template <class Pub>
+template <md::MdSink Pub>
 class OkxMdDecoder : public JsonDecoderBase {
 public:
     explicit OkxMdDecoder(const SubscriptionMap& subs) : subs_(subs) {}

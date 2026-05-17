@@ -11,6 +11,7 @@
 /// into a single straight-line code path on the hot tick path.
 
 #include "md_gateway/md/md_encoder.h"
+#include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_types.h"
 
 #include <Aeron.h>
@@ -76,5 +77,10 @@ private:
     alignas(64) std::atomic<uint64_t> seq_{0};
     alignas(64) std::atomic<uint64_t> drops_{0};
 };
+
+// Self-verification: this concrete satisfies the contract its consumers
+// (ValidatingPublisher, venue decoders) constrain on. Catches drift if
+// the concept evolves without updating this class.
+static_assert(md::MdPublisher<MdPublisher>);
 
 }  // namespace bpt::md_gateway::messaging
