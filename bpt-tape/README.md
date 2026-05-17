@@ -13,6 +13,17 @@ See [service-anatomy.md](../docs/service-anatomy.md) for the canonical service s
 ## At a glance
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': '"SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryColor': '#1e293b',
+    'primaryTextColor': '#f8fafc',
+    'primaryBorderColor': '#0f172a'
+  }
+}}%%
 flowchart LR
     exchanges["<b>EXCHANGES</b><br/>WebSocket + REST"]
     disk["<b>LOCAL DISK</b><br/>/opt/bpt/data/tape/<br/>*.wslog · *.json"]

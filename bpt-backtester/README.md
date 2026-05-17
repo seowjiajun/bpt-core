@@ -16,6 +16,17 @@ See [service-anatomy.md](../docs/service-anatomy.md) for the canonical service s
 ## At a glance — bpt-backtester (multi-process)
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': '"SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryColor': '#1e293b',
+    'primaryTextColor': '#f8fafc',
+    'primaryBorderColor': '#0f172a'
+  }
+}}%%
 flowchart TD
     tape["<b>TAPE FILES</b><br/>.wslog / .parquet"]
     services["<b>regular Aeron services</b><br/>strategy · md-gateway<br/>order-gateway"]
@@ -60,6 +71,17 @@ flowchart TD
 ## At a glance — bpt-backtester-mono (deterministic)
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': '"SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryColor': '#1e293b',
+    'primaryTextColor': '#f8fafc',
+    'primaryBorderColor': '#0f172a'
+  }
+}}%%
 flowchart TD
     tape["<b>TAPE FILES</b><br/>.wslog"]
 

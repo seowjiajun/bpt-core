@@ -12,7 +12,53 @@ A solo project. Built end-to-end — services, deploy tooling, console, and a ba
   <img src="docs/diagrams/system-overview.svg" alt="bpt-core system overview" width="900">
 </p>
 
-Deeper diagrams (tick→fill sequence, config topology) live in [`docs/architecture.md`](docs/architecture.md).
+Deeper diagrams ([context](docs/architecture.md#context), [tick→fill sequence](docs/architecture.md#sequence-view), [config topology](docs/architecture.md#configuration-topology)) live in [`docs/architecture.md`](docs/architecture.md).
+
+## Deployment topology
+
+The hosts and their workloads. Trading services co-locate with the Aeron MediaDriver to keep IPC in shared memory; monitoring + tape archive run separately so operator visibility survives a trading-host issue.
+
+```mermaid
+architecture-beta
+    group trading(server)[Trading host AWS Tokyo]
+    group obs(cloud)[Monitoring host]
+    group archive(cloud)[Archive]
+    group local(disk)[Operator laptop]
+
+    service mediadriver(logos:java)[Aeron MediaDriver] in trading
+    service mdgw(logos:cplusplus)[md gateway] in trading
+    service ogw(logos:cplusplus)[order gateway] in trading
+    service rdata(logos:cplusplus)[refdata] in trading
+    service strat(logos:cplusplus)[strategy] in trading
+    service bridge(logos:cplusplus)[bridge] in trading
+    service tape(logos:cplusplus)[tape] in trading
+
+    service prom(logos:prometheus)[Prometheus] in obs
+    service graf(logos:grafana)[Grafana] in obs
+
+    service s3(logos:aws-s3)[S3 Tokyo] in archive
+
+    service console(logos:react)[React console] in local
+    service ssh(logos:gnu-bash)[ops shell] in local
+
+    mdgw:R --> L:mediadriver
+    ogw:R --> L:mediadriver
+    rdata:R --> L:mediadriver
+    strat:R --> L:mediadriver
+    bridge:R --> L:mediadriver
+
+    mdgw:B --> T:prom
+    ogw:B --> T:prom
+    rdata:B --> T:prom
+    strat:B --> T:prom
+    prom:R --> L:graf
+
+    tape:R --> L:s3
+    bridge:B <--> T:console
+    graf:B <--> T:ssh
+```
+
+Every hop inside the trading host is shared-memory (Aeron IPC). Cross-host hops (WebSocket to console, S3 sync, Prometheus scrape) are out of the latency-critical path.
 
 ## What's here
 

@@ -11,6 +11,17 @@ shape this service has.
 ## At a glance
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': '"SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryColor': '#1e293b',
+    'primaryTextColor': '#f8fafc',
+    'primaryBorderColor': '#0f172a'
+  }
+}}%%
 flowchart TD
     exchanges["<b>EXCHANGES</b><br/>Binance · OKX<br/>Deribit · Hyperliquid<br/>(WebSocket JSON)"]
     consumers["<b>INTERNAL CONSUMERS</b><br/>strategy · pricer<br/>analytics · bridge · radar<br/>(Aeron / SBE)"]

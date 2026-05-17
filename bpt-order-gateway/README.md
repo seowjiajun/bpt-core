@@ -11,6 +11,17 @@ See [service-anatomy.md](../docs/service-anatomy.md) for the canonical service s
 ## At a glance
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': '"SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryColor': '#1e293b',
+    'primaryTextColor': '#f8fafc',
+    'primaryBorderColor': '#0f172a'
+  }
+}}%%
 flowchart TD
     strategy["strategy"]
     exchanges["<b>EXCHANGES</b><br/>Binance · OKX<br/>Deribit · Hyperliquid<br/>(REST + WS user data)"]
