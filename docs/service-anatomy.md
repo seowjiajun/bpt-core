@@ -12,24 +12,38 @@ shows what's *inside* one service.
 ## The canonical full stack (bpt-md-gateway — has every layer)
 
 ```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': '"SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryColor': '#1e293b',
+    'primaryTextColor': '#f8fafc',
+    'primaryBorderColor': '#0f172a'
+  }
+}}%%
 flowchart TD
-    subgraph svc["bpt-md-gateway"]
-        main["<b>COMPOSITION ROOT</b><br/>main.cpp — wires everything"]
-        service["<b>SERVICE</b><br/>MdGatewayService<br/>IService, main poll loop"]
-        bus["<b>BUS</b><br/>AeronBus<br/>composition root for messaging concretes"]
-        routing["<b>ROUTING</b><br/>SubscriptionManager<br/>canonical ID → per-venue adapter"]
+    subgraph svc[" bpt-md-gateway "]
+        direction TB
+        main["<b>COMPOSITION ROOT</b><br/><i>main.cpp — wires everything</i>"]
+        service["<b>SERVICE</b><br/><i>MdGatewayService · IService<br/>main poll loop</i>"]
+        bus["<b>BUS</b><br/><i>AeronBus<br/>messaging composition root</i>"]
+        routing["<b>ROUTING</b><br/><i>SubscriptionManager<br/>canonical id → per-venue</i>"]
 
-        subgraph adapter_grp["<b>ADAPTER (per venue)</b>"]
-            adapter["BinanceMdAdapter<br/>OkxMdAdapter<br/>DeribitMdAdapter<br/>HyperliquidMdAdapter"]
-            wire["<b>WIRE</b><br/>*MdWsClient<br/>*FundingRateStream"]
-            extcodec["<b>EXTERNAL CODEC</b><br/>*MdDecoder&lt;Pub&gt;<br/>JSON → domain via simdjson"]
+        subgraph adapter_grp[" Per-venue Adapter "]
+            direction TB
+            adapter["<b>ADAPTER</b><br/><i>Binance · OKX<br/>Deribit · Hyperliquid</i>"]
+            wire["<b>WIRE</b><br/><i>*MdWsClient<br/>*FundingRateStream</i>"]
+            extcodec["<b>EXT CODEC</b><br/><i>*MdDecoder&lt;Pub&gt;<br/>JSON → domain</i>"]
             adapter --> wire
             adapter --> extcodec
         end
 
-        subgraph pubsub_grp["<b>PUB / SUB</b>"]
-            pubsub["publishers/api/<br/>publishers/aeron/<br/>subscribers/api/<br/>subscribers/aeron/<br/>MdPublisher (hot path)"]
-            intcodec["<b>CODEC (internal)</b><br/>SbeFundingRateCodec<br/>SbeInstrumentStatsCodec<br/>SbeMdSubscription*Codec<br/>(encode into scratch → span&lt;byte&gt;)"]
+        subgraph pubsub_grp[" Internal messaging "]
+            direction TB
+            pubsub["<b>PUB / SUB</b><br/><i>publishers/{api,aeron}/<br/>subscribers/{api,aeron}/<br/>MdPublisher (hot path)</i>"]
+            intcodec["<b>INT CODEC</b><br/><i>Sbe*Codec<br/>scratch → span&lt;byte&gt;</i>"]
             pubsub --> intcodec
         end
 
@@ -40,18 +54,22 @@ flowchart TD
         bus --> pubsub_grp
     end
 
-    ext["<b>EXCHANGES</b><br/>Binance · OKX<br/>Deribit · Hyperliquid"]
-    aeron_md["<b>AERON MEDIADRIVER</b><br/>Java external proc"]
-    consumers["<b>INTERNAL CONSUMERS</b><br/>strategy · pricer<br/>analytics · bridge · radar"]
+    ext(["📡 <b>EXCHANGES</b><br/><i>Binance · OKX<br/>Deribit · Hyperliquid</i>"])
+    aeron_md[("☕ <b>AERON MEDIADRIVER</b><br/><i>Java external proc</i>")]
+    consumers(["⚙️ <b>INTERNAL CONSUMERS</b><br/><i>strategy · pricer<br/>analytics · bridge · radar</i>"])
 
-    wire <-->|"WebSocket / JSON"| ext
-    intcodec -->|"Aeron offer / SBE"| aeron_md
-    aeron_md --> consumers
+    wire <==>|"WebSocket / JSON"| ext
+    intcodec ==>|"SBE / shared mem"| aeron_md
+    aeron_md ==> consumers
 
-    classDef layer fill:#f5f5f5,stroke:#333,stroke-width:1px,color:#000
-    classDef external fill:#fff3cd,stroke:#856404,stroke-width:1px,color:#000
-    class main,service,bus,routing,adapter,wire,extcodec,pubsub,intcodec layer
+    classDef service fill:#1e293b,stroke:#0f172a,stroke-width:1px,color:#f8fafc
+    classDef external fill:#fef3c7,stroke:#b45309,stroke-width:2px,color:#451a03
+    class main,service,bus,routing,adapter,wire,extcodec,pubsub,intcodec service
     class ext,aeron_md,consumers external
+
+    style svc fill:#f1f5f9,stroke:#cbd5e1,stroke-width:1px,color:#0f172a
+    style adapter_grp fill:#ffffff,stroke:#cbd5e1,stroke-width:1px,color:#475569
+    style pubsub_grp fill:#ffffff,stroke:#cbd5e1,stroke-width:1px,color:#475569
 ```
 
 > **Rendering this:** GitHub renders Mermaid inline automatically. In VS Code,

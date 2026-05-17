@@ -6,7 +6,38 @@ renders dashboards from Python source via [grafanalib](https://github.com/weavew
 
 This layer is **ops only** — service up/down, exchange connectivity,
 order-ack latency, error counters. PnL / fills / order-book visualisation
-live in the bpt-core React dashboard, not here.
+live in the bpt-core React console, not here.
+
+## Observability stack
+
+```mermaid
+architecture-beta
+    group bpt(server)[bpt core services]
+    group monitor(cloud)[monitoring host]
+
+    service mdgw(server)[md gateway] in bpt
+    service ogw(server)[order gateway] in bpt
+    service rdata(server)[refdata] in bpt
+    service strat(server)[strategy] in bpt
+    service tape(database)[tape] in bpt
+
+    service prom(logos:prometheus)[Prometheus] in monitor
+    service graf(logos:grafana)[Grafana] in monitor
+    service alert(logos:alertmanager)[Alertmanager] in monitor
+
+    service s3(logos:aws-s3)[AWS S3 Tokyo]
+    service ops(logos:linux-tux)[on call]
+
+    mdgw:R --> L:prom
+    ogw:R --> L:prom
+    rdata:R --> L:prom
+    strat:R --> L:prom
+    prom:R --> L:graf
+    prom:B --> T:alert
+    alert:R --> L:ops
+    graf:B --> T:ops
+    tape:R --> L:s3
+```
 
 ## Layout
 
