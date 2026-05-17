@@ -5,25 +5,32 @@
 ///
 /// The canonical adapter shape (any venue):
 ///
-///                ┌─────────────────────────────┐
-///                │  Adapter (e.g. BinanceMdAdapter)│
-///                │   implements IAdapter         │
-///                ├─────────────────────────────┤
-///                │  owns:                        │
-///                │    *MdWsClient   ─── WIRE     │
-///                │    *MdDecoder<Pub> ─ EXTERNAL CODEC
-///                │    (JSON → domain via simdjson)
-///                │  refs:                        │
-///                │    MdPublisher (the hot sink) │
-///                │    funding_cb, stats_cb       │
-///                └────────────┬────────────────┘
-///                             │
-///       inbound:              │ decoder.decode(payload, ts, pub, callbacks)
-///       [exchange WS] ── frame ─→ ws_client ─→ adapter ─→ decoder ─→ pub.publish(domain)
-///                                                            └─→ funding_cb(domain)
+///     ┌───────────────────────────────────────┐
+///     │  Adapter (e.g. BinanceMdAdapter)      │
+///     │    implements IAdapter                │
+///     ├───────────────────────────────────────┤
+///     │  owns:                                │
+///     │    *MdWsClient        ─── WIRE        │
+///     │    *MdDecoder<Pub>    ─── EXT CODEC   │
+///     │      (JSON → domain via simdjson)     │
+///     │                                       │
+///     │  refs (non-owning):                   │
+///     │    MdPublisher        (the hot sink)  │
+///     │    funding_cb, stats_cb               │
+///     └───────────────────────────────────────┘
 ///
-///       outbound:              │ ws_client.send(query string)
-///       [exchange WS] ←── subscribe ── ws_client ←── adapter ←── encoder.build_streams_query(subs)
+///   inbound flow:
+///     [exchange WS] ──frame──→ ws_client ──→ adapter ──→ decoder
+///                                                          │
+///                                            ┌─────────────┼─────────────┐
+///                                            ↓             ↓             ↓
+///                                       pub.publish   funding_cb     stats_cb
+///                                       (MdBbo,        (Funding-      (Instrument-
+///                                        MdTrade,       RateUpdate)    StatsUpdate)
+///                                        MdOrderBook)
+///
+///   outbound flow:
+///     adapter ──→ encoder.build_streams_query(subs) ──→ ws_client.send ──→ [exchange WS]
 ///
 /// See docs/service-anatomy.md for where this fits in the overall service stack.
 

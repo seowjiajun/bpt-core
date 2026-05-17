@@ -11,64 +11,52 @@ shows what's *inside* one service.
 
 ## The canonical full stack (bpt-md-gateway — has every layer)
 
+```mermaid
+flowchart TD
+    subgraph svc["bpt-md-gateway"]
+        main["<b>COMPOSITION ROOT</b><br/>main.cpp — wires everything"]
+        service["<b>SERVICE</b><br/>MdGatewayService<br/>IService, main poll loop"]
+        bus["<b>BUS</b><br/>AeronBus<br/>composition root for messaging concretes"]
+        routing["<b>ROUTING</b><br/>SubscriptionManager<br/>canonical ID → per-venue adapter"]
+
+        subgraph adapter_grp["<b>ADAPTER (per venue)</b>"]
+            adapter["BinanceMdAdapter<br/>OkxMdAdapter<br/>DeribitMdAdapter<br/>HyperliquidMdAdapter"]
+            wire["<b>WIRE</b><br/>*MdWsClient<br/>*FundingRateStream"]
+            extcodec["<b>EXTERNAL CODEC</b><br/>*MdDecoder&lt;Pub&gt;<br/>JSON → domain via simdjson"]
+            adapter --> wire
+            adapter --> extcodec
+        end
+
+        subgraph pubsub_grp["<b>PUB / SUB</b>"]
+            pubsub["publishers/api/<br/>publishers/aeron/<br/>subscribers/api/<br/>subscribers/aeron/<br/>MdPublisher (hot path)"]
+            intcodec["<b>CODEC (internal)</b><br/>SbeFundingRateCodec<br/>SbeInstrumentStatsCodec<br/>SbeMdSubscription*Codec<br/>(encode into scratch → span&lt;byte&gt;)"]
+            pubsub --> intcodec
+        end
+
+        main --> service
+        service --> routing
+        service --> bus
+        routing --> adapter_grp
+        bus --> pubsub_grp
+    end
+
+    ext["<b>EXCHANGES</b><br/>Binance · OKX<br/>Deribit · Hyperliquid"]
+    aeron_md["<b>AERON MEDIADRIVER</b><br/>Java external proc"]
+    consumers["<b>INTERNAL CONSUMERS</b><br/>strategy · pricer<br/>analytics · bridge · radar"]
+
+    wire <-->|"WebSocket / JSON"| ext
+    intcodec -->|"Aeron offer / SBE"| aeron_md
+    aeron_md --> consumers
+
+    classDef layer fill:#f5f5f5,stroke:#333,stroke-width:1px,color:#000
+    classDef external fill:#fff3cd,stroke:#856404,stroke-width:1px,color:#000
+    class main,service,bus,routing,adapter,wire,extcodec,pubsub,intcodec layer
+    class ext,aeron_md,consumers external
 ```
-                          bpt-md-gateway
-   ┌────────────────────────────────────────────────────────┐
-   │                                                        │
-   │  ┌──────────────────────────────────────────────────┐  │
-   │  │  COMPOSITION ROOT                                │  │
-   │  │   main.cpp — wires everything                    │  │
-   │  └──────────────────────┬───────────────────────────┘  │
-   │                         │                              │
-   │  ┌──────────────────────┴───────────────────────────┐  │
-   │  │  SERVICE                                         │  │
-   │  │   MdGatewayService — main poll loop              │  │
-   │  └────┬───────────────────────┬─────────────────────┘  │
-   │       │                       │                        │
-   │  ┌────┴─────────┐    ┌────────┴──────────────┐         │
-   │  │  ROUTING     │    │  BUS                  │         │
-   │  │  Subscription│    │   AeronBus            │         │
-   │  │  Manager     │    │   (composition root   │         │
-   │  │              │    │    for messaging)     │         │
-   │  └────┬─────────┘    └──┬────────────────────┘         │
-   │       │                 │                              │
-   │  ┌────┴─────────────┐   │   ┌────────────────────────┐ │
-   │  │  ADAPTER (per venue) │   │  PUB/SUB             │ │
-   │  │   IAdapter         │   ├──→│   publishers/api/    │ │
-   │  │   ├ BinanceMdAdpt  │   │   │   publishers/aeron/  │ │
-   │  │   ├ OkxMdAdpt      │   │   │   subscribers/api/   │ │
-   │  │   ├ DeribitMdAdpt  │   │   │   subscribers/aeron/ │ │
-   │  │   └ HLMdAdpt       │   │   │   MdPublisher (hot)  │ │
-   │  │  ┌──────────────┐  │   │   └──────────┬───────────┘ │
-   │  │  │ WIRE         │  │   │              │             │
-   │  │  │  *MdWsClient │  │   │   ┌──────────┴───────────┐ │
-   │  │  │  *FundingRate│  │   │   │  CODEC (internal)    │ │
-   │  │  │   Stream     │  │   │   │   SbeFundingRateCodec│ │
-   │  │  └──────────────┘  │   │   │   SbeInstrumentStats │ │
-   │  │  ┌──────────────┐  │   │   │   SbeMdSubscription* │ │
-   │  │  │ CODEC (ext)  │  │   │   │   (writes into       │ │
-   │  │  │  *MdDecoder  │  │   │   │    scratch, returns  │ │
-   │  │  │   <Pub>      │  │   │   │    span<byte>)       │ │
-   │  │  │  (parses JSON)│ │   │   └──────────────────────┘ │
-   │  │  └──────────────┘  │   │                            │
-   │  └───────┬───────────┘    │                            │
-   │          │                │                            │
-   │          ↓                │                            │
-   └──────────┼────────────────┼────────────────────────────┘
-              │                │
-              ↓ WebSocket      ↓ Aeron IPC
-        ┌──────────────┐    ┌────────────────────────┐
-        │  EXCHANGES   │    │  AERON MEDIADRIVER     │
-        │  Binance /   │    │  (Java external proc)  │
-        │  OKX /       │    └──────────┬─────────────┘
-        │  Deribit /   │               │
-        │  Hyperliquid │               ↓
-        └──────────────┘    ┌──────────────────────────┐
-                            │ strategy / pricer /      │
-                            │ analytics / bridge /     │
-                            │ radar                    │
-                            └──────────────────────────┘
-```
+
+> **Rendering this:** GitHub renders Mermaid inline automatically. In VS Code,
+> install `bierner.markdown-mermaid` (Markdown Preview Mermaid Support) — one-click,
+> no other config. Anywhere else, the raw text is the source-of-truth.
 
 ## Layer vocabulary
 
@@ -86,17 +74,29 @@ shows what's *inside* one service.
 
 ## The four abstraction "halves" and what each owns
 
-```
-                            DOMAIN TYPES
-                  (MdBbo, FundingRateUpdate, etc.)
-                                |
-   ┌───── external side ────────┼──────── internal side ─────┐
-   │                            │                            │
-   ↓                            ↓                            ↓
-[ws_client]──[decoder]──→ [domain object] ──→[codec]──→[publisher]
-   exchange wire             POD struct          internal wire
-   bytes                     in memory            bytes
-   JSON                                           SBE / POD
+```mermaid
+flowchart LR
+    ext_bytes["<b>exchange wire</b><br/>(JSON / WS bytes)"]
+    ws["ws_client"]
+    decoder["decoder<br/>(simdjson)"]
+    domain["<b>DOMAIN TYPES</b><br/>MdBbo<br/>FundingRateUpdate<br/>MdSubscribeBatch<br/>...<br/>POD structs in memory"]
+    codec["codec<br/>(SBE / POD<br/>encode)"]
+    publisher["publisher"]
+    int_bytes["<b>internal wire</b><br/>(SBE / POD bytes,<br/>Aeron log buffer)"]
+
+    ext_bytes <--> ws
+    ws --> decoder
+    decoder --> domain
+    domain --> codec
+    codec --> publisher
+    publisher <--> int_bytes
+
+    classDef pivot fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#000
+    classDef wire fill:#dbeafe,stroke:#1e40af,color:#000
+    classDef component fill:#f5f5f5,stroke:#333,color:#000
+    class domain pivot
+    class ext_bytes,int_bytes wire
+    class ws,decoder,codec,publisher component
 ```
 
 The domain types (`MdBbo`, `FundingRateUpdate`, `MdSubscribeBatch`, etc.) are
