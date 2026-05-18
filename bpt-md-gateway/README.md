@@ -18,9 +18,9 @@ shape this service has.
 
 | Edge colour | Path | What flows |
 |---|---|---|
-| 🟥 **Red** | Hot tick path | BBO / Trade / OrderBook (zero-copy SBE into Aeron log buffer) |
-| 🟩 **Green** | Slow path | FundingRate / InstrumentStats / Ack (codec + offer) |
-| 🟦 **Cyan** | Control | MdSubscribeBatch from strategy → SubscriptionManager → adapter / slow-pub |
+| 🟥 **Red** | Hot tick path | venue → adapter (WS) → MdPublisher → **Aeron** → consumers. Zero-copy SBE into the log buffer. |
+| 🟩 **Green** | Slow path | FundingRate / InstrumentStats / Ack → **Aeron** → consumers. Codec + offer. |
+| 🟦 **Cyan** | Control | strategy → **Aeron** → MdControlSubscriber → SubscriptionManager → adapter / slow-pub. |
 
 ## Detailed data flow (every major object)
 

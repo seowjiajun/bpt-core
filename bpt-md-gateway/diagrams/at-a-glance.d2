@@ -1,5 +1,5 @@
 # bpt-md-gateway "at a glance" diagram
-# Render: d2 --layout=elk at-a-glance.d2 at-a-glance.svg
+# Render: ./render.sh at-a-glance
 # Source-of-truth — the .svg next to it is generated.
 
 direction: down
@@ -13,6 +13,15 @@ classes: {
       font-color: "#0f172a"
       shadow: true
       border-radius: 20
+    }
+  }
+  cylinder-card: {
+    shape: cylinder
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#0f172a"
     }
   }
   swimlane-ext: {
@@ -84,26 +93,30 @@ mdgw: bpt-md-gateway {
   slow: "slow-path publishers\nFundingRate · InstrumentStats · Ack" { class: card }
 }
 
-right: "Aeron + Consumers" {
+# Aeron is the bus, not part of mdgw and not part of consumers.
+# Every internal cross-service exchange (control in, hot/slow out) passes through here.
+aeron: "Aeron — shared-memory log buffers" { class: cylinder-card }
+
+cons: Consumers {
   class: swimlane-ext
   label.near: outside-top-center
-  aeron: "Aeron\nshared-memory log buffers" { class: card }
-  consumers: "strategy · pricer · analytics\nbridge · radar" { class: card }
+  list: "strategy · pricer · analytics\nbridge · radar" { class: card }
 }
 
-# Hot tick path (red)
+# Venue → adapter is the only external link that's NOT Aeron (it's WebSocket).
 ext.venue -> mdgw.adapter.ws: { class: hot }
 mdgw.adapter.ws -> mdgw.adapter.decoder: { class: hot }
 mdgw.adapter.decoder -> mdgw.adapter.pub: { class: hot }
-mdgw.adapter.pub -> right.aeron: { class: hot }
-right.aeron -> right.consumers: { class: hot }
+mdgw.adapter.pub -> aeron: { class: hot }
+aeron -> cons.list: { class: hot }
 
-# Slow path (emerald)
+# Slow path (funding, stats, ack) also lands in Aeron.
 mdgw.adapter.decoder -> mdgw.slow: { class: slow }
-mdgw.slow -> right.aeron: { class: slow }
+mdgw.slow -> aeron: { class: slow }
 
-# Control / ack path (cyan)
-ext.strat -> mdgw.ctrl: { class: control }
+# Control path: strategy publishes to Aeron → Aeron delivers to mdgw.
+ext.strat -> aeron: { class: control }
+aeron -> mdgw.ctrl: { class: control }
 mdgw.ctrl -> mdgw.sm: { class: control }
 mdgw.sm -> mdgw.adapter.ws: { class: control }
 mdgw.sm -> mdgw.slow: { class: control }
