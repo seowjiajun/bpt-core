@@ -1,12 +1,12 @@
 #pragma once
 
-#include "refdata/refdata/types.h"
+#include "refdata/model/types.h"
 
 #include <cstdint>
 #include <optional>
 #include <string>
 
-namespace bpt::refdata::refdata {
+namespace bpt::refdata::model {
 
 struct Instrument {
     uint64_t inst_uid;
@@ -33,4 +33,4 @@ struct Instrument {
     bool operator==(const Instrument& other) const = default;
 };
 
-}  // namespace bpt::refdata::refdata
+}  // namespace bpt::refdata::model

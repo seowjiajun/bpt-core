@@ -1,7 +1,7 @@
 #pragma once
 
 #include "refdata/messaging/publishers/api/refdata_delta_publisher.h"
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/instrument.h"
 
 #include <Aeron.h>
 
@@ -15,7 +15,7 @@ class RefdataDeltaPublisher final : public api::RefdataDeltaPublisher {
 public:
     RefdataDeltaPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
-    void publish_delta(bpt::messages::DeltaUpdateType::Value update_type, const refdata::Instrument& inst) override;
+    void publish_delta(bpt::messages::DeltaUpdateType::Value update_type, const model::Instrument& inst) override;
 
     // Publish a heartbeat on the delta stream so subscribers can detect silent failures.
     // Uses DeltaUpdateType::NULL_VALUE with instrumentId=0; sequence number increments

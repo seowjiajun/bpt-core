@@ -6,7 +6,7 @@
 /// Wraps a `bpt::common::aeron::Subscriber` over the control channel
 /// and decodes each delivered fragment as an SBE `MdSubscribeBatch`
 /// before invoking the user-supplied handler. Constructed by
-/// AeronBus::build() at the prod composition root.
+/// MdGatewayAeronBus::build() at the prod composition root.
 ///
 /// Threading: the underlying Aeron Subscriber is single-poll-thread;
 /// poll() is invoked from MdGatewayService's main thread only.

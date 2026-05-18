@@ -6,7 +6,7 @@
 /// MdGatewayService is the `bpt::app::IService` the process entry point
 /// hands to `bpt::app::run()`. It owns:
 ///   - the loaded `Settings`,
-///   - the Aeron-port objects (built by AeronBus::build in main),
+///   - the Aeron-port objects (built by MdGatewayAeronBus::build in main),
 ///   - one SubscriptionManager that fans control batches out to the
 ///     per-venue adapters,
 ///   - the Prometheus registry/exposer,
@@ -42,7 +42,7 @@ namespace bpt::md_gateway {
 ///
 /// Constructor takes everything pre-built — the bus ports, topology,
 /// settings — so the app itself contains no Aeron / port construction
-/// logic. That stays in main.cpp via `messaging::AeronBus::build`.
+/// logic. That stays in main.cpp via `messaging::MdGatewayAeronBus::build`.
 class MdGatewayService : public bpt::app::IService {
 public:
     /// \brief Construct.

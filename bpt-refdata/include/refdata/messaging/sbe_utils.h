@@ -9,7 +9,7 @@
 #include <bpt_common/logging.h>
 #include <cstring>
 #include <ctime>
-#include <refdata/refdata/instrument.h>
+#include <refdata/model/instrument.h>
 #include <x86intrin.h>
 
 namespace bpt::refdata::messaging {
@@ -41,8 +41,8 @@ inline void aeron_offer(::aeron::Publication& pub,
     } while (r < 0);
 }
 
-inline bpt::messages::InstrumentType::Value to_sbe_type(refdata::InstrumentType t) {
-    using S = refdata::InstrumentType;
+inline bpt::messages::InstrumentType::Value to_sbe_type(model::InstrumentType t) {
+    using S = model::InstrumentType;
     using P = bpt::messages::InstrumentType;
     switch (t) {
         case S::SPOT:
@@ -58,8 +58,8 @@ inline bpt::messages::InstrumentType::Value to_sbe_type(refdata::InstrumentType 
     }
 }
 
-inline bpt::messages::InstrumentStatus::Value to_sbe_status(refdata::InstrumentStatus s) {
-    using S = refdata::InstrumentStatus;
+inline bpt::messages::InstrumentStatus::Value to_sbe_status(model::InstrumentStatus s) {
+    using S = model::InstrumentStatus;
     using P = bpt::messages::InstrumentStatus;
     switch (s) {
         case S::ACTIVE:

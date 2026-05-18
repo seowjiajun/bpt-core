@@ -1,9 +1,9 @@
 /// \file
-/// \brief AeronBus::build — instantiate the prod messaging-port concrete classes.
+/// \brief MdGatewayAeronBus::build — instantiate the prod messaging-port concrete classes.
 ///
 /// One place that maps `settings.aeron.*` channel+stream pairs onto the
 /// concrete Aeron-backed classes. Kept tiny on purpose: the app's wiring
-/// is a single call (`AeronBus::build`) which the rest of the binary
+/// is a single call (`MdGatewayAeronBus::build`) which the rest of the binary
 /// never has to look at again.
 
 #include "md_gateway/messaging/aeron_bus.h"
@@ -17,8 +17,8 @@
 
 namespace bpt::md_gateway::messaging {
 
-AeronBus AeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
-    AeronBus bus;
+MdGatewayBus MdGatewayAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
+    MdGatewayBus bus;
     bus.control_sub = std::make_unique<aeron::MdControlSubscriber>(aeron,
                                                                       settings.aeron.md_control.channel,
                                                                       settings.aeron.md_control.stream_id);

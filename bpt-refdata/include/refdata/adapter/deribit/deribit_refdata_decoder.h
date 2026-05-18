@@ -4,8 +4,8 @@
 /// \brief Deribit `public/get_instruments` decoder (JSON → refdata structs).
 
 #include "refdata/mapping/instrument_mapping_loader.h"
-#include "refdata/refdata/funding_rate.h"
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/funding_rate.h"
+#include "refdata/model/instrument.h"
 
 #include <memory>
 #include <string>
@@ -25,8 +25,8 @@ namespace bpt::refdata::adapter {
 class DeribitRefdataDecoder {
 public:
     struct InstrumentWithFee {
-        refdata::Instrument instrument;
-        refdata::FeeScheduleState fee;
+        model::Instrument instrument;
+        model::FeeScheduleState fee;
     };
 
     explicit DeribitRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping);

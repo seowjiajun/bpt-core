@@ -89,7 +89,7 @@ flowchart TD
 |---|---|---|
 | Composition root | yes | `src/main.cpp` |
 | Service | yes | `app/refdata_service.{h,cpp}` |
-| Bus | yes | `messaging/aeron_bus.{h,cpp}` — `AeronBus` |
+| Bus | yes | `messaging/aeron_bus.{h,cpp}` — `RefdataBus` |
 | Routing | yes | per-venue adapter handles its own venue's universe; `SubscriptionManager` (`messaging/subscription_manager.{h,cpp}`) routes `RefDataSubscriptionRequest` filters to the snapshot publisher |
 | Adapter | yes | `adapter/<venue>/<venue>_refdata_adapter.{h,cpp}` — 4 venues |
 | Wire | yes | `http/rest_client.{h,cpp}` (Boost.Beast over TLS, with retries — shared across venues) |
@@ -137,7 +137,7 @@ slice to push on the snapshot stream.
 
 1. `src/main.cpp`
 2. `app/refdata_service.{h,cpp}` — main loop, adapter fan-in, control-stream handling.
-3. `messaging/aeron_bus.{h,cpp}` — `AeronBus` shape (4 pubs + 1 sub).
+3. `messaging/aeron_bus.{h,cpp}` — `RefdataBus` shape (4 pubs + 1 sub).
 4. `adapter/binance/binance_refdata_adapter.{h,cpp}` — concrete venue example.
 5. `registry/instrument_registry.{h,cpp}` — canonical universe + ID generation.
 6. `resolver/instrument_resolver.{h,cpp}` — venue ↔ canonical lookup.

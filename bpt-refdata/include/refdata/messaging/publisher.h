@@ -1,6 +1,6 @@
 #pragma once
 
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/instrument.h"
 
 #include <memory>
 #include <vector>
@@ -18,8 +18,8 @@ public:
     RefdataPublisher();  // In real app, would take Aeron context/publication
     ~RefdataPublisher();
 
-    void publishSnapshot(const std::vector<refdata::Instrument>& instruments);
-    void publishDelta(const refdata::Instrument& instrument);
+    void publishSnapshot(const std::vector<model::Instrument>& instruments);
+    void publishDelta(const model::Instrument& instrument);
 
 private:
     // std::shared_ptr<aeron::ExclusivePublication> snapshot_pub_;

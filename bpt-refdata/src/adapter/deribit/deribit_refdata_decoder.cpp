@@ -1,6 +1,6 @@
 #include "refdata/adapter/deribit/deribit_refdata_decoder.h"
 
-#include "refdata/refdata/types.h"
+#include "refdata/model/types.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
@@ -16,15 +16,15 @@ namespace bpt::refdata::adapter {
 namespace {
 
 // Map bpt-refdata InstrumentType to SBE InstrumentType
-bpt::messages::InstrumentType::Value to_sbe_inst_type(refdata::InstrumentType t) {
+bpt::messages::InstrumentType::Value to_sbe_inst_type(model::InstrumentType t) {
     switch (t) {
-        case refdata::InstrumentType::SPOT:
+        case model::InstrumentType::SPOT:
             return bpt::messages::InstrumentType::SPOT;
-        case refdata::InstrumentType::PERP:
+        case model::InstrumentType::PERP:
             return bpt::messages::InstrumentType::PERPETUAL;
-        case refdata::InstrumentType::FUTURE:
+        case model::InstrumentType::FUTURE:
             return bpt::messages::InstrumentType::FUTURE;
-        case refdata::InstrumentType::OPTION:
+        case model::InstrumentType::OPTION:
             return bpt::messages::InstrumentType::OPTION;
         default:
             return bpt::messages::InstrumentType::NULL_VALUE;
@@ -58,17 +58,17 @@ uint32_t derive_deribit_canonical_id(const std::string& instrument_name) {
 // kind=future with settlement_period=perpetual → PERP
 // kind=future otherwise → FUTURE
 // kind=option → OPTION
-refdata::InstrumentType deribit_to_inst_type(const std::string& kind, const std::string& settlement_period) {
+model::InstrumentType deribit_to_inst_type(const std::string& kind, const std::string& settlement_period) {
     if (kind == "option")
-        return refdata::InstrumentType::OPTION;
+        return model::InstrumentType::OPTION;
     if (kind == "future") {
         if (settlement_period == "perpetual")
-            return refdata::InstrumentType::PERP;
-        return refdata::InstrumentType::FUTURE;
+            return model::InstrumentType::PERP;
+        return model::InstrumentType::FUTURE;
     }
     if (kind == "spot")
-        return refdata::InstrumentType::SPOT;
-    return refdata::InstrumentType::UNKNOWN;
+        return model::InstrumentType::SPOT;
+    return model::InstrumentType::UNKNOWN;
 }
 
 }  // namespace
@@ -110,8 +110,8 @@ std::vector<DeribitRefdataDecoder::InstrumentWithFee> DeribitRefdataDecoder::par
         std::string kind = sym.value("kind", "");
         std::string settlement_period = sym.value("settlement_period", "");
 
-        refdata::InstrumentType itype = deribit_to_inst_type(kind, settlement_period);
-        if (itype == refdata::InstrumentType::UNKNOWN)
+        model::InstrumentType itype = deribit_to_inst_type(kind, settlement_period);
+        if (itype == model::InstrumentType::UNKNOWN)
             continue;
 
         // Deribit symbols are unique per type (BTC-PERPETUAL, BTC-28MAR25, ...).
@@ -126,7 +126,7 @@ std::vector<DeribitRefdataDecoder::InstrumentWithFee> DeribitRefdataDecoder::par
         }
 
         InstrumentWithFee iwf;
-        refdata::Instrument& inst = iwf.instrument;
+        model::Instrument& inst = iwf.instrument;
         inst.inst_uid = mapping::make_inst_uid(canonical_id, mapping::EXCHANGE_ID_DERIBIT);
         inst.venue = "DERIBIT";
         inst.venue_symbol = instrument_name;
@@ -134,7 +134,7 @@ std::vector<DeribitRefdataDecoder::InstrumentWithFee> DeribitRefdataDecoder::par
         inst.base = sym.value("base_currency", "");
         inst.quote = sym.value("quote_currency", "");
         inst.inst_type = itype;
-        inst.status = refdata::InstrumentStatus::ACTIVE;
+        inst.status = model::InstrumentStatus::ACTIVE;
         inst.version = collected_ts;
 
         // tick_size, min_trade_amount (lot_size), contract_size (contract_multiplier)
@@ -143,14 +143,14 @@ std::vector<DeribitRefdataDecoder::InstrumentWithFee> DeribitRefdataDecoder::par
         inst.contract_multiplier = sym.value("contract_size", 1.0);
 
         // Expiry for FUTURE and OPTION types (expiration_timestamp is ms)
-        if (itype == refdata::InstrumentType::FUTURE || itype == refdata::InstrumentType::OPTION) {
+        if (itype == model::InstrumentType::FUTURE || itype == model::InstrumentType::OPTION) {
             uint64_t exp_ms = sym.value("expiration_timestamp", static_cast<uint64_t>(0));
             if (exp_ms > 0)
                 inst.expiry_timestamp = exp_ms * 1'000'000ULL;  // ms → ns
         }
 
         // Strike price for OPTIONS
-        if (itype == refdata::InstrumentType::OPTION) {
+        if (itype == model::InstrumentType::OPTION) {
             double strike = sym.value("strike", 0.0);
             if (strike > 0.0)
                 inst.strike_price = strike;
@@ -161,7 +161,7 @@ std::vector<DeribitRefdataDecoder::InstrumentWithFee> DeribitRefdataDecoder::par
         double maker = sym.value("maker_commission", 0.0);
         double taker = sym.value("taker_commission", 0.0);
 
-        refdata::FeeScheduleState& fs = iwf.fee;
+        model::FeeScheduleState& fs = iwf.fee;
         fs.exchange_id = bpt::messages::ExchangeId::DERIBIT;
         fs.instrument_id = inst.inst_uid;
         fs.instrument_type = to_sbe_inst_type(itype);

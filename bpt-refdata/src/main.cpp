@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
         bpt::common::logging::init(service_name);
 
         // Optional fault injection (dev/qa only). Must run before
-        // bpt::app::run builds the AeronBus — Subscribers consult the
+        // bpt::app::run builds the RefdataBus — Subscribers consult the
         // registry at ctor time.
         bpt::common::aeron::install_chaos_from_toml(args.config_path,
                                                     bpt::common::to_string(settings.base.environment),
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
                                  // Composition root: build the Aeron-backed bus adapters
                                  // as one unit, then hand the ports to RefdataService.
-                                 auto bus = bpt::refdata::messaging::AeronBus::build(ctx.aeron, cfg);
+                                 auto bus = bpt::refdata::messaging::RefdataAeronBus::build(ctx.aeron, cfg);
 
                                  return std::make_unique<bpt::refdata::RefdataService>(std::move(cfg),
                                                                                    std::move(bus.control_sub),

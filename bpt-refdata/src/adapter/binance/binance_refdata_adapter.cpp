@@ -79,7 +79,7 @@ void BinanceRefDataAdapter::fetchInstrumentListing() {
     bpt::common::log::info(kLog(), "Hourly instrument listing refresh...");
     const uint64_t ts = now_ns();
 
-    auto notify = [this, ts](refdata::Instrument& inst) {
+    auto notify = [this, ts](model::Instrument& inst) {
         if (registry_->update_if_changed(inst) && on_instrument_delta)
             on_instrument_delta(inst, bpt::messages::DeltaUpdateType::MODIFY, ts);
     };

@@ -5,7 +5,7 @@
 ///
 /// OrderGatewayService talks to the four messaging ports (api::OrderSubscriber +
 /// api::ExecReportPublisher + api::AccountSnapshotPublisher + api::HeartbeatPublisher)
-/// without knowing how they are implemented. `AeronBus::build()` is
+/// without knowing how they are implemented. `OrderGatewayAeronBus::build()` is
 /// the single place that constructs the Aeron-backed concrete classes
 /// and bundles them into a struct the app accepts in its constructor —
 /// swap this factory for a different one (e.g. an in-memory bus for
@@ -13,8 +13,8 @@
 ///
 /// Mirrors the bpt-md-gateway and bpt-refdata bus shape.
 ///
-/// Lifetime: AeronBus owns the publisher and subscriber objects but
-/// hands ownership to OrderGatewayService at construction; AeronBus itself
+/// Lifetime: OrderGatewayBus owns the publisher and subscriber objects but
+/// hands ownership to OrderGatewayService at construction; OrderGatewayBus itself
 /// is a value type that can be moved out at the wiring site in main.cpp.
 
 #include "order_gateway/messaging/publishers/api/account_snapshot_publisher.h"
@@ -37,7 +37,7 @@ namespace bpt::order_gateway::messaging {
 /// All four ports are exposed via interface type so alternate
 /// implementations (test fakes, replay drivers) can substitute without
 /// rebuilding the app.
-struct AeronBus {
+struct OrderGatewayBus {
     /// \brief Inbound: NewOrder / Cancel / CancelAll / Modify /
     ///        AccountSnapshotRequest fragments from strategy.
     ///
@@ -62,13 +62,17 @@ struct AeronBus {
     /// \brief Outbound: OrderGatewayHeartbeat on a fixed cadence.
     std::shared_ptr<api::HeartbeatPublisher> heartbeat_pub;
 
+};
+
+class OrderGatewayAeronBus {
+public:
     /// \brief Construct the prod (Aeron-backed) implementations of all
     ///        four ports.
     ///
     /// Reads channel + stream-id assignments from `settings.aeron`. The
     /// supplied `aeron` shared client must already have a MediaDriver
     /// connection — see bpt::app::run() which sets it up.
-    static AeronBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
+    static OrderGatewayBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace bpt::order_gateway::messaging

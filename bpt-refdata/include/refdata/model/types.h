@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace bpt::refdata::refdata {
+namespace bpt::refdata::model {
 
 enum class InstrumentType : uint8_t { SPOT, PERP, FUTURE, OPTION, UNKNOWN };
 
@@ -37,9 +37,9 @@ constexpr std::string_view toString(InstrumentStatus status) {
     }
 }
 
-}  // namespace bpt::refdata::refdata
+}  // namespace bpt::refdata::model
 
-namespace bpt::refdata::refdata {
+namespace bpt::refdata::model {
 constexpr InstrumentType instrumentTypeFromString(std::string_view str) {
     if (str == "SPOT")
         return InstrumentType::SPOT;
@@ -51,4 +51,4 @@ constexpr InstrumentType instrumentTypeFromString(std::string_view str) {
         return InstrumentType::OPTION;
     return InstrumentType::UNKNOWN;
 }
-}  // namespace bpt::refdata::refdata
+}  // namespace bpt::refdata::model

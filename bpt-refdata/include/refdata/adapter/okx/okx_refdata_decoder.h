@@ -4,8 +4,8 @@
 /// \brief OKX REST refdata response decoder (JSON → refdata structs).
 
 #include "refdata/mapping/instrument_mapping_loader.h"
-#include "refdata/refdata/funding_rate.h"
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/funding_rate.h"
+#include "refdata/model/instrument.h"
 
 #include <memory>
 #include <string>
@@ -22,12 +22,12 @@ public:
     explicit OKXRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping);
 
     /// \brief Decode `GET /api/v5/public/instruments?instType=SPOT|SWAP|FUTURES` body.
-    std::vector<refdata::Instrument> parse_instruments(const std::string& body,
+    std::vector<model::Instrument> parse_instruments(const std::string& body,
                                                        const std::string& inst_type,
                                                        uint64_t collected_ts) const;
 
     /// \brief Decode `GET /api/v5/account/trade-fee?instType=SPOT|SWAP` body.
-    std::vector<refdata::FeeScheduleState> parse_trade_fee(const std::string& body, uint64_t collected_ts) const;
+    std::vector<model::FeeScheduleState> parse_trade_fee(const std::string& body, uint64_t collected_ts) const;
 
 private:
     std::shared_ptr<mapping::InstrumentMappingLoader> mapping_;

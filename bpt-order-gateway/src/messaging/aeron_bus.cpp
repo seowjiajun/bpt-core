@@ -1,9 +1,9 @@
 /// \file
-/// \brief AeronBus::build — instantiate the prod messaging-port concrete classes.
+/// \brief OrderGatewayAeronBus::build — instantiate the prod messaging-port concrete classes.
 ///
 /// One place that maps `settings.aeron.*` channel+stream pairs onto the
 /// concrete Aeron-backed classes. Kept tiny on purpose — main.cpp's
-/// wiring is a single call (`AeronBus::build`) and the rest of the
+/// wiring is a single call (`OrderGatewayAeronBus::build`) and the rest of the
 /// binary never has to look at it again.
 
 #include "order_gateway/messaging/aeron_bus.h"
@@ -16,8 +16,8 @@
 
 namespace bpt::order_gateway::messaging {
 
-AeronBus AeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
-    AeronBus bus;
+OrderGatewayBus OrderGatewayAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
+    OrderGatewayBus bus;
     bus.control_sub =
         std::make_shared<aeron::OrderSubscriber>(aeron, settings.aeron.order.channel, settings.aeron.order.stream_id);
     bus.exec_pub = std::make_shared<aeron::ExecReportPublisher>(aeron,

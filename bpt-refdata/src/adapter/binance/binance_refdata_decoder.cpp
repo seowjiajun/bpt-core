@@ -1,6 +1,6 @@
 #include "refdata/adapter/binance/binance_refdata_decoder.h"
 
-#include "refdata/refdata/types.h"
+#include "refdata/model/types.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
@@ -15,21 +15,21 @@ namespace bpt::refdata::adapter {
 
 namespace {
 
-refdata::InstrumentType binance_to_inst_type(const std::string& contract_type) {
+model::InstrumentType binance_to_inst_type(const std::string& contract_type) {
     if (contract_type == "PERPETUAL")
-        return refdata::InstrumentType::PERP;
+        return model::InstrumentType::PERP;
     if (contract_type == "CURRENT_QUARTER" || contract_type == "NEXT_QUARTER" || contract_type == "CURRENT_MONTH" ||
         contract_type == "NEXT_MONTH")
-        return refdata::InstrumentType::FUTURE;
-    return refdata::InstrumentType::UNKNOWN;
+        return model::InstrumentType::FUTURE;
+    return model::InstrumentType::UNKNOWN;
 }
 
-refdata::InstrumentStatus binance_to_status(const std::string& s) {
+model::InstrumentStatus binance_to_status(const std::string& s) {
     if (s == "TRADING")
-        return refdata::InstrumentStatus::ACTIVE;
+        return model::InstrumentStatus::ACTIVE;
     if (s == "BREAK")
-        return refdata::InstrumentStatus::HALTED;
-    return refdata::InstrumentStatus::DELISTED;
+        return model::InstrumentStatus::HALTED;
+    return model::InstrumentStatus::DELISTED;
 }
 
 void parse_filters(const json& filters, double& tick_size, double& lot_size, double& min_notional) {
@@ -52,22 +52,22 @@ void parse_filters(const json& filters, double& tick_size, double& lot_size, dou
 BinanceRefdataDecoder::BinanceRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
     : mapping_(std::move(mapping)) {}
 
-std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_spot_exchange_info(const std::string& body,
+std::vector<model::Instrument> BinanceRefdataDecoder::parse_spot_exchange_info(const std::string& body,
                                                                                  uint64_t collected_ts) const {
     auto j = json::parse(body);
-    std::vector<refdata::Instrument> result;
+    std::vector<model::Instrument> result;
 
     for (const auto& sym : j["symbols"]) {
         if (sym.value("status", "") != "TRADING")
             continue;
 
-        refdata::Instrument inst;
+        model::Instrument inst;
         inst.venue = "BINANCE";
         inst.venue_symbol = sym.value("symbol", "");
         inst.base = sym.value("baseAsset", "");
         inst.quote = sym.value("quoteAsset", "");
-        inst.inst_type = refdata::InstrumentType::SPOT;
-        inst.status = refdata::InstrumentStatus::ACTIVE;
+        inst.inst_type = model::InstrumentType::SPOT;
+        inst.status = model::InstrumentStatus::ACTIVE;
         inst.version = collected_ts;
         inst.contract_multiplier = 1.0;
         inst.display_name = inst.venue_symbol;
@@ -91,17 +91,17 @@ std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_spot_exchange_info
     return result;
 }
 
-std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_futures_exchange_info(const std::string& body,
+std::vector<model::Instrument> BinanceRefdataDecoder::parse_futures_exchange_info(const std::string& body,
                                                                                     uint64_t collected_ts) const {
     auto j = json::parse(body);
-    std::vector<refdata::Instrument> result;
+    std::vector<model::Instrument> result;
 
     for (const auto& sym : j["symbols"]) {
         auto status = sym.value("status", "");
         if (status != "TRADING" && status != "DELIVERING")
             continue;
 
-        refdata::Instrument inst;
+        model::Instrument inst;
         inst.venue = "BINANCE";
         inst.venue_symbol = sym.value("symbol", "");
         inst.base = sym.value("baseAsset", "");
@@ -136,10 +136,10 @@ std::vector<refdata::Instrument> BinanceRefdataDecoder::parse_futures_exchange_i
     return result;
 }
 
-std::vector<refdata::FeeScheduleState> BinanceRefdataDecoder::parse_trade_fee(const std::string& body,
+std::vector<model::FeeScheduleState> BinanceRefdataDecoder::parse_trade_fee(const std::string& body,
                                                                               uint64_t collected_ts) const {
     auto j = json::parse(body);
-    std::vector<refdata::FeeScheduleState> result;
+    std::vector<model::FeeScheduleState> result;
     if (!j.is_array())
         return result;
 
@@ -155,7 +155,7 @@ std::vector<refdata::FeeScheduleState> BinanceRefdataDecoder::parse_trade_fee(co
         double maker = std::stod(entry.value("makerCommission", "0.001"));
         double taker = std::stod(entry.value("takerCommission", "0.001"));
 
-        refdata::FeeScheduleState fs;
+        model::FeeScheduleState fs;
         fs.exchange_id = bpt::messages::ExchangeId::BINANCE;
         fs.instrument_id = mapping::make_inst_uid(*cid, mapping::EXCHANGE_ID_BINANCE);
         fs.instrument_type = bpt::messages::InstrumentType::SPOT;

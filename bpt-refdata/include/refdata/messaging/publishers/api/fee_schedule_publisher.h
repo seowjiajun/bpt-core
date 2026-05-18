@@ -3,7 +3,7 @@
 /// \file
 /// \brief Outbound port: fee schedule publish.
 
-namespace bpt::refdata::refdata {
+namespace bpt::refdata::model {
 struct FeeScheduleState;
 }
 
@@ -13,7 +13,7 @@ class FeeSchedulePublisher {
 public:
     virtual ~FeeSchedulePublisher() = default;
 
-    virtual void publish(const refdata::FeeScheduleState& fs) = 0;
+    virtual void publish(const model::FeeScheduleState& fs) = 0;
 };
 
 }  // namespace bpt::refdata::messaging::api

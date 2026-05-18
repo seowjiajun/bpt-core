@@ -39,7 +39,7 @@ bool venue_matches_filter_exchange(const std::string& venue, const char* filter_
 }
 
 // Returns true if inst matches the request filter (empty filters = match all).
-bool matches(const refdata::Instrument& inst, const RefdataRequest& req) {
+bool matches(const model::Instrument& inst, const RefdataRequest& req) {
     // Canonical filter takes priority when present.
     if (!req.canonical_filters.empty()) {
         for (const auto& f : req.canonical_filters) {
@@ -78,8 +78,8 @@ void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& regis
                                        const RefdataRequest& request,
                                        uint64_t seq_start) {
     // Pass 1: collect matching instruments (only copies matches, not the full registry).
-    std::vector<refdata::Instrument> matched;
-    registry.for_each([&](const refdata::Instrument& inst) {
+    std::vector<model::Instrument> matched;
+    registry.for_each([&](const model::Instrument& inst) {
         if (matches(inst, request))
             matched.push_back(inst);
     });

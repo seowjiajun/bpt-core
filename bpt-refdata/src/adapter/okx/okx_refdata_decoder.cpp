@@ -1,6 +1,6 @@
 #include "refdata/adapter/okx/okx_refdata_decoder.h"
 
-#include "refdata/refdata/types.h"
+#include "refdata/model/types.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
@@ -16,35 +16,35 @@ namespace bpt::refdata::adapter {
 
 namespace {
 
-refdata::InstrumentType okx_to_inst_type(const std::string& inst_type) {
+model::InstrumentType okx_to_inst_type(const std::string& inst_type) {
     if (inst_type == "SPOT")
-        return refdata::InstrumentType::SPOT;
+        return model::InstrumentType::SPOT;
     if (inst_type == "SWAP")
-        return refdata::InstrumentType::PERP;
+        return model::InstrumentType::PERP;
     if (inst_type == "FUTURES")
-        return refdata::InstrumentType::FUTURE;
+        return model::InstrumentType::FUTURE;
     if (inst_type == "OPTION")
-        return refdata::InstrumentType::OPTION;
-    return refdata::InstrumentType::UNKNOWN;
+        return model::InstrumentType::OPTION;
+    return model::InstrumentType::UNKNOWN;
 }
 
-refdata::InstrumentStatus okx_to_status(const std::string& state) {
+model::InstrumentStatus okx_to_status(const std::string& state) {
     if (state == "live")
-        return refdata::InstrumentStatus::ACTIVE;
+        return model::InstrumentStatus::ACTIVE;
     if (state == "suspend")
-        return refdata::InstrumentStatus::HALTED;
-    return refdata::InstrumentStatus::DELISTED;
+        return model::InstrumentStatus::HALTED;
+    return model::InstrumentStatus::DELISTED;
 }
 
-bpt::messages::InstrumentType::Value to_sbe_inst_type(refdata::InstrumentType t) {
+bpt::messages::InstrumentType::Value to_sbe_inst_type(model::InstrumentType t) {
     switch (t) {
-        case refdata::InstrumentType::SPOT:
+        case model::InstrumentType::SPOT:
             return bpt::messages::InstrumentType::SPOT;
-        case refdata::InstrumentType::PERP:
+        case model::InstrumentType::PERP:
             return bpt::messages::InstrumentType::PERPETUAL;
-        case refdata::InstrumentType::FUTURE:
+        case model::InstrumentType::FUTURE:
             return bpt::messages::InstrumentType::FUTURE;
-        case refdata::InstrumentType::OPTION:
+        case model::InstrumentType::OPTION:
             return bpt::messages::InstrumentType::OPTION;
         default:
             return bpt::messages::InstrumentType::NULL_VALUE;
@@ -56,7 +56,7 @@ bpt::messages::InstrumentType::Value to_sbe_inst_type(refdata::InstrumentType t)
 OKXRefdataDecoder::OKXRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
     : mapping_(std::move(mapping)) {}
 
-std::vector<refdata::Instrument> OKXRefdataDecoder::parse_instruments(const std::string& body,
+std::vector<model::Instrument> OKXRefdataDecoder::parse_instruments(const std::string& body,
                                                                       const std::string& inst_type,
                                                                       uint64_t collected_ts) const {
     auto j = json::parse(body);
@@ -68,7 +68,7 @@ std::vector<refdata::Instrument> OKXRefdataDecoder::parse_instruments(const std:
     }
 
     const auto& data = j["data"];
-    std::vector<refdata::Instrument> result;
+    std::vector<model::Instrument> result;
 
     for (const auto& sym : data) {
         if (sym.value("state", "") != "live")
@@ -99,7 +99,7 @@ std::vector<refdata::Instrument> OKXRefdataDecoder::parse_instruments(const std:
         if (!cid)
             continue;
 
-        refdata::Instrument inst;
+        model::Instrument inst;
         inst.venue = "OKX";
         inst.venue_symbol = venue_symbol;
         inst.base = base;
@@ -125,7 +125,7 @@ std::vector<refdata::Instrument> OKXRefdataDecoder::parse_instruments(const std:
         }
         inst.lot_size = lot_sz_raw * inst.contract_multiplier;
 
-        if (inst.inst_type == refdata::InstrumentType::FUTURE) {
+        if (inst.inst_type == model::InstrumentType::FUTURE) {
             if (auto it = sym.find("expTime"); it != sym.end() && it->is_string()) {
                 auto s = it->get<std::string>();
                 if (!s.empty()) {
@@ -143,7 +143,7 @@ std::vector<refdata::Instrument> OKXRefdataDecoder::parse_instruments(const std:
     return result;
 }
 
-std::vector<refdata::FeeScheduleState> OKXRefdataDecoder::parse_trade_fee(const std::string& body,
+std::vector<model::FeeScheduleState> OKXRefdataDecoder::parse_trade_fee(const std::string& body,
                                                                           uint64_t collected_ts) const {
     auto j = json::parse(body);
     if (j.value("code", "") != "0") {
@@ -151,10 +151,10 @@ std::vector<refdata::FeeScheduleState> OKXRefdataDecoder::parse_trade_fee(const 
         return {};
     }
 
-    std::vector<refdata::FeeScheduleState> result;
+    std::vector<model::FeeScheduleState> result;
     for (const auto& entry : j["data"]) {
         std::string inst_type_str = entry.value("instType", "");
-        refdata::InstrumentType itype = okx_to_inst_type(inst_type_str);
+        model::InstrumentType itype = okx_to_inst_type(inst_type_str);
 
         double maker = 0.0, taker = 0.0;
         if (auto it = entry.find("maker"); it != entry.end() && it->is_string()) {
@@ -168,7 +168,7 @@ std::vector<refdata::FeeScheduleState> OKXRefdataDecoder::parse_trade_fee(const 
                 taker = std::stod(s);
         }
 
-        refdata::FeeScheduleState fs;
+        model::FeeScheduleState fs;
         fs.exchange_id = bpt::messages::ExchangeId::OKX;
         fs.instrument_id = 0;  // 0 = applies to all instruments of this type on OKX
         fs.instrument_type = to_sbe_inst_type(itype);

@@ -138,12 +138,12 @@ RefdataService::RefdataService(config::Settings settings,
         }
 
         const std::string exch_name = adapter->exchange_name();
-        adapter->on_fee_schedule = [this, exch_name](const refdata::FeeScheduleState& fs) {
+        adapter->on_fee_schedule = [this, exch_name](const model::FeeScheduleState& fs) {
             std::lock_guard lock(pub_mutex_);
             fee_pub_->publish(fs);
             metrics_.fee_update(exch_name).Increment();
         };
-        adapter->on_instrument_delta = [this](const refdata::Instrument& inst,
+        adapter->on_instrument_delta = [this](const model::Instrument& inst,
                                               bpt::messages::DeltaUpdateType::Value update_type,
                                               uint64_t /*collected_ts_ns*/) {
             delta_pub_->publish_delta(update_type, inst);
@@ -261,7 +261,7 @@ void RefdataService::run() {
                 try {
                     instrument_mapping_->load(local);
                     std::size_t delta_count = 0;
-                    registry_->for_each([this, &delta_count](const refdata::Instrument& inst) {
+                    registry_->for_each([this, &delta_count](const model::Instrument& inst) {
                         delta_pub_->publish_delta(bpt::messages::DeltaUpdateType::MODIFY, inst);
                         ++delta_count;
                     });

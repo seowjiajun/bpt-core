@@ -14,8 +14,8 @@
 #include "refdata/messaging/publishers/api/refdata_delta_publisher.h"
 #include "refdata/messaging/publishers/api/refdata_snapshot_publisher.h"
 #include "refdata/messaging/publishers/api/refdata_status_publisher.h"
-#include "refdata/refdata/funding_rate.h"
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/funding_rate.h"
+#include "refdata/model/instrument.h"
 #include "refdata/registry/instrument_registry.h"
 
 #include <cstddef>
@@ -34,8 +34,8 @@ using bpt::refdata::messaging::api::RefdataControlSubscriber;
 using bpt::refdata::messaging::api::RefdataDeltaPublisher;
 using bpt::refdata::messaging::api::RefdataSnapshotPublisher;
 using bpt::refdata::messaging::api::RefdataStatusPublisher;
-using bpt::refdata::refdata::FeeScheduleState;
-using bpt::refdata::refdata::Instrument;
+using bpt::refdata::model::FeeScheduleState;
+using bpt::refdata::model::Instrument;
 using bpt::refdata::registry::InstrumentRegistry;
 
 // ---- Fakes -----------------------------------------------------------------

@@ -10,12 +10,12 @@ RefdataPublisher::RefdataPublisher() {
 
 RefdataPublisher::~RefdataPublisher() = default;
 
-void RefdataPublisher::publishSnapshot(const std::vector<refdata::Instrument>& instruments) {
+void RefdataPublisher::publishSnapshot(const std::vector<model::Instrument>& instruments) {
     bpt::common::log::info("Publishing snapshot of {} instruments", instruments.size());
     // Iterate and send via Aeron
 }
 
-void RefdataPublisher::publishDelta(const refdata::Instrument& instrument) {
+void RefdataPublisher::publishDelta(const model::Instrument& instrument) {
     bpt::common::log::info("Publishing delta for instrument: {}", instrument.inst_uid);
     // Send via Aeron
 }

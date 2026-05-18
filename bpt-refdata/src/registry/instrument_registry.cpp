@@ -5,7 +5,7 @@
 
 namespace bpt::refdata::registry {
 
-void InstrumentRegistry::add(const refdata::Instrument& instrument) {
+void InstrumentRegistry::add(const model::Instrument& instrument) {
     std::unique_lock lock(mutex_);
     instruments_by_uid_[instrument.inst_uid] = instrument;
 
@@ -17,7 +17,7 @@ void InstrumentRegistry::add(const refdata::Instrument& instrument) {
     uid_by_venue_symbol_[key] = instrument.inst_uid;
 }
 
-void InstrumentRegistry::update(const refdata::Instrument& instrument) {
+void InstrumentRegistry::update(const model::Instrument& instrument) {
     // For now, update behaves same as add (upsert)
     add(instrument);
 }
@@ -33,7 +33,7 @@ void InstrumentRegistry::remove(uint64_t inst_uid) {
     }
 }
 
-std::optional<refdata::Instrument> InstrumentRegistry::get(uint64_t inst_uid) const {
+std::optional<model::Instrument> InstrumentRegistry::get(uint64_t inst_uid) const {
     std::shared_lock lock(mutex_);
     auto it = instruments_by_uid_.find(inst_uid);
     if (it != instruments_by_uid_.end()) {
@@ -42,7 +42,7 @@ std::optional<refdata::Instrument> InstrumentRegistry::get(uint64_t inst_uid) co
     return std::nullopt;
 }
 
-std::optional<refdata::Instrument> InstrumentRegistry::get(const std::string& venue,
+std::optional<model::Instrument> InstrumentRegistry::get(const std::string& venue,
                                                            const std::string& venue_symbol) const {
     std::shared_lock lock(mutex_);
     // Linear scan — most callers use venues where symbols are unique per type.
@@ -53,9 +53,9 @@ std::optional<refdata::Instrument> InstrumentRegistry::get(const std::string& ve
     return std::nullopt;
 }
 
-std::optional<refdata::Instrument> InstrumentRegistry::get(const std::string& venue,
+std::optional<model::Instrument> InstrumentRegistry::get(const std::string& venue,
                                                            const std::string& venue_symbol,
-                                                           refdata::InstrumentType type) const {
+                                                           model::InstrumentType type) const {
     std::shared_lock lock(mutex_);
     std::string key = venue + ":" + venue_symbol + ":" + std::to_string(static_cast<int>(type));
     auto it_uid = uid_by_venue_symbol_.find(key);
@@ -67,7 +67,7 @@ std::optional<refdata::Instrument> InstrumentRegistry::get(const std::string& ve
     return std::nullopt;
 }
 
-bool InstrumentRegistry::update_if_changed(const refdata::Instrument& instrument) {
+bool InstrumentRegistry::update_if_changed(const model::Instrument& instrument) {
     std::unique_lock lock(mutex_);
     auto it = instruments_by_uid_.find(instrument.inst_uid);
     if (it == instruments_by_uid_.end()) {
@@ -92,15 +92,15 @@ std::size_t InstrumentRegistry::count() const {
     return instruments_by_uid_.size();
 }
 
-void InstrumentRegistry::for_each(const std::function<void(const refdata::Instrument&)>& fn) const {
+void InstrumentRegistry::for_each(const std::function<void(const model::Instrument&)>& fn) const {
     std::shared_lock lock(mutex_);
     for (const auto& [uid, inst] : instruments_by_uid_)
         fn(inst);
 }
 
-std::vector<refdata::Instrument> InstrumentRegistry::getAll() const {
+std::vector<model::Instrument> InstrumentRegistry::getAll() const {
     std::shared_lock lock(mutex_);
-    std::vector<refdata::Instrument> result;
+    std::vector<model::Instrument> result;
     result.reserve(instruments_by_uid_.size());
     for (const auto& pair : instruments_by_uid_) {
         result.push_back(pair.second);

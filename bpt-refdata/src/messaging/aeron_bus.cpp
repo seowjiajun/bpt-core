@@ -9,8 +9,8 @@
 
 namespace bpt::refdata::messaging {
 
-AeronBus AeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
-    AeronBus bus;
+RefdataBus RefdataAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
+    RefdataBus bus;
     bus.control_sub = std::make_unique<aeron::RefdataControlSubscriber>(aeron,
                                                                            settings.refdata_control.channel,
                                                                            settings.refdata_control.stream_id);

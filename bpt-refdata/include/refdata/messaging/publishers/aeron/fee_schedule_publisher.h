@@ -2,7 +2,7 @@
 
 #include "refdata/messaging/codecs/sbe_fee_schedule_codec.h"
 #include "refdata/messaging/publishers/api/fee_schedule_publisher.h"
-#include "refdata/refdata/funding_rate.h"
+#include "refdata/model/funding_rate.h"
 
 #include <Aeron.h>
 
@@ -15,7 +15,7 @@ class FeeSchedulePublisher final : public api::FeeSchedulePublisher {
 public:
     FeeSchedulePublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
 
-    void publish(const refdata::FeeScheduleState& fs) override;
+    void publish(const model::FeeScheduleState& fs) override;
 
 private:
     std::shared_ptr<::aeron::Publication> publication_;

@@ -15,7 +15,7 @@ FeeSchedulePublisher::FeeSchedulePublisher(std::shared_ptr<::aeron::Aeron> aeron
     publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
 }
 
-void FeeSchedulePublisher::publish(const refdata::FeeScheduleState& fs) {
+void FeeSchedulePublisher::publish(const model::FeeScheduleState& fs) {
     alignas(8) std::byte scratch[SbeFeeScheduleCodec::kRecommendedScratchSize];
     const auto bytes = codec_.encode(fs, scratch);
 

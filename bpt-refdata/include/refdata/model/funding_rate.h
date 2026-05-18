@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace bpt::refdata::refdata {
+namespace bpt::refdata::model {
 
 struct FeeScheduleState {
     bpt::messages::ExchangeId::Value exchange_id;
@@ -16,4 +16,4 @@ struct FeeScheduleState {
     uint64_t updated_ts;  // UTC nanosecond epoch when fetched from exchange
 };
 
-}  // namespace bpt::refdata::refdata
+}  // namespace bpt::refdata::model

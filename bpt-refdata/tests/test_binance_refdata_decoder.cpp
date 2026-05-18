@@ -1,6 +1,6 @@
 #include "refdata/adapter/binance/binance_refdata_decoder.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
-#include "refdata/refdata/types.h"
+#include "refdata/model/types.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
@@ -14,8 +14,8 @@ using bpt::refdata::adapter::BinanceRefdataDecoder;
 using bpt::refdata::mapping::InstrumentMappingLoader;
 using bpt::refdata::mapping::EXCHANGE_ID_BINANCE;
 using bpt::refdata::mapping::make_inst_uid;
-using bpt::refdata::refdata::InstrumentStatus;
-using bpt::refdata::refdata::InstrumentType;
+using bpt::refdata::model::InstrumentStatus;
+using bpt::refdata::model::InstrumentType;
 
 // ---------------------------------------------------------------------------
 // Shared instrument mapping fixture

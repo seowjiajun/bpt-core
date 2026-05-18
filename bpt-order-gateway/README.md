@@ -90,7 +90,7 @@ flowchart TD
 |---|---|---|
 | Composition root | yes | `src/main.cpp` |
 | Service | yes | `app/order_gateway_service.{h,cpp}` |
-| Bus | yes | `messaging/aeron_bus.{h,cpp}` — `AeronBus` |
+| Bus | yes | `messaging/aeron_bus.{h,cpp}` — `OrderGatewayBus` |
 | Routing | yes | per-venue adapter map (instrument_id → venue resolved via refdata) |
 | Adapter | yes | `adapter/<venue>/<venue>_order_adapter.{h,cpp}` — 4 venues, share `adapter/common/order_adapter_base.{h,cpp}` |
 | Wire | yes | `adapter/<venue>/<venue>_https_client.{h,cpp}` (REST orders) + `*_ws_client.{h,cpp}` (user-data WS for exec events) |
@@ -144,7 +144,7 @@ Future split into a `bpt-risk` service is documented in
 
 1. `src/main.cpp`
 2. `app/order_gateway_service.{h,cpp}` — poll loop, fan-in from adapters, periodic snapshot.
-3. `messaging/aeron_bus.{h,cpp}` — `AeronBus` shape.
+3. `messaging/aeron_bus.{h,cpp}` — `OrderGatewayBus` shape.
 4. `adapter/common/i_order_adapter.h` — venue adapter contract.
 5. `adapter/binance/binance_order_adapter.{h,cpp}` — concrete adapter; encoder + decoder visible.
 6. `order/order_processor.{h,cpp}` — risk gates, order lifecycle.

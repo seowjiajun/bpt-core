@@ -24,7 +24,7 @@ RefdataDeltaPublisher::RefdataDeltaPublisher(std::shared_ptr<::aeron::Aeron> aer
 }
 
 void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value update_type,
-                                          const refdata::Instrument& inst) {
+                                          const model::Instrument& inst) {
     ++seq_;
 
 

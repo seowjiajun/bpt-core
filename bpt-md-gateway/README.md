@@ -84,7 +84,7 @@ flowchart TD
 |---|---|---|
 | Composition root | `src/main.cpp` | — |
 | Service | `app/md_gateway_service.{h,cpp}` | `MdGatewayService` (IService impl) |
-| Bus | `messaging/aeron_bus.{h,cpp}` | `AeronBus` struct + `build()` factory |
+| Bus | `messaging/aeron_bus.{h,cpp}` | `MdGatewayBus` struct + `build()` factory |
 | Routing | `subscription/subscription_manager.{h,cpp}` | `SubscriptionManager` |
 | Adapter | `adapter/<venue>/<venue>_md_adapter.{h,cpp}` | 4 adapters, share `adapter/common/adapter_base.h` |
 | Wire | `adapter/<venue>/<venue>_md_ws_client.{h,cpp}` | Boost.Beast + Asio WS |

@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
         bpt::common::logging::init(service_name);
 
         // Optional fault injection (dev/qa only). Must run before
-        // bpt::app::run builds the AeronBus — Subscribers consult the
+        // bpt::app::run builds the OrderGatewayBus — Subscribers consult the
         // registry at ctor time.
         bpt::common::aeron::install_chaos_from_toml(args.config_path,
                                                     bpt::common::to_string(cfg.base.environment),
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
                              std::move(cfg),
                              [](auto& settings, auto& ctx) -> std::unique_ptr<bpt::app::IService> {
                                  auto creds = load_credentials(settings.gateway.adapters, settings.base.environment);
-                                 auto bus = bpt::order_gateway::messaging::AeronBus::build(ctx.aeron, settings);
+                                 auto bus = bpt::order_gateway::messaging::OrderGatewayAeronBus::build(ctx.aeron, settings);
                                  return std::make_unique<bpt::order_gateway::OrderGatewayService>(
                                      std::move(settings),
                                      std::move(bus.control_sub),

@@ -3,8 +3,8 @@
 /// \file
 /// \brief IExchangeRefDataAdapter — the per-venue refdata interface used by bpt-refdata.
 
-#include "refdata/refdata/funding_rate.h"
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/funding_rate.h"
+#include "refdata/model/instrument.h"
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
@@ -45,11 +45,11 @@ public:
     virtual bpt::messages::ExchangeId::Value exchange_id() const = 0;
 
     /// \brief Fired for each instrument ADD/MODIFY/REMOVE.
-    std::function<void(const refdata::Instrument&, bpt::messages::DeltaUpdateType::Value, uint64_t collected_ts_ns)>
+    std::function<void(const model::Instrument&, bpt::messages::DeltaUpdateType::Value, uint64_t collected_ts_ns)>
         on_instrument_delta;
 
     /// \brief Fired on startup (from snapshot) and whenever fees change.
-    std::function<void(const refdata::FeeScheduleState&)> on_fee_schedule;
+    std::function<void(const model::FeeScheduleState&)> on_fee_schedule;
 };
 
 }  // namespace bpt::refdata::adapter

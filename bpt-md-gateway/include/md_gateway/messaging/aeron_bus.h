@@ -6,7 +6,7 @@
 /// MdGatewayService talks to the four messaging ports (api::MdControlSubscriber +
 /// api::AckPublisher + api::FundingRatePublisher + api::InstrumentStatsPublisher
 /// + concrete MdPublisher) without knowing how they are implemented.
-/// `AeronBus::build()` is the single place that constructs the Aeron-backed
+/// `MdGatewayAeronBus::build()` is the single place that constructs the Aeron-backed
 /// concrete classes and bundles them into a struct the app accepts in its
 /// constructor — swap this factory for a different one (e.g. an in-memory bus
 /// for seam tests, a NoopMdPublisher for bpt-tape) and the app code is
@@ -18,8 +18,8 @@
 /// Variation at the MD publisher is therefore a compile-time choice
 /// (which `Pub` you instantiate the adapters with), not a runtime polymorphism.
 ///
-/// Lifetime: AeronBus owns the publisher and subscriber objects but
-/// hands ownership to MdGatewayService at construction; AeronBus itself is
+/// Lifetime: MdGatewayBus owns the publisher and subscriber objects but
+/// hands ownership to MdGatewayService at construction; MdGatewayBus itself is
 /// a value type that can be moved out at the wiring site.
 ///
 /// Where this bus sits in the service stack:
@@ -28,7 +28,7 @@
 ///         ↓
 ///     [ MdGatewayService ]                      service / poll loop
 ///         ↓ owns
-///     [ AeronBus ]  ←── this file                bus (messaging composition root)
+///     [ MdGatewayBus ]  ←── this file                bus (messaging composition root)
 ///         │
 ///         ├──→ [ api::*Publisher / Subscriber ] virtual ports (slow path)
 ///         │        ↓ dispatches to
@@ -61,7 +61,7 @@ namespace bpt::md_gateway::messaging {
 /// alternate implementations (test fakes, recorder no-ops) can substitute
 /// without rebuilding the app; the MD publisher is concrete because the
 /// hot path is templated on `Pub` (see file-level doc above).
-struct AeronBus {
+struct MdGatewayBus {
     /// \brief Inbound: SBE `MdSubscribeBatch` control fragments from strategy.
     ///
     /// Polled from MdGatewayService::run(); each fragment dispatched to the
@@ -93,12 +93,16 @@ struct AeronBus {
     /// strategy consumers that don't need OI don't pay decode cost on every tick.
     std::shared_ptr<api::InstrumentStatsPublisher> stats_pub;
 
+};
+
+class MdGatewayAeronBus {
+public:
     /// \brief Construct the prod (Aeron-backed) implementations of all five ports.
     ///
     /// Reads channel + stream-id assignments from `settings.aeron`. The
     /// supplied `aeron` shared client must already have a MediaDriver
     /// connection — see bpt::app::run() which sets it up.
-    static AeronBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
+    static MdGatewayBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace bpt::md_gateway::messaging

@@ -1,13 +1,13 @@
-#include "refdata/refdata/instrument.h"
-#include "refdata/refdata/types.h"
+#include "refdata/model/instrument.h"
+#include "refdata/model/types.h"
 #include "refdata/registry/instrument_registry.h"
 
 #include <gtest/gtest.h>
 
 using bpt::refdata::registry::InstrumentRegistry;
-using bpt::refdata::refdata::Instrument;
-using bpt::refdata::refdata::InstrumentStatus;
-using bpt::refdata::refdata::InstrumentType;
+using bpt::refdata::model::Instrument;
+using bpt::refdata::model::InstrumentStatus;
+using bpt::refdata::model::InstrumentType;
 
 static Instrument make_instrument(uint64_t uid,
                                   const std::string& venue,

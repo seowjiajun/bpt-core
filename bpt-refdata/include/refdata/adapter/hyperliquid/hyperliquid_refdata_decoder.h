@@ -4,8 +4,8 @@
 /// \brief Hyperliquid REST refdata response decoder (JSON → refdata structs).
 
 #include "refdata/mapping/instrument_mapping_loader.h"
-#include "refdata/refdata/funding_rate.h"
-#include "refdata/refdata/instrument.h"
+#include "refdata/model/funding_rate.h"
+#include "refdata/model/instrument.h"
 
 #include <memory>
 #include <string>
@@ -22,7 +22,7 @@ public:
     explicit HyperliquidRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping);
 
     /// \brief Decode `POST /info {"type":"meta"}` body (perpetuals).
-    std::vector<refdata::Instrument> parse_meta(const std::string& body, uint64_t collected_ts) const;
+    std::vector<model::Instrument> parse_meta(const std::string& body, uint64_t collected_ts) const;
 
     /// \brief Decode `POST /info {"type":"spotMeta"}` body (spot pairs).
     ///
@@ -31,10 +31,10 @@ public:
     /// spot convention (MAX_DECIMALS=8, vs perps' 6). Pairs whose
     /// venue_symbol (HL `name` field — e.g. "PURR/USDC") isn't in the
     /// mapping JSON are silently skipped — same gating as perps.
-    std::vector<refdata::Instrument> parse_spot_meta(const std::string& body, uint64_t collected_ts) const;
+    std::vector<model::Instrument> parse_spot_meta(const std::string& body, uint64_t collected_ts) const;
 
     /// \brief Decode `POST /info {"type":"userFees","user":"<wallet_address>"}` body.
-    std::vector<refdata::FeeScheduleState> parse_user_fees(const std::string& body, uint64_t collected_ts) const;
+    std::vector<model::FeeScheduleState> parse_user_fees(const std::string& body, uint64_t collected_ts) const;
 
 private:
     std::shared_ptr<mapping::InstrumentMappingLoader> mapping_;

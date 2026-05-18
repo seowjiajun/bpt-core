@@ -23,16 +23,19 @@ struct Settings;
 
 namespace bpt::refdata::messaging {
 
-struct AeronBus {
+struct RefdataBus {
     std::unique_ptr<messaging::api::RefdataControlSubscriber> control_sub;
     std::unique_ptr<messaging::api::RefdataSnapshotPublisher> snapshot_pub;
     std::shared_ptr<messaging::api::RefdataDeltaPublisher> delta_pub;
     std::shared_ptr<messaging::api::FeeSchedulePublisher> fee_pub;
     std::shared_ptr<messaging::api::RefdataStatusPublisher> status_pub;
+};
 
+class RefdataAeronBus {
+public:
     /// \brief Build all five Aeron-backed adapters wired to the channels
     ///        and stream IDs in `settings`.
-    static AeronBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
+    static RefdataBus build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings);
 };
 
 }  // namespace bpt::refdata::messaging

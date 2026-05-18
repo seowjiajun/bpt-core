@@ -11,7 +11,7 @@ namespace bpt::refdata::messaging {
 using bpt::messages::FeeSchedule;
 using bpt::messages::MessageHeader;
 
-std::span<const std::byte> SbeFeeScheduleCodec::encode(const refdata::FeeScheduleState& fs,
+std::span<const std::byte> SbeFeeScheduleCodec::encode(const model::FeeScheduleState& fs,
                                                        std::span<std::byte> scratch) {
     auto* buf = reinterpret_cast<char*>(scratch.data());
     std::memset(buf, 0, scratch.size());
@@ -29,7 +29,7 @@ std::span<const std::byte> SbeFeeScheduleCodec::encode(const refdata::FeeSchedul
     return scratch.subspan(0, total);
 }
 
-refdata::FeeScheduleState SbeFeeScheduleCodec::decode(std::span<const std::byte> bytes) {
+model::FeeScheduleState SbeFeeScheduleCodec::decode(std::span<const std::byte> bytes) {
     if (bytes.size() < MessageHeader::encodedLength())
         throw std::runtime_error("SbeFeeScheduleCodec::decode: too short");
 
@@ -45,7 +45,7 @@ refdata::FeeScheduleState SbeFeeScheduleCodec::decode(std::span<const std::byte>
     FeeSchedule msg;
     msg.wrapForDecode(data, MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), len);
 
-    refdata::FeeScheduleState out;
+    model::FeeScheduleState out;
     out.exchange_id = msg.exchangeId();
     out.instrument_id = msg.instrumentId();
     out.instrument_type = msg.instrumentType();

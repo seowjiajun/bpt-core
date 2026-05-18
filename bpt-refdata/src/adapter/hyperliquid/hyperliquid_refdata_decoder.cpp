@@ -15,12 +15,12 @@ namespace bpt::refdata::adapter {
 HyperliquidRefdataDecoder::HyperliquidRefdataDecoder(std::shared_ptr<mapping::InstrumentMappingLoader> mapping)
     : mapping_(std::move(mapping)) {}
 
-std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_meta(const std::string& body,
+std::vector<model::Instrument> HyperliquidRefdataDecoder::parse_meta(const std::string& body,
                                                                        uint64_t collected_ts) const {
     auto j = json::parse(body);
     const auto& universe = j.value("universe", json::array());
 
-    std::vector<refdata::Instrument> result;
+    std::vector<model::Instrument> result;
     for (const auto& asset : universe) {
         std::string name = asset.value("name", "");
         if (name.empty())
@@ -30,13 +30,13 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_meta(const std
         if (!cid)
             continue;
 
-        refdata::Instrument inst;
+        model::Instrument inst;
         inst.venue = "HYPERLIQUID";
         inst.venue_symbol = name;
         inst.base = name;
         inst.quote = "USD";  // All HL perps are USD-quoted
-        inst.inst_type = refdata::InstrumentType::PERP;
-        inst.status = refdata::InstrumentStatus::ACTIVE;
+        inst.inst_type = model::InstrumentType::PERP;
+        inst.status = model::InstrumentStatus::ACTIVE;
         inst.version = collected_ts;
         inst.display_name = name + "-USD";
         inst.inst_uid = mapping::make_inst_uid(*cid, mapping::EXCHANGE_ID_HYPERLIQUID);
@@ -62,7 +62,7 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_meta(const std
     return result;
 }
 
-std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(const std::string& body,
+std::vector<model::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(const std::string& body,
                                                                             uint64_t collected_ts) const {
     auto j = json::parse(body);
     const auto& tokens = j.value("tokens", json::array());
@@ -84,7 +84,7 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(cons
         token_by_idx.emplace(idx, TokenInfo{t.value("name", std::string{}), t.value("szDecimals", 0)});
     }
 
-    std::vector<refdata::Instrument> result;
+    std::vector<model::Instrument> result;
     for (const auto& pair : universe) {
         std::string name = pair.value("name", "");
         if (name.empty())
@@ -109,13 +109,13 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(cons
         if (base_it->second.name.empty() || quote_it->second.name.empty())
             continue;
 
-        refdata::Instrument inst;
+        model::Instrument inst;
         inst.venue = "HYPERLIQUID";
         inst.venue_symbol = name;
         inst.base = base_it->second.name;
         inst.quote = quote_it->second.name;
-        inst.inst_type = refdata::InstrumentType::SPOT;
-        inst.status = refdata::InstrumentStatus::ACTIVE;
+        inst.inst_type = model::InstrumentType::SPOT;
+        inst.status = model::InstrumentStatus::ACTIVE;
         inst.version = collected_ts;
         inst.display_name = name;
         inst.inst_uid = mapping::make_inst_uid(*cid, mapping::EXCHANGE_ID_HYPERLIQUID);
@@ -137,7 +137,7 @@ std::vector<refdata::Instrument> HyperliquidRefdataDecoder::parse_spot_meta(cons
     return result;
 }
 
-std::vector<refdata::FeeScheduleState> HyperliquidRefdataDecoder::parse_user_fees(const std::string& body,
+std::vector<model::FeeScheduleState> HyperliquidRefdataDecoder::parse_user_fees(const std::string& body,
                                                                                   uint64_t collected_ts) const {
     auto j = json::parse(body);
     const auto& sched = j.value("feeSchedule", json{});
@@ -152,7 +152,7 @@ std::vector<refdata::FeeScheduleState> HyperliquidRefdataDecoder::parse_user_fee
     if (auto it = sched.find("taker"); it != sched.end() && it->is_string())
         taker = std::stod(it->get<std::string>());
 
-    refdata::FeeScheduleState fs;
+    model::FeeScheduleState fs;
     fs.exchange_id = bpt::messages::ExchangeId::HYPERLIQUID;
     fs.instrument_id = 0;  // 0 = applies to all instruments on Hyperliquid
     fs.instrument_type = bpt::messages::InstrumentType::PERPETUAL;
