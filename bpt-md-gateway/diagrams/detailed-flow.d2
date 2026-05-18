@@ -1,0 +1,157 @@
+# bpt-md-gateway detailed dataflow (every major object)
+# Render: d2 --layout=elk detailed-flow.d2 detailed-flow.svg
+# Source-of-truth — the .svg next to it is generated.
+
+direction: down
+
+classes: {
+  card: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#0f172a"
+      shadow: true
+      border-radius: 20
+    }
+  }
+  cylinder-card: {
+    shape: cylinder
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#0f172a"
+    }
+  }
+  swimlane-mdgw: {
+    style: {
+      fill: "#1e1b4b"
+      stroke: "#4338ca"
+      stroke-width: 2
+      font-color: "#c7d2fe"
+    }
+  }
+  swimlane-inner: {
+    style: {
+      fill: "#0f172a"
+      stroke: "#475569"
+      stroke-width: 1
+      font-color: "#e2e8f0"
+    }
+  }
+  swimlane-adapter: {
+    style: {
+      fill: "#312e81"
+      stroke: "#6366f1"
+      stroke-width: 1
+      font-color: "#e0e7ff"
+    }
+  }
+  hot: {
+    style: {
+      stroke: "#ef4444"
+      stroke-width: 3
+    }
+  }
+  slow: {
+    style: {
+      stroke: "#10b981"
+      stroke-width: 2
+    }
+  }
+  control: {
+    style: {
+      stroke: "#22d3ee"
+      stroke-width: 2
+    }
+  }
+  composition: {
+    style: {
+      stroke: "#64748b"
+      stroke-width: 1
+      stroke-dash: 4
+    }
+  }
+}
+
+venue: "📡 Exchange\n(Binance / OKX / Deribit / HL)" { class: card }
+strat_in: "strategy\npublishes MdSubscribeBatch" { class: card }
+consumers: "strategy · pricer · analytics\nbridge · radar\nconsume MD via Aeron" { class: card }
+aeron: "☕ Aeron MediaDriver\nshared-memory log buffers" { class: cylinder-card }
+
+mdgw: bpt-md-gateway {
+  class: swimlane-mdgw
+
+  main: "main.cpp\ncomposition root" { class: card }
+  service: "MdGatewayService\nIService · main poll loop" { class: card }
+  factory: "MdGatewayAeronBus::build\nfactory" { class: card }
+
+  bus: "MdGatewayBus (struct)" {
+    class: swimlane-inner
+    ctrl_sub: "control_sub\napi::MdControlSubscriber" { class: card }
+    ack_pub: "ack_pub\napi::AckPublisher" { class: card }
+    funding_pub: "funding_pub\napi::FundingRatePublisher" { class: card }
+    stats_pub: "stats_pub\napi::InstrumentStatsPublisher" { class: card }
+  }
+
+  sub_mgr: "SubscriptionManager\ncanonical_id → per-venue\nholds SubscriptionMap" { class: card }
+
+  adapter: "BinanceMdAdapter : AdapterBase<Pub> : IAdapter (one per venue)" {
+    class: swimlane-adapter
+    ws_client: "BinanceMdWsClient\nBoost.Beast WS / TLS\n(IO thread)" { class: card }
+    queue: "SpscQueue<Frame>\nIO → publisher thread" { class: card }
+    decoder: "BinanceMdDecoder<Pub>\nsimdjson → domain\n(publisher thread)" { class: card }
+    pub: "MdPublisher\nowns MdValidator + ValidationDropBreaker\n+ aeron::Publisher; one per adapter,\npublisher-thread-confined" { class: card }
+    encoder: "BinanceMdEncoder\nbuild_streams_query" { class: card }
+  }
+
+  codecs: "codecs/" {
+    class: swimlane-inner
+    sbe_funding: "SbeFundingRateCodec\nencode(fr, scratch) → span" { class: card }
+    sbe_stats: "SbeInstrumentStatsCodec" { class: card }
+    sbe_ack: "SbeMdSubscription*Codec\n(3 message types)" { class: card }
+  }
+
+  common_pub: "bpt::common::aeron::Publisher\nthin wrapper: offer + back-pressure" { class: card }
+}
+
+# Composition / lifetime wiring (slate, dashed)
+mdgw.main -> mdgw.service: { class: composition }
+mdgw.main -> mdgw.factory: builds { class: composition }
+mdgw.factory -> mdgw.bus: constructs { class: composition }
+mdgw.service -> mdgw.bus: owns { class: composition }
+mdgw.service -> mdgw.sub_mgr: owns { class: composition }
+mdgw.service -> mdgw.adapter: owns { class: composition }
+
+# Hot tick path (red, numbered 1-5)
+venue -> mdgw.adapter.ws_client: "1: WS frame (JSON)" { class: hot }
+mdgw.adapter.ws_client -> mdgw.adapter.queue: "2: push raw frame" { class: hot }
+mdgw.adapter.queue -> mdgw.adapter.decoder: "3: pop on pub thread" { class: hot }
+mdgw.adapter.decoder -> mdgw.adapter.pub: "4: MdBbo / MdTrade / MdOrderBook" { class: hot }
+mdgw.adapter.pub -> aeron: "5: validate · breaker · SBE encode + tryClaim (zero-copy)" { class: hot }
+
+# Slow path (emerald)
+mdgw.adapter.decoder -> mdgw.bus.funding_pub: "funding_cb (std::function)" { class: slow }
+mdgw.adapter.decoder -> mdgw.bus.stats_pub: "stats_cb" { class: slow }
+mdgw.bus.funding_pub -> mdgw.codecs.sbe_funding: "encode(fr, scratch)" { class: slow }
+mdgw.bus.stats_pub -> mdgw.codecs.sbe_stats: { class: slow }
+mdgw.codecs.sbe_funding -> mdgw.common_pub: "span<byte>" { class: slow }
+mdgw.codecs.sbe_stats -> mdgw.common_pub: { class: slow }
+mdgw.codecs.sbe_ack -> mdgw.common_pub: { class: slow }
+mdgw.common_pub -> aeron: "offer (back-pressure policy)" { class: slow }
+
+# Control path (cyan, lettered a-g)
+aeron -> mdgw.bus.ctrl_sub: "a: MdSubscribeBatch" { class: control }
+mdgw.bus.ctrl_sub -> mdgw.service: "b: decoded batch" { class: control }
+mdgw.service -> mdgw.sub_mgr: "c: apply_batch(...)" { class: control }
+mdgw.sub_mgr -> mdgw.bus.ack_pub: "d: ack via SBE" { class: control }
+mdgw.bus.ack_pub -> mdgw.codecs.sbe_ack: { class: control }
+mdgw.sub_mgr -> mdgw.adapter: "e: subscribe(symbol)" { class: control }
+mdgw.adapter -> mdgw.adapter.encoder: { class: control }
+mdgw.adapter.encoder -> mdgw.adapter.ws_client: "f: subscribe URL" { class: control }
+mdgw.adapter.ws_client -> venue: "g: WS sub frame" { class: control }
+
+# Aeron → consumers delivery (hot)
+aeron -> consumers: deliver via shared memory { class: hot }
+strat_in -> aeron: { class: control }

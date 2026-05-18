@@ -1,0 +1,104 @@
+# bpt-md-gateway "at a glance" diagram
+# Render: d2 --layout=elk at-a-glance.d2 at-a-glance.svg
+# Source-of-truth — the .svg next to it is generated.
+
+direction: right
+
+classes: {
+  card: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#0f172a"
+      shadow: true
+      border-radius: 20
+    }
+  }
+  swimlane-ext: {
+    style: {
+      fill: "#0f172a"
+      stroke: "#475569"
+      stroke-width: 1
+      font-color: "#e2e8f0"
+    }
+  }
+  swimlane-mdgw: {
+    style: {
+      fill: "#1e1b4b"
+      stroke: "#4338ca"
+      stroke-width: 1
+      font-color: "#c7d2fe"
+    }
+  }
+  swimlane-inner: {
+    style: {
+      fill: "#312e81"
+      stroke: "#6366f1"
+      stroke-width: 1
+      font-color: "#e0e7ff"
+    }
+  }
+  hot: {
+    style: {
+      stroke: "#ef4444"
+      stroke-width: 3
+    }
+  }
+  slow: {
+    style: {
+      stroke: "#10b981"
+      stroke-width: 2
+    }
+  }
+  control: {
+    style: {
+      stroke: "#22d3ee"
+      stroke-width: 2
+    }
+  }
+}
+
+ext: External {
+  class: swimlane-ext
+  venue: "Exchange\n(Binance · OKX · Deribit · HL)" { class: card }
+  strat: "strategy\n(MdSubscribeBatch)" { class: card }
+}
+
+mdgw: bpt-md-gateway {
+  class: swimlane-mdgw
+
+  adapter: "per-venue Adapter" {
+    class: swimlane-inner
+    ws: "*MdWsClient" { class: card }
+    decoder: "*MdDecoder<Pub>" { class: card }
+    pub: "MdPublisher\nvalidate · breaker\nSBE encode (zero-copy)" { class: card }
+  }
+
+  ctrl: "MdControlSubscriber" { class: card }
+  sm: "SubscriptionManager" { class: card }
+  slow: "slow-path publishers\nFundingRate · InstrumentStats · Ack" { class: card }
+}
+
+right: "Aeron + Consumers" {
+  class: swimlane-ext
+  aeron: "Aeron\nshared-memory log buffers" { class: card }
+  consumers: "strategy · pricer · analytics\nbridge · radar" { class: card }
+}
+
+# Hot tick path (red)
+ext.venue -> mdgw.adapter.ws: { class: hot }
+mdgw.adapter.ws -> mdgw.adapter.decoder: { class: hot }
+mdgw.adapter.decoder -> mdgw.adapter.pub: { class: hot }
+mdgw.adapter.pub -> right.aeron: { class: hot }
+right.aeron -> right.consumers: { class: hot }
+
+# Slow path (emerald)
+mdgw.adapter.decoder -> mdgw.slow: { class: slow }
+mdgw.slow -> right.aeron: { class: slow }
+
+# Control / ack path (cyan)
+ext.strat -> mdgw.ctrl: { class: control }
+mdgw.ctrl -> mdgw.sm: { class: control }
+mdgw.sm -> mdgw.adapter.ws: { class: control }
+mdgw.sm -> mdgw.slow: { class: control }
