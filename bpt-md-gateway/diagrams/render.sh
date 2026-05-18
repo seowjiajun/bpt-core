@@ -13,9 +13,12 @@ cd "$(dirname "$0")"
 render_one() {
     local stem="$1"
     d2 --layout=elk "${stem}.d2" "${stem}.svg"
-    # D2 v0.7.x paints a #FFFFFF page rect with class fill-N7. Make it
-    # transparent so README dark mode doesn't show a stark white block.
-    sed -i 's|fill="#FFFFFF" class=" fill-N7"|fill="none" class=" fill-N7"|g' "${stem}.svg"
+    # D2 v0.7.x paints a #FFFFFF page-background rect with class fill-N7.
+    # Setting fill="none" doesn't win — the CSS rule .fill-N7{fill:#FFFFFF}
+    # in the embedded <style> overrides the presentation attribute (CSS
+    # beats attributes in SVG). Just delete the rect entirely. Nothing
+    # else uses the class.
+    sed -i 's|<rect[^>]* class=" fill-N7"[^>]*/>||g' "${stem}.svg"
     echo "rendered ${stem}.svg (background stripped)"
 }
 
