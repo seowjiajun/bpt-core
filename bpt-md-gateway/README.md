@@ -12,7 +12,7 @@ shape this service has.
 
 ![at-a-glance dataflow](diagrams/at-a-glance.svg)
 
-> Source: [`diagrams/at-a-glance.d2`](diagrams/at-a-glance.d2). Re-render with `d2 --layout=elk diagrams/at-a-glance.d2 diagrams/at-a-glance.svg`.
+> Source: [`diagrams/at-a-glance.d2`](diagrams/at-a-glance.d2). Re-render with `diagrams/render.sh at-a-glance` (renders + strips D2's white background rect so the SVG inherits page bg).
 
 **Legend**
 
@@ -29,7 +29,7 @@ semantic (see legend); rendered via D2 with ELK orthogonal routing.
 
 ![detailed dataflow](diagrams/detailed-flow.svg)
 
-> Source: [`diagrams/detailed-flow.d2`](diagrams/detailed-flow.d2). Re-render with `d2 --layout=elk diagrams/detailed-flow.d2 diagrams/detailed-flow.svg`.
+> Source: [`diagrams/detailed-flow.d2`](diagrams/detailed-flow.d2). Re-render with `diagrams/render.sh detailed-flow`.
 
 **Legend** (same colour scheme as the at-a-glance above)
 
