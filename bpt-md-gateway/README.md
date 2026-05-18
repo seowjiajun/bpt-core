@@ -18,9 +18,9 @@ shape this service has.
 
 | Edge colour | Path | What flows |
 |---|---|---|
-| 🟥 **Red** | Hot tick path | venue → adapter (WS) → MdPublisher → **Aeron** → consumers. Zero-copy SBE into the log buffer. |
-| 🟩 **Green** | Slow path | FundingRate / InstrumentStats / Ack → **Aeron** → consumers. Codec + offer. |
-| 🟦 **Cyan** | Control | strategy → **Aeron** → MdControlSubscriber → SubscriptionManager → adapter / slow-pub. |
+| 🟥 **Red** | Hot tick path | venue → adapter (WS) → MdPublisher → **Aeron** → subscribers. Zero-copy SBE into the log buffer. |
+| 🟩 **Green** | Slow path | FundingRate / InstrumentStats / Ack → **Aeron** → subscribers. Codec + offer. |
+| 🟦 **Cyan** | Control | producer → **Aeron** → MdControlSubscriber → SubscriptionManager → adapter / slow-pub. |
 
 ## Detailed data flow (every major object)
 

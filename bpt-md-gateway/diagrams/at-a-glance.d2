@@ -72,7 +72,6 @@ ext: External {
   class: swimlane-ext
   label.near: outside-top-center
   venue: "Exchange\n(Binance · OKX · Deribit · HL)" { class: card }
-  strat: "strategy\n(MdSubscribeBatch)" { class: card }
 }
 
 mdgw: bpt-md-gateway {
@@ -97,10 +96,11 @@ mdgw: bpt-md-gateway {
 # Every internal cross-service exchange (control in, hot/slow out) passes through here.
 aeron: "Aeron — shared-memory log buffers" { class: cylinder-card }
 
-cons: Consumers {
+clients: "Aeron clients" {
   class: swimlane-ext
   label.near: outside-top-center
-  list: "strategy · pricer · analytics\nbridge · radar" { class: card }
+  producers: "Producers\npublish MdSubscribeBatch\non control stream" { class: card }
+  subscribers: "Subscribers\nconsume BBO · Trade · OrderBook\nFundingRate · Stats · Ack" { class: card }
 }
 
 # Venue → adapter is the only external link that's NOT Aeron (it's WebSocket).
@@ -108,14 +108,14 @@ ext.venue -> mdgw.adapter.ws: { class: hot }
 mdgw.adapter.ws -> mdgw.adapter.decoder: { class: hot }
 mdgw.adapter.decoder -> mdgw.adapter.pub: { class: hot }
 mdgw.adapter.pub -> aeron: { class: hot }
-aeron -> cons.list: { class: hot }
+aeron -> clients.subscribers: { class: hot }
 
-# Slow path (funding, stats, ack) also lands in Aeron.
+# Slow path (funding, stats, ack) also lands in Aeron and is delivered to subscribers.
 mdgw.adapter.decoder -> mdgw.slow: { class: slow }
 mdgw.slow -> aeron: { class: slow }
 
-# Control path: strategy publishes to Aeron → Aeron delivers to mdgw.
-ext.strat -> aeron: { class: control }
+# Control path: any Aeron producer publishes MdSubscribeBatch → Aeron → mdgw.
+clients.producers -> aeron: { class: control }
 aeron -> mdgw.ctrl: { class: control }
 mdgw.ctrl -> mdgw.sm: { class: control }
 mdgw.sm -> mdgw.adapter.ws: { class: control }
