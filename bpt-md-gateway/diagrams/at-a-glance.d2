@@ -24,13 +24,15 @@ classes: {
       font-color: "#0f172a"
     }
   }
-  cloud-card: {
-    shape: cloud
+  multi-card: {
     style: {
       fill: "#f1f5f9"
       stroke: "#cbd5e1"
       stroke-width: 1
       font-color: "#0f172a"
+      shadow: true
+      border-radius: 20
+      multiple: true
     }
   }
   swimlane-ext: {
@@ -108,8 +110,8 @@ aeron: "Aeron — shared-memory log buffers" { class: cylinder-card }
 clients: "Aeron clients" {
   class: swimlane-ext
   label.near: outside-top-center
-  producers: "Producers\npublish MdSubscribeBatch\non control stream" { class: cloud-card }
-  subscribers: "Subscribers\nconsume BBO · Trade · OrderBook\nFundingRate · Stats · Ack" { class: cloud-card }
+  producers: "Producers\npublish MdSubscribeBatch\non control stream" { class: multi-card }
+  subscribers: "Subscribers\nconsume BBO · Trade · OrderBook\nFundingRate · Stats · Ack" { class: multi-card }
 }
 
 # Venue → adapter is the only external link that's NOT Aeron (it's WebSocket).
