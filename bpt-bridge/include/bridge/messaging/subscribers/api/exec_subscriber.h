@@ -1,13 +1,13 @@
 #pragma once
 
 /// @file
-/// Port: ExecutionReport subscriber. Dispatches decoded fills and order
-/// lifecycle events. Aeron concrete in `aeron/exec_subscriber.h`.
+/// Port: ExecutionReport subscriber. CRTP-templated concrete in
+/// `aeron::ExecSubscriber<H>` dispatches on_exec_order_event for all
+/// statuses and on_exec_fill only for real fills.
 
 #include "bridge/ws/message_encoder.h"
 
 #include <cstdint>
-#include <functional>
 
 namespace bpt::bridge::messaging::api {
 
@@ -38,19 +38,9 @@ public:
         double remaining_qty;
     };
 
-    using FillHandler = std::function<void(const Fill&)>;
-    using OrderHandler = std::function<void(const OrderEvent&)>;
-
     virtual ~ExecSubscriber() = default;
 
-    void set_handler(FillHandler h) { handler_ = std::move(h); }
-    void set_order_handler(OrderHandler h) { order_handler_ = std::move(h); }
-
     virtual int poll(int fragment_limit = 32) = 0;
-
-protected:
-    FillHandler handler_;
-    OrderHandler order_handler_;
 };
 
 }  // namespace bpt::bridge::messaging::api

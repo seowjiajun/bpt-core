@@ -1,12 +1,10 @@
 #pragma once
 
 /// @file
-/// Port: AccountSnapshot subscriber. Dispatches decoded balance / equity /
-/// open-position state via the configured handler. Aeron concrete in
-/// `aeron/account_subscriber.h`.
+/// Port: AccountSnapshot subscriber. CRTP-templated concrete in
+/// `aeron::AccountSubscriber<H>` calls H::on_account_snapshot.
 
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -36,16 +34,9 @@ public:
         std::vector<CurrencyBalance> currency_balances;
     };
 
-    using Handler = std::function<void(const Snapshot&)>;
-
     virtual ~AccountSubscriber() = default;
 
-    void set_handler(Handler h) { handler_ = std::move(h); }
-
     virtual int poll(int fragment_limit = 8) = 0;
-
-protected:
-    Handler handler_;
 };
 
 }  // namespace bpt::bridge::messaging::api

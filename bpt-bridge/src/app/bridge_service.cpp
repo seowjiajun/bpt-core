@@ -230,23 +230,20 @@ void BridgeService::run() {
                            settings_.exchange,
                            settings_.instrument_id == 0 ? "(none)" : std::to_string(settings_.instrument_id));
 
-    // Wire bus callbacks to public event handlers.
+    // CRTP: templated subscribers dispatch directly into our on_* methods —
+    // no std::function indirection on the hot path.
     if (bus_.md_sub)
-        bus_.md_sub->set_handler([this](uint64_t instr, double mid, uint64_t ts_ns) { on_md_tick(instr, mid, ts_ns); });
-    if (bus_.exec_sub) {
-        bus_.exec_sub->set_order_handler(
-            [this](const messaging::api::ExecSubscriber::OrderEvent& ev) { on_exec_order_event(ev); });
-        bus_.exec_sub->set_handler([this](const messaging::api::ExecSubscriber::Fill& f) { on_exec_fill(f); });
-    }
+        bus_.md_sub->set_handler(this);
+    if (bus_.exec_sub)
+        bus_.exec_sub->set_handler(this);
     if (bus_.account_sub)
-        bus_.account_sub->set_handler(
-            [this](const messaging::api::AccountSubscriber::Snapshot& s) { on_account_snapshot(s); });
+        bus_.account_sub->set_handler(this);
     if (bus_.portfolio_sub)
-        bus_.portfolio_sub->set_handler([this](std::string_view json) { on_portfolio_json(json); });
+        bus_.portfolio_sub->set_handler(this);
     if (bus_.tox_sub)
-        bus_.tox_sub->set_handler([this](const bpt::analytics::messaging::ToxicityUpdate& u) { on_toxicity(u); });
+        bus_.tox_sub->set_handler(this);
     if (bus_.color_sub)
-        bus_.color_sub->set_handler([this](const bpt::radar::messaging::MarketColor& mc) { on_market_color(mc); });
+        bus_.color_sub->set_handler(this);
 
     // Install console command handler on the broadcaster (IO-thread-safe in
     // production WsServer; tests can drive it synchronously).
