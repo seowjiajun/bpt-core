@@ -17,10 +17,14 @@ public:
     AnalyticsService(config::Settings settings, messaging::AnalyticsBus bus);
     void run() override;
 
-private:
+    /// \name Handler interface — called by the templated subscribers in the bus.
+    /// @{
     void on_bbo(uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns);
-    void on_exec_fill(uint64_t instrument_id, int side_sign, double fill_price, uint64_t timestamp_ns);
     void on_exec_report(const bpt::messages::ExecutionReport& rpt);
+    /// @}
+
+private:
+    void on_exec_fill(uint64_t instrument_id, int side_sign, double fill_price, uint64_t timestamp_ns);
     void maybe_publish(uint64_t now_ns);
 
     config::Settings settings_;

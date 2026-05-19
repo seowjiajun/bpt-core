@@ -8,24 +8,29 @@
 /// constructor.
 
 #include "analytics/messaging/publishers/api/toxicity_publisher.h"
-#include "analytics/messaging/subscribers/api/exec_report_subscriber.h"
-#include "analytics/messaging/subscribers/api/md_bbo_subscriber.h"
+#include "analytics/messaging/subscribers/aeron/exec_report_subscriber.h"
+#include "analytics/messaging/subscribers/aeron/md_bbo_subscriber.h"
 
 #include <Aeron.h>
 
 #include <memory>
 
 namespace bpt::analytics {
+class AnalyticsService;
 namespace config {
 struct Settings;
 }
 
 namespace messaging {
 
+/// Each subscriber is the concrete CRTP-templated instantiation on
+/// AnalyticsService. Templated dispatch directly into
+/// AnalyticsService::on_bbo / on_exec_report — zero std::function
+/// indirection per tick.
 struct AnalyticsBus {
-    std::unique_ptr<api::ExecReportSubscriber> exec_sub;  ///< port; aeron::ExecReportSubscriber in prod
-    std::unique_ptr<api::MdBboSubscriber> md_sub;         ///< port; aeron::MdBboSubscriber in prod
-    std::unique_ptr<api::ToxicityPublisher> tox_pub;      ///< port; aeron::ToxicityPublisher in prod
+    std::unique_ptr<aeron::ExecReportSubscriber<AnalyticsService>> exec_sub;
+    std::unique_ptr<aeron::MdBboSubscriber<AnalyticsService>> md_sub;
+    std::unique_ptr<api::ToxicityPublisher> tox_pub;
 };
 
 class AnalyticsAeronBus {

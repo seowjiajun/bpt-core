@@ -35,12 +35,10 @@ AnalyticsService::AnalyticsService(config::Settings settings, messaging::Analyti
         .window_size = settings_.scorer_window_size,  // same window as scorer
     };
 
-    bus_.exec_sub->on_report = [this](const ExecutionReport& rpt) {
-        on_exec_report(rpt);
-    };
-    bus_.md_sub->on_bbo = [this](uint64_t instrument_id, double bid, double ask, uint64_t ts_ns) {
-        on_bbo(instrument_id, bid, ask, ts_ns);
-    };
+    // CRTP: templated subscribers dispatch directly into our on_* methods —
+    // no std::function indirection on the BBO/exec hot paths.
+    bus_.exec_sub->set_handler(this);
+    bus_.md_sub->set_handler(this);
 
     bpt::common::log::info("Exec report subscription ready: {} stream {}",
                            settings_.exec_report.channel,

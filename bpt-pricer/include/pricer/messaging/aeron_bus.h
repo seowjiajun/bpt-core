@@ -12,17 +12,18 @@
 /// sim variant in `messaging/publishers/sim/`; the others can grow one
 /// when the deterministic backtester needs them.
 
+#include "pricer/md/aeron/md_subscriber.h"
 #include "pricer/md/api/md_subscribe_client.h"
-#include "pricer/md/api/md_subscriber.h"
 #include "pricer/messaging/publishers/api/status_publisher.h"
 #include "pricer/messaging/publishers/api/vol_surface_publisher.h"
-#include "pricer/refdata/api/refdata_subscriber.h"
+#include "pricer/refdata/aeron/refdata_subscriber.h"
 
 #include <Aeron.h>
 
 #include <memory>
 
 namespace bpt::pricer {
+class PricerService;
 namespace config {
 struct Settings;
 }
@@ -30,11 +31,11 @@ struct Settings;
 namespace messaging {
 
 struct PricerBus {
-    std::unique_ptr<api::VolSurfacePublisher> vol_pub;             ///< port; aeron::VolSurfacePublisher in prod
-    std::unique_ptr<api::StatusPublisher> status_pub;              ///< port; aeron::StatusPublisher in prod
-    std::unique_ptr<md::api::MdSubscriber> md_sub;                 ///< port
-    std::unique_ptr<md::api::MdSubscribeClient> md_ctrl;           ///< port; pricer → md-gateway subscribe batches
-    std::unique_ptr<refdata::api::RefdataSubscriber> refdata_sub;  ///< port
+    std::unique_ptr<api::VolSurfacePublisher> vol_pub;    ///< port; aeron::VolSurfacePublisher in prod
+    std::unique_ptr<api::StatusPublisher> status_pub;     ///< port; aeron::StatusPublisher in prod
+    std::unique_ptr<md::aeron::MdSubscriber<PricerService>> md_sub;
+    std::unique_ptr<md::api::MdSubscribeClient> md_ctrl;  ///< port; pricer → md-gateway subscribe batches
+    std::unique_ptr<refdata::aeron::RefdataSubscriber<PricerService>> refdata_sub;
 };
 
 class PricerAeronBus {

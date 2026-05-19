@@ -20,6 +20,15 @@ public:
     PricerService(config::Settings settings, messaging::PricerBus bus);
     void run() override;
 
+    /// \name Handler interface — called by the templated subscribers in the bus.
+    /// @{
+    void on_bbo(uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns);
+    void on_trade(uint64_t /*instrument_id*/, double /*price*/, double /*qty*/, uint64_t /*timestamp_ns*/) noexcept {}
+    void on_refdata_option(const surface::OptionInstrument& inst);
+    void on_refdata_perp(const refdata::PerpInstrument& inst);
+    void on_refdata_remove(uint64_t instrument_id);
+    /// @}
+
 private:
     struct PerpInfo {
         std::string underlying;
@@ -44,7 +53,6 @@ private:
         bool is_call;
     };
 
-    void on_refdata_option(const surface::OptionInstrument& inst);
     void maybe_resubscribe_options();
 
     /// \brief Build the filtered subscribe batch from `option_universe_`.

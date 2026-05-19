@@ -29,44 +29,9 @@ PricerService::PricerService(config::Settings settings, messaging::PricerBus bus
       builder_(settings_.risk_free_rate, settings_.newton_max_iterations, settings_.newton_tolerance),
       bus_(std::move(bus)),
       md_correlation_id_(bpt::common::util::TscClock::now_epoch_ns()) {
-    bus_.md_sub->set_bbo_callback([this](uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns) {
-        auto pit = perp_map_.find(instrument_id);
-        if (pit != perp_map_.end()) {
-            builder_.set_spot(pit->second.underlying, pit->second.exchange_id, (bid + ask) * 0.5);
-            return;
-        }
-        builder_.on_bbo(instrument_id, bid, ask, timestamp_ns);
-    });
-
-    bus_.refdata_sub->set_on_option([this](const surface::OptionInstrument& inst) { on_refdata_option(inst); });
-
-    bus_.refdata_sub->set_on_perp([this](const refdata::PerpInstrument& inst) {
-        perp_map_[inst.instrument_id] = {inst.underlying, inst.exchange_id};
-        // Treat a perp as a (degenerate) option entry with a sentinel expiry
-        // of 0 so it's always included in the subscribe batch regardless of
-        // front-N filter. The batch needs perps so we can compute forwards.
-        option_universe_[inst.instrument_id] = OptionDesc{
-            .instrument_id = inst.instrument_id,
-            .underlying = inst.underlying,
-            .exchange = inst.exchange,
-            .venue_symbol = inst.venue_symbol,
-            .expiry_date = 0,
-            .strike_price = 0.0,
-            .is_call = false,
-        };
-        universe_dirty_ = true;
-        bpt::common::log::info("Perp instrument registered: id={} {} {} symbol={}",
-                               inst.instrument_id,
-                               inst.underlying,
-                               inst.exchange,
-                               inst.venue_symbol);
-    });
-
-    bus_.refdata_sub->set_on_remove([this](uint64_t instrument_id) {
-        builder_.remove_instrument(instrument_id);
-        if (option_universe_.erase(instrument_id) > 0)
-            universe_dirty_ = true;
-    });
+    // CRTP: templated subscribers dispatch directly into our on_* methods.
+    bus_.md_sub->set_handler(this);
+    bus_.refdata_sub->set_handler(this);
 
     bpt::common::log::info("publish_interval_ms={} risk_free_rate={:.4f} md_correlation_id={}",
                            settings_.publish_interval_ms,
@@ -77,6 +42,43 @@ PricerService::PricerService(config::Settings settings, messaging::PricerBus bus
     for (const auto& e : settings_.exchanges)
         bpt::common::log::info("exchange: {}", e);
     bpt::common::log::info("Ready — entering main loop");
+}
+
+void PricerService::on_bbo(uint64_t instrument_id, double bid, double ask, uint64_t timestamp_ns) {
+    auto pit = perp_map_.find(instrument_id);
+    if (pit != perp_map_.end()) {
+        builder_.set_spot(pit->second.underlying, pit->second.exchange_id, (bid + ask) * 0.5);
+        return;
+    }
+    builder_.on_bbo(instrument_id, bid, ask, timestamp_ns);
+}
+
+void PricerService::on_refdata_perp(const refdata::PerpInstrument& inst) {
+    perp_map_[inst.instrument_id] = {inst.underlying, inst.exchange_id};
+    // Treat a perp as a (degenerate) option entry with a sentinel expiry
+    // of 0 so it's always included in the subscribe batch regardless of
+    // front-N filter. The batch needs perps so we can compute forwards.
+    option_universe_[inst.instrument_id] = OptionDesc{
+        .instrument_id = inst.instrument_id,
+        .underlying = inst.underlying,
+        .exchange = inst.exchange,
+        .venue_symbol = inst.venue_symbol,
+        .expiry_date = 0,
+        .strike_price = 0.0,
+        .is_call = false,
+    };
+    universe_dirty_ = true;
+    bpt::common::log::info("Perp instrument registered: id={} {} {} symbol={}",
+                           inst.instrument_id,
+                           inst.underlying,
+                           inst.exchange,
+                           inst.venue_symbol);
+}
+
+void PricerService::on_refdata_remove(uint64_t instrument_id) {
+    builder_.remove_instrument(instrument_id);
+    if (option_universe_.erase(instrument_id) > 0)
+        universe_dirty_ = true;
 }
 
 void PricerService::on_refdata_option(const surface::OptionInstrument& inst) {
