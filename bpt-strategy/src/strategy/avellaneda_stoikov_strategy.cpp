@@ -396,18 +396,23 @@ void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& 
     // timing enough to shift fill outcomes through the Aeron-IPC
     // simulator, breaking the "ofi_weight_bps=0 is identical to the
     // prior baseline" property required for the calibration grid.
+    //
+    // Hot-path allocation note: the four scratch buffers live on
+    // InstrumentState so subsequent ticks .clear() + refill instead of
+    // constructing fresh vectors. First tick after warmup grows them
+    // to K levels; from there on the per-tick cost is purely
+    // amortised iteration.
     if (ofi_weight_bps_ != 0.0 && st.book.ready()) {
         const std::size_t K = order_book_depth_ > 0 ? order_book_depth_ : 5;
-        const auto top_b = st.book.top_bids(K);
-        const auto top_a = st.book.top_asks(K);
-        std::vector<OFICalculator::Level> ofi_bids, ofi_asks;
-        ofi_bids.reserve(top_b.size());
-        ofi_asks.reserve(top_a.size());
-        for (const auto& l : top_b)
-            ofi_bids.emplace_back(l.price, l.qty);
-        for (const auto& l : top_a)
-            ofi_asks.emplace_back(l.price, l.qty);
-        st.ofi.update(ofi_bids, ofi_asks, book.timestampNs());
+        st.book.top_bids(K, st.ofi_top_bid_buf);
+        st.book.top_asks(K, st.ofi_top_ask_buf);
+        st.ofi_bids_buf.clear();
+        st.ofi_asks_buf.clear();
+        for (const auto& l : st.ofi_top_bid_buf)
+            st.ofi_bids_buf.emplace_back(l.price, l.qty);
+        for (const auto& l : st.ofi_top_ask_buf)
+            st.ofi_asks_buf.emplace_back(l.price, l.qty);
+        st.ofi.update(st.ofi_bids_buf, st.ofi_asks_buf, book.timestampNs());
     }
 
     // Diagnostic: log maintained-ladder state periodically so we can

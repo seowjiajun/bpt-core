@@ -81,6 +81,13 @@ public:
 
     // Top N levels, ordered best → worst. If N exceeds the ladder depth,
     // the shorter actual depth is returned.
+    //
+    // The buffer-fill overloads (preferred on the hot path) `.clear()` `out`
+    // and refill — once the caller has called `.reserve(N)` at warmup,
+    // these allocate zero on the per-tick path. The value-return versions
+    // are kept for tests + callers where allocation cost is irrelevant.
+    void top_bids(size_t n, std::vector<Level>& out) const;
+    void top_asks(size_t n, std::vector<Level>& out) const;
     std::vector<Level> top_bids(size_t n) const;
     std::vector<Level> top_asks(size_t n) const;
 

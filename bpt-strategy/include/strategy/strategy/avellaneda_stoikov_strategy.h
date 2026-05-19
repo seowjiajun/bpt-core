@@ -266,6 +266,16 @@ private:
         // produce byte-identical quotes.
         OFICalculator ofi{OFICalculator::Config{}};
 
+        // Reusable scratch buffers for the OFI block in on_order_book.
+        // First call grows them to ladder_depth; subsequent ticks just
+        // .clear() + refill without allocating. Keeping them per-instrument
+        // (rather than thread_local) avoids spurious sharing if more than
+        // one symbol is later quoted on the same thread.
+        std::vector<OrderBookState::Level> ofi_top_bid_buf;
+        std::vector<OrderBookState::Level> ofi_top_ask_buf;
+        std::vector<OFICalculator::Level> ofi_bids_buf;
+        std::vector<OFICalculator::Level> ofi_asks_buf;
+
         // Drawdown circuit-breaker. When set non-zero (in steady_clock ns),
         // both sides are suppressed until this timestamp passes. Set in
         // on_exec_report when realized PnL crosses the configured loss

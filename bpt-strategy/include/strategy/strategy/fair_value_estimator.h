@@ -141,6 +141,13 @@ private:
     double last_ = std::numeric_limits<double>::quiet_NaN();
     double ewma_state_ = std::numeric_limits<double>::quiet_NaN();
 
+    /// Per-instance scratch reused by the L2-weighted path. The book
+    /// lookups call into OrderBookState's buffer-fill overload which
+    /// `.clear()`s and refills — zero allocation after the first
+    /// reserve grows the buffer.
+    mutable std::vector<OrderBookState::Level> l2_bids_scratch_;
+    mutable std::vector<OrderBookState::Level> l2_asks_scratch_;
+
     static double micro_tob(double bid_px, double ask_px, double bid_qty, double ask_qty) noexcept {
         const double total = bid_qty + ask_qty;
         if (total <= 0.0)
@@ -154,20 +161,20 @@ private:
         return micro_tob(bid_px, ask_px, bq, aq);
     }
 
-    static double l2_weighted(const OrderBookState& b, std::size_t depth, double decay) noexcept {
-        const auto bids = b.top_bids(depth);
-        const auto asks = b.top_asks(depth);
-        const double bp = bids.front().price;
-        const double ap = asks.front().price;
+    double l2_weighted(const OrderBookState& b, std::size_t depth, double decay) const noexcept {
+        b.top_bids(depth, l2_bids_scratch_);
+        b.top_asks(depth, l2_asks_scratch_);
+        const double bp = l2_bids_scratch_.front().price;
+        const double ap = l2_asks_scratch_.front().price;
 
         double bq_w = 0.0, aq_w = 0.0;
         double w = 1.0;
-        for (const auto& lvl : bids) {
+        for (const auto& lvl : l2_bids_scratch_) {
             bq_w += lvl.qty * w;
             w *= decay;
         }
         w = 1.0;
-        for (const auto& lvl : asks) {
+        for (const auto& lvl : l2_asks_scratch_) {
             aq_w += lvl.qty * w;
             w *= decay;
         }

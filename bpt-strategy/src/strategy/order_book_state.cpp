@@ -108,27 +108,37 @@ double OrderBookState::ask_vol_below(double price) const {
     return total;
 }
 
-std::vector<OrderBookState::Level> OrderBookState::top_bids(size_t n) const {
-    std::vector<Level> out;
-    out.reserve(std::min(n, bids_.size()));
+void OrderBookState::top_bids(size_t n, std::vector<Level>& out) const {
+    out.clear();
     size_t i = 0;
     for (auto& [px, qty] : bids_) {
         if (i++ >= n)
             break;
         out.push_back({px, qty});
     }
-    return out;
 }
 
-std::vector<OrderBookState::Level> OrderBookState::top_asks(size_t n) const {
-    std::vector<Level> out;
-    out.reserve(std::min(n, asks_.size()));
+void OrderBookState::top_asks(size_t n, std::vector<Level>& out) const {
+    out.clear();
     size_t i = 0;
     for (auto& [px, qty] : asks_) {
         if (i++ >= n)
             break;
         out.push_back({px, qty});
     }
+}
+
+std::vector<OrderBookState::Level> OrderBookState::top_bids(size_t n) const {
+    std::vector<Level> out;
+    out.reserve(std::min(n, bids_.size()));
+    top_bids(n, out);
+    return out;
+}
+
+std::vector<OrderBookState::Level> OrderBookState::top_asks(size_t n) const {
+    std::vector<Level> out;
+    out.reserve(std::min(n, asks_.size()));
+    top_asks(n, out);
     return out;
 }
 
