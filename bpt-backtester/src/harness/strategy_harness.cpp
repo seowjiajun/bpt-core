@@ -164,6 +164,13 @@ uint64_t StrategyHarness::replay() {
             // Forward order-gateway clock ticks so heartbeats /
             // simulation_now reflect replay time, not wallclock.
             order_gw_->set_simulation_time(rec->ts_ns);
+            // Same for refdata: without a fresh heartbeat the strategy's
+            // RefdataStaleGate trips after ~5s of replay time and the
+            // entire on_bbo path early-returns, silencing the quoter for
+            // the rest of the run. There's no live refdata producer in
+            // backtest, so we synthesize the heartbeat from the same
+            // tape timestamp.
+            refdata_client_->push_heartbeat(rec->ts_ns);
 
             if (rec->type == bpt::common::recorder::RecordType::WS_FRAME) {
                 std::string_view payload(reinterpret_cast<const char*>(rec->payload.data()), rec->payload.size());

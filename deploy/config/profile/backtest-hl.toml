@@ -1,0 +1,7 @@
+# Deployment profile — BACKTEST against HL mainnet refdata.
+#
+# Used by bpt-strategy when running under the deterministic backtest
+# harness (bpt-backtester). Just declares the environment + which
+# exchange's instrument universe to load.
+environment = "dev"
+exchanges   = ["HYPERLIQUID"]
