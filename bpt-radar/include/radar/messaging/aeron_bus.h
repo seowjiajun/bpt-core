@@ -7,32 +7,36 @@
 /// one factory so `RadarService` doesn't depend on `<Aeron.h>` directly.
 
 #include "radar/messaging/publishers/api/market_color_publisher.h"
-#include "radar/messaging/subscribers/api/funding_rate_subscriber.h"
-#include "radar/messaging/subscribers/api/instrument_stats_subscriber.h"
-#include "radar/messaging/subscribers/api/md_market_data_subscriber.h"
-#include "radar/messaging/subscribers/api/md_trade_subscriber.h"
-#include "radar/messaging/subscribers/api/refdata_perp_subscriber.h"
-#include "radar/messaging/subscribers/api/vol_surface_subscriber.h"
+#include "radar/messaging/subscribers/aeron/funding_rate_subscriber.h"
+#include "radar/messaging/subscribers/aeron/instrument_stats_subscriber.h"
+#include "radar/messaging/subscribers/aeron/md_market_data_subscriber.h"
+#include "radar/messaging/subscribers/aeron/md_trade_subscriber.h"
+#include "radar/messaging/subscribers/aeron/refdata_perp_subscriber.h"
+#include "radar/messaging/subscribers/aeron/vol_surface_subscriber.h"
 
 #include <Aeron.h>
 
 #include <memory>
 
 namespace bpt::radar {
+class RadarService;
 namespace config {
 struct Settings;
 }
 
 namespace messaging {
 
+/// Each subscriber is the concrete CRTP-templated instantiation on
+/// RadarService. Templated dispatch directly into RadarService::on_*
+/// — zero std::function indirection per fragment.
 struct RadarBus {
-    std::unique_ptr<api::VolSurfaceSubscriber> surface_sub;        ///< port
-    std::unique_ptr<api::InstrumentStatsSubscriber> stats_sub;     ///< port
-    std::unique_ptr<api::FundingRateSubscriber> funding_sub;       ///< port
-    std::unique_ptr<api::RefdataPerpSubscriber> refdata_perp_sub;  ///< port
-    std::unique_ptr<api::MdTradeSubscriber> trade_sub;             ///< port
-    std::unique_ptr<api::MdMarketDataSubscriber> bbo_sub;          ///< port
-    std::unique_ptr<api::MarketColorPublisher> color_pub;          ///< port; aeron::MarketColorPublisher in prod
+    std::unique_ptr<aeron::VolSurfaceSubscriber<RadarService>> surface_sub;
+    std::unique_ptr<aeron::InstrumentStatsSubscriber<RadarService>> stats_sub;
+    std::unique_ptr<aeron::FundingRateSubscriber<RadarService>> funding_sub;
+    std::unique_ptr<aeron::RefdataPerpSubscriber<RadarService>> refdata_perp_sub;
+    std::unique_ptr<aeron::MdTradeSubscriber<RadarService>> trade_sub;
+    std::unique_ptr<aeron::MdMarketDataSubscriber<RadarService>> bbo_sub;
+    std::unique_ptr<api::MarketColorPublisher> color_pub;
 };
 
 class RadarAeronBus {

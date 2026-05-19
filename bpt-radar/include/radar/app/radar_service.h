@@ -38,6 +38,16 @@ public:
 
     void run() override;
 
+    /// \name Handler interface — called by the templated subscribers.
+    /// @{
+    void on_vol_surface(bpt::messages::VolSurface& surface);
+    void on_instrument_stats(bpt::messages::InstrumentStats& stats);
+    void on_funding(bpt::messages::FundingRate& fr);
+    void on_refdata_perp(const messaging::api::RefdataPerpSubscriber::PerpInfo& p);
+    void on_trade(bpt::messages::MdTrade& trade);
+    void on_bbo(bpt::messages::MdMarketData& bbo);
+    /// @}
+
 private:
     /// \brief Snapshot of a surface keyed by (exchange, underlying).
     ///
@@ -59,13 +69,6 @@ private:
             return h;
         }
     };
-
-    void on_vol_surface(bpt::messages::VolSurface& surface);
-    void on_instrument_stats(bpt::messages::InstrumentStats& stats);
-    void on_funding(bpt::messages::FundingRate& fr);
-    void on_refdata_perp(uint64_t instrument_id, const std::string& underlying, uint8_t exchange_id);
-    void on_trade(bpt::messages::MdTrade& trade);
-    void on_bbo(bpt::messages::MdMarketData& bbo);
 
     void publish_all();
     void publish_for(const SurfaceKey& key, std::vector<analysis::SurfacePoint>& cached);

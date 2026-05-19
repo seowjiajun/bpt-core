@@ -2,10 +2,9 @@
 
 /// \file
 /// Port: refdata-snapshot consumer scoped to perpetual instruments only.
-/// Aeron concrete in `aeron/refdata_perp_subscriber.h`.
+/// CRTP-templated concrete in `aeron::RefdataPerpSubscriber<H>`.
 
 #include <cstdint>
-#include <functional>
 #include <string>
 
 namespace bpt::radar::messaging::api {
@@ -18,13 +17,9 @@ public:
         uint8_t exchange_id;     ///< bpt::messages::ExchangeId::Value
     };
 
-    using OnPerpFn = std::function<void(const PerpInfo&)>;
-
     virtual ~RefdataPerpSubscriber() = default;
 
     virtual int poll(int fragment_limit = 4) = 0;
-
-    OnPerpFn on_perp;
 };
 
 }  // namespace bpt::radar::messaging::api

@@ -17,24 +17,13 @@ namespace bpt::radar {
 RadarService::RadarService(config::Settings settings, messaging::RadarBus bus)
     : settings_(std::move(settings)),
       bus_(std::move(bus)) {
-    bus_.surface_sub->on_vol_surface = [this](bpt::messages::VolSurface& s) {
-        on_vol_surface(s);
-    };
-    bus_.stats_sub->on_stats = [this](bpt::messages::InstrumentStats& s) {
-        on_instrument_stats(s);
-    };
-    bus_.funding_sub->on_funding = [this](bpt::messages::FundingRate& fr) {
-        on_funding(fr);
-    };
-    bus_.refdata_perp_sub->on_perp = [this](const messaging::api::RefdataPerpSubscriber::PerpInfo& p) {
-        on_refdata_perp(p.instrument_id, p.underlying, p.exchange_id);
-    };
-    bus_.trade_sub->on_trade = [this](bpt::messages::MdTrade& t) {
-        on_trade(t);
-    };
-    bus_.bbo_sub->on_bbo = [this](bpt::messages::MdMarketData& b) {
-        on_bbo(b);
-    };
+    // CRTP: templated subscribers dispatch directly into our on_* methods.
+    bus_.surface_sub->set_handler(this);
+    bus_.stats_sub->set_handler(this);
+    bus_.funding_sub->set_handler(this);
+    bus_.refdata_perp_sub->set_handler(this);
+    bus_.trade_sub->set_handler(this);
+    bus_.bbo_sub->set_handler(this);
 
     bpt::common::log::info(
         "[RadarService] ready — surface={} stats={} funding={} refdata={} md_data={} color={} publish={}ms",
@@ -109,10 +98,10 @@ void RadarService::on_funding(bpt::messages::FundingRate& fr) {
     funding_by_instrument_[fr.instrumentId()] = s;
 }
 
-void RadarService::on_refdata_perp(uint64_t instrument_id, const std::string& underlying, uint8_t exchange_id) {
-    SurfaceKey key{exchange_id, underlying};
-    perp_id_by_key_[key] = instrument_id;
-    perp_key_by_id_[instrument_id] = key;
+void RadarService::on_refdata_perp(const messaging::api::RefdataPerpSubscriber::PerpInfo& p) {
+    SurfaceKey key{p.exchange_id, p.underlying};
+    perp_id_by_key_[key] = p.instrument_id;
+    perp_key_by_id_[p.instrument_id] = key;
 }
 
 void RadarService::on_trade(bpt::messages::MdTrade& trade) {
