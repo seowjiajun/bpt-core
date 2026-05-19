@@ -19,7 +19,7 @@
 
 #include "strategy/backtest/backtest_client.h"
 #include "strategy/console/portfolio_snapshot_publisher.h"
-#include "strategy/md/i_md_client.h"
+#include "strategy/md/md_client.h"
 #include "strategy/messaging/subscribers/api/console_control_subscriber.h"
 #include "strategy/messaging/subscribers/api/toxicity_subscriber.h"
 #include "strategy/order/i_order_gateway_client.h"
@@ -31,6 +31,7 @@
 #include <memory>
 
 namespace bpt::strategy {
+class StrategyService;
 namespace config {
 struct AppConfig;
 }
@@ -50,7 +51,10 @@ namespace messaging {
 /// concrete consumer needs the substitution.
 struct StrategyBus {
     std::unique_ptr<refdata::IRefdataClient> refdata;
-    std::unique_ptr<md::IMdClient> md;
+    /// Templated on StrategyService — the templated client dispatches
+    /// fragments directly into StrategyService::on_bbo etc. with zero
+    /// vtable / std::function indirection.
+    std::unique_ptr<md::AeronMdClient<StrategyService>> md;
     std::unique_ptr<order::IOrderGatewayClient> order_gw;
     std::unique_ptr<vol::VolSurfaceClient> vol;
     std::unique_ptr<backtest::BacktestClient> backtest;

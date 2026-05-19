@@ -15,6 +15,12 @@
 #include <cstdint>
 #include <memory>
 
+namespace bpt::messages {
+class MdMarketData;
+class MdTrade;
+class MdOrderBook;
+}  // namespace bpt::messages
+
 namespace bpt::strategy {
 
 class StrategyService : public bpt::app::IService {
@@ -22,6 +28,17 @@ public:
     StrategyService(config::AppConfig cfg, messaging::StrategyBus bus, const bpt::common::util::Topology& topology);
     void run() override;
     void stop() override;
+
+    /// \name MD client Handler interface — called by `AeronMdClient<StrategyService>`.
+    /// Public because the templated client dispatches into them directly
+    /// (no vtable, no std::function indirection). Single-threaded — only
+    /// the strategy poll thread ever calls these.
+    /// @{
+    void on_bbo(const bpt::messages::MdMarketData& tick) noexcept;
+    void on_trade(const bpt::messages::MdTrade& tick) noexcept;
+    void on_order_book(const bpt::messages::MdOrderBook& book) noexcept;
+    void on_md_service_heartbeat() noexcept;
+    /// @}
 
 private:
     void wire_refdata_callbacks();

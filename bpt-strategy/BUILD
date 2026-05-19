@@ -87,7 +87,6 @@ cc_library(
         "src/strategy/short_vol_strategy.cpp",
         "src/strategy/options_maker_strategy.cpp",
         "src/strategy/strategy_factory.cpp",
-        "src/md/md_client.cpp",
         "src/vol/vol_surface_client.cpp",
         "src/order/aeron_order_gateway_client.cpp",
         "src/order/order_manager.cpp",

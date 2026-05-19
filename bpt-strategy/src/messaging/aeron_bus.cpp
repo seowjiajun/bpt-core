@@ -1,5 +1,6 @@
 #include "strategy/messaging/aeron_bus.h"
 
+#include "strategy/app/strategy_service.h"
 #include "strategy/config/config.h"
 #include "strategy/md/md_client.h"
 #include "strategy/messaging/subscribers/aeron/console_control_subscriber.h"
@@ -28,11 +29,11 @@ StrategyBus StrategyAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const
                                                                 fc.strategy.schedule.max_refdata_staleness_ns);
 
     if (ac.md_control.stream_id != 0) {
-        bus.md = std::make_unique<md::AeronMdClient>(aeron,
-                                                     ac.md_control.channel,
-                                                     ac.md_control.stream_id,
-                                                     ac.md_data.stream_id,
-                                                     ac.md_ack_hb.stream_id);
+        bus.md = std::make_unique<md::AeronMdClient<StrategyService>>(aeron,
+                                                                      ac.md_control.channel,
+                                                                      ac.md_control.stream_id,
+                                                                      ac.md_data.stream_id,
+                                                                      ac.md_ack_hb.stream_id);
     }
 
     if (ac.order.stream_id != 0) {

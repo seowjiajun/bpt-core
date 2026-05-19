@@ -108,11 +108,24 @@ private:
 
     Options opts_;
 
+    // Thin Handler the templated InProcessMdClient<HarnessHandler>
+    // dispatches into. Just forwards to strategy_; the
+    // on_md_service_heartbeat no-op satisfies the Handler shape
+    // (heartbeats aren't meaningful in deterministic backtest replay).
+    struct HarnessHandler {
+        bpt::strategy::strategy::IStrategy* strategy{nullptr};
+        void on_bbo(const bpt::messages::MdMarketData& t) { strategy->on_bbo(t); }
+        void on_trade(const bpt::messages::MdTrade& t) { strategy->on_trade(t); }
+        void on_order_book(const bpt::messages::MdOrderBook& b) { strategy->on_order_book(b); }
+        void on_md_service_heartbeat() {}
+    };
+
     // Harness-owned components — order matters: strategy is constructed
     // last (depends on clients + order manager), destroyed first.
     matching::MatchingEngine matching_;
     std::unique_ptr<results::ResultsCollector> results_;
-    std::unique_ptr<bpt::strategy::md::InProcessMdClient> md_client_;
+    HarnessHandler md_handler_;
+    std::unique_ptr<bpt::strategy::md::InProcessMdClient<HarnessHandler>> md_client_;
     std::unique_ptr<bpt::strategy::refdata::InProcessRefdataClient> refdata_client_;
     std::unique_ptr<InProcessOrderGatewayClient> order_gw_;
     std::unique_ptr<bpt::strategy::order::OrderManager> order_mgr_;

@@ -39,7 +39,7 @@ void StrategyHarness::initialize() {
     // interface; harness keeps the concrete pointers so it can drive
     // the push_* methods.
     refdata_client_ = std::make_unique<bpt::strategy::refdata::InProcessRefdataClient>();
-    md_client_ = std::make_unique<bpt::strategy::md::InProcessMdClient>();
+    md_client_ = std::make_unique<bpt::strategy::md::InProcessMdClient<HarnessHandler>>();
 
     // Load instrument mapping JSON into the refdata client's cache.
     // bpt-refdata's mapping_lib does the parsing — same loader the
@@ -109,15 +109,8 @@ void StrategyHarness::initialize() {
                                        bpt::messages::DeltaUpdateType::Value t) {
         strategy_->on_delta(inst, t);
     };
-    md_client_->on_bbo = [this](const bpt::messages::MdMarketData& tick) {
-        strategy_->on_bbo(tick);
-    };
-    md_client_->on_trade = [this](const bpt::messages::MdTrade& tick) {
-        strategy_->on_trade(tick);
-    };
-    md_client_->on_order_book = [this](const bpt::messages::MdOrderBook& book) {
-        strategy_->on_order_book(book);
-    };
+    md_handler_.strategy = strategy_.get();
+    md_client_->set_handler(&md_handler_);
     order_gw_->on_exec_report = [this](const bpt::messages::ExecutionReport& rpt) {
         strategy_->on_exec_report(rpt);
     };

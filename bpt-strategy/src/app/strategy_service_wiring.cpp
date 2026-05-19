@@ -63,72 +63,78 @@ void StrategyService::wire_refdata_callbacks() {
 void StrategyService::wire_md_callbacks() {
     if (!bus_.md)
         return;
+    // CRTP: StrategyService is the Handler the templated AeronMdClient
+    // dispatches into. set_handler installs the pointer; on_bbo /
+    // on_trade / on_order_book / on_md_service_heartbeat are member
+    // methods called directly from the fragment handler — zero vtable,
+    // no std::function indirection.
+    bus_.md->set_handler(this);
+}
 
-    bus_.md->on_service_heartbeat = [this]() {
-        last_md_hb_recv_ns_ = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
-                .count());
-    };
+void StrategyService::on_md_service_heartbeat() noexcept {
+    last_md_hb_recv_ns_ = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+}
 
-    bus_.md->on_bbo = [this](const bpt::messages::MdMarketData& tick) {
-        static uint64_t bbo_count = 0;
-        if (++bbo_count <= 10 || bbo_count % 1000 == 0) {
-            bpt::common::log::info("BBO tick #{}: id={} bid={:.4f} ask={:.4f}",
-                                   bbo_count,
-                                   tick.instrumentId(),
-                                   tick.bidPrice(),
-                                   tick.askPrice());
-        }
-        metrics_.md_ticks_total->Increment();
-        if (trading_paused_ || trading_halted_)
-            return;
+void StrategyService::on_bbo(const bpt::messages::MdMarketData& tick) noexcept {
+    static uint64_t bbo_count = 0;
+    if (++bbo_count <= 10 || bbo_count % 1000 == 0) {
+        bpt::common::log::info("BBO tick #{}: id={} bid={:.4f} ask={:.4f}",
+                               bbo_count,
+                               tick.instrumentId(),
+                               tick.bidPrice(),
+                               tick.askPrice());
+    }
+    metrics_.md_ticks_total->Increment();
+    if (trading_paused_ || trading_halted_)
+        return;
 
-        // Cross-service timestamp comparison: bpt-md-gateway stamps tick.timestampNs()
-        // with WallClock (CLOCK_REALTIME), so we read the same clock here.
-        // Using TscClock would inherit per-process calibration drift and
-        // silently underflow the delta when strategy calibration is behind
-        // bpt-md-gateway's.
-        curr_tick_ts_ns_ = tick.timestampNs();
+    // Cross-service timestamp comparison: bpt-md-gateway stamps tick.timestampNs()
+    // with WallClock (CLOCK_REALTIME), so we read the same clock here.
+    // Using TscClock would inherit per-process calibration drift and
+    // silently underflow the delta when strategy calibration is behind
+    // bpt-md-gateway's.
+    curr_tick_ts_ns_ = tick.timestampNs();
 
-        strategy_->on_bbo(tick);
-        const uint64_t t3 = bpt::common::util::WallClock::now_ns();
-        if (t3 > curr_tick_ts_ns_) {
-            const uint64_t delta = t3 - curr_tick_ts_ns_;
-            if (bbo_count <= 3)
-                bpt::common::log::debug("[Latency] bbo raw delta={}ns", delta);
-            tick_lat_hist_.record(delta);
-            metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
-        }
-    };
+    strategy_->on_bbo(tick);
+    const uint64_t t3 = bpt::common::util::WallClock::now_ns();
+    if (t3 > curr_tick_ts_ns_) {
+        const uint64_t delta = t3 - curr_tick_ts_ns_;
+        if (bbo_count <= 3)
+            bpt::common::log::debug("[Latency] bbo raw delta={}ns", delta);
+        tick_lat_hist_.record(delta);
+        metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
+    }
+}
 
-    bus_.md->on_trade = [this](const bpt::messages::MdTrade& tick) {
-        metrics_.md_ticks_total->Increment();
-        if (trading_paused_ || trading_halted_)
-            return;
+void StrategyService::on_trade(const bpt::messages::MdTrade& tick) noexcept {
+    metrics_.md_ticks_total->Increment();
+    if (trading_paused_ || trading_halted_)
+        return;
 
-        curr_tick_ts_ns_ = tick.timestampNs();
+    curr_tick_ts_ns_ = tick.timestampNs();
 
-        strategy_->on_trade(tick);
-        const uint64_t t3 = bpt::common::util::WallClock::now_ns();
-        if (t3 > curr_tick_ts_ns_) {
-            const uint64_t delta = t3 - curr_tick_ts_ns_;
-            tick_lat_hist_.record(delta);
-            metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
-        }
-    };
+    strategy_->on_trade(tick);
+    const uint64_t t3 = bpt::common::util::WallClock::now_ns();
+    if (t3 > curr_tick_ts_ns_) {
+        const uint64_t delta = t3 - curr_tick_ts_ns_;
+        tick_lat_hist_.record(delta);
+        metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
+    }
+}
 
-    bus_.md->on_order_book = [this](const bpt::messages::MdOrderBook& book) {
-        if (!trading_paused_ && !trading_halted_) {
-            curr_tick_ts_ns_ = book.timestampNs();
-            strategy_->on_order_book(book);
-            const uint64_t t3 = bpt::common::util::WallClock::now_ns();
-            if (t3 > curr_tick_ts_ns_) {
-                const uint64_t delta = t3 - curr_tick_ts_ns_;
-                tick_lat_hist_.record(delta);
-                metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
-            }
-        }
-    };
+void StrategyService::on_order_book(const bpt::messages::MdOrderBook& book) noexcept {
+    if (trading_paused_ || trading_halted_)
+        return;
+    curr_tick_ts_ns_ = book.timestampNs();
+    strategy_->on_order_book(book);
+    const uint64_t t3 = bpt::common::util::WallClock::now_ns();
+    if (t3 > curr_tick_ts_ns_) {
+        const uint64_t delta = t3 - curr_tick_ts_ns_;
+        tick_lat_hist_.record(delta);
+        metrics_.tick_to_strategy_ns_hist->Observe(static_cast<double>(delta));
+    }
 }
 
 void StrategyService::wire_vol_callbacks() {

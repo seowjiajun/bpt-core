@@ -1,34 +1,27 @@
 #pragma once
 
 /// @file
-/// IMdClient — abstract interface for the strategy's market-data client.
+/// IMdClient — minimal abstract interface exposing the methods strategies
+/// call on the MD client (`subscribe`, `poll`). The per-frame dispatch
+/// path was lifted to a CRTP-templated concrete client — see
+/// `md_client.h` (`AeronMdClient<Handler>`) and `inprocess_md_client.h`
+/// (`InProcessMdClient<Handler>`). Each is parameterised on a Handler
+/// type with `on_bbo`, `on_trade`, `on_order_book`, `on_md_service_heartbeat`
+/// methods (in prod the Handler is `StrategyService`). Removing the
+/// `std::function` callback fields kills one level of indirection per
+/// tick — same shape used by `bpt-md-gateway` for its decoder→publisher
+/// chain.
 ///
 /// Two implementations live behind this interface:
 ///
-///   AeronMdClient  — production path. Publishes MdSubscribeBatch on the
-///                    control stream and consumes MdMarketData / MdTrade /
-///                    MdOrderBook from the data stream over Aeron IPC.
-///                    Today's strategy_service uses this for both live trading
-///                    and the multi-process backtest stack.
+///   AeronMdClient<Handler>     — production path; Aeron IPC.
+///   InProcessMdClient<Handler> — deterministic backtest harness.
 ///
-///   InProcessMdClient — deterministic backtest path. Driven directly off
-///                       captured tape; no Aeron, no thread, no queue.
-///                       Used by the single-process strategy harness so
-///                       parameter sweeps produce bit-identical summaries.
-///
-/// Both implement the same public surface so AvellanedaStoikovStrategy
-/// (and every other strategy) is identical bytes regardless of which
-/// transport sits behind. Keeping the std::function callback fields as
-/// public data members preserves the existing assignment idiom
-/// (`client->on_bbo = lambda;`) — only the polymorphic methods are
-/// virtual.
-
-#include <messages/MdMarketData.h>
-#include <messages/MdOrderBook.h>
-#include <messages/MdTrade.h>
+/// Strategies keep `IMdClient*` (this interface) for the subscribe/poll
+/// surface so they don't have to know which Handler the concrete client
+/// is templated on.
 
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -45,11 +38,6 @@ public:
         uint8_t depth{0};      // 0 = BBO only, 5 = top-5 order book levels
     };
 
-    using OnBboFn = std::function<void(const bpt::messages::MdMarketData&)>;
-    using OnTradeFn = std::function<void(const bpt::messages::MdTrade&)>;
-    using OnOrderBookFn = std::function<void(const bpt::messages::MdOrderBook&)>;
-    using OnServiceHeartbeatFn = std::function<void()>;
-
     virtual ~IMdClient() = default;
 
     /// Send a full-replace subscription batch.
@@ -58,23 +46,6 @@ public:
     /// Poll both data and ack/hb streams. Returns total fragment count.
     /// Backtest impls return 0 (no polling needed; events are pushed).
     virtual int poll(int fragment_limit = 10) = 0;
-
-    /// Fired for each BBO tick received from the MD service.
-    /// Mutually exclusive with on_order_book — MdGateway publishes one or
-    /// the other depending on its order_book_depth config (0 = BBO,
-    /// N > 0 = order book).
-    OnBboFn on_bbo;
-
-    /// Fired for each trade tick received from the MD service.
-    OnTradeFn on_trade;
-
-    /// Fired for each order book snapshot received from the MD service.
-    /// Only populated when MdGateway is configured with order_book_depth > 0.
-    OnOrderBookFn on_order_book;
-
-    /// Fired each time a MdServiceHeartbeat is received from MdGateway.
-    /// Used by StrategyService to track local receipt time for the liveness watchdog.
-    OnServiceHeartbeatFn on_service_heartbeat;
 };
 
 }  // namespace bpt::strategy::md
