@@ -632,7 +632,55 @@ body,
   color: var(--text-secondary);
 }
 
+/* ── Generic filter pills ──────────────────────────────────────────────────
+   Reusable across panels (Blotter today, Cross-strategy risk + State machine
+   panels later). Same visual language as .radar-tab but scoped to panel
+   filters rather than top-level navigation. */
+.filter-pill {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    background 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease;
+}
+.filter-pill:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+}
+.filter-pill--active {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.filter-pill--active:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
 /* ── Blotter ───────────────────────────────────────────────────────────────── */
+.blotter-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated, transparent);
+}
+.blotter-filter-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
 .blotter-table {
   width: 100%;
   border-collapse: collapse;

@@ -13,7 +13,14 @@ if (import.meta.hot) {
 }
 
 import { create } from 'zustand'
-import type { ConnectionStatus, InstrumentType, MarketColorMsg, Msg, OrderMsg, RunMode } from './types/messages'
+import type {
+  ConnectionStatus,
+  InstrumentType,
+  MarketColorMsg,
+  Msg,
+  OrderMsg,
+  RunMode,
+} from './types/messages'
 import type { Fill } from './components/Blotter'
 import type { OptionLeg, PortfolioGreeks, VolSmileSlice, VolSurfacePoint } from './types/options'
 import { sendCommand } from './ws/client'
@@ -77,9 +84,9 @@ export interface FundingSample {
 // delta. Same store-not-chart persistence rationale as FundingSample.
 export interface BookDeltaSample {
   ts: number // unix seconds, monotonic
-  bookDelta: number      // portfolio_delta + perp_position (≈ 0 when hedged)
+  bookDelta: number // portfolio_delta + perp_position (≈ 0 when hedged)
   portfolioDelta: number // option-leg delta only
-  perpPosition: number   // signed perp inventory
+  perpPosition: number // signed perp inventory
 }
 
 interface State {
@@ -277,6 +284,7 @@ export const useStore = create<State>((set) => ({
             seq: state.fills.length, // monotonic, unique per store instance
             ts: msg.ts,
             orderId: msg.orderId,
+            symbol: msg.symbol,
             side: msg.side,
             orderType: msg.orderType,
             qty: msg.qty,

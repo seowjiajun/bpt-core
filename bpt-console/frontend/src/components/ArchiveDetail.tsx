@@ -96,11 +96,14 @@ export function ArchiveDetail({ name }: Props) {
 
   // Turn trade rows into the Fill shape the Blotter renders.  We synthesize
   // `seq` from the array index — it's only used as a React key and the
-  // archive data is immutable, so index is stable.
+  // archive data is immutable, so index is stable. Symbol is per-row in
+  // trades.csv (typically same value across all rows for single-symbol
+  // backtests, but read it per-row to support multi-symbol archives).
   const fills: Fill[] = trades.map((t, i) => ({
     seq: i,
     ts: t.ts,
     orderId: t.orderId,
+    symbol: t.symbol,
     side: t.side,
     orderType: 'LIMIT', // archive runs don't persist order type — default to LIMIT
     qty: t.qty,

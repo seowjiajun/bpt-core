@@ -6,8 +6,9 @@ import type { Fill } from '../components/Blotter'
 import type { Msg, Side } from '../types/messages'
 import { useStore } from '../store'
 
-// Minimal mock-fill shape — orderType and fee are synthesized by the replay.
-export type MockFill = Omit<Fill, 'seq' | 'orderType' | 'fee'>
+// Minimal mock-fill shape — orderType, fee, and symbol are synthesized by the
+// replay (symbol comes from cfg.symbol so every fill in a mock session shares it).
+export type MockFill = Omit<Fill, 'seq' | 'orderType' | 'fee' | 'symbol'>
 
 interface ReplayConfig {
   fills: MockFill[]
