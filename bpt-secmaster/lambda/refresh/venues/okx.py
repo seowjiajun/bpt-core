@@ -46,9 +46,15 @@ class OkxIngester(VenueIngester):
     def fetch(self) -> Iterable[NormalizedInstrument]:
         for inst_type in ("SPOT", "SWAP", "FUTURES"):
             yield from self._fetch_and_normalize(inst_type)
-        # OPTION needs per-family fetches.
+        # OPTION needs per-family fetches. Wrap individually — a family
+        # that doesn't exist on OKX yet (e.g. newly-listed coin) raises
+        # 400, which without isolation would yield-from-propagate and
+        # abort the whole OKX venue run.
         for family in OKX_OPTION_FAMILIES:
-            yield from self._fetch_and_normalize("OPTION", inst_family=family)
+            try:
+                yield from self._fetch_and_normalize("OPTION", inst_family=family)
+            except Exception as e:
+                log.warning("OKX: OPTION family %s skipped: %s", family, e)
 
     def _fetch_and_normalize(
         self, inst_type: str, inst_family: str | None = None
@@ -98,6 +104,16 @@ class OkxIngester(VenueIngester):
         base = row["baseCcy"].upper() if row.get("baseCcy") else None
         quote = row["quoteCcy"].upper() if row.get("quoteCcy") else None
         settle = row.get("settleCcy", "").upper() or None
+
+        # OKX leaves baseCcy/quoteCcy empty for SWAP/FUTURES — the base
+        # and quote currencies have to be parsed out of `uly` or
+        # `instFamily` (format: "BASE-QUOTE", e.g. "BTC-USDT").
+        if (not base or not quote) and inst_type in ("SWAP", "FUTURES"):
+            uly = row.get("uly") or row.get("instFamily", "")
+            if "-" in uly:
+                b, q = uly.split("-", 1)
+                base = base or b.upper()
+                quote = quote or q.upper()
 
         tick = Decimal(row["tickSz"])
         lot = Decimal(row["lotSz"])
