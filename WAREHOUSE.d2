@@ -1,0 +1,185 @@
+# bpt-canon warehouse — Path (c)
+# Cheapest legitimate shape: GitHub Actions on cron + existing C++ binaries
+# + S3 (Standard/Glacier lifecycle). Render with:
+#   d2 WAREHOUSE.d2 WAREHOUSE.svg
+# (See WAREHOUSE.md for the ASCII-art companion and the full design write-up.)
+
+direction: right
+
+title: |md
+  # bpt-canon Warehouse — Path (c)
+  Daily ingest via GitHub Actions · cheap S3 lifecycle · DuckDB queries
+| {
+  near: top-center
+  shape: text
+}
+
+# ───────────────────────── External source ─────────────────────────
+okx: "OKX historical-data API" {
+  shape: cloud
+  style.fill: "#FFEFC2"
+  style.stroke: "#F2A900"
+  style.stroke-width: 2
+}
+
+# ───────────────────────── Producer (GitHub Actions) ───────────────
+gha: "Producer · GitHub Actions (free)" {
+  style.fill: "#F6F8FA"
+  style.stroke: "#24292F"
+  style.stroke-dash: 4
+
+  github_icon: "" {
+    shape: image
+    icon: https://icons.terrastruct.com/dev%2Fgithub.svg
+    width: 40
+    height: 40
+  }
+
+  build_job: "build-binaries.yml\n(on push to main)" {
+    shape: rectangle
+    style.fill: "#FFFFFF"
+    style.stroke: "#0969DA"
+  }
+
+  daily_job: "daily-ingest.yml\n(cron 01:00 UTC)" {
+    shape: rectangle
+    style.fill: "#FFFFFF"
+    style.stroke: "#0969DA"
+  }
+
+  orchestrator: "orchestrator.py\nper (venue, symbol, date), idempotent:\n  1. fetch  + DQ-bronze (file size)\n  2. ingest + DQ-silver (>23h span)\n  3. parquet + DQ-gold (row counts)\n  4. publish atomically + _SUCCESS marker\n  5. manifest UPSERT (sha256, etag, code_sha)" {
+    shape: rectangle
+    style.fill: "#FFFFFF"
+    style.stroke: "#1F883D"
+    style.font-size: 11
+  }
+
+  daily_job -> orchestrator: "invokes"
+}
+
+# ───────────────────────── AWS storage layer ───────────────────────
+aws: "AWS · ap-northeast-1 (Tokyo)" {
+  style.fill: "#FFF8E7"
+  style.stroke: "#FF9900"
+  style.stroke-width: 2
+
+  iam: "IAM user\n(GHA runner creds)" {
+    shape: person
+    style.fill: "#FFFFFF"
+    style.stroke: "#D13212"
+  }
+
+  bucket: "S3 bucket · bpt-tape-archive" {
+    style.fill: "#FFFCF0"
+    style.stroke: "#FF9900"
+
+    bin: "bpt-bin/  (Standard)\nbinaries by git SHA" {
+      shape: image
+      icon: https://icons.terrastruct.com/aws%2FStorage%2FAmazon-Simple-Storage-Service-S3.svg
+    }
+    raw: "raw/  (Deep Archive)\nvenue=…/symbol=…/date=…/\n  {trades.zip, L2.tar.gz, _SUCCESS}" {
+      shape: image
+      icon: https://icons.terrastruct.com/aws%2FStorage%2FAmazon-S3-Glacier.svg
+    }
+    canon: "canon/  (Standard 30d → DA)\nvenue=…/symbol=…/date=…/\n  {trades.canon, l2.canon, merged.canon, _SUCCESS}" {
+      shape: image
+      icon: https://icons.terrastruct.com/aws%2FStorage%2FAmazon-Simple-Storage-Service-S3.svg
+    }
+    parquet: "parquet/  (Standard 30d → Glacier IA)\nvenue=…/symbol=…/date=…/\n  {trades, books, candles_*, funding, _SUCCESS}" {
+      shape: image
+      icon: https://icons.terrastruct.com/aws%2FStorage%2FAmazon-Simple-Storage-Service-S3.svg
+    }
+    manifest: "manifest.sqlite\ncols: venue, symbol, date, kind, path,\nsha256, bytes, source_etag,\ncode_sha, produced_at" {
+      shape: image
+      icon: https://icons.terrastruct.com/aws%2FStorage%2FAmazon-Simple-Storage-Service-S3.svg
+    }
+  }
+
+  logs: "CloudWatch Logs\n(ingest run history)" {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FManagement%20%26%20Governance%2FAmazon-CloudWatch.svg
+  }
+}
+
+# ───────────────────────── Consumer (laptop) ───────────────────────
+laptop: "Consumer · your laptop" {
+  style.fill: "#EFEFEF"
+  style.stroke: "#454545"
+
+  bt: "bpt-backtester\n--canon s3://…/canon/…" {
+    shape: rectangle
+    style.fill: "#FFFFFF"
+  }
+  dd: "DuckDB\nSELECT … FROM read_parquet('s3://…/parquet/…')" {
+    shape: rectangle
+    style.fill: "#FFFFFF"
+    style.font-size: 11
+  }
+}
+
+# ───────────────────────── Flows ───────────────────────────────────
+okx -> gha.orchestrator: "POST download-link\nfetch zips" {
+  style.stroke: "#F2A900"
+  style.stroke-width: 2
+}
+
+gha.build_job -> aws.bucket.bin: "push compiled\nbinaries" {
+  style.stroke: "#0969DA"
+}
+gha.daily_job -> aws.bucket.bin: "pull binaries at boot" {
+  style.stroke-dash: 3
+}
+
+gha.orchestrator -> aws.bucket.raw: "raw archives"
+gha.orchestrator -> aws.bucket.canon: "canon files"
+gha.orchestrator -> aws.bucket.parquet: "parquet (trades, books,\ncandles 1m/5m/1h/1d, funding)"
+gha.orchestrator -> aws.bucket.manifest: "row per file written"
+gha.orchestrator -> aws.logs: "structured log\nlines"
+
+aws.iam -> gha.orchestrator: "creds via GitHub Secret" {
+  style.stroke-dash: 3
+  style.stroke: "#D13212"
+}
+
+aws.bucket.canon -> laptop.bt: "read (after _SUCCESS check)" {
+  style.stroke: "#1F883D"
+  style.stroke-width: 2
+}
+aws.bucket.parquet -> laptop.dd: "read (Hive-partitioned,\ncolumnar, on demand)" {
+  style.stroke: "#1F883D"
+  style.stroke-width: 2
+}
+
+# ───────────────────────── Cost annotation ─────────────────────────
+costs: |||md
+  ### Monthly cost · 1 symbol × 1 year (ap-northeast-1)
+  | Item | $/mo |
+  |---|---|
+  | S3 Standard (canon+parquet hot 30d) | 4.00 |
+  | S3 Glacier IA / Deep Archive (cold) | 2.10 |
+  | Lifecycle transitions | 0.10 |
+  | GitHub Actions compute | 0.00 |
+  | Data transfer (S3 → laptop) | 0.60 |
+  | **Total** | **~6.80** |
+||| {
+  near: bottom-right
+  shape: text
+}
+
+# Data-engineering principles legend (bottom-left annotation)
+de_principles: |||md
+  ### Five data-eng principles baked in
+  1. **Hive partitioning** — `venue=…/symbol=…/date=…/`
+     auto partition-pruning in DuckDB/Spark/Iceberg
+  2. **`_SUCCESS` marker** — written *last*, consumers check it.
+     Kills "read-half-written-partition" bug.
+  3. **sha256 + etag + code_sha in manifest** — silent
+     corruption + republished-data + forensics, all covered.
+  4. **Idempotent ingest** — re-running a (venue, symbol, date)
+     produces byte-identical bytes. Safe retry on any failure.
+  5. **DQ assert per layer** — bronze/silver/gold checks,
+     3 lines each, catch ~80% of silent-failure modes.
+||| {
+  near: bottom-left
+  shape: text
+}
