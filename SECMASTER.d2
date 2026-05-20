@@ -1,0 +1,187 @@
+# bpt-secmaster — central source-of-truth architecture
+# Render: d2 SECMASTER.d2 SECMASTER.svg
+#
+# AWS RDS PostgreSQL (Free Tier 12mo) is the source of truth.
+# EventBridge fires daily → Lambda function pulls venue REST APIs
+# and upserts to RDS. bpt-refdata reads at startup, caches in-memory,
+# writes a snapshot file as last-known-good fallback (Pattern 3).
+# All other services read instruments via Aeron — unchanged from today.
+
+direction: down
+
+classes: {
+  card: {
+    style: {
+      fill: "#64748b"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#f8fafc"
+      shadow: true
+      border-radius: 20
+    }
+  }
+  swimlane-ext: {
+    style: {
+      fill: "#0f172a"
+      stroke: "#475569"
+      stroke-width: 1
+      font-color: "#e2e8f0"
+    }
+  }
+  swimlane-aws: {
+    style: {
+      fill: "#3a2a0e"
+      stroke: "#f2a900"
+      stroke-width: 2
+      font-color: "#fde68a"
+    }
+  }
+  swimlane-host: {
+    style: {
+      fill: "#1e293b"
+      stroke: "#64748b"
+      stroke-width: 1
+      font-color: "#cbd5e1"
+    }
+  }
+  swimlane-inner: {
+    style: {
+      fill: "#334155"
+      stroke: "#94a3b8"
+      stroke-width: 1
+      font-color: "#e2e8f0"
+    }
+  }
+  # Hot path: read at bpt-refdata startup (trading-critical).
+  hot: {
+    style: {
+      stroke: "#ef4444"
+      stroke-width: 3
+    }
+  }
+  # Slow path: daily refresh, backups, UI browse (off-critical).
+  slow: {
+    style: {
+      stroke: "#10b981"
+      stroke-width: 2
+    }
+  }
+  # Control path: fallback wiring (only fires when primary fails).
+  control: {
+    style: {
+      stroke: "#22d3ee"
+      stroke-width: 2
+      stroke-dash: 4
+    }
+  }
+}
+
+# ───────────────────────── External venue APIs ───────────────────────
+venues: External venue REST APIs {
+  class: swimlane-ext
+  label.near: outside-top-center
+  direction: right
+  okx: "OKX\n/api/v5/public/instruments" { class: card }
+  hl: "Hyperliquid\n/info meta" { class: card }
+  binance: "Binance\n/exchangeInfo" { class: card }
+  deribit: "Deribit\n/public/get_instruments" { class: card }
+}
+
+# ───────────────────────── AWS (ap-northeast-1) ──────────────────────
+# Everything ingest-side lives here now. RDS is in the same VPC as
+# the Lambda; private connection, no public DB exposure.
+aws: AWS · ap-northeast-1 (Tokyo) {
+  class: swimlane-aws
+  label.near: outside-top-center
+
+  eventbridge: "EventBridge schedule\ncron(0 3 * * ? *)\ndaily 03:00 UTC" { class: card }
+
+  lambda: "Lambda · bpt-secmaster-refresh" {
+    class: swimlane-inner
+    label.near: outside-top-center
+    direction: right
+
+    runtime: "Python 3.12 container\n512 MB · 5 min timeout\nVPC-attached" { class: card }
+    iam: "IAM role\nrds:connect · logs:* · sns:Publish" { class: card }
+  }
+
+  rds: "RDS PostgreSQL\ndb.t4g.micro · Free Tier 12mo\nthen ~15 USD/mo\nSOURCE OF TRUTH" { class: card }
+
+  rds_pitr: "Automated PITR snapshots\n7-day retention · in-region\n(included, no extra cost)" { class: card }
+
+  cloudwatch: "CloudWatch Logs\n(Lambda run history)\n+ alarm on failure" { class: card }
+
+  sns: "SNS topic\n→ Discord webhook\n(daily summary + failure pages)" { class: card }
+}
+
+# ───────────────────────── Trading host (Tokyo VPS) ──────────────────
+# Refresher is gone — trading host now only reads.
+host: Trading host (Tokyo VPS) {
+  class: swimlane-host
+  label.near: outside-top-center
+
+  refdata: "bpt-refdata · IService" {
+    class: swimlane-inner
+    label.near: outside-top-center
+    direction: right
+
+    src: "PostgresSecmasterSource\n(libpqxx connection at startup)" { class: card }
+    cache: "in-memory cache\nstd::unordered_map<id, Instrument>" { class: card }
+    snap: "/var/cache/bpt/secmaster-snapshot.db\nSQLite · last-known-good fallback" { class: card }
+    aeron_pub: "InstrumentPublisher\n(Aeron — unchanged)" { class: card }
+  }
+
+  pgweb: "pgweb\nport 8081 · browseable web UI\n(SSH-tunnel from laptop)" { class: card }
+
+  consumers: "Strategies · ogw · mdgw · pricer · analytics · etc.\n(read instruments via Aeron — unchanged)" { class: card }
+}
+
+# ───────────────────────── Operator (laptop) ─────────────────────────
+operator: Operator · laptop {
+  class: swimlane-ext
+  label.near: outside-top-center
+  browser: "browser\nssh -L 8081:trading-host:8081\n→ http://localhost:8081" { class: card }
+}
+
+# ───────────────────────── Slow path: daily refresh ──────────────────
+# EventBridge fires Lambda daily; Lambda pulls each venue's REST API,
+# derives canonical symbols, upserts with SCD-2 timestamps to RDS.
+# Decoupled from trading host: trading restart / outage doesn't skip
+# refresh, refresh failure doesn't touch trading.
+aws.eventbridge -> aws.lambda: "invokes daily" { class: slow }
+aws.lambda -> venues.okx: { class: slow }
+aws.lambda -> venues.hl: { class: slow }
+aws.lambda -> venues.binance: { class: slow }
+aws.lambda -> venues.deribit: { class: slow }
+aws.lambda -> aws.rds: "UPSERT instrument · listing\n· symbology · event\nSCD-2 valid_from/valid_to" { class: slow }
+aws.lambda -> aws.cloudwatch: "structured log lines" { class: slow }
+aws.lambda -> aws.sns: "daily summary + errors" { class: slow }
+
+# ───────────────────────── Slow path: backups ────────────────────────
+# Single tier for v1: AWS-managed PITR. 7-day retention is enough at
+# our update cadence (daily). If we ever need longer retention or
+# cross-region DR, enable AWS Backup with cross-region copy.
+aws.rds -> aws.rds_pitr: "automatic" { class: slow }
+
+# ───────────────────────── Hot path: primary read at startup ─────────
+# bpt-refdata opens a libpqxx connection on startup, SELECTs the
+# full live instrument set, loads into in-memory map, then writes
+# the snapshot file for next-startup fallback. Aeron publish to
+# consumers is unchanged from today.
+aws.rds -> host.refdata.src: "SELECT at startup\n(~100ms RTT same-region)" { class: hot }
+host.refdata.src -> host.refdata.cache: "hydrate map" { class: hot }
+host.refdata.cache -> host.refdata.snap: "write snapshot\nafter successful load" { class: hot }
+host.refdata.cache -> host.refdata.aeron_pub: { class: hot }
+host.refdata.aeron_pub -> host.consumers: "InstrumentUpdate via Aeron" { class: hot }
+
+# ───────────────────────── Control path: fallback ────────────────────
+# If RDS is unreachable at startup, hydrate the in-memory cache from
+# the snapshot file instead. Log a loud warning + fire a Prometheus
+# metric → alertmanager pages. Trading runs with bounded staleness.
+host.refdata.snap -> host.refdata.cache: "FALLBACK load\nif RDS unreachable\n(logs WARN +\nfires metric)" { class: control }
+
+# ───────────────────────── Slow path: UI browse ──────────────────────
+# pgweb is a single Go binary that gives a browseable web UI over
+# any Postgres connection. No code to write.
+aws.rds -> host.pgweb: "read-only DSN" { class: slow }
+operator.browser -> host.pgweb: "HTTPS via SSH tunnel" { class: slow }

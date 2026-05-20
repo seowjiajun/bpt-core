@@ -1,0 +1,37 @@
+# Local artifacts that should never enter git.
+# The DB never lives in git — it's in RDS in AWS, or in /var/cache on
+# trading hosts (which is gitignored at /). This file is belt-and-braces
+# for anyone running secmaster scripts locally.
+
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Python venv (if developer creates one in-tree)
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Terraform state — managed via remote backend, never in git
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/.terraform.lock.hcl
+# Live inputs (contains trading_host_cidr / webhook URL). .example is committed.
+infra/terraform/terraform.tfvars
+
+# Lambda build artifacts
+lambda/refresh/dist/
+lambda/refresh/*.zip
+lambda/refresh/build/
+
+# Local creds / DSNs (should always be in systemd-creds or env, never in tree)
+*.env
+.env.local
+secrets/
