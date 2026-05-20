@@ -72,6 +72,26 @@ resource "aws_iam_role_policy_attachment" "lambda_secret_read" {
   policy_arn = aws_iam_policy.lambda_secret_read.arn
 }
 
+# Upload the rendered instrument_mapping.json snapshot to S3 after each
+# successful refresh. Scoped to the one object key, not the whole bucket.
+data "aws_iam_policy_document" "lambda_snapshot_upload" {
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:PutObjectAcl"]
+    resources = ["arn:aws:s3:::${var.snapshot_s3_bucket}/${var.snapshot_s3_key}"]
+  }
+}
+
+resource "aws_iam_policy" "lambda_snapshot_upload" {
+  name   = "${var.name_prefix}-refresh-snapshot-upload"
+  policy = data.aws_iam_policy_document.lambda_snapshot_upload.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_snapshot_upload" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = aws_iam_policy.lambda_snapshot_upload.arn
+}
+
 # ──────────────────────── CloudWatch log group ────────────────────────
 # Pre-created with retention so logs don't accumulate forever (AWS
 # default is 'never expire' → unbounded cost growth).
@@ -95,8 +115,9 @@ resource "aws_lambda_function" "refresh" {
 
   environment {
     variables = {
-      SECMASTER_DB_SECRET_ARN   = aws_secretsmanager_secret.db.arn
-      SECMASTER_DISCORD_WEBHOOK = var.discord_webhook_url
+      SECMASTER_DB_SECRET_ARN     = aws_secretsmanager_secret.db.arn
+      SECMASTER_DISCORD_WEBHOOK   = var.discord_webhook_url
+      SECMASTER_SNAPSHOT_S3_URI   = "s3://${var.snapshot_s3_bucket}/${var.snapshot_s3_key}"
       # SECMASTER_VENUES left unset — handler defaults to all venues.
     }
   }
@@ -105,6 +126,7 @@ resource "aws_lambda_function" "refresh" {
     aws_cloudwatch_log_group.lambda,
     aws_iam_role_policy_attachment.lambda_basic,
     aws_iam_role_policy_attachment.lambda_secret_read,
+    aws_iam_role_policy_attachment.lambda_snapshot_upload,
   ]
 
   lifecycle {

@@ -1,0 +1,22 @@
+[Unit]
+Description=bpt-secmaster: pull instrument_mapping.json snapshot from S3
+Documentation=https://github.com/jseow/bpt-core/tree/main/bpt-secmaster/systemd
+After=network-online.target
+Wants=network-online.target
+
+# Only run if the destination dir is writable — defensive against a
+# misconfigured host where /opt/bpt/data was never provisioned.
+ConditionPathIsDirectory=/opt/bpt/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bpt-secmaster-pull
+
+# Runs as root (writes to /opt/bpt/data). If you've got a `bpt`
+# service user for everything else, swap User= here. The aws-cli
+# credentials come from the host's default profile (/root/.aws/
+# or instance profile if on EC2).
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bpt-secmaster-pull

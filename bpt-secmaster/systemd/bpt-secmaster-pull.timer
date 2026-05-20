@@ -1,0 +1,24 @@
+[Unit]
+Description=bpt-secmaster: pull snapshot from S3 hourly + at boot
+
+[Timer]
+# Pull at boot so a fresh trading host gets the latest snapshot
+# before bpt-refdata starts (use OnBootSec= rather than OnStartupSec=
+# so we wait until network is up).
+OnBootSec=2min
+
+# Then every hour. The Lambda refreshes daily 03:00 UTC; an hourly
+# poll catches that within the hour. ETag check makes off-cycle pulls
+# nearly free (single HEAD request).
+OnUnitActiveSec=1h
+
+# Always run on time — don't catch up missed pulls if the host was off.
+# Catching up just downloads the same file we'd download next cycle.
+Persistent=false
+
+# Splay across 60 seconds to avoid thundering-herd if multiple hosts
+# wake up simultaneously after a regional restart.
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

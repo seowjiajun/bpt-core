@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
 # Copy application code. Flat layout — handler.py at the top, venues/
 # beside it. Lambda's default WORKDIR is /var/task = $LAMBDA_TASK_ROOT.
-COPY handler.py db.py symbology.py ${LAMBDA_TASK_ROOT}/
+COPY handler.py db.py symbology.py render.py ${LAMBDA_TASK_ROOT}/
 COPY venues/ ${LAMBDA_TASK_ROOT}/venues/
 
 # Lambda runtime entrypoint. Image's base ENTRYPOINT is already

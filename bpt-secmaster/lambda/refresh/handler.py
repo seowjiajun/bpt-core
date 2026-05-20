@@ -94,6 +94,16 @@ def _run() -> dict:
                 log.exception("venue %s failed entirely: %s", code, e)
                 summary["venues"][code] = {"fatal_error": str(e)}
                 summary["total"].error_count += 1
+        # End-of-refresh: render the instrument_mapping.json snapshot
+        # for trading hosts to pull from S3. Only render if at least
+        # one venue succeeded — don't overwrite the last-good snapshot
+        # with one built from a fully-failed refresh.
+        if summary["total"].rows_added + summary["total"].rows_unchanged > 0:
+            try:
+                _render_and_upload(conn)
+            except Exception as e:
+                log.exception("snapshot render/upload failed (data still in RDS): %s", e)
+                summary["snapshot_error"] = str(e)
     finally:
         conn.close()
 
@@ -102,6 +112,50 @@ def _run() -> dict:
 
     _post_discord_summary(summary)
     return summary
+
+
+def _render_and_upload(conn) -> None:
+    """
+    Render the legacy instrument_mapping.json snapshot from RDS and
+    upload to S3. Trading hosts pull from S3 via systemd timer.
+
+    Skipped silently if SECMASTER_SNAPSHOT_S3_URI isn't set (local-dev
+    or single-host mode with no S3 cutover yet).
+    """
+    s3_uri = os.environ.get("SECMASTER_SNAPSHOT_S3_URI")
+    if not s3_uri:
+        log.info("no SECMASTER_SNAPSHOT_S3_URI set; skipping render+upload")
+        return
+
+    import boto3  # lazy: only when actually uploading
+
+    from render import render_mapping_json
+
+    log.info("rendering instrument_mapping snapshot")
+    blob = render_mapping_json(conn)
+    log.info("rendered %d bytes; uploading to %s", len(blob), s3_uri)
+
+    bucket, key = _parse_s3_uri(s3_uri)
+    s3 = boto3.client("s3")
+    s3.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=blob.encode("utf-8"),
+        ContentType="application/json",
+        # Cache-Control lets pullers know to revalidate aggressively.
+        CacheControl="max-age=0, must-revalidate",
+    )
+    log.info("uploaded snapshot to s3://%s/%s", bucket, key)
+
+
+def _parse_s3_uri(uri: str) -> tuple[str, str]:
+    if not uri.startswith("s3://"):
+        raise ValueError(f"bad S3 URI: {uri!r}")
+    rest = uri[len("s3://"):]
+    bucket, _, key = rest.partition("/")
+    if not bucket or not key:
+        raise ValueError(f"S3 URI missing bucket or key: {uri!r}")
+    return bucket, key
 
 
 # ─────────────────────────── per-venue execution ──────────────────────

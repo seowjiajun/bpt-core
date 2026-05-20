@@ -81,3 +81,15 @@ variable "log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "snapshot_s3_bucket" {
+  description = "S3 bucket name to upload the rendered instrument_mapping.json snapshot to. Reuses the existing bpt-tape-archive bucket from [[project_tape_storage]]."
+  type        = string
+  default     = "bpt-tape-archive"
+}
+
+variable "snapshot_s3_key" {
+  description = "Object key in the snapshot bucket. Single overwriting key; S3 versioning on the bucket provides history."
+  type        = string
+  default     = "secmaster/instrument_mapping.json"
+}
