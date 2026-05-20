@@ -378,3 +378,113 @@ groups:
             indicates either a config regression (universe filter
             tightened, mapping shrunk) or a startup race where the
             mapping hadn't fully loaded.
+
+  # ─────────────── TRADING ──────────────────────────────────────────
+  # Strategy-flavoured alerts: distinct from the breaker-tripped /
+  # process-down ops alerts above. These fire on behavioural drift
+  # (strategy alive but not quoting, MD stream silently degraded,
+  # exec-reports lagging) where there's no single "thing broke" signal
+  # but the trading isn't healthy. severity=trading routes to the
+  # Discord receiver with a distinguishable prefix so the operator
+  # can tell trading-floor alerts from infrastructure ones at a glance.
+  #
+  # Items intentionally NOT here yet because the underlying metric
+  # doesn't exist on the strategy:
+  #   - Position approaching max — needs strategy_position_pct_of_max gauge
+  #   - Realized PnL crossed threshold — needs strategy_realized_pnl_usd gauge
+  #   - Markouts turned negative — needs bpt-analytics markout histogram
+  # See backlog "Trading-floor tooling" for the metric work to land first.
+
+  - name: bpt-trading
+    interval: 15s
+    rules:
+
+      - alert: StrategyActiveButQuiet
+        # All strategy gates report green (active, not paused, not
+        # halted, refdata fresh) yet order-gw has received zero new
+        # orders for 10 minutes. Almost always means: cooldown stuck
+        # on every subscribed symbol, drift suppression latched on,
+        # or quoting math returning size=0 each tick. The strategy
+        # is alive but doing no work — needs eyeballs.
+        expr: |
+          strategy_strategy_active == 1
+          and strategy_trading_paused == 0
+          and strategy_trading_halted == 0
+          and strategy_refdata_stale == 0
+          and rate(order_gateway_orders_received_total[5m]) == 0
+        for: 10m
+        labels:
+          severity: trading
+        annotations:
+          summary: "Strategy active but placed zero orders in 10 min"
+          description: |
+            All strategy gates green (active, not paused/halted, refdata
+            fresh) but order-gw has received no new orders for 10 min.
+            Likely: per-symbol cooldown latched, drift/vol suppression
+            stuck on, or quote math returning size=0. Grep strategy
+            log for "suppress" / "skip" / "cooldown" in the last
+            10 min — there will be a reason.
+
+      - alert: StrategyMdTicksDropped
+        # The strategy is consuming far less MD than md-gw is publishing.
+        # In a healthy IPC setup these should be ~1:1 (minus per-instrument
+        # subscription filtering, but order-of-magnitude). >50% gap means
+        # the Aeron sub fell off, an image was lost, or strategy is
+        # eating decode exceptions silently.
+        expr: |
+          rate(strategy_md_ticks_total[2m]) <
+            0.5 * sum(rate(bpt_md_gateway_md_messages_published_total[2m]))
+          and sum(rate(bpt_md_gateway_md_messages_published_total[2m])) > 1
+        for: 2m
+        labels:
+          severity: trading
+        annotations:
+          summary: "Strategy seeing <50% of MD published by md-gw"
+          description: |
+            Strategy's md_ticks_total rate over the last 2 min is below
+            half of md-gw's md_messages_published_total rate. Strategy
+            is missing market data the gateway is producing — Aeron sub
+            cursor advanced past, image lost, or decoder swallowing
+            exceptions. Check strategy logs for "image_unavailable" or
+            "decode_error".
+
+      - alert: OrderExecReportLag
+        # OGW received N exec reports from the venue, strategy received
+        # fewer. Within 1 min these should match. Persistent gap means
+        # strategy's exec-report stream is degraded — stale fill picture
+        # → stale position → possible double-quoting and unintended
+        # net exposure.
+        expr: |
+          rate(order_gateway_exec_reports_total[1m]) -
+            rate(strategy_exec_reports_total[1m]) > 0.1
+        for: 2m
+        labels:
+          severity: trading
+        annotations:
+          summary: "Strategy is behind OGW's exec-report stream"
+          description: |
+            order-gw is emitting exec reports faster than strategy is
+            consuming them (gap >0.1/sec for 2 min). Strategy's view of
+            position and filled-qty is stale — risk of double-quoting
+            or incorrect inventory. Investigate Aeron sub on the
+            OGW→strategy stream and strategy's exec-report handler.
+
+      - alert: ReconciliationDivergenceRepeating
+        # The existing ReconciliationDivergence (warning) fires on each
+        # individual divergence. This rolls up — 3+ divergences in 10 min
+        # is systematic, not a race. Page the trader, not just notify
+        # the channel.
+        expr: |
+          increase(strategy_reconciliation_divergences_total[10m]) >= 3
+        for: 0s
+        labels:
+          severity: trading
+        annotations:
+          summary: "Recurring strategy↔exchange divergences ({{ $value }} in 10m)"
+          description: |
+            3+ reconciliation divergences in the last 10 minutes — this
+            is a systematic gap between strategy-side PositionTracker
+            and the exchange's reported positions, not a one-off race.
+            Real money at stake; investigate now. Likely causes:
+            exec-report stream loss, scale/rounding bug, manual
+            exchange-side intervention.

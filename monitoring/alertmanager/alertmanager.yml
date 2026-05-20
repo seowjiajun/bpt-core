@@ -12,10 +12,13 @@
 #   integration's service-detail page in the UI.
 #
 # Re-route precedence:
-#   Routes are evaluated top-down; the first match wins. Critical alerts
-#   use the `pd-critical` receiver (severity=critical → PagerDuty's
-#   escalation policy fires phone calls); warnings use `pd-warning`
-#   (severity=warning → mobile push only, no phone ring).
+#   Routes are evaluated top-down; the first match wins.
+#     - severity=critical → pd-critical (PagerDuty escalation → phone call)
+#     - severity=warning  → pd-warning  (PagerDuty mobile push only)
+#     - severity=trading  → pd-trading  (PagerDuty mobile push, "[TRADING]"
+#                                        prefix so operator can tell
+#                                        strategy-flavoured alerts from
+#                                        infra-flavoured ones)
 #
 # repeat_interval vs PagerDuty escalation:
 #   PagerDuty re-pages on its own cadence per the escalation policy
@@ -59,6 +62,14 @@ route:
       group_wait: 2m           # batch warnings in 2-minute windows
       repeat_interval: 24h
 
+    - matchers:
+        - severity="trading"
+      receiver: pd-trading
+      group_wait: 1m           # tighter than warning — trading drift wants
+                               # eyes-on within minutes, not 2-minute batches
+      repeat_interval: 12h     # halve the ops repeat — trading drift that
+                               # persists hours is worse than infra warnings
+
 # ─── Receivers ────────────────────────────────────────────────────────
 #
 # Both receivers target the same PagerDuty service (same routing_key).
@@ -83,6 +94,20 @@ receivers:
         severity: warning
         send_resolved: true
         description: '{{ .CommonLabels.alertname }} — {{ .CommonAnnotations.summary }}'
+
+  # Trading-floor alerts. Same PagerDuty service (one integration key,
+  # one incident stream) but the description prefix lets the operator
+  # tell strategy-drift alerts apart from infrastructure alerts at a
+  # glance in the PagerDuty mobile app / inbox. PD severity=warning
+  # because trading drift isn't a wake-you-up event — but the
+  # `[TRADING]` prefix lets the operator filter their feed when
+  # investigating.
+  - name: pd-trading
+    pagerduty_configs:
+      - routing_key_file: /etc/bpt/creds/pagerduty-integration-key
+        severity: warning
+        send_resolved: true
+        description: '[TRADING] {{ .CommonLabels.alertname }} — {{ .CommonAnnotations.summary }}'
 
 # ─── Inhibit rules ────────────────────────────────────────────────────
 # When an upstream cause is already firing, don't also page on

@@ -82,7 +82,7 @@ health_panels = [
         "refdata", "refdata_healthy or on() vector(0)", x=0, y=0, w=3, thresholds=HEALTH_THRESHOLDS
     ),
     stat(
-        "md-gw", "md_gateway_healthy or on() vector(0)", x=3, y=0, w=3, thresholds=HEALTH_THRESHOLDS
+        "md-gw", "bpt_md_gateway_healthy or on() vector(0)", x=3, y=0, w=3, thresholds=HEALTH_THRESHOLDS
     ),
     stat(
         "order-gw",
@@ -129,7 +129,7 @@ connectivity_panels = [
     ),
     graph(
         "Exchange connectivity — md-gw",
-        [target("md_gateway_exchange_connected", "{{exchange}}")],
+        [target("bpt_md_gateway_exchange_connected", "{{exchange}}")],
         x=12,
         y=3,
         w=12,
@@ -159,7 +159,7 @@ activity_panels = [
         "Market data publish rate (md-gw)",
         [
             target(
-                "sum(rate(md_gateway_md_messages_published_total[1m])) by (exchange)",
+                "sum(rate(bpt_md_gateway_md_messages_published_total[1m])) by (exchange)",
                 "{{exchange}}",
             )
         ],
@@ -231,14 +231,59 @@ latency_panels = [
 ]
 
 
-# ── Row 5: Errors (y=25) ──────────────────────────────────────────────
+# ── Row 4b: MD decode latency (y=25) ──────────────────────────────────
+# The md-gateway adapters each maintain a LatencyHistogram of BBO decode
+# time (ns) and publish pre-computed percentiles as Prometheus gauges
+# every ~5s (see lat_reporters_ in md_gateway_service.cpp). These are
+# the *inbound* counterpart to the order-ACK RTT one row above — if
+# decode time regresses (e.g. simdjson recompiled with -O0, or a new
+# exchange channel needs a slow JSON path) it surfaces here within the
+# next reporter cycle.
+#
+# Note the bpt_md_gateway_ prefix — md-gateway is the only service in
+# the stack that prefixes its metrics; other services use the plain
+# service name. See backlog item "prefix inconsistency across services."
+
+md_latency_panels = [
+    graph(
+        "MD decode latency (md-gw, per exchange) — µs",
+        [
+            target("bpt_md_gateway_bbo_decode_p50_ns / 1000", "{{exchange}} p50"),
+            target("bpt_md_gateway_bbo_decode_p99_ns / 1000", "{{exchange}} p99"),
+            target("bpt_md_gateway_bbo_decode_p999_ns / 1000", "{{exchange}} p99.9"),
+        ],
+        x=0,
+        y=25,
+        w=12,
+        h=8,
+    ),
+    # Max + mean give a sanity-check pair: if max ≫ p99.9 we have a
+    # rare-event tail (likely GC-ish, allocator pause, kernel jitter);
+    # if mean drifts up while p50 stays flat we have a bimodal load
+    # (one slow path among many fast ones — usually an unhandled
+    # channel that's getting JSON-decoded but discarded later).
+    graph(
+        "MD decode latency — max & mean per exchange — µs",
+        [
+            target("bpt_md_gateway_bbo_decode_max_ns / 1000", "{{exchange}} max"),
+            target("bpt_md_gateway_bbo_decode_mean_ns / 1000", "{{exchange}} mean"),
+        ],
+        x=12,
+        y=25,
+        w=12,
+        h=8,
+    ),
+]
+
+
+# ── Row 5: Errors (y=33) ──────────────────────────────────────────────
 
 error_panels = [
     graph(
         "Stale orders",
         [target("sum(rate(order_gateway_stale_orders_total[5m]))", "rate/s")],
         x=0,
-        y=25,
+        y=33,
         w=8,
         h=7,
         unit=OPS_FORMAT,
@@ -247,7 +292,7 @@ error_panels = [
         "Risk rejects",
         [target("sum(rate(order_gateway_risk_rejects_total[5m])) by (reason)", "{{reason}}")],
         x=8,
-        y=25,
+        y=33,
         w=8,
         h=7,
         unit=OPS_FORMAT,
@@ -256,11 +301,11 @@ error_panels = [
         "MD validation drops (md-gw)",
         [
             target(
-                "sum(rate(md_gateway_md_validation_drops_total[5m])) by (exchange)", "{{exchange}}"
+                "sum(rate(bpt_md_gateway_md_validation_drops_total[5m])) by (exchange)", "{{exchange}}"
             )
         ],
         x=16,
-        y=25,
+        y=33,
         w=8,
         h=7,
         unit=OPS_FORMAT,
@@ -278,7 +323,14 @@ dashboard = Dashboard(
     refresh="10s",
     time=Time("now-15m", "now"),
     templating=Templating(list=[]),
-    panels=(health_panels + connectivity_panels + activity_panels + latency_panels + error_panels),
+    panels=(
+        health_panels
+        + connectivity_panels
+        + activity_panels
+        + latency_panels
+        + md_latency_panels
+        + error_panels
+    ),
     uid="bpt-system-overview",
     version=1,
     schemaVersion=30,
