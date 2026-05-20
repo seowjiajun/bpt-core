@@ -18,8 +18,14 @@ the architecture diagram.
 | 3 | Refresh Lambda + venue ingesters (Python) | ✓ |
 | 4 | Terraform infra (RDS, Lambda, EventBridge, ECR, IAM, Secrets) | ✓ |
 | 5 | `pgweb` browse UI (trading host systemd unit) | ✓ |
-| 6 | bpt-refdata `PostgresSecmasterSource` cutover | — |
-| 7 | Delete legacy `instrument_mapping.<venue>.json` files | — |
+| 6 | Production architecture: Path A (sidecar + S3 + trading-host pull) | ✓ |
+| 7 | Delete legacy in-tree `instrument_mapping.<venue>.json` files | — |
+
+**Phase 6 decision**: chose **Path A (sidecar)** over direct C++
+`PostgresSecmasterSource`. The Lambda renders the legacy JSON shape and
+uploads to S3; trading host pulls via systemd timer. No C++ changes to
+bpt-refdata. See SECMASTER.d2 for the full architecture; see commit
+message of `secmaster: productionize Path A` for the rationale.
 
 ## Why it exists
 

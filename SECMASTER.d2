@@ -1,11 +1,12 @@
-# bpt-secmaster — central source-of-truth architecture
+# bpt-secmaster — central source-of-truth architecture (Path A: sidecar)
 # Render: d2 SECMASTER.d2 SECMASTER.svg
 #
 # AWS RDS PostgreSQL (Free Tier 12mo) is the source of truth.
-# EventBridge fires daily → Lambda function pulls venue REST APIs
-# and upserts to RDS. bpt-refdata reads at startup, caches in-memory,
-# writes a snapshot file as last-known-good fallback (Pattern 3).
-# All other services read instruments via Aeron — unchanged from today.
+# EventBridge fires daily → Lambda function pulls venue REST APIs,
+# upserts to RDS, then renders the legacy instrument_mapping.json and
+# uploads to S3. Trading host pulls from S3 via systemd timer (hourly +
+# at boot, ETag-conditional). bpt-refdata reads the same JSON file path
+# it always has — no C++ changes.
 
 direction: down
 
@@ -107,29 +108,25 @@ aws: AWS · ap-northeast-1 (Tokyo) {
 
   rds: "RDS PostgreSQL\ndb.t4g.micro · Free Tier 12mo\nthen ~15 USD/mo\nSOURCE OF TRUTH" { class: card }
 
-  rds_pitr: "Automated PITR snapshots\n7-day retention · in-region\n(included, no extra cost)" { class: card }
+  rds_pitr: "Automated PITR snapshots\n1-day retention (Free Plan cap)\n(included, no extra cost)" { class: card }
+
+  s3: "S3 · bpt-tape-archive\nsecmaster/instrument_mapping.json\n(versioned; CacheControl: revalidate)" { class: card }
 
   cloudwatch: "CloudWatch Logs\n(Lambda run history)\n+ alarm on failure" { class: card }
-
-  sns: "SNS topic\n→ Discord webhook\n(daily summary + failure pages)" { class: card }
 }
 
 # ───────────────────────── Trading host (Tokyo VPS) ──────────────────
-# Refresher is gone — trading host now only reads.
+# Trading host has no DB, no Postgres client. Just an S3 puller +
+# the existing bpt-refdata reading a JSON file (unchanged).
 host: Trading host (Tokyo VPS) {
   class: swimlane-host
   label.near: outside-top-center
 
-  refdata: "bpt-refdata · IService" {
-    class: swimlane-inner
-    label.near: outside-top-center
-    direction: right
+  puller: "bpt-secmaster-pull.timer\nhourly + at boot\n(ETag-conditional GET,\natomic rename into place)" { class: card }
 
-    src: "PostgresSecmasterSource\n(libpqxx connection at startup)" { class: card }
-    cache: "in-memory cache\nstd::unordered_map<id, Instrument>" { class: card }
-    snap: "/var/cache/bpt/secmaster-snapshot.db\nSQLite · last-known-good fallback" { class: card }
-    aeron_pub: "InstrumentPublisher\n(Aeron — unchanged)" { class: card }
-  }
+  mapping_file: "/opt/bpt/data/instrument_mapping.json\n(plain file, ~1 MB)" { class: card }
+
+  refdata: "bpt-refdata · IService\n(UNCHANGED from today —\nreads JSON, publishes via Aeron)" { class: card }
 
   pgweb: "pgweb\nport 8081 · browseable web UI\n(SSH-tunnel from laptop)" { class: card }
 
@@ -145,17 +142,17 @@ operator: Operator · laptop {
 
 # ───────────────────────── Slow path: daily refresh ──────────────────
 # EventBridge fires Lambda daily; Lambda pulls each venue's REST API,
-# derives canonical symbols, upserts with SCD-2 timestamps to RDS.
-# Decoupled from trading host: trading restart / outage doesn't skip
-# refresh, refresh failure doesn't touch trading.
+# upserts to RDS, renders the instrument_mapping.json snapshot, uploads
+# to S3. Decoupled from trading host: trading restart / outage doesn't
+# skip refresh, refresh failure doesn't touch trading.
 aws.eventbridge -> aws.lambda: "invokes daily" { class: slow }
 aws.lambda -> venues.okx: { class: slow }
 aws.lambda -> venues.hl: { class: slow }
 aws.lambda -> venues.binance: { class: slow }
 aws.lambda -> venues.deribit: { class: slow }
 aws.lambda -> aws.rds: "UPSERT instrument · listing\n· symbology · event\nSCD-2 valid_from/valid_to" { class: slow }
+aws.lambda -> aws.s3: "render + upload\ninstrument_mapping.json" { class: slow }
 aws.lambda -> aws.cloudwatch: "structured log lines" { class: slow }
-aws.lambda -> aws.sns: "daily summary + errors" { class: slow }
 
 # ───────────────────────── Slow path: backups ────────────────────────
 # Single tier for v1: AWS-managed PITR. 7-day retention is enough at
@@ -163,22 +160,15 @@ aws.lambda -> aws.sns: "daily summary + errors" { class: slow }
 # cross-region DR, enable AWS Backup with cross-region copy.
 aws.rds -> aws.rds_pitr: "automatic" { class: slow }
 
-# ───────────────────────── Hot path: primary read at startup ─────────
-# bpt-refdata opens a libpqxx connection on startup, SELECTs the
-# full live instrument set, loads into in-memory map, then writes
-# the snapshot file for next-startup fallback. Aeron publish to
-# consumers is unchanged from today.
-aws.rds -> host.refdata.src: "SELECT at startup\n(~100ms RTT same-region)" { class: hot }
-host.refdata.src -> host.refdata.cache: "hydrate map" { class: hot }
-host.refdata.cache -> host.refdata.snap: "write snapshot\nafter successful load" { class: hot }
-host.refdata.cache -> host.refdata.aeron_pub: { class: hot }
-host.refdata.aeron_pub -> host.consumers: "InstrumentUpdate via Aeron" { class: hot }
-
-# ───────────────────────── Control path: fallback ────────────────────
-# If RDS is unreachable at startup, hydrate the in-memory cache from
-# the snapshot file instead. Log a loud warning + fire a Prometheus
-# metric → alertmanager pages. Trading runs with bounded staleness.
-host.refdata.snap -> host.refdata.cache: "FALLBACK load\nif RDS unreachable\n(logs WARN +\nfires metric)" { class: control }
+# ───────────────────────── Pull path: trading host → S3 ─────────────
+# Trading host's systemd timer fetches the latest snapshot hourly +
+# at boot. ETag-conditional GET means off-cycle pulls are nearly free
+# (single HEAD request). bpt-refdata reads the file at startup —
+# identical to today; no network dependency on RDS at trading time.
+aws.s3 -> host.puller: "GET (ETag-conditional)\nhourly + at boot" { class: slow }
+host.puller -> host.mapping_file: "atomic rename" { class: slow }
+host.mapping_file -> host.refdata: "open() at startup\n(or on reload signal)" { class: hot }
+host.refdata -> host.consumers: "InstrumentUpdate via Aeron\n(existing path, no changes)" { class: hot }
 
 # ───────────────────────── Slow path: UI browse ──────────────────────
 # pgweb is a single Go binary that gives a browseable web UI over
