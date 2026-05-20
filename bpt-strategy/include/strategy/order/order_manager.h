@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 
 namespace bpt::strategy::order {
@@ -79,7 +80,17 @@ private:
     const refdata::InstrumentCache& cache_;
     // High 32 bits = Unix timestamp at construction (seconds), low 32 bits = counter.
     // Guarantees uniqueness across process restarts without any persistent state.
-    static uint64_t make_session_base() { return bpt::common::util::WallClock::now_s() << 32; }
+    //
+    // Env var BPT_ORDER_ID_SEED overrides the wallclock seed for
+    // deterministic-replay tests (see deterministic backtester parity
+    // suite). Without it, two replays of the same input produce different
+    // order_id integers — fine for production but hides a class of
+    // matching-engine non-determinism bugs in tests.
+    static uint64_t make_session_base() {
+        if (const char* s = std::getenv("BPT_ORDER_ID_SEED"))
+            return static_cast<uint64_t>(std::strtoull(s, nullptr, 10)) << 32;
+        return bpt::common::util::WallClock::now_s() << 32;
+    }
     std::atomic<uint64_t> next_order_id_{make_session_base() + 1};
 };
 

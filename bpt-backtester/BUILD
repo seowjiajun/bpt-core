@@ -51,6 +51,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":backtester_core",
+        "//bpt-canon:bpt-canon",
+        "//bpt-canon:canon_sbe",
         "//bpt-strategy:strategy_lib",
         "//bpt-md-gateway:md_gateway_lib",
         "//bpt-refdata:mapping_lib",

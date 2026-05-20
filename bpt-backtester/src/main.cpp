@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
     std::string strategy_config;
     std::string instrument_mapping;
     std::vector<std::string> wslog_paths;
+    std::vector<std::string> canon_paths;
     std::string output_dir = "results";
     double starting_capital = 1000.0;
     std::string strategy_name;
@@ -30,9 +31,13 @@ int main(int argc, char* argv[]) {
     cli.add_option("--instrument-mapping", instrument_mapping, "Path to instrument_mapping.<venue>.json")
         ->required()
         ->check(CLI::ExistingFile);
-    cli.add_option("--wslog", wslog_paths, "One or more .wslog files to replay (in timestamp order)")
-        ->required()
-        ->check(CLI::ExistingFile);
+    auto* wslog_opt = cli.add_option("--wslog", wslog_paths, "One or more .wslog files to replay (raw venue capture)")
+                          ->check(CLI::ExistingFile);
+    auto* canon_opt =
+        cli.add_option("--canon", canon_paths, "One or more .canon files to replay (derived SBE events)")
+            ->check(CLI::ExistingFile);
+    wslog_opt->excludes(canon_opt);
+    canon_opt->excludes(wslog_opt);
     cli.add_option("--output-dir", output_dir, "Where to write results")->capture_default_str();
     cli.add_option("--starting-capital", starting_capital, "Starting capital ($) — feeds ResultsCollector")
         ->capture_default_str();
@@ -46,10 +51,16 @@ int main(int argc, char* argv[]) {
 
     bpt::common::logging::init("bpt-backtester");
 
+    if (wslog_paths.empty() && canon_paths.empty()) {
+        std::cerr << "fatal: exactly one of --wslog or --canon is required\n";
+        return 1;
+    }
+
     bpt::backtester::harness::StrategyHarness::Options opts{
         .strategy_config_path = strategy_config,
         .instrument_mapping_path = instrument_mapping,
         .wslog_paths = wslog_paths,
+        .canon_paths = canon_paths,
         .starting_capital = starting_capital,
         .output_dir = output_dir,
         .strategy_name = strategy_name,

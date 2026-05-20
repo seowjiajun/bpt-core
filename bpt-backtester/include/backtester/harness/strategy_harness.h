@@ -45,6 +45,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace bpt::backtester::harness {
@@ -66,7 +67,18 @@ public:
         /// One or more .wslog files to replay in timestamp order.
         /// Today the harness assumes all files belong to the same
         /// venue; HL only.
+        ///
+        /// Mutually exclusive with `canon_paths` — exactly one source
+        /// must be populated. wslog is the raw venue path (JSON decode
+        /// on the hot path); canon is the derived path (SBE blobs,
+        /// no JSON parse).
         std::vector<std::string> wslog_paths;
+
+        /// Alternative source: one or more `.canon` files (produced by
+        /// `bpt-canon-replay` or by future archive ingesters). When
+        /// non-empty, the harness skips the JSON-decoder pipeline and
+        /// feeds the matching engine + strategy directly from SBE bytes.
+        std::vector<std::string> canon_paths;
 
         /// Starting capital for ResultsCollector. Defaults to whatever
         /// the strategy's [results] section holds; CLI override
@@ -98,11 +110,20 @@ private:
     /// to receive MD.
     void initialize();
 
-    /// \brief Drive each .wslog file in sequence: read records, decode WS_FRAMEs,
-    ///        dispatch to the strategy via HarnessMdPublisher, advance the
-    ///        matching engine.
+    /// \brief Drive every input file. Picks the wslog or canon variant
+    ///        based on which Options field is populated.
     /// \return The last simulated timestamp seen.
     uint64_t replay();
+
+    /// \brief WS_FRAME-driven replay: each frame is JSON-decoded through
+    ///        the live HyperliquidMdDecoder and fanned out via HarnessMdPublisher.
+    uint64_t replay_wslog();
+
+    /// \brief Canon-driven replay: each canon record's SBE blob is
+    ///        decoded back to MdBbo/MdTrade/MdOrderBook and fanned out
+    ///        via the same HarnessMdPublisher. Same downstream code path
+    ///        as wslog — only the source differs.
+    uint64_t replay_canon();
 
     /// \brief Final flatten + write summary.json, trades.csv, pnl_curve.csv.
     void finalize(uint64_t end_ts_ns);
@@ -125,6 +146,14 @@ private:
     bpt::md_gateway::adapter::SubscriptionMap hl_subs_;
     std::unique_ptr<HarnessMdPublisher> hl_publisher_;
     std::unique_ptr<bpt::md_gateway::adapter::HyperliquidMdDecoder<HarnessMdPublisher>> hl_decoder_;
+
+    // Mirror of the strategy's subscribed instruments — used by the
+    // canon replay path to filter events the wslog HL decoder would
+    // have dropped via SubscriptionMap.find_id() == 0. Without this
+    // filter, canon (which carries the full venue universe) would feed
+    // BBOs for non-subscribed instruments into the strategy and shift
+    // its time-based state, breaking wslog/canon parity.
+    std::unordered_set<uint64_t> strategy_instrument_ids_;
 
     // Funding-rate + instrument-stats callbacks the decoder requires;
     // AS strategy doesn't need either (HL funding is on stream 1005 in

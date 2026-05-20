@@ -1,6 +1,8 @@
 #include "backtester/harness/strategy_harness.h"
 
 #include "backtester/harness/wslog_reader.h"
+#include "canon/canon_reader.h"
+#include "canon/canon_sbe.h"
 #include "strategy/strategy/strategy_factory.h"
 
 #include <messages/ExchangeId.h>
@@ -89,6 +91,16 @@ void StrategyHarness::initialize() {
             if (venue.id == bpt::messages::ExchangeId::HYPERLIQUID) {
                 inst.tick_size = 0.0001;
                 inst.lot_size = 1.0;
+            } else if (venue.id == bpt::messages::ExchangeId::OKX) {
+                // OKX V5 instrument metadata (tickSz / lotSz) varies per
+                // contract. BTC-USDT-SWAP: tick=$0.1, lot=0.01 contracts
+                // (each contract = 0.01 BTC face). Hardcoded for the
+                // subset we backtest today; a real meta-snapshot loader
+                // belongs on bpt-refdata's OKX adapter.
+                if (e.venue_symbol == "BTC-USDT-SWAP") {
+                    inst.tick_size = 0.1;
+                    inst.lot_size = 0.01;
+                }
             }
             seed.push_back(std::move(inst));
         }
@@ -164,16 +176,30 @@ void StrategyHarness::initialize() {
     // instrument list. Now that the subscription is in hand, copy it
     // into the HL SubscriptionMap so the venue decoder knows which
     // canonical instrument_id each "coin" string maps to.
+    // Populate two tracking sets:
+    //   - hl_subs_ is the HL JSON decoder's subscription map, only used
+    //     by the wslog replay path. Limit it to HL entries.
+    //   - strategy_instrument_ids_ is venue-agnostic — used by the canon
+    //     replay path to filter SBE events to what the strategy actually
+    //     subscribed to. Add every venue here so OKX / future venues
+    //     work without code edits.
     for (const auto& desc : md_client_->subscribed_instruments()) {
-        if (desc.exchange == "HYPERLIQUID") {
+        if (desc.exchange == "HYPERLIQUID")
             hl_subs_.subscribe(desc.instrument_id, desc.symbol, desc.depth);
-        }
+        strategy_instrument_ids_.insert(desc.instrument_id);
     }
-    bpt::common::log::info("[harness] subscribed {} HL instruments via venue decoder",
-                           md_client_->subscribed_instruments().size());
+    bpt::common::log::info("[harness] subscribed {} instruments ({} HL via JSON decoder)",
+                           md_client_->subscribed_instruments().size(),
+                           hl_subs_.snapshot().size());
 }
 
 uint64_t StrategyHarness::replay() {
+    if (!opts_.canon_paths.empty())
+        return replay_canon();
+    return replay_wslog();
+}
+
+uint64_t StrategyHarness::replay_wslog() {
     uint64_t last_ts = 0;
     for (const auto& path : opts_.wslog_paths) {
         WslogReader reader(path);
@@ -208,6 +234,98 @@ uint64_t StrategyHarness::replay() {
             // the tape as one continuous stream).
         }
     }
+    return last_ts;
+}
+
+uint64_t StrategyHarness::replay_canon() {
+    // Canon source: skip the JSON decoder, decode each canon record's
+    // SBE blob back to the same MdBbo / MdTrade / MdOrderBook /
+    // FundingRateUpdate domain types the wslog path produces, and
+    // dispatch through the same HarnessMdPublisher so the matching
+    // engine + strategy fan-out is byte-equivalent to wslog replay.
+    //
+    // Filter by strategy_instrument_ids_: canon files are produced by
+    // bpt-canon-replay against the full venue universe (so they're
+    // generic across strategies), but the live wslog path filters
+    // events to the strategy's subscribed set inside the HL decoder via
+    // SubscriptionMap. Without this filter, non-APE BBOs would bump
+    // simulation_time / refdata heartbeats and shift AS's time-based
+    // state — that was the cause of the wslog/canon parity drift.
+    bpt::common::log::info("[harness] replay_canon: strategy_instrument_ids_ has {} entries",
+                           strategy_instrument_ids_.size());
+    uint64_t bbo_kept = 0, bbo_filtered = 0, trade_kept = 0, trade_filtered = 0;
+    uint64_t last_ts = 0;
+    for (const auto& path : opts_.canon_paths) {
+        bpt::canon::CanonReader reader(path);
+        if (!reader.ok()) {
+            bpt::common::log::warn("[harness] failed to open canon: {}", path);
+            continue;
+        }
+        while (auto rec = reader.next()) {
+            // Advance clock + heartbeat on EVERY record, including
+            // events for instruments the strategy doesn't subscribe to.
+            // This mirrors the wslog harness loop, which ticks the
+            // clock on every wslog record before deciding whether to
+            // dispatch the frame to the strategy.
+            last_ts = rec->ts_ns;
+            order_gw_->set_simulation_time(rec->ts_ns);
+            refdata_client_->push_heartbeat(rec->ts_ns);
+
+            const char* sbe_buf = reinterpret_cast<const char*>(rec->sbe.data());
+            const std::size_t sbe_len = rec->sbe.size();
+
+            switch (rec->type) {
+            case bpt::canon::EventType::BBO: {
+                bpt::md_gateway::md::MdBbo bbo{};
+                if (!bpt::canon::decode_bbo(sbe_buf, sbe_len, bbo))
+                    break;
+                // Strategy-subscription filter — same as wslog HL
+                // decoder's `subs_.find_id(coin) == 0 → return`.
+                if (!strategy_instrument_ids_.contains(bbo.instrument_id)) {
+                    ++bbo_filtered;
+                    break;
+                }
+                ++bbo_kept;
+                bbo.timestamp_ns = rec->ts_ns;
+                hl_publisher_->publish(bbo);
+                break;
+            }
+            case bpt::canon::EventType::TRADE: {
+                bpt::md_gateway::md::MdTrade trade{};
+                if (!bpt::canon::decode_trade(sbe_buf, sbe_len, trade))
+                    break;
+                if (!strategy_instrument_ids_.contains(trade.instrument_id)) {
+                    ++trade_filtered;
+                    break;
+                }
+                ++trade_kept;
+                trade.timestamp_ns = rec->ts_ns;
+                hl_publisher_->publish(trade);
+                break;
+            }
+            case bpt::canon::EventType::BOOK: {
+                bpt::md_gateway::md::MdOrderBook book{};
+                if (!bpt::canon::decode_book(sbe_buf, sbe_len, book))
+                    break;
+                if (!strategy_instrument_ids_.contains(book.instrument_id))
+                    break;
+                book.timestamp_ns = rec->ts_ns;
+                hl_publisher_->publish(book);
+                break;
+            }
+            case bpt::canon::EventType::FUNDING:
+            case bpt::canon::EventType::MARK:
+                // AS strategy doesn't react to funding/mark directly —
+                // see noop_funding_cb_ on the wslog path.
+                break;
+            }
+        }
+    }
+    bpt::common::log::info("[harness] replay_canon stats: BBO kept={} filtered={} | Trade kept={} filtered={}",
+                           bbo_kept,
+                           bbo_filtered,
+                           trade_kept,
+                           trade_filtered);
     return last_ts;
 }
 
