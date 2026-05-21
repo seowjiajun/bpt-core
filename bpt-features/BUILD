@@ -27,7 +27,7 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 cc_library(
     name = "features",
     srcs = [
-        "src/ofi_calculator.cpp",
+        "src/ofi.cpp",
     ],
     hdrs = glob(["include/features/*.h"]),
     includes = ["include"],

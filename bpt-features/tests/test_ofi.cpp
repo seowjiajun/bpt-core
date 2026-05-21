@@ -1,4 +1,4 @@
-#include "features/ofi_calculator.h"
+#include "features/ofi.h"
 
 #include <gtest/gtest.h>
 

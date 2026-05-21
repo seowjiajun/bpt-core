@@ -6,7 +6,7 @@
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
-#include "features/ofi_calculator.h"
+#include "features/ofi.h"
 #include "strategy/strategy/volatility_gate.h"
 
 #include <messages/ExchangeId.h>

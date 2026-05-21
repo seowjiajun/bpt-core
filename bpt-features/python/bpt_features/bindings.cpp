@@ -11,7 +11,7 @@
 // "internal C extension, don't import directly"); the public Python
 // package `bpt_features` re-exports the bits people should use.
 
-#include "features/ofi_calculator.h"
+#include "features/ofi.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>  // for std::vector ↔ Python list conversion
@@ -24,7 +24,7 @@ PYBIND11_MODULE(_core, m) {
 
     // ─────────────────────────── OFICalculator ───────────────────────────
     // Cont-Kukanov-Stoikov rolling Order-Flow Imbalance. See
-    // features/ofi_calculator.h for the math + per-level weighting rules.
+    // features/ofi.h for the math + per-level weighting rules.
     py::class_<OFICalculator> ofi(m, "OFICalculator",
                                   "Rolling multi-level Order-Flow Imbalance estimator");
 
