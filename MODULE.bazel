@@ -106,3 +106,19 @@ http_archive(
     urls = ["https://github.com/nlohmann/json/releases/download/v3.11.3/include.zip"],
     build_file = "//third_party:nlohmann_json.BUILD",
 )
+
+# ── pybind11 (for bpt-features/python bindings) ─────────────────────────────
+# Lets the C++ feature library be called from Python research notebooks
+# without re-implementing the features in Python — the production-research
+# drift fix. pybind11_bazel provides the `pybind_extension` rule; the
+# pybind11 module itself is the header library it wraps.
+bazel_dep(name = "rules_python", version = "1.7.0")
+bazel_dep(name = "pybind11_bazel", version = "2.13.6")
+
+# Python toolchain — uses the system Python by default. Override
+# python_version via .bazelrc if a specific version is needed.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = "3.12",
+    is_default = True,
+)
