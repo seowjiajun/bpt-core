@@ -1,13 +1,13 @@
-#include "strategy/strategy/fair_value_estimator.h"
-#include "strategy/strategy/order_book_state.h"
+#include "features/fair_value.h"
+#include "features/order_book_state.h"
 
 #include <cmath>
 #include <gtest/gtest.h>
 
 namespace {
 
-using bpt::strategy::strategy::FairValueEstimator;
-using bpt::strategy::strategy::OrderBookState;
+using bpt::features::FairValueEstimator;
+using bpt::features::OrderBookState;
 using Mode = FairValueEstimator::Mode;
 using Level = OrderBookState::Level;
 

@@ -5,14 +5,14 @@
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
-#include "strategy/strategy/fair_value_estimator.h"
+#include "features/fair_value.h"
 #include "strategy/strategy/i_strategy.h"
 #include "features/ofi.h"
-#include "strategy/strategy/order_book_state.h"
+#include "features/order_book_state.h"
 #include "strategy/strategy/position_tracker.h"
-#include "strategy/strategy/queue_tracker.h"
+#include "features/queue.h"
 #include "strategy/strategy/regime_detector.h"
-#include "strategy/strategy/volatility_gate.h"
+#include "features/vol_gate.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecutionReport.h>
@@ -31,6 +31,10 @@
 namespace bpt::strategy::strategy {
 
 using bpt::features::OFICalculator;
+using bpt::features::OrderBookState;
+using bpt::features::FairValueEstimator;
+using bpt::features::QueueTracker;
+using bpt::features::VolatilityGate;
 
 // Avellaneda-Stoikov market-making strategy.
 //

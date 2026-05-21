@@ -1,10 +1,10 @@
-#include "strategy/strategy/volatility_gate.h"
+#include "features/vol_gate.h"
 
 #include <gtest/gtest.h>
 
 namespace {
 
-using bpt::strategy::strategy::VolatilityGate;
+using bpt::features::VolatilityGate;
 
 constexpr uint64_t SEC = 1'000'000'000ULL;
 

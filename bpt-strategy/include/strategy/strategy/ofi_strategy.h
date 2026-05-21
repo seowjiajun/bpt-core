@@ -7,7 +7,7 @@
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
 #include "features/ofi.h"
-#include "strategy/strategy/volatility_gate.h"
+#include "features/vol_gate.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecutionReport.h>
@@ -25,6 +25,7 @@
 namespace bpt::strategy::strategy {
 
 using bpt::features::OFICalculator;
+using bpt::features::VolatilityGate;
 
 // Standalone Order-Flow-Imbalance strategy.
 //

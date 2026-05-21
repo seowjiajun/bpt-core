@@ -1,6 +1,6 @@
-#include "strategy/strategy/order_book_state.h"
+#include "features/order_book_state.h"
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 namespace {
 template <class Map>
@@ -142,4 +142,4 @@ std::vector<OrderBookState::Level> OrderBookState::top_asks(size_t n) const {
     return out;
 }
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features

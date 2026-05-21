@@ -7,7 +7,7 @@
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
 #include "strategy/strategy/position_tracker.h"
-#include "strategy/strategy/realized_vol_estimator.h"
+#include "features/realized_vol.h"
 #include "strategy/vol/vol_surface_client.h"
 
 #include <messages/ExchangeId.h>
@@ -23,6 +23,8 @@
 #include <vector>
 
 namespace bpt::strategy::strategy {
+
+using bpt::features::RealizedVolEstimator;
 
 // Delta-neutral short volatility strategy.
 //

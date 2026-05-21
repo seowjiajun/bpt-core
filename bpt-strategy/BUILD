@@ -8,12 +8,9 @@ cc_library(
     name = "strategy_core",
     srcs = [
         "src/strategy/hurst_estimator.cpp",
-        "src/strategy/order_book_state.cpp",
         "src/strategy/position_tracker.cpp",
-        "src/strategy/queue_tracker.cpp",
         "src/strategy/reconciler.cpp",
         "src/strategy/regime_detector.cpp",
-        "src/strategy/realized_vol_estimator.cpp",
         "src/refdata/instrument_cache.cpp",
     ],
     hdrs = glob(["include/strategy/**/*.h"]),
@@ -30,18 +27,14 @@ cc_library(
 cc_test(
     name = "strategy_unit_tests",
     srcs = [
-        "tests/unit/test_fair_value_estimator.cpp",
         "tests/unit/test_instrument_cache.cpp",
-        "tests/unit/test_order_book_state.cpp",
         "tests/unit/test_position_tracker.cpp",
-        "tests/unit/test_queue_tracker.cpp",
         "tests/unit/test_reconciler.cpp",
         "tests/unit/test_refdata_stale_gate.cpp",
         "tests/unit/test_passive_maker.cpp",
         "tests/unit/test_regime_classifier.cpp",
         "tests/unit/test_regime_detector.cpp",
         "tests/unit/test_sim_clock.cpp",
-        "tests/unit/test_volatility_gate.cpp",
     ],
     deps = [
         ":strategy_core",

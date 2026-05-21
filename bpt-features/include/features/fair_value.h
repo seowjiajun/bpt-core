@@ -22,13 +22,13 @@
 ///     caller (strategy) already gates on book.ready(); we re-check
 ///     defensively rather than UB.
 
-#include "strategy/strategy/order_book_state.h"
+#include "features/order_book_state.h"
 
 #include <cmath>
 #include <cstddef>
 #include <limits>
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 class FairValueEstimator {
 public:
@@ -194,4 +194,4 @@ private:
     }
 };
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features

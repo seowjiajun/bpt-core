@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 // Rolling window realized volatility estimator using log-returns.
 // Incrementally maintains mean and variance for O(1) updates.
@@ -47,4 +47,4 @@ private:
     uint64_t last_sample_ns_{0};
 };
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features

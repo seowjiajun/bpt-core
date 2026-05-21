@@ -1,12 +1,12 @@
-#include "strategy/strategy/queue_tracker.h"
+#include "features/queue.h"
 
 #include <gtest/gtest.h>
 
 namespace {
 
 using bpt::messages::OrderSide;
-using bpt::strategy::strategy::OrderBookState;
-using bpt::strategy::strategy::QueueTracker;
+using bpt::features::OrderBookState;
+using bpt::features::QueueTracker;
 
 // Helper: build a book with a simple bid/ask ladder.
 OrderBookState make_book() {

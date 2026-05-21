@@ -1,8 +1,8 @@
-#include "strategy/strategy/queue_tracker.h"
+#include "features/queue.h"
 
 #include <algorithm>
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 using bpt::messages::OrderSide;
 
@@ -76,4 +76,4 @@ double QueueTracker::fill_probability(uint64_t order_id) const {
     return e->our_qty / denom;
 }
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "strategy/strategy/order_book_state.h"
+#include "features/order_book_state.h"
 
 #include <messages/OrderSide.h>
 
@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <unordered_map>
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 // Per-resting-order queue-position tracker.
 //
@@ -88,4 +88,4 @@ private:
     std::unordered_map<uint64_t, Entry> entries_;
 };
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features

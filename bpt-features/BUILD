@@ -28,10 +28,19 @@ cc_library(
     name = "features",
     srcs = [
         "src/ofi.cpp",
+        "src/order_book_state.cpp",
+        "src/queue.cpp",
+        "src/realized_vol.cpp",
     ],
     hdrs = glob(["include/features/*.h"]),
     includes = ["include"],
     visibility = ["//visibility:public"],
+    deps = [
+        # OrderBookState consumes MdOrderBook; QueueTracker uses OrderSide enum.
+        # Both are wire-format types from the shared messages package — not
+        # strategy logic, safe to depend on here.
+        "//messages",
+    ],
 )
 
 cc_test(

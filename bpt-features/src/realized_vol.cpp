@@ -1,8 +1,8 @@
-#include "strategy/strategy/realized_vol_estimator.h"
+#include "features/realized_vol.h"
 
 #include <cmath>
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 RealizedVolEstimator::RealizedVolEstimator(size_t window_size, uint64_t sample_interval_ns)
     : window_size_(window_size),
@@ -75,4 +75,4 @@ void RealizedVolEstimator::reset() {
     std::fill(returns_.begin(), returns_.end(), 0.0);
 }
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features

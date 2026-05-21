@@ -4,7 +4,7 @@
 #include <deque>
 #include <utility>
 
-namespace bpt::strategy::strategy {
+namespace bpt::features {
 
 // Short-horizon realized-volatility gate for trading halts.
 //
@@ -105,4 +105,4 @@ private:
     double last_trip_bps_{0.0};
 };
 
-}  // namespace bpt::strategy::strategy
+}  // namespace bpt::features
