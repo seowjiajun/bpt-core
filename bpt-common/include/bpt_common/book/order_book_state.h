@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-namespace bpt::features {
+namespace bpt::common::book {
 
 // Per-instrument L2 book state built by folding MdOrderBook frames into
 // a maintained ladder. OKX `books` and `books5` feeds both publish
@@ -111,4 +111,4 @@ private:
     uint64_t last_update_ns_{0};
 };
 
-}  // namespace bpt::features
+}  // namespace bpt::common::book

@@ -8,7 +8,7 @@
 #include "features/fair_value.h"
 #include "strategy/strategy/i_strategy.h"
 #include "features/ofi.h"
-#include "features/order_book_state.h"
+#include "bpt_common/book/order_book_state.h"
 #include "strategy/strategy/position_tracker.h"
 #include "features/queue.h"
 #include "strategy/strategy/regime_detector.h"
@@ -31,7 +31,7 @@
 namespace bpt::strategy::strategy {
 
 using bpt::features::OFICalculator;
-using bpt::features::OrderBookState;
+using bpt::common::book::OrderBookState;
 using bpt::features::FairValueEstimator;
 using bpt::features::QueueTracker;
 using bpt::features::VolatilityGate;

@@ -5,7 +5,7 @@
 namespace {
 
 using bpt::messages::OrderSide;
-using bpt::features::OrderBookState;
+using bpt::common::book::OrderBookState;
 using bpt::features::QueueTracker;
 
 // Helper: build a book with a simple bid/ask ladder.

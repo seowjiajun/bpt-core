@@ -1,6 +1,6 @@
 #pragma once
 
-#include "features/order_book_state.h"
+#include "bpt_common/book/order_book_state.h"
 
 #include <messages/OrderSide.h>
 
@@ -9,6 +9,8 @@
 #include <unordered_map>
 
 namespace bpt::features {
+
+using bpt::common::book::OrderBookState;
 
 // Per-resting-order queue-position tracker.
 //

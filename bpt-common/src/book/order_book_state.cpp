@@ -1,6 +1,6 @@
-#include "features/order_book_state.h"
+#include "bpt_common/book/order_book_state.h"
 
-namespace bpt::features {
+namespace bpt::common::book {
 
 namespace {
 template <class Map>
@@ -142,4 +142,4 @@ std::vector<OrderBookState::Level> OrderBookState::top_asks(size_t n) const {
     return out;
 }
 
-}  // namespace bpt::features
+}  // namespace bpt::common::book

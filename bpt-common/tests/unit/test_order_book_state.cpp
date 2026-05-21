@@ -1,10 +1,10 @@
-#include "features/order_book_state.h"
+#include "bpt_common/book/order_book_state.h"
 
 #include <gtest/gtest.h>
 
 namespace {
 
-using bpt::features::OrderBookState;
+using bpt::common::book::OrderBookState;
 using Level = OrderBookState::Level;
 
 // ---------------------------------------------------------------------------

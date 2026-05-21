@@ -8,6 +8,7 @@ cc_library(
     name = "bpt-common",
     srcs = [
         "src/aeron/streams_map.cpp",
+        "src/book/order_book_state.cpp",
         "src/config/profile_config.cpp",
         "src/env.cpp",
         "src/logging.cpp",
@@ -20,6 +21,9 @@ cc_library(
     includes = ["include"],
     visibility = ["//visibility:public"],
     deps = [
+        # OrderBookState applies MdOrderBook deltas — wire-format type
+        # from the shared messages package.
+        "//messages",
         "@quill",
         "@aeron//:aeron_client",
         "@fmt",
