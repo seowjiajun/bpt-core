@@ -557,13 +557,15 @@ void ShortVolStrategy::send_option_order(UnderlyingState& state,
     if (!order_mgr_)
         return;
 
-    const uint64_t oid = order_mgr_->place_order(leg.instrument_id,
-                                                 state.exchange_id,
-                                                 side,
-                                                 bpt::messages::OrderType::LIMIT,
-                                                 bpt::messages::TimeInForce::IOC,
-                                                 price,
-                                                 qty);
+    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = leg.instrument_id,
+        .exchange_id = state.exchange_id,
+        .side = side,
+        .type = bpt::messages::OrderType::LIMIT,
+        .tif = bpt::messages::TimeInForce::IOC,
+        .price = price,
+        .qty = qty,
+    }).order_id();
     if (oid == 0)
         return;
 
@@ -580,13 +582,15 @@ void ShortVolStrategy::send_perp_order(UnderlyingState& state,
     if (!order_mgr_)
         return;
 
-    const uint64_t oid = order_mgr_->place_order(state.perp_instrument_id,
-                                                 state.exchange_id,
-                                                 side,
-                                                 bpt::messages::OrderType::LIMIT,
-                                                 bpt::messages::TimeInForce::IOC,
-                                                 price,
-                                                 qty);
+    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = state.perp_instrument_id,
+        .exchange_id = state.exchange_id,
+        .side = side,
+        .type = bpt::messages::OrderType::LIMIT,
+        .tif = bpt::messages::TimeInForce::IOC,
+        .price = price,
+        .qty = qty,
+    }).order_id();
     if (oid == 0)
         return;
 

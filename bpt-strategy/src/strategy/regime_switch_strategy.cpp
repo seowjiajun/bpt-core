@@ -995,7 +995,15 @@ uint64_t RegimeSwitchStrategy::send_order(InstrumentState& st,
                            qty,
                            tif == bpt::messages::TimeInForce::IOC ? "IOC" : "GTC");
 
-    const uint64_t order_id = order_mgr_->place_order(st.instrument_id, st.exchange_id, side, type, tif, price, qty);
+    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = st.instrument_id,
+        .exchange_id = st.exchange_id,
+        .side = side,
+        .type = type,
+        .tif = tif,
+        .price = price,
+        .qty = qty,
+    }).order_id();
     if (order_id == 0)
         return 0;
 
@@ -1007,7 +1015,7 @@ uint64_t RegimeSwitchStrategy::send_order(InstrumentState& st,
 void RegimeSwitchStrategy::cancel_order(InstrumentState& st, uint64_t order_id) {
     if (!order_mgr_ || order_id == 0)
         return;
-    order_mgr_->cancel_order(order_id, st.exchange_id, st.instrument_id);
+    order_mgr_->send_cancel(order::CancelOrderRequest{order_id, st.exchange_id, st.instrument_id});
 }
 
 }  // namespace bpt::strategy::strategy

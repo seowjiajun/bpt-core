@@ -173,11 +173,11 @@ void PassiveMakerStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
     if (st.vol_gate.update_and_check(mid, st.last_book_ns)) {
         bpt::common::log::info(kLog(), "{} vol_gate halted — cancelling resting quotes", st.symbol);
         if (st.bid_order_id != 0 && order_mgr_) {
-            order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, st.instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, st.instrument_id});
             st.bid_order_id = 0;
         }
         if (st.ask_order_id != 0 && order_mgr_) {
-            order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, st.instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, st.instrument_id});
             st.ask_order_id = 0;
         }
         return;
@@ -194,11 +194,11 @@ void PassiveMakerStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
         const auto regime = st.regime.classify(st.last_book_ns);
         if (regime == RegimeClassifier::Regime::CHOPPY) {
             if (st.bid_order_id != 0 && order_mgr_) {
-                order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, st.instrument_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, st.instrument_id});
                 st.bid_order_id = 0;
             }
             if (st.ask_order_id != 0 && order_mgr_) {
-                order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, st.instrument_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, st.instrument_id});
                 st.ask_order_id = 0;
             }
             return;
@@ -247,11 +247,11 @@ void PassiveMakerStrategy::requote(InstrumentState& st, double fv, uint64_t /*no
     // quote, not milliseconds).
     if (order_mgr_) {
         if (st.bid_order_id != 0) {
-            order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, st.instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, st.instrument_id});
             st.bid_order_id = 0;
         }
         if (st.ask_order_id != 0) {
-            order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, st.instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, st.instrument_id});
             st.ask_order_id = 0;
         }
     }
@@ -325,8 +325,15 @@ uint64_t PassiveMakerStrategy::place_side(InstrumentState& st, OrderSide::Value 
     // would cross. The round_to_tick step above already pulls bid/ask
     // one tick inside the touch, so this should never trigger in
     // practice — belt-and-braces for the rare race-condition case.
-    const uint64_t oid =
-        order_mgr_->place_order(st.instrument_id, st.exchange_id, side, OrderType::LIMIT, TimeInForce::GTC, price, qty);
+    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = st.instrument_id,
+        .exchange_id = st.exchange_id,
+        .side = side,
+        .type = OrderType::LIMIT,
+        .tif = TimeInForce::GTC,
+        .price = price,
+        .qty = qty,
+    }).order_id();
     if (oid == 0) {
         bpt::common::log::warn(kLog(),
                                "{} place_order rejected ({} @ {:.6f})",
@@ -397,11 +404,11 @@ void PassiveMakerStrategy::on_shutdown_flatten() {
         if (order_mgr_) {
             // Cancel resting POST_ONLY quotes first.
             if (st.bid_order_id != 0) {
-                order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, st.instrument_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, st.instrument_id});
                 st.bid_order_id = 0;
             }
             if (st.ask_order_id != 0) {
-                order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, st.instrument_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, st.instrument_id});
                 st.ask_order_id = 0;
             }
             // IOC unwind any non-zero inventory.
@@ -412,13 +419,15 @@ void PassiveMakerStrategy::on_shutdown_flatten() {
                     // Cross by 5bps to ensure the IOC takes immediately.
                     const double price =
                         (side == OrderSide::SELL) ? st.bid * (1.0 - 5.0 / 1e4) : st.ask * (1.0 + 5.0 / 1e4);
-                    const uint64_t oid = order_mgr_->place_order(st.instrument_id,
-                                                                 st.exchange_id,
-                                                                 side,
-                                                                 OrderType::LIMIT,
-                                                                 TimeInForce::IOC,
-                                                                 price,
-                                                                 std::abs(st.inventory));
+                    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+                        .instrument_id = st.instrument_id,
+                        .exchange_id = st.exchange_id,
+                        .side = side,
+                        .type = OrderType::LIMIT,
+                        .tif = TimeInForce::IOC,
+                        .price = price,
+                        .qty = std::abs(st.inventory),
+                    }).order_id();
                     if (oid != 0)
                         order_to_instrument_[oid] = st.instrument_id;
                     bpt::common::log::warn(kLog(),

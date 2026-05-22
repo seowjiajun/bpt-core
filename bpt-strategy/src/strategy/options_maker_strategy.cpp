@@ -775,7 +775,7 @@ void OptionsMakerStrategy::on_shutdown_flatten() {
 
     const auto snapshot = live_orders_;  // copy; cancel_order may trigger exec reports that mutate the map
     for (const auto& [oid, ref] : snapshot)
-        order_mgr_->cancel_order(oid, ref.exchange_id, ref.instrument_id);
+        order_mgr_->send_cancel(order::CancelOrderRequest{oid, ref.exchange_id, ref.instrument_id});
 
     bpt::common::log::info("[OptionsMaker] shutdown_flatten cancelled {} live orders (option quotes + perp hedges)",
                            snapshot.size());
@@ -820,15 +820,15 @@ void OptionsMakerStrategy::on_shutdown_flatten() {
             const bool sell = opt.position_qty > 0.0;
             const double price = sell ? opt.venue_bid_price : opt.venue_ask_price;
             const double qty = std::abs(opt.position_qty);
-            const uint64_t oid =
-                order_mgr_->place_order(opt.instrument_id,
-                                        st.exchange_id,
-                                        sell ? bpt::messages::OrderSide::SELL : bpt::messages::OrderSide::BUY,
-                                        bpt::messages::OrderType::LIMIT,
-                                        bpt::messages::TimeInForce::IOC,
-                                        price,
-                                        qty,
-                                        /*exec_inst=*/0);
+            const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+                .instrument_id = opt.instrument_id,
+                .exchange_id = st.exchange_id,
+                .side = sell ? bpt::messages::OrderSide::SELL : bpt::messages::OrderSide::BUY,
+                .type = bpt::messages::OrderType::LIMIT,
+                .tif = bpt::messages::TimeInForce::IOC,
+                .price = price,
+                .qty = qty,
+            }).order_id();
             if (oid == 0) {
                 ++opt_skipped;
                 continue;
@@ -862,15 +862,15 @@ void OptionsMakerStrategy::on_shutdown_flatten() {
                 const double price = sell ? mid * (1.0 - cross) : mid * (1.0 + cross);
                 const double qty_native = std::abs(st.perp_position_qty);
                 const double qty_usd = qty_native * price;
-                const uint64_t oid =
-                    order_mgr_->place_order(st.perp_instrument_id,
-                                            st.exchange_id,
-                                            sell ? bpt::messages::OrderSide::SELL : bpt::messages::OrderSide::BUY,
-                                            bpt::messages::OrderType::LIMIT,
-                                            bpt::messages::TimeInForce::IOC,
-                                            price,
-                                            qty_usd,
-                                            /*exec_inst=*/0);
+                const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+                    .instrument_id = st.perp_instrument_id,
+                    .exchange_id = st.exchange_id,
+                    .side = sell ? bpt::messages::OrderSide::SELL : bpt::messages::OrderSide::BUY,
+                    .type = bpt::messages::OrderType::LIMIT,
+                    .tif = bpt::messages::TimeInForce::IOC,
+                    .price = price,
+                    .qty = qty_usd,
+                }).order_id();
                 if (oid == 0) {
                     ++perp_skipped;
                 } else {
@@ -1081,17 +1081,18 @@ void OptionsMakerStrategy::requote(UnderlyingState& state, OptionQuote& opt, uin
     if (opt.ask_order_id != 0)
         cancel_quote_side(opt, /*bid_side=*/false);
 
-    constexpr uint8_t kPostOnlyFlag = 0x01;  // bit 0 = POST_ONLY per protocol schema
 
     if (!bid_breaches) {
-        const uint64_t oid = order_mgr_->place_order(opt.instrument_id,
-                                                     state.exchange_id,
-                                                     bpt::messages::OrderSide::BUY,
-                                                     bpt::messages::OrderType::LIMIT,
-                                                     bpt::messages::TimeInForce::GTC,
-                                                     target_bid,
-                                                     qty,
-                                                     kPostOnlyFlag);
+        const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+            .instrument_id = opt.instrument_id,
+            .exchange_id = state.exchange_id,
+            .side = bpt::messages::OrderSide::BUY,
+            .type = bpt::messages::OrderType::LIMIT,
+            .tif = bpt::messages::TimeInForce::GTC,
+            .price = target_bid,
+            .qty = qty,
+            .exec_inst = {.post_only = true},
+        }).order_id();
         if (oid != 0) {
             opt.bid_order_id = oid;
             opt.bid_price = target_bid;
@@ -1103,14 +1104,16 @@ void OptionsMakerStrategy::requote(UnderlyingState& state, OptionQuote& opt, uin
     }
 
     if (!ask_breaches) {
-        const uint64_t oid = order_mgr_->place_order(opt.instrument_id,
-                                                     state.exchange_id,
-                                                     bpt::messages::OrderSide::SELL,
-                                                     bpt::messages::OrderType::LIMIT,
-                                                     bpt::messages::TimeInForce::GTC,
-                                                     target_ask,
-                                                     qty,
-                                                     kPostOnlyFlag);
+        const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+            .instrument_id = opt.instrument_id,
+            .exchange_id = state.exchange_id,
+            .side = bpt::messages::OrderSide::SELL,
+            .type = bpt::messages::OrderType::LIMIT,
+            .tif = bpt::messages::TimeInForce::GTC,
+            .price = target_ask,
+            .qty = qty,
+            .exec_inst = {.post_only = true},
+        }).order_id();
         if (oid != 0) {
             opt.ask_order_id = oid;
             opt.ask_price = target_ask;
@@ -1137,7 +1140,7 @@ void OptionsMakerStrategy::cancel_quote_side(OptionQuote& opt, bool bid_side) {
     if (key_it != order_to_key_.end()) {
         auto state_it = states_.find(key_it->second);
         if (state_it != states_.end())
-            order_mgr_->cancel_order(oid_ref, state_it->second.exchange_id, opt.instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{oid_ref, state_it->second.exchange_id, opt.instrument_id});
     }
     oid_ref = 0;
 }
@@ -1214,14 +1217,15 @@ void OptionsMakerStrategy::maybe_hedge(UnderlyingState& state, uint64_t now_ns) 
     // unit hook.
     const double hedge_qty_for_order = hedge_qty_native * price;
 
-    const uint64_t oid = order_mgr_->place_order(state.perp_instrument_id,
-                                                 state.exchange_id,
-                                                 sell ? bpt::messages::OrderSide::SELL : bpt::messages::OrderSide::BUY,
-                                                 bpt::messages::OrderType::LIMIT,
-                                                 bpt::messages::TimeInForce::IOC,
-                                                 price,
-                                                 hedge_qty_for_order,
-                                                 /*exec_inst=*/0);
+    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = state.perp_instrument_id,
+        .exchange_id = state.exchange_id,
+        .side = sell ? bpt::messages::OrderSide::SELL : bpt::messages::OrderSide::BUY,
+        .type = bpt::messages::OrderType::LIMIT,
+        .tif = bpt::messages::TimeInForce::IOC,
+        .price = price,
+        .qty = hedge_qty_for_order,
+    }).order_id();
     if (oid == 0)
         return;
 
