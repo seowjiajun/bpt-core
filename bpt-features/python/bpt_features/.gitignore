@@ -1,0 +1,3 @@
+# Symlinked from bazel-bin so notebooks can import bpt_features._core
+# without juggling sys.path. See bpt-research/README.md "Setup".
+_core.so
