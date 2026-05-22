@@ -1,0 +1,191 @@
+# bpt-strategy "at a glance" diagram
+# Render: ./render.sh at-a-glance
+# Source-of-truth — the .svg next to it is generated.
+
+direction: down
+
+classes: {
+  card: {
+    style: {
+      fill: "#64748b"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#f8fafc"
+      shadow: true
+      border-radius: 20
+    }
+  }
+  bus-card: {
+    shape: queue
+    style: {
+      fill: "#64748b"
+      stroke: "#cbd5e1"
+      stroke-width: 1
+      font-color: "#f8fafc"
+    }
+  }
+  iface-card: {
+    style: {
+      fill: "#3b0764"
+      stroke: "#a78bfa"
+      stroke-width: 1
+      font-color: "#ede9fe"
+      shadow: true
+      border-radius: 20
+    }
+  }
+  swimlane-ext: {
+    style: {
+      fill: "#0f172a"
+      stroke: "#475569"
+      stroke-width: 1
+      font-color: "#e2e8f0"
+    }
+  }
+  swimlane-strat: {
+    style: {
+      fill: "#1e293b"
+      stroke: "#64748b"
+      stroke-width: 1
+      font-color: "#cbd5e1"
+    }
+  }
+  swimlane-inner: {
+    style: {
+      fill: "#334155"
+      stroke: "#94a3b8"
+      stroke-width: 1
+      font-color: "#e2e8f0"
+    }
+  }
+  # Hot path: market data in, order out, exec back — every microsecond counts.
+  hot: {
+    style: {
+      stroke: "#ef4444"
+      stroke-width: 3
+    }
+  }
+  # Slow path: refdata snapshots, account snapshots, heartbeats.
+  slow: {
+    style: {
+      stroke: "#10b981"
+      stroke-width: 2
+    }
+  }
+  # Control: gate/breaker side-channels (refdata-stale, vol-halt).
+  control: {
+    style: {
+      stroke: "#22d3ee"
+      stroke-width: 2
+    }
+  }
+}
+
+ext_in: External producers {
+  class: swimlane-ext
+  label.near: outside-top-center
+  direction: right
+  refdata: "bpt-refdata\nInstrument cache +\ndeltas, fee schedule" { class: card }
+  mdgw: "bpt-md-gateway\nBBO · trades ·\nL2 book frames" { class: card }
+  ogw: "bpt-order-gateway\nExecReport · heartbeat ·\nAccountSnapshot" { class: card }
+}
+
+aeron: "Aeron — shared-memory log buffers" {
+  class: bus-card
+  icon: aeron-logo.png
+  icon.near: top-center
+  label.near: bottom-center
+}
+
+strat: bpt-strategy {
+  class: swimlane-strat
+  label.near: outside-top-center
+
+  # ── Inbound clients ───────────────────────────────────────────────
+  # Subscribe to the Aeron streams above, decode SBE, dispatch typed
+  # events into the IStrategy callbacks. CRTP-templated on the
+  # strategy-service handler so there's no std::function indirection
+  # on the tick path.
+  clients: "Inbound clients (CRTP)" {
+    class: swimlane-inner
+    label.near: outside-top-center
+    direction: right
+    refdata_c: "RefdataClient\nstream 2001" { class: card }
+    md_c: "MdClient\nstream 2002" { class: card }
+    ogw_c: "OrderGatewayClient\nstreams 3002/3/4" { class: card }
+  }
+
+  # ── IStrategy interface ──────────────────────────────────────────
+  # Every concrete strategy implements this. Inbound clients call
+  # these directly; no virtual dispatch on the hot path.
+  iface: "IStrategy callbacks" {
+    class: swimlane-inner
+    label.near: outside-top-center
+    direction: right
+    on_snapshot: "on_snapshot\non_delta" { class: iface-card }
+    on_md: "on_bbo · on_trade ·\non_order_book" { class: iface-card }
+    on_exec: "on_exec_report" { class: iface-card }
+    on_acct: "on_account_snapshot\non_refdata_stale_changed" { class: iface-card }
+  }
+
+  # ── The strategy itself ──────────────────────────────────────────
+  # Generic — diagram doesn't pick AS / OFI / etc. Holds per-instrument
+  # state, runs whatever math, decides when to emit orders.
+  impl: "Strategy implementation\n(InstrumentState map · model state ·\nOrderHandles for live orders)" { class: card }
+
+  # ── OrderManager — single point through which orders go out ──────
+  om: "OrderManager" {
+    class: swimlane-inner
+    label.near: outside-top-center
+    direction: right
+    send_new: "send_new_order(NewOrderRequest, tag)\n→ OrderHandle" { class: card }
+    send_cxl: "send_cancel(OrderHandle | CancelOrderRequest)" { class: card }
+    om_exec: "on_exec_report(ER)\nupdates OrderState by order_id" { class: card }
+    book: "OrderState book\ndeque<OrderState> +\nlookup_ by order_id" { class: card }
+  }
+
+  # ── Outbound publisher ──────────────────────────────────────────
+  # AeronOrderGatewayClient. Zero-copy claim/commit straight into the
+  # Aeron log buffer — no struct→buffer memcpy on the order path.
+  aeron_ogw: "AeronOrderGatewayClient\nzero-copy publish<MessageT>(λ)\nstream 3001" { class: card }
+}
+
+# ── Hot path — market data in (red) ─────────────────────────────
+ext_in.mdgw -> aeron: BBO / trade / book { class: hot }
+aeron -> strat.clients.md_c: stream 2002 { class: hot }
+strat.clients.md_c -> strat.iface.on_md: dispatch { class: hot }
+strat.iface.on_md -> strat.impl: tick callback { class: hot }
+
+# ── Hot path — order out (red) ──────────────────────────────────
+# Strategy fills NewOrderRequest, OM tracks lifecycle, AeronOGW
+# claims an Aeron slot and writes the SBE message in place.
+strat.impl -> strat.om.send_new: NewOrderRequest { class: hot }
+strat.impl -> strat.om.send_cxl: OrderHandle / CancelOrderRequest { class: hot }
+strat.om.send_new -> strat.om.book: push OrderState\nstamp order_id { class: hot }
+strat.om.send_cxl -> strat.om.book: mark CancelPending { class: hot }
+strat.om.send_new -> strat.aeron_ogw: { class: hot }
+strat.om.send_cxl -> strat.aeron_ogw: { class: hot }
+strat.aeron_ogw -> aeron: NewOrder · CancelOrder ·\nModifyOrder · CancelAll { class: hot }
+aeron -> ext_in.ogw: stream 3001 { class: hot }
+
+# ── Hot path — exec report return (red) ─────────────────────────
+# OGW publishes ER → strategy's OrderGatewayClient decodes → calls
+# strategy's on_exec_report → strategy forwards to OM (updates
+# OrderState) → strategy dispatches off OrderHandle.tag.
+ext_in.ogw -> aeron: ExecutionReport { class: hot }
+aeron -> strat.clients.ogw_c: stream 3002 { class: hot }
+strat.clients.ogw_c -> strat.iface.on_exec: dispatch { class: hot }
+strat.iface.on_exec -> strat.impl: ER { class: hot }
+strat.impl -> strat.om.om_exec: forward { class: hot }
+strat.om.om_exec -> strat.om.book: update OrderState\n(filled_qty / status) { class: hot }
+
+# ── Slow path — refdata + account snapshot (emerald) ────────────
+ext_in.refdata -> aeron: snapshot / delta { class: slow }
+aeron -> strat.clients.refdata_c: stream 2001 { class: slow }
+strat.clients.refdata_c -> strat.iface.on_snapshot: { class: slow }
+strat.iface.on_snapshot -> strat.impl: build universe { class: slow }
+
+ext_in.ogw -> aeron: AccountSnapshot · heartbeat { class: slow }
+aeron -> strat.clients.ogw_c: streams 3003 / 3004 { class: slow }
+strat.clients.ogw_c -> strat.iface.on_acct: { class: slow }
+strat.iface.on_acct -> strat.impl: positions · equity ·\nrefdata-stale flag { class: slow }
