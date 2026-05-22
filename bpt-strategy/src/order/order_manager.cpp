@@ -101,4 +101,19 @@ void OrderManager::modify_order(uint64_t order_id,
     gw_.send_modify(order_id, exchange_id, instrument_id, new_price, new_quantity);
 }
 
+uint64_t OrderManager::send_new_order(const NewOrderRequest& req) {
+    return place_order(req.instrument_id,
+                       req.exchange_id,
+                       req.side,
+                       req.type,
+                       req.tif,
+                       req.price,
+                       req.qty,
+                       req.exec_inst.to_bitmask());
+}
+
+void OrderManager::send_cancel(const CancelOrderRequest& req) {
+    cancel_order(req.order_id, req.exchange_id, req.instrument_id);
+}
+
 }  // namespace bpt::strategy::order

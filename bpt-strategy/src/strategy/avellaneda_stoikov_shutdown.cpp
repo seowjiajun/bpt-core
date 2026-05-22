@@ -59,7 +59,7 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
                                    "SHUTDOWN FLATTEN {} cancelling bid order_id={}",
                                    st.symbol,
                                    st.bid_order_id);
-            order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, instrument_id});
             st.bid_cancel_pending = true;
             ++cancels;
         }
@@ -68,7 +68,7 @@ void AvellanedaStoikovStrategy::on_shutdown_flatten() {
                                    "SHUTDOWN FLATTEN {} cancelling ask order_id={}",
                                    st.symbol,
                                    st.ask_order_id);
-            order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, instrument_id);
+            order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, instrument_id});
             st.ask_cancel_pending = true;
             ++cancels;
         }

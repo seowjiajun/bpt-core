@@ -568,11 +568,11 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
                                vol_gate_cfg_.halt_duration_ns / 1'000'000);
         if (order_mgr_) {
             if (st.bid_order_id != 0 && !st.bid_cancel_pending) {
-                order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, tick.instrumentId());
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, tick.instrumentId()});
                 st.bid_cancel_pending = true;
             }
             if (st.ask_order_id != 0 && !st.ask_cancel_pending) {
-                order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, tick.instrumentId());
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, tick.instrumentId()});
                 st.ask_cancel_pending = true;
             }
         }
@@ -726,11 +726,11 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
                                        pause_cooldown_s_);
                 if (order_mgr_) {
                     if (st.bid_order_id != 0 && !st.bid_cancel_pending) {
-                        order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, canonical_id);
+                        order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, canonical_id});
                         st.bid_cancel_pending = true;
                     }
                     if (st.ask_order_id != 0 && !st.ask_cancel_pending) {
-                        order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, canonical_id);
+                        order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, canonical_id});
                         st.ask_cancel_pending = true;
                     }
                 }
@@ -935,7 +935,7 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
                                         at_max_long           ? "max_inv"
                                         : final_suppress_bids ? "suppress"
                                                               : "adverse");
-                order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, instrument_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, instrument_id});
             }
         } else if (stale) {
             // Price drift — amend in place to preserve queue position.
@@ -986,7 +986,7 @@ void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
                                         at_max_short          ? "max_inv"
                                         : final_suppress_asks ? "suppress"
                                                               : "adverse");
-                order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, instrument_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, instrument_id});
             }
         } else if (stale) {
             if (order_mgr_) {
@@ -1063,14 +1063,16 @@ uint64_t AvellanedaStoikovStrategy::send_limit_order(uint64_t instrument_id,
             price = std::ceil(price / st.tick_size) * st.tick_size;
     }
 
-    const uint64_t order_id = order_mgr_->place_order(instrument_id,
-                                                      st.exchange_id,
-                                                      side,
-                                                      OrderType::LIMIT,
-                                                      TimeInForce::GTC,
-                                                      price,
-                                                      qty,
-                                                      bpt::messages::kExecInstPostOnly);
+    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = instrument_id,
+        .exchange_id = st.exchange_id,
+        .side = side,
+        .type = OrderType::LIMIT,
+        .tif = TimeInForce::GTC,
+        .price = price,
+        .qty = qty,
+        .exec_inst = {.post_only = true},
+    });
     if (order_id == 0)
         return 0;
 
@@ -1126,8 +1128,15 @@ uint64_t AvellanedaStoikovStrategy::send_unwind_order(uint64_t instrument_id,
     const double cross_factor = 1.0 + (shutdown_cross_bps_ / 10000.0);
     const double price = (side == OrderSide::BUY) ? mid * cross_factor : mid / cross_factor;
 
-    const uint64_t order_id =
-        order_mgr_->place_order(instrument_id, st.exchange_id, side, OrderType::LIMIT, TimeInForce::IOC, price, qty);
+    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
+        .instrument_id = instrument_id,
+        .exchange_id = st.exchange_id,
+        .side = side,
+        .type = OrderType::LIMIT,
+        .tif = TimeInForce::IOC,
+        .price = price,
+        .qty = qty,
+    });
     if (order_id == 0)
         return 0;
 
@@ -1185,11 +1194,11 @@ void AvellanedaStoikovStrategy::on_refdata_stale_changed(bool stale) {
             return;
         for (auto& [inst_id, st] : state_) {
             if (st.bid_order_id != 0 && !st.bid_cancel_pending) {
-                order_mgr_->cancel_order(st.bid_order_id, st.exchange_id, inst_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.bid_order_id, st.exchange_id, inst_id});
                 st.bid_cancel_pending = true;
             }
             if (st.ask_order_id != 0 && !st.ask_cancel_pending) {
-                order_mgr_->cancel_order(st.ask_order_id, st.exchange_id, inst_id);
+                order_mgr_->send_cancel(order::CancelOrderRequest{st.ask_order_id, st.exchange_id, inst_id});
                 st.ask_cancel_pending = true;
             }
         }

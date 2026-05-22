@@ -2,6 +2,7 @@
 
 #include "bpt_common/util/tsc_clock.h"
 #include "strategy/order/i_order_gateway_client.h"
+#include "strategy/order/requests.h"
 #include "strategy/refdata/instrument_cache.h"
 
 #include <messages/ExchangeId.h>
@@ -52,6 +53,12 @@ public:
                                        double price,
                                        double quantity,
                                        uint8_t exec_inst = 0);
+
+    // Typed-request entry points (mlp-algo-style). Forward to place_order /
+    // cancel_order under the hood for now — Phase 2 makes these the primary
+    // path and the args-based methods the facades.
+    [[nodiscard]] uint64_t send_new_order(const NewOrderRequest& req);
+    void send_cancel(const CancelOrderRequest& req);
 
     // Called by StrategyService to measure MD-to-order latency. Set before strategy callbacks.
     // Invoked synchronously inside place_order on success, before returning to the caller.
