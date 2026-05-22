@@ -984,3 +984,35 @@ off only on external publication. A means living with the noise.
 - ~10 #include sites across consumers per package — all mechanical
 - MODULE.bazel — no changes needed; Bazel label resolution is
   orthogonal to include-path conventions
+
+## OrderManager pre-trade enrichment hooks (phase 2b of order-message pattern)
+
+**Status:** open, low priority. Add when a real driver appears (risk
+gate, audit channel, venue-specific exec_inst defaults).
+
+**Symptom:** today the strategy fills a NewOrderRequest, OrderManager
+does fixed normalisation (price/qty tick rounding, lot enforcement),
+then publishes. There's no place for cross-cutting concerns to inspect
+or annotate an order between strategy intent and wire send.
+
+**Fix:** add a chain of callable enrichment hooks on OrderManager —
+each takes `NewOrderRequest&` (mutable), returns bool for accept/reject.
+Strategies register hooks at construction; OM walks them in order
+before the gw publish. Same shape as mlp-algo's interceptor list.
+
+```cpp
+order_mgr_->add_enrichment(risk_gate);     // checks notional cap, can reject
+order_mgr_->add_enrichment(venue_defaults); // stamps exec_inst per venue
+order_mgr_->add_enrichment(audit_logger);   // never rejects, records intent
+```
+
+**Why deferred:** no concrete driver today — no risk gate spec, no
+audit channel design. Adding framework now is the speculative-
+abstraction trap. ~1 hour to land when a driver appears.
+
+**Relevant code (for reference when picking up):**
+- `bpt-strategy/src/order/order_manager.cpp` — `send_new_order` is
+  the obvious insertion point, between `normalise_and_validate` and
+  the `gw_.send_new_order` call.
+- `bpt-strategy/include/strategy/order/requests.h` — `NewOrderRequest`
+  fields would be the enrichment surface.
