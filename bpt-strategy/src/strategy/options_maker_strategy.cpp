@@ -1,5 +1,6 @@
 #include "strategy/strategy/options_maker_strategy.h"
 
+#include "strategy/refdata/exchange_id.h"
 #include "strategy/strategy/reconciler.h"
 
 #include <messages/ExchangeId.h>
@@ -20,23 +21,6 @@
 #include <vector>
 
 namespace bpt::strategy::strategy {
-
-namespace {
-
-bpt::messages::ExchangeId::Value exchange_from_str(const std::string& s) {
-    using bpt::messages::ExchangeId;
-    if (s == "BINANCE")
-        return ExchangeId::BINANCE;
-    if (s == "OKX")
-        return ExchangeId::OKX;
-    if (s == "HYPERLIQUID")
-        return ExchangeId::HYPERLIQUID;
-    if (s == "DERIBIT")
-        return ExchangeId::DERIBIT;
-    return ExchangeId::NULL_VALUE;
-}
-
-}  // namespace
 
 std::string OptionsMakerStrategy::state_key(bpt::messages::ExchangeId::Value ex, const std::string& underlying) {
     return fmt::format("{}:{}", static_cast<int>(ex), underlying);
@@ -135,7 +119,7 @@ void OptionsMakerStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
         if (!relevant)
             continue;
 
-        const auto ex = exchange_from_str(inst.exchange);
+        const auto ex = refdata::to_exchange_id(inst.exchange);
         if (ex == bpt::messages::ExchangeId::NULL_VALUE)
             continue;
 

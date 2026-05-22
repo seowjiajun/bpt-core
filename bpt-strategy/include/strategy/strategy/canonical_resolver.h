@@ -1,7 +1,10 @@
 #pragma once
 
+#include "strategy/refdata/i_refdata_client.h"
 #include "strategy/refdata/instrument.h"
 #include "strategy/refdata/instrument_cache.h"
+
+#include <messages/ExchangeId.h>
 
 #include <optional>
 #include <string>
@@ -43,6 +46,31 @@ public:
     [[nodiscard]] static std::vector<uint64_t> resolve(const refdata::InstrumentCache& cache,
                                                        const std::vector<std::string>& canonical_symbols,
                                                        const std::vector<std::string>& exchanges);
+
+    // Build the filter list passed to `IRefdataClient::subscribe()`.
+    // Empty `exchanges` → single any-exchange entry per symbol.
+    // Malformed symbols are skipped.
+    [[nodiscard]] static std::vector<refdata::IRefdataClient::CanonicalFilter> build_filters(
+        const std::vector<std::string>& canonical_symbols,
+        const std::vector<std::string>& exchanges);
+
+    // resolve() + cache lookup + exchange-id mapping in one pass.
+    // Instrument held by value since cache.get() returns optional<>.
+    struct ResolvedInstrument {
+        uint64_t instrument_id;
+        refdata::Instrument instrument;
+        bpt::messages::ExchangeId::Value exchange_id;
+    };
+    [[nodiscard]] static std::vector<ResolvedInstrument> resolve_instruments(
+        const refdata::InstrumentCache& cache,
+        const std::vector<std::string>& canonical_symbols,
+        const std::vector<std::string>& exchanges);
+
+    // Single-instrument predicate: does `inst` belong to the universe?
+    // Same filter semantics as resolve(). Empty lists = no constraint.
+    [[nodiscard]] static bool matches(const std::vector<std::string>& canonical_symbols,
+                                      const std::vector<std::string>& exchanges,
+                                      const refdata::Instrument& inst);
 };
 
 }  // namespace bpt::strategy::strategy

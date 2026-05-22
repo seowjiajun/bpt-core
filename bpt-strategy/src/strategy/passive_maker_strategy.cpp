@@ -1,6 +1,8 @@
 #include "strategy/strategy/passive_maker_strategy.h"
 
 #include "strategy/clock/sim_clock.h"
+#include "strategy/md/subscribe_helpers.h"
+#include "strategy/refdata/exchange_id.h"
 #include "strategy/venue/min_order_value.h"
 
 #include <messages/DeltaUpdateType.h>
@@ -106,34 +108,7 @@ PassiveMakerStrategy::PassiveMakerStrategy(uint64_t correlation_id,
 // ── IStrategy lifecycle ──────────────────────────────────────────────────────
 
 void PassiveMakerStrategy::start() {
-    std::vector<refdata::IRefdataClient::CanonicalFilter> filters;
-    for (const auto& sym : instruments_) {
-        if (auto parsed = CanonicalResolver::parse(sym)) {
-            const auto sbe_type = [&]() {
-                using T = refdata::InstrumentType;
-                using S = bpt::messages::InstrumentType;
-                switch (parsed->type) {
-                    case T::SPOT:
-                        return S::SPOT;
-                    case T::PERPETUAL:
-                        return S::PERPETUAL;
-                    case T::FUTURE:
-                        return S::FUTURE;
-                    case T::OPTION:
-                        return S::OPTION;
-                    default:
-                        return S::NULL_VALUE;
-                }
-            }();
-            if (md_exchanges_.empty()) {
-                filters.push_back({parsed->base, parsed->quote, sbe_type, ""});
-            } else {
-                for (const auto& ex : md_exchanges_)
-                    filters.push_back({parsed->base, parsed->quote, sbe_type, ex});
-            }
-        }
-    }
-    refdata_.subscribe(correlation_id_, std::move(filters));
+    refdata_.subscribe(correlation_id_, CanonicalResolver::build_filters(instruments_, md_exchanges_));
 }
 
 void PassiveMakerStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
@@ -141,48 +116,29 @@ void PassiveMakerStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
         bpt::common::log::debug(kLog(), "Ignoring duplicate snapshot ({} instruments)", cache.size());
         return;
     }
-    const auto all_ids = CanonicalResolver::resolve(cache, instruments_, md_exchanges_);
-    for (uint64_t id : all_ids) {
-        const auto inst = cache.get(id);
-        if (!inst)
-            continue;
-
-        auto ex_id = ExchangeId::NULL_VALUE;
-        if (inst->exchange == "BINANCE")
-            ex_id = ExchangeId::BINANCE;
-        else if (inst->exchange == "OKX")
-            ex_id = ExchangeId::OKX;
-        else if (inst->exchange == "HYPERLIQUID")
-            ex_id = ExchangeId::HYPERLIQUID;
-        else if (inst->exchange == "DERIBIT")
-            ex_id = ExchangeId::DERIBIT;
-
+    for (const auto& r : CanonicalResolver::resolve_instruments(cache, instruments_, md_exchanges_)) {
         InstrumentState st(vol_gate_cfg_, vol_window_size_, vol_sample_interval_ns_, regime_cfg_);
-        st.instrument_id = id;
-        st.symbol = inst->symbol;
-        st.exchange = inst->exchange;
-        st.exchange_id = ex_id;
-        st.tick_size = inst->tick_size;
-        st.lot_size = inst->lot_size;
+        st.instrument_id = r.instrument_id;
+        st.symbol = r.instrument.symbol;
+        st.exchange = r.instrument.exchange;
+        st.exchange_id = r.exchange_id;
+        st.tick_size = r.instrument.tick_size;
+        st.lot_size = r.instrument.lot_size;
 
         bpt::common::log::info(kLog(),
                                "Instrument [{}] {} @ {} tick={} lot={}",
-                               id,
-                               inst->symbol,
-                               inst->exchange,
-                               inst->tick_size,
-                               inst->lot_size);
-        state_.emplace(id, std::move(st));
+                               r.instrument_id,
+                               r.instrument.symbol,
+                               r.instrument.exchange,
+                               r.instrument.tick_size,
+                               r.instrument.lot_size);
+        state_.emplace(r.instrument_id, std::move(st));
     }
     bpt::common::log::info(kLog(), "Resolved {} instrument(s)", state_.size());
 
-    if (!md_client_)
-        return;
-    std::vector<md::IMdClient::InstrumentDesc> subs;
-    for (const auto& [id, st] : state_)
+    if (md_client_)
         // Depth=1 is enough for L1-driven microprice; we don't need deeper.
-        subs.push_back({id, st.exchange, st.symbol, /*depth=*/1});
-    md_client_->subscribe(correlation_id_, subs);
+        md_client_->subscribe(correlation_id_, md::build_subscriptions(state_, /*depth=*/1));
 }
 
 void PassiveMakerStrategy::on_delta(const refdata::Instrument& /*inst*/,

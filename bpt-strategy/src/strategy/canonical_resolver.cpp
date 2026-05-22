@@ -1,11 +1,30 @@
 #include "strategy/strategy/canonical_resolver.h"
 
+#include "strategy/refdata/exchange_id.h"
+
 #include <algorithm>
 #include <bpt_common/logging.h>
 
 namespace bpt::strategy::strategy {
 
 namespace {
+
+bpt::messages::InstrumentType::Value to_sbe_type(refdata::InstrumentType t) {
+    using T = refdata::InstrumentType;
+    using S = bpt::messages::InstrumentType;
+    switch (t) {
+        case T::SPOT:
+            return S::SPOT;
+        case T::PERPETUAL:
+            return S::PERPETUAL;
+        case T::FUTURE:
+            return S::FUTURE;
+        case T::OPTION:
+            return S::OPTION;
+        default:
+            return S::NULL_VALUE;
+    }
+}
 
 refdata::InstrumentType parse_type(const std::string& s) {
     if (s == "SPOT")
@@ -80,6 +99,61 @@ std::vector<uint64_t> CanonicalResolver::resolve(const refdata::InstrumentCache&
     }
 
     return result;
+}
+
+std::vector<refdata::IRefdataClient::CanonicalFilter> CanonicalResolver::build_filters(
+    const std::vector<std::string>& canonical_symbols,
+    const std::vector<std::string>& exchanges) {
+    std::vector<refdata::IRefdataClient::CanonicalFilter> filters;
+    filters.reserve(canonical_symbols.size() * std::max<size_t>(exchanges.size(), 1));
+
+    for (const auto& sym : canonical_symbols) {
+        auto parsed = parse(sym);
+        if (!parsed)
+            continue;
+        const auto sbe_type = to_sbe_type(parsed->type);
+        if (exchanges.empty()) {
+            filters.push_back({parsed->base, parsed->quote, sbe_type, ""});
+        } else {
+            for (const auto& ex : exchanges)
+                filters.push_back({parsed->base, parsed->quote, sbe_type, ex});
+        }
+    }
+    return filters;
+}
+
+bool CanonicalResolver::matches(const std::vector<std::string>& canonical_symbols,
+                                const std::vector<std::string>& exchanges,
+                                const refdata::Instrument& inst) {
+    if (!exchanges.empty()) {
+        if (std::find(exchanges.begin(), exchanges.end(), inst.exchange) == exchanges.end())
+            return false;
+    }
+    if (canonical_symbols.empty())
+        return true;
+    for (const auto& s : canonical_symbols) {
+        auto p = parse(s);
+        if (p && inst.base_currency == p->base && inst.quote_currency == p->quote && inst.type == p->type)
+            return true;
+    }
+    return false;
+}
+
+std::vector<CanonicalResolver::ResolvedInstrument> CanonicalResolver::resolve_instruments(
+    const refdata::InstrumentCache& cache,
+    const std::vector<std::string>& canonical_symbols,
+    const std::vector<std::string>& exchanges) {
+    const auto ids = resolve(cache, canonical_symbols, exchanges);
+    std::vector<ResolvedInstrument> out;
+    out.reserve(ids.size());
+    for (uint64_t id : ids) {
+        auto inst = cache.get(id);
+        if (!inst)
+            continue;
+        const auto ex_id = refdata::to_exchange_id(inst->exchange);
+        out.push_back(ResolvedInstrument{id, std::move(*inst), ex_id});
+    }
+    return out;
 }
 
 }  // namespace bpt::strategy::strategy

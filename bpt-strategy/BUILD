@@ -7,6 +7,7 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 cc_library(
     name = "strategy_core",
     srcs = [
+        "src/strategy/canonical_resolver.cpp",
         "src/strategy/hurst_estimator.cpp",
         "src/strategy/position_tracker.cpp",
         "src/strategy/reconciler.cpp",
@@ -27,6 +28,8 @@ cc_library(
 cc_test(
     name = "strategy_unit_tests",
     srcs = [
+        "tests/unit/test_canonical_resolver.cpp",
+        "tests/unit/test_exchange_id.cpp",
         "tests/unit/test_instrument_cache.cpp",
         "tests/unit/test_position_tracker.cpp",
         "tests/unit/test_reconciler.cpp",
@@ -63,13 +66,15 @@ cc_library(
         "src/metrics/metrics.cpp",
         "src/refdata/fee_cache.cpp",
         "src/refdata/funding_rate_cache.cpp",
-        "src/strategy/canonical_resolver.cpp",
         "src/strategy/hmm_filter.cpp",
         "src/strategy/hmm_strategy.cpp",
         "src/strategy/momentum_strategy.cpp",
         "src/strategy/ofi_strategy.cpp",
         "src/strategy/passive_maker_strategy.cpp",
         "src/strategy/avellaneda_stoikov_strategy.cpp",
+        "src/strategy/avellaneda_stoikov_quoting.cpp",
+        "src/strategy/avellaneda_stoikov_shutdown.cpp",
+        "src/strategy/avellaneda_stoikov_state_io.cpp",
         "src/strategy/funding_arb_strategy.cpp",
         "src/strategy/regime_switch_strategy.cpp",
         "src/strategy/vwap_reversion_strategy.cpp",

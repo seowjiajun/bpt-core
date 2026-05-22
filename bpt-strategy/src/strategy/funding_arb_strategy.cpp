@@ -1,6 +1,7 @@
 #include "strategy/strategy/funding_arb_strategy.h"
 
 #include "strategy/clock/sim_clock.h"
+#include "strategy/refdata/exchange_id.h"
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
@@ -111,35 +112,7 @@ void FundingArbStrategy::start() {
     for (const auto& ex : md_exchanges_)
         bpt::common::log::info("[FA] MD exchange: {}", ex);
 
-    // Build canonical filters for both SPOT and PERP for each base asset.
-    std::vector<refdata::IRefdataClient::CanonicalFilter> filters;
-    for (const auto& sym : instruments_) {
-        if (auto parsed = CanonicalResolver::parse(sym)) {
-            const auto sbe_type = [&]() {
-                using T = refdata::InstrumentType;
-                using S = bpt::messages::InstrumentType;
-                switch (parsed->type) {
-                    case T::SPOT:
-                        return S::SPOT;
-                    case T::PERPETUAL:
-                        return S::PERPETUAL;
-                    case T::FUTURE:
-                        return S::FUTURE;
-                    case T::OPTION:
-                        return S::OPTION;
-                    default:
-                        return S::NULL_VALUE;
-                }
-            }();
-            if (md_exchanges_.empty()) {
-                filters.push_back({parsed->base, parsed->quote, sbe_type, ""});
-            } else {
-                for (const auto& ex : md_exchanges_)
-                    filters.push_back({parsed->base, parsed->quote, sbe_type, ex});
-            }
-        }
-    }
-    refdata_.subscribe(correlation_id_, std::move(filters));
+    refdata_.subscribe(correlation_id_, CanonicalResolver::build_filters(instruments_, md_exchanges_));
 }
 
 void FundingArbStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
@@ -162,13 +135,7 @@ void FundingArbStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
             if (!inst || inst->base_currency != base)
                 continue;
 
-            auto ex_id = ExchangeId::NULL_VALUE;
-            if (inst->exchange == "BINANCE")
-                ex_id = ExchangeId::BINANCE;
-            else if (inst->exchange == "OKX")
-                ex_id = ExchangeId::OKX;
-            else if (inst->exchange == "HYPERLIQUID")
-                ex_id = ExchangeId::HYPERLIQUID;
+            const auto ex_id = refdata::to_exchange_id(inst->exchange);
 
             LegState leg;
             leg.instrument_id = id;

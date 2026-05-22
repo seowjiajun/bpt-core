@@ -1,6 +1,7 @@
 #include "strategy/strategy/short_vol_strategy.h"
 
 #include "strategy/clock/sim_clock.h"
+#include "strategy/refdata/exchange_id.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -20,18 +21,6 @@ using bpt::messages::RejectSource;
 using bpt::messages::TimeInForce;
 
 namespace bpt::strategy::strategy {
-
-static ExchangeId::Value exchange_from_str(const std::string& s) {
-    if (s == "BINANCE")
-        return ExchangeId::BINANCE;
-    if (s == "OKX")
-        return ExchangeId::OKX;
-    if (s == "HYPERLIQUID")
-        return ExchangeId::HYPERLIQUID;
-    if (s == "DERIBIT")
-        return ExchangeId::DERIBIT;
-    return ExchangeId::NULL_VALUE;
-}
 
 ShortVolStrategy::ShortVolStrategy(uint64_t correlation_id,
                                    const config::StrategyConfig& cfg,
@@ -166,7 +155,7 @@ void ShortVolStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
                 continue;
         }
 
-        auto ex_id = exchange_from_str(inst.exchange);
+        auto ex_id = refdata::to_exchange_id(inst.exchange);
         auto key = state_key(ex_id, inst.base_currency);
         auto& state = states_[key];
         state.underlying = inst.base_currency;
@@ -201,7 +190,7 @@ void ShortVolStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
         if (!relevant)
             continue;
 
-        auto ex_id = exchange_from_str(inst.exchange);
+        auto ex_id = refdata::to_exchange_id(inst.exchange);
         auto key = state_key(ex_id, inst.base_currency);
         if (states_.find(key) == states_.end())
             continue;
@@ -223,7 +212,7 @@ void ShortVolStrategy::on_delta(const refdata::Instrument& inst,
             }
         }
         if (relevant) {
-            auto ex_id = exchange_from_str(inst.exchange);
+            auto ex_id = refdata::to_exchange_id(inst.exchange);
             auto key = state_key(ex_id, inst.base_currency);
             if (states_.find(key) != states_.end()) {
                 instrument_to_key_[inst.instrument_id] = key;

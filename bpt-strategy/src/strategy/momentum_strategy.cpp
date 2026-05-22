@@ -1,5 +1,8 @@
 #include "strategy/strategy/momentum_strategy.h"
 
+#include "strategy/md/subscribe_helpers.h"
+#include "strategy/refdata/exchange_id.h"
+
 #include <messages/ExchangeId.h>
 #include <messages/InstrumentType.h>
 #include <messages/OrderSide.h>
@@ -73,34 +76,7 @@ void MomentumStrategy::start() {
             bpt::common::log::info(kLog(), "MD exchange: {}", ex);
     }
 
-    std::vector<refdata::IRefdataClient::CanonicalFilter> filters;
-    for (const auto& sym : instruments_) {
-        if (auto parsed = CanonicalResolver::parse(sym)) {
-            const auto sbe_type = [&]() {
-                using T = refdata::InstrumentType;
-                using S = bpt::messages::InstrumentType;
-                switch (parsed->type) {
-                    case T::SPOT:
-                        return S::SPOT;
-                    case T::PERPETUAL:
-                        return S::PERPETUAL;
-                    case T::FUTURE:
-                        return S::FUTURE;
-                    case T::OPTION:
-                        return S::OPTION;
-                    default:
-                        return S::NULL_VALUE;
-                }
-            }();
-            if (md_exchanges_.empty()) {
-                filters.push_back({parsed->base, parsed->quote, sbe_type, ""});
-            } else {
-                for (const auto& ex : md_exchanges_)
-                    filters.push_back({parsed->base, parsed->quote, sbe_type, ex});
-            }
-        }
-    }
-    refdata_.subscribe(correlation_id_, std::move(filters));
+    refdata_.subscribe(correlation_id_, CanonicalResolver::build_filters(instruments_, md_exchanges_));
 }
 
 void MomentumStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
@@ -108,43 +84,26 @@ void MomentumStrategy::on_snapshot(const refdata::InstrumentCache& cache) {
 
     state_.clear();
 
-    const auto ids = CanonicalResolver::resolve(cache, instruments_, md_exchanges_);
-
-    for (uint64_t id : ids) {
-        const auto inst = cache.get(id);
-        if (!inst)
-            continue;
-        auto ex_id = ExchangeId::NULL_VALUE;
-        if (inst->exchange == "BINANCE")
-            ex_id = ExchangeId::BINANCE;
-        else if (inst->exchange == "OKX")
-            ex_id = ExchangeId::OKX;
-        else if (inst->exchange == "HYPERLIQUID")
-            ex_id = ExchangeId::HYPERLIQUID;
-        state_.emplace(id, InstrumentState{.symbol = inst->symbol, .exchange = inst->exchange, .exchange_id = ex_id});
-        bpt::common::log::info("  [{}] {} @ {}", id, inst->symbol, inst->exchange);
+    for (const auto& r : CanonicalResolver::resolve_instruments(cache, instruments_, md_exchanges_)) {
+        state_.emplace(r.instrument_id,
+                       InstrumentState{.symbol = r.instrument.symbol,
+                                       .exchange = r.instrument.exchange,
+                                       .exchange_id = r.exchange_id});
+        bpt::common::log::info("  [{}] {} @ {}", r.instrument_id, r.instrument.symbol, r.instrument.exchange);
     }
 
     bpt::common::log::info(kLog(), "Trading universe: {} instrument(s)", state_.size());
 
     if (!md_client_)
         return;
-
-    std::vector<md::IMdClient::InstrumentDesc> subs;
-    subs.reserve(state_.size());
-    for (const auto& [id, st] : state_)
-        subs.push_back({id, st.exchange, st.symbol});
-
+    auto subs = md::build_subscriptions(state_);
     bpt::common::log::info(kLog(), "Subscribing MD service to {} instrument(s)", subs.size());
     md_client_->subscribe(correlation_id_, subs);
 }
 
 void MomentumStrategy::on_delta(const refdata::Instrument& inst, bpt::messages::DeltaUpdateType::Value update_type) {
     if (update_type == bpt::messages::DeltaUpdateType::ADD) {
-        // Re-run resolver for the single new instrument against our universe.
-        const auto ids = CanonicalResolver::resolve(refdata_.cache(), instruments_, md_exchanges_);
-        const bool wanted = std::find(ids.begin(), ids.end(), inst.instrument_id) != ids.end();
-        if (!wanted)
+        if (!CanonicalResolver::matches(instruments_, md_exchanges_, inst))
             return;
         state_.emplace(inst.instrument_id, InstrumentState{.symbol = inst.symbol, .exchange = inst.exchange});
         bpt::common::log::info(kLog(), "Delta ADD {} @ {}", inst.symbol, inst.exchange);
