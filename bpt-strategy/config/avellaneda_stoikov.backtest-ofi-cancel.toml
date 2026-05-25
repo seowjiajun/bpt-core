@@ -1,0 +1,22 @@
+# Instance config — BACKTEST mode, AvellanedaStoikov on HL APE.
+# Replays raw HL mainnet ticks captured by the recording rig through
+# bpt-backtester's HyperliquidMdServer/HyperliquidOrderServer.
+
+# Deployment profile (env only; strategy keeps its own md_exchanges).
+profile_config = "../deploy/config/profile/backtest-hl.toml"
+
+backtest_mode  = true
+strategy_config = "strategies/avellaneda_stoikov.backtest-ofi-cancel.toml"
+
+# Shared aeron stream registry — see deploy/config/aeron/streams.toml.
+aeron_config = "../deploy/config/aeron/streams.toml"
+
+[aeron]
+# Fallback only — shared file wins when present.
+media_driver_dir = "/dev/shm/aeron-bpt"
+
+[strategy]
+correlation_id = 1006
+
+[metrics]
+port = 9104

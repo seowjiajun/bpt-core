@@ -2,6 +2,7 @@
 
 #include "strategy/strategy/avellaneda_stoikov_strategy.h"
 
+#include "features/fill_prob.h"
 #include "strategy/venue/min_order_value.h"
 
 #include <algorithm>
@@ -349,18 +350,47 @@ AvellanedaStoikovStrategy::SuppressionState AvellanedaStoikovStrategy::compute_s
     }
 
     // Queue position: project fill_prob at the candidate quote price
-    // using the live ladder. Below queue_suppress_fill_prob_min_, we'd
-    // sit buried behind enough size that expected fill accumulates
-    // stale-inventory risk without meaningful edge. Default fp = 1.0
-    // when the book isn't ready — i.e. don't suppress, quoting wins.
+    // using the live ladder. Two formulations:
+    //   - Time-aware (preferred): P(fill within T) ≈ 1 - exp(-κ·T / queue_ahead).
+    //     Models taker arrival as a Poisson process at rate κ; fill
+    //     happens when cumulative volume crosses queue_ahead. Gives a
+    //     real probability with units of time, not just an ordinal ratio.
+    //   - Geometric (fallback): our_qty / (our_qty + queue_ahead). Used
+    //     when queue_suppress_horizon_s_ = 0 or κ hasn't warmed up.
+    // Default fp = 1.0 when book isn't ready — don't suppress, quoting wins.
     if (queue_suppress_fill_prob_min_ > 0.0 && st.book.ready()) {
         const double qa_bid = st.book.bid_vol_above(new_bid) + st.book.size_at_bid(new_bid);
         const double qa_ask = st.book.ask_vol_below(new_ask) + st.book.size_at_ask(new_ask);
-        const double qty = effective_order_qty(st);
-        s.fp_bid = qty / (qty + qa_bid);
-        s.fp_ask = qty / (qty + qa_ask);
+        const bool kappa_warm = st.ewma_kappa.count() >= kappa_warmup_ticks_;
+        if (queue_suppress_horizon_s_ > 0.0 && kappa_warm) {
+            const double kappa = std::max(kappa_min_, st.ewma_kappa.value());
+            s.fp_bid = bpt::features::fill_probability_poisson(kappa, queue_suppress_horizon_s_, qa_bid);
+            s.fp_ask = bpt::features::fill_probability_poisson(kappa, queue_suppress_horizon_s_, qa_ask);
+        } else {
+            const double qty = effective_order_qty(st);
+            s.fp_bid = bpt::features::fill_probability_geometric(qty, qa_bid);
+            s.fp_ask = bpt::features::fill_probability_geometric(qty, qa_ask);
+        }
         s.queue_bid = s.fp_bid < queue_suppress_fill_prob_min_;
         s.queue_ask = s.fp_ask < queue_suppress_fill_prob_min_;
+    }
+
+    // OFI cancel suppression — research-validated +0.915 bps/fill uplift
+    // from per-fill markout sim across 5 spread regimes (see
+    // bpt-research/findings/2026-05-24_ofi_cancel_spread_aware.md).
+    // Suppress the side opposite the OFI signal when |OFI(t)| > θ × σ(OFI):
+    //   OFI > +θσ (buy pressure) → suppress ASK (about to be lifted adversely)
+    //   OFI < -θσ (sell pressure) → suppress BID (about to be hit adversely)
+    // θ=inf disables (default); θ=0 cancels on any directional OFI.
+    // 50-sample warmup on the EWMA of OFI² to avoid firing on early noise.
+    if (!std::isinf(ofi_cancel_threshold_sigma_) && st.ewma_ofi_sq.count() > 50) {
+        const double sigma_ofi = std::sqrt(st.ewma_ofi_sq.value());
+        if (sigma_ofi > 0.0) {
+            const double gate = ofi_cancel_threshold_sigma_ * sigma_ofi;
+            const double v = st.ofi.value();
+            s.ofi_cancel_ask = v > gate;
+            s.ofi_cancel_bid = v < -gate;
+        }
     }
 
     return s;

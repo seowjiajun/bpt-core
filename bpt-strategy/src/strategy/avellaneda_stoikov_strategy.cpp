@@ -15,6 +15,7 @@
 #include <messages/exec_inst.h>
 
 #include <algorithm>
+#include <limits>
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
 #include <chrono>
@@ -107,6 +108,7 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       slow_drift_suppress_sigma_mult_(cfg.params["slow_drift_suppress_sigma_mult"].value<double>().value_or(0.0)),
       tox_suppress_threshold_(cfg.params["tox_suppress_threshold"].value<double>().value_or(0.0)),
       queue_suppress_fill_prob_min_(cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0)),
+      queue_suppress_horizon_s_(cfg.params["queue_suppress_horizon_s"].value<double>().value_or(5.0)),
       shutdown_cross_bps_(cfg.params["shutdown_cross_bps"].value<double>().value_or(20.0)),
       shutdown_max_unwind_retries_(
           static_cast<uint32_t>(cfg.params["shutdown_max_unwind_retries"].value<int64_t>().value_or(3))),
@@ -134,6 +136,9 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       gamma_pnl_tighten_mult_(cfg.params["gamma_pnl_tighten_mult"].value<double>().value_or(1.0)),
       ofi_weight_bps_(cfg.params["ofi_weight_bps"].value<double>().value_or(0.0)),
       ofi_window_ns_(static_cast<uint64_t>(cfg.params["ofi_window_ms"].value<double>().value_or(1000.0) * 1e6)),
+      ofi_cancel_threshold_sigma_(
+          cfg.params["ofi_cancel_threshold_sigma"].value<double>().value_or(std::numeric_limits<double>::infinity())),
+      ofi_sigma_halflife_s_(cfg.params["ofi_sigma_halflife_s"].value<double>().value_or(60.0)),
       instruments_(cfg.instruments),
       md_exchanges_(cfg.md_exchanges),
       venue_exec_(cfg.venue_exec),
@@ -264,6 +269,7 @@ void AvellanedaStoikovStrategy::on_snapshot(const refdata::InstrumentCache& cach
                 .max_levels = static_cast<int>(order_book_depth_ > 0 ? order_book_depth_ : 5),
                 .window_ns = ofi_window_ns_,
             }};
+            it->second.ewma_ofi_sq = TimeWeightedEwma(ofi_sigma_halflife_s_);
         }
         bpt::common::log::info("  [{}] {} @ {} tick={} lot={}",
                                r.instrument_id,
@@ -312,6 +318,7 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
                 .max_levels = static_cast<int>(order_book_depth_ > 0 ? order_book_depth_ : 5),
                 .window_ns = ofi_window_ns_,
             }};
+            it->second.ewma_ofi_sq = TimeWeightedEwma(ofi_sigma_halflife_s_);
         }
         bpt::common::log::info(kLog(),
                                "Delta ADD {} @ {} tick={} lot={}",
@@ -350,7 +357,12 @@ void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& 
     // constructing fresh vectors. First tick after warmup grows them
     // to K levels; from there on the per-tick cost is purely
     // amortised iteration.
-    if (ofi_weight_bps_ != 0.0 && st.book.ready()) {
+    // OFI update gate widened: also fires when the cancel rule is armed.
+    // Keep the "skip when fully off" property so existing baselines stay
+    // byte-identical when both knobs are disabled (weight=0, threshold=inf).
+    const bool cancel_armed = !std::isinf(ofi_cancel_threshold_sigma_);
+    const bool ofi_active = ofi_weight_bps_ != 0.0 || cancel_armed;
+    if (ofi_active && st.book.ready()) {
         const std::size_t K = order_book_depth_ > 0 ? order_book_depth_ : 5;
         st.book.top_bids(K, st.ofi_top_bid_buf);
         st.book.top_asks(K, st.ofi_top_ask_buf);
@@ -361,6 +373,18 @@ void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& 
         for (const auto& l : st.ofi_top_ask_buf)
             st.ofi_asks_buf.emplace_back(l.price, l.qty);
         st.ofi.update(st.ofi_bids_buf, st.ofi_asks_buf, book.timestampNs());
+
+        // Rolling σ²(OFI) — only updated when the cancel rule is armed.
+        // Skipping when only the skew is active keeps the legacy
+        // ofi_weight_bps-only hot path identical.
+        if (cancel_armed) {
+            const double v = st.ofi.value();
+            const double dt_s = st.ewma_ofi_last_ns > 0
+                                    ? static_cast<double>(book.timestampNs() - st.ewma_ofi_last_ns) * 1e-9
+                                    : 0.0;
+            st.ewma_ofi_sq.update(v * v, dt_s);
+            st.ewma_ofi_last_ns = book.timestampNs();
+        }
     }
 
     // Diagnostic: log maintained-ladder state periodically so we can

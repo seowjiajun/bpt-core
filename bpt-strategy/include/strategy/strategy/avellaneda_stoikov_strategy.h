@@ -35,6 +35,7 @@ using bpt::features::EwmaDrift;
 using bpt::features::EwmaVariance;
 using bpt::features::KappaEstimator;
 using bpt::features::OFICalculator;
+using bpt::features::TimeWeightedEwma;
 using bpt::common::book::OrderBookState;
 using bpt::features::FairValueEstimator;
 using bpt::features::QueueTracker;
@@ -265,6 +266,16 @@ private:
         // produce byte-identical quotes.
         OFICalculator ofi{OFICalculator::Config{}};
 
+        // Rolling σ²(OFI) for the OFI-cancel suppression threshold —
+        // EWMA of OFI² with halflife = ofi_sigma_halflife_s_. Updated
+        // alongside `ofi` in on_order_book only when the cancel rule
+        // is armed (ofi_cancel_threshold_sigma_ > 0); skipped otherwise
+        // to keep the hot path identical to the legacy baseline. The
+        // halflife default in this in-class initializer is overwritten
+        // by the designated-init in on_snapshot/on_delta.
+        TimeWeightedEwma ewma_ofi_sq{60.0};
+        uint64_t ewma_ofi_last_ns{0};
+
         // Reusable scratch buffers for the OFI block in on_order_book.
         // First call grows them to ladder_depth; subsequent ticks just
         // .clear() + refill without allocating. Keeping them per-instrument
@@ -322,6 +333,7 @@ private:
         bool queue_bid{false}, queue_ask{false};          // projected fill-prob too low
         bool inventory_bid{false}, inventory_ask{false};  // |net_qty| >= max_inventory
         bool post_fill_bid{false}, post_fill_ask{false};  // post-fill markout cooldown (Phase 2.1)
+        bool ofi_cancel_bid{false}, ofi_cancel_ask{false};  // OFI > θσ rule (research +0.915 bps/fill)
         bool vol_halted{false};                           // intra-tick realized-vol gate
         bool pause_active{false};                         // PnL drawdown circuit-breaker
 
@@ -332,29 +344,31 @@ private:
         // Full aggregate — every reason counted. Used by the console
         // bidSuppressed / askSuppressed flags.
         [[nodiscard]] bool bid_suppressed() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid || post_fill_bid || vol_halted ||
-                   pause_active;
+            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid || post_fill_bid || ofi_cancel_bid ||
+                   vol_halted || pause_active;
         }
         [[nodiscard]] bool ask_suppressed() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask || post_fill_ask || vol_halted ||
-                   pause_active;
+            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask || post_fill_ask || ofi_cancel_ask ||
+                   vol_halted || pause_active;
         }
 
-        // "Signal-only" aggregate — drift/trend/toxicity/queue/post_fill. Used by
+        // "Signal-only" aggregate — drift/trend/toxicity/queue/post_fill/ofi_cancel. Used by
         // maybe_requote for the "cancel + don't replace" logic; the
         // caller checks inventory + vol_gate separately because it
         // wants different log strings for those cases.
         [[nodiscard]] bool bid_signal() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || post_fill_bid || pause_active;
+            return drift_bid || trend_bid || tox_bid || queue_bid || post_fill_bid || ofi_cancel_bid || pause_active;
         }
         [[nodiscard]] bool ask_signal() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || post_fill_ask || pause_active;
+            return drift_ask || trend_ask || tox_ask || queue_ask || post_fill_ask || ofi_cancel_ask || pause_active;
         }
 
         // Priority-ordered reason string. Priority: vol_gate →
-        // inventory → post_fill → drift → trend → tox → queue (most to
-        // least severe). post_fill ranks above drift because it's a
-        // direct response to a confirmed adverse fill, not a forecast.
+        // inventory → post_fill → ofi_cancel → drift → trend → tox →
+        // queue (most to least severe). post_fill ranks above ofi_cancel
+        // because it's a direct response to a confirmed adverse fill,
+        // not a forecast; ofi_cancel ranks above drift because OFI is
+        // current-tick book pressure, drift is a per-√s rate estimate.
         [[nodiscard]] std::string_view bid_reason() const noexcept {
             if (pause_active)
                 return "pause";
@@ -364,6 +378,8 @@ private:
                 return "inventory";
             if (post_fill_bid)
                 return "post_fill";
+            if (ofi_cancel_bid)
+                return "ofi_cancel";
             if (drift_bid)
                 return "drift";
             if (trend_bid)
@@ -383,6 +399,8 @@ private:
                 return "inventory";
             if (post_fill_ask)
                 return "post_fill";
+            if (ofi_cancel_ask)
+                return "ofi_cancel";
             if (drift_ask)
                 return "drift";
             if (trend_ask)
@@ -555,9 +573,18 @@ private:
     double tox_suppress_threshold_;  // negative value; 0 disables
 
     // Queue-position suppression — suppress a side if the projected
-    // fill probability at the candidate quote price (our_qty /
-    // (our_qty + queue_ahead)) drops below this floor. 0 disables.
+    // fill probability at the candidate quote price drops below this
+    // floor. 0 disables.
+    //
+    // Two formulations:
+    //   - Time-aware (preferred): P(fill within queue_suppress_horizon_s_) ≈
+    //       1 - exp(-κ × T / queue_ahead). Uses the κ estimate AS already
+    //       maintains. Threshold becomes a real probability ("P(fill in
+    //       5s) < min") rather than an ordinal ratio.
+    //   - Geometric (fallback): our_qty / (our_qty + queue_ahead). Used
+    //       when queue_suppress_horizon_s_ = 0 or κ has not warmed up.
     double queue_suppress_fill_prob_min_;
+    double queue_suppress_horizon_s_;
 
     // Shutdown-unwind aggression, expressed in basis points through
     // mid. Used by send_unwind_order() to price the IOC that flattens
@@ -620,6 +647,21 @@ private:
     // makes the feature a no-op so legacy configs are unchanged.
     double ofi_weight_bps_;
     uint64_t ofi_window_ns_;
+
+    // OFI cancel suppression — research-validated +0.915 bps/fill uplift
+    // from per-fill markout sim across 5 spread regimes (see
+    // research/findings/2026-05-24_ofi_cancel_spread_aware.md).
+    // When |OFI(t)| > ofi_cancel_threshold_sigma_ × σ(OFI), suppress the
+    // side that would be adversely picked off:
+    //   OFI > +θσ (buy pressure) → suppress ASK
+    //   OFI < -θσ (sell pressure) → suppress BID
+    // Threshold range: [0, inf]. θ=0 cancels on ANY directional OFI
+    // (most aggressive, matches research script's best setting); larger
+    // θ tightens the gate; θ=inf disables the rule (default — TOML omitted
+    // resolves to inf via value_or). σ(OFI) is estimated by EWMA of OFI²
+    // with halflife ofi_sigma_halflife_s_, updated on every OFI tick.
+    double ofi_cancel_threshold_sigma_;
+    double ofi_sigma_halflife_s_;
 
     std::vector<std::string> instruments_;
     std::vector<std::string> md_exchanges_;

@@ -1,0 +1,126 @@
+# Strategy params — BACKTEST mode, AS on HL APE, ABLATION.
+# Side-suppression defenses (drift_suppress, slow_drift_suppress, vol_gate,
+# post_fill_markout, gamma_pnl, tox_suppress) all DISABLED here so the
+# OFI cancel sweep can isolate that rule's marginal contribution. The
+# initial backtest sweep showed cancel-on lifted per-fill PnL ~40% but
+# AS already had drift_suppress active — couldn't tell if cancel was
+# pulling its weight or duplicating drift_suppress. This config strips
+# all side gates so the only side suppression is OFI cancel (when armed)
+# or none (baseline).
+# Adapted from avellaneda_stoikov.hyperliquid.toml. APE was selected from
+# the HL universe scan as the only top-volume mainnet perp with median
+# spread (~10 bps) wide enough to clear HL fees with margin for AS to make
+# spread profit. Most other HL perps run sub-2bp spreads — too tight.
+
+[strategy]
+type = "AvellanedaStoikovStrategy"
+enabled = true
+instruments = ["APE/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "GTC"
+max_retries = 3
+
+[strategy.risk]
+max_position_usd = 1000.0
+max_order_size_usd = 100.0
+max_daily_loss_usd = 200.0
+max_open_orders = 10
+
+[strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[strategy.params]
+gamma = 0.05
+kappa = 15.0
+session_duration_s = 3600
+
+vol_halflife_s = 60.0
+vol_warmup_ticks = 20
+
+kappa_halflife_s = 45.0
+kappa_warmup_ticks = 10
+kappa_min = 5.0
+
+max_half_spread_bps = 3.0
+
+# APE tick is much smaller than XMR. Median spread observed ~10 bps;
+# market price ~$0.18 = ~0.018 USD spread. order_qty 50 APE ≈ ~$9 notional;
+# max_inventory 500 APE ≈ ~$90. Adjust as backtest results suggest.
+order_qty = 50
+requote_threshold = 0.002
+max_inventory = 500.0
+
+# Subscribe to L2 ladder (depth 5) so the deterministic backtest harness's
+# matching engine has real depth for queue_ahead seeding + fill-against-book
+# logic. Multi-process backtest stack also works with this.
+order_book_depth = 5
+
+# Disabled in backtest — simulator pushes $0 starting balance so equity-fraction
+# sizing collapses qty to 0. Use absolute order_qty / max_inventory above instead.
+order_qty_fraction      = 0
+order_qty_min           = 50
+max_inventory_fraction  = 0
+min_half_spread_bps     = 1.0   # full quote = 8 bps, matches HL APE's ~8 bps median spread
+
+# Backtest knobs: real HL APE shows drift ≈ 6.7 bps/√s and σ² ≈ 1.6e-4
+# at steady state, well above the prod 3.0 bps drift_suppress and the
+# slow-drift 20.0 bps gate. The prod thresholds are calibrated for
+# live use where staying out on adverse drift is the right call;
+# here we deliberately loosen to validate pipeline mechanics
+# (quotes, fills, fees, equity) on the data we have.
+# ABLATION: side-suppression defenses fully disabled (0). The drift signal
+# still affects reservation pricing via drift_skew_frac (not ablated) —
+# only the per-side suppression checks are zeroed.
+drift_halflife_s    = 15.0
+drift_suppress_bps  = 0.0
+drift_suppress_sigma_mult = 0.0
+
+slow_drift_window_s     = 120.0
+slow_drift_suppress_bps = 0.0
+slow_drift_suppress_sigma_mult = 0.0
+
+tox_suppress_threshold = 0.0
+
+# vol_gate fully disabled — no intra-tick halt. Cold start may produce
+# wider quotes during warmup; accepted for ablation purity.
+vol_gate_max_bps    = 0.0
+vol_gate_window_ms  = 1000
+vol_gate_halt_ms    = 0
+vol_gate_sigma_mult = 0.0
+
+# gamma_pnl feedback loop disabled.
+gamma_pnl_window_n             = 0
+gamma_pnl_loss_threshold_usd   = 0.0
+gamma_pnl_profit_threshold_usd = 0.0
+gamma_pnl_widen_mult           = 1.0
+gamma_pnl_tighten_mult         = 1.0
+
+# Drawdown pause kept loose: tiny APE notional × maker fee accumulates
+# to -$0.30 in ~45 fills, which would falsely halt the run. Push out
+# of the way for backtest profile.
+pause_below_rpnl_usd = -1000.0
+pause_cooldown_s     = 300.0
+
+# Phase 2.1 — per-side post-fill cooldown. DISABLED on APE.
+# The 2026-05-07 sweep across thresholds {-15, -25, -40} bps and
+# cooldowns {5, 10, 30}s found that no setting improved per-fill PnL
+# vs unfiltered: $/fill ≈ $0.111 with the cooldown off, $0.115 at
+# the best on-setting. The mechanism just dropped fills without
+# selecting for better ones — APE's markouts are uniformly negative
+# (no toxic-vs-benign period structure for the cooldown to exploit),
+# and AS recovers via inventory rotation regardless of short-horizon
+# markout. Mechanism kept in code for instruments that DO show
+# bursty toxicity; threshold = 0 disables. Re-evaluate per-instrument.
+post_fill_markout_threshold_bps = 0.0
+post_fill_markout_cooldown_s    = 10.0
+
+[strategy.params.fair_value]
+mode = "micro"
