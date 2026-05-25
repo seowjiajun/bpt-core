@@ -1,0 +1,186 @@
+#!/bin/bash
+# bpt-deploy — workstation wrapper that ships a release to a target host.
+#
+# End-to-end flow:
+#   1. Resolve version → git SHA (via S3 by-tag/ pointer)
+#   2. Fetch tarball + MANIFEST from S3
+#   3. Verify SHA256 against MANIFEST
+#   4. SCP tarball to target host's staging dir
+#   5. SSH + run deploy.sh --restart on the host
+#   6. Watch the strategy log for an "operational" line; auto-rollback if not
+#
+# Targets are mapped via the BPT_DEPLOY_TARGETS env (one host per target).
+# Example: BPT_DEPLOY_TARGETS="testnet=ubuntu@1.2.3.4 qa=ubuntu@5.6.7.8"
+#
+# Usage:
+#   bpt-deploy v0.1.0 --target testnet
+#   bpt-deploy v0.1.0 --target testnet --dry-run
+#   bpt-deploy v0.1.0 --target testnet --no-restart    # stage only
+#   bpt-deploy --rollback --target testnet              # invoke rollback.sh on the host
+#
+# Required env:
+#   BPT_RELEASES_BUCKET   default: bpt-releases
+#   BPT_RELEASES_REGION   default: ap-southeast-1
+#   BPT_DEPLOY_TARGETS    "target1=user@host1 target2=user@host2"
+#
+# Optional env:
+#   BPT_DEPLOY_ROOT       default: /opt/bpt  (path on the target host)
+#   BPT_SSH_KEY           path to ssh private key; default: ~/.ssh/id_ed25519
+
+set -euo pipefail
+
+# ── Args ────────────────────────────────────────────────────────────────────
+VERSION=""
+TARGET=""
+DRY_RUN=0
+NO_RESTART=0
+ROLLBACK=0
+SKIP_HEALTH_CHECK=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --target)
+            TARGET="$2"; shift 2;;
+        --dry-run)
+            DRY_RUN=1; shift;;
+        --no-restart)
+            NO_RESTART=1; shift;;
+        --rollback)
+            ROLLBACK=1; shift;;
+        --skip-health-check)
+            SKIP_HEALTH_CHECK=1; shift;;
+        -h|--help)
+            sed -n '/^# bpt-deploy/,/^$/p' "$0" | sed 's/^# \?//'
+            exit 0;;
+        v*)
+            VERSION="$1"; shift;;
+        *)
+            echo "Unknown arg: $1" >&2
+            exit 2;;
+    esac
+done
+
+[[ -n "$TARGET" ]] || { echo "ERROR: --target required" >&2; exit 2; }
+[[ -n "$VERSION" || $ROLLBACK -eq 1 ]] || { echo "ERROR: version required (or use --rollback)" >&2; exit 2; }
+
+# ── Resolve target host ─────────────────────────────────────────────────────
+TARGETS_ENV="${BPT_DEPLOY_TARGETS:-}"
+[[ -n "$TARGETS_ENV" ]] || { echo "ERROR: BPT_DEPLOY_TARGETS env not set" >&2; exit 2; }
+TARGET_HOST=""
+for pair in $TARGETS_ENV; do
+    name="${pair%%=*}"
+    host="${pair##*=}"
+    if [[ "$name" == "$TARGET" ]]; then
+        TARGET_HOST="$host"
+        break
+    fi
+done
+[[ -n "$TARGET_HOST" ]] || { echo "ERROR: target '$TARGET' not found in BPT_DEPLOY_TARGETS" >&2; exit 2; }
+
+BUCKET="${BPT_RELEASES_BUCKET:-bpt-releases}"
+REGION="${BPT_RELEASES_REGION:-ap-southeast-1}"
+DEPLOY_ROOT="${BPT_DEPLOY_ROOT:-/opt/bpt}"
+SSH_KEY="${BPT_SSH_KEY:-$HOME/.ssh/id_ed25519}"
+SSH_OPTS=(-i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+
+# ── Production gate ─────────────────────────────────────────────────────────
+# Require explicit confirmation for prod. Other targets proceed without
+# prompting — testnet/qa are throwaway, but prod sends real orders to a
+# real exchange with real money. Humans in the loop, always.
+if [[ "$TARGET" == "prod" ]]; then
+    echo "─── PROD DEPLOY ──────────────────────────────────────────────────"
+    echo "  Target: $TARGET_HOST"
+    echo "  Version: ${VERSION:-<rollback>}"
+    echo "  This will replace the currently-running binaries on prod."
+    echo
+    read -p "Type the target name ('prod') to confirm: " CONFIRM
+    [[ "$CONFIRM" == "prod" ]] || { echo "Aborted."; exit 1; }
+fi
+
+# ── Rollback path ───────────────────────────────────────────────────────────
+if [[ $ROLLBACK -eq 1 ]]; then
+    echo "── Rolling back on $TARGET_HOST"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        echo "  [dry-run] would run: ssh $TARGET_HOST 'cd $DEPLOY_ROOT && rollback.sh --restart'"
+        exit 0
+    fi
+    ssh "${SSH_OPTS[@]}" "$TARGET_HOST" "cd $DEPLOY_ROOT && ./current/scripts/rollback.sh --restart"
+    echo "Rollback complete."
+    exit 0
+fi
+
+# ── Resolve version → SHA ───────────────────────────────────────────────────
+echo "── Resolving $VERSION → git SHA via S3 ($BUCKET, $REGION)"
+SHA=$(aws s3 cp "s3://$BUCKET/by-tag/$VERSION/LATEST_SHA" - --region "$REGION" 2>/dev/null \
+    | tr -d '[:space:]' || true)
+[[ -n "$SHA" ]] || { echo "ERROR: no SHA recorded for $VERSION in s3://$BUCKET/by-tag/$VERSION/" >&2; exit 1; }
+echo "  $VERSION → $SHA"
+
+# ── Fetch tarball + MANIFEST locally ────────────────────────────────────────
+TARBALL="bpt-${VERSION}.tar.gz"
+LOCAL_DIR=$(mktemp -d -t bpt-deploy.XXXXXX)
+trap 'rm -rf "$LOCAL_DIR"' EXIT
+
+echo "── Fetching s3://$BUCKET/$SHA/$TARBALL"
+aws s3 cp "s3://$BUCKET/$SHA/$TARBALL"  "$LOCAL_DIR/$TARBALL"  --region "$REGION"
+aws s3 cp "s3://$BUCKET/$SHA/MANIFEST"  "$LOCAL_DIR/MANIFEST"  --region "$REGION"
+
+# ── Verify SHA256 against MANIFEST ──────────────────────────────────────────
+echo "── Verifying SHA256"
+EXPECTED=$(grep '^sha256:' "$LOCAL_DIR/MANIFEST" | awk '{print $2}')
+ACTUAL=$(sha256sum "$LOCAL_DIR/$TARBALL" | awk '{print $1}')
+[[ "$EXPECTED" == "$ACTUAL" ]] || {
+    echo "ERROR: SHA256 mismatch — manifest=$EXPECTED actual=$ACTUAL" >&2
+    exit 1
+}
+echo "  OK ($ACTUAL)"
+
+# ── Ship to target ──────────────────────────────────────────────────────────
+REMOTE_STAGING="/tmp/bpt-deploy.$$"
+echo "── Shipping to $TARGET_HOST:$REMOTE_STAGING"
+
+if [[ $DRY_RUN -eq 1 ]]; then
+    echo "  [dry-run] would scp $TARBALL to $TARGET_HOST"
+    echo "  [dry-run] would ssh $TARGET_HOST → deploy.sh $REMOTE_STAGING/$TARBALL"
+    exit 0
+fi
+
+ssh "${SSH_OPTS[@]}" "$TARGET_HOST" "mkdir -p $REMOTE_STAGING"
+scp -i "$SSH_KEY" "$LOCAL_DIR/$TARBALL" "$TARGET_HOST:$REMOTE_STAGING/$TARBALL"
+
+# ── Run deploy.sh on target ─────────────────────────────────────────────────
+RESTART_FLAG="--restart"
+[[ $NO_RESTART -eq 1 ]] && RESTART_FLAG=""
+
+echo "── Running deploy.sh $RESTART_FLAG on $TARGET_HOST"
+ssh "${SSH_OPTS[@]}" "$TARGET_HOST" \
+    "BPT_DEPLOY_ROOT=$DEPLOY_ROOT $DEPLOY_ROOT/current/scripts/deploy.sh $REMOTE_STAGING/$TARBALL $RESTART_FLAG && rm -rf $REMOTE_STAGING"
+
+# ── Health check (auto-rollback on failure) ─────────────────────────────────
+if [[ $NO_RESTART -eq 1 || $SKIP_HEALTH_CHECK -eq 1 ]]; then
+    echo "── Skipping health check (--no-restart or --skip-health-check)"
+    exit 0
+fi
+
+echo "── Health check: watching journalctl for strategy 'operational' marker (60s)"
+set +e
+HEALTHY=0
+for i in $(seq 1 12); do
+    if ssh "${SSH_OPTS[@]}" "$TARGET_HOST" \
+        "journalctl --user -u bpt-strategy --since '60 seconds ago' --no-pager 2>/dev/null | grep -q 'Trading universe:'"; then
+        HEALTHY=1
+        break
+    fi
+    sleep 5
+done
+set -e
+
+if [[ $HEALTHY -eq 1 ]]; then
+    echo "── Strategy operational. Deploy complete."
+    exit 0
+fi
+
+echo "── HEALTH CHECK FAILED. Auto-rolling back."
+ssh "${SSH_OPTS[@]}" "$TARGET_HOST" "$DEPLOY_ROOT/current/scripts/rollback.sh --restart"
+echo "── Rollback executed. Investigate target before retrying."
+exit 1

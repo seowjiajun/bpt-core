@@ -1,0 +1,158 @@
+name: Release
+
+# Fires on annotated tag push matching v0.x.y. The tag is the source of
+# truth for "what's deployable" — every prod-bound deploy traces back
+# to a tag here. Force-rebuilds (e.g., CI flake retries) overwrite by
+# git-sha prefix in S3 so the same tag can re-issue an artifact safely.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'  # pre-release suffixes: v0.1.0-rc1, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g. v0.1.0-test). Used only for manual runs.'
+        required: true
+        default: 'v0.0.0-manual'
+
+permissions:
+  contents: read
+  id-token: write  # for OIDC role assumption if BPT_CI_OIDC_ROLE_ARN is configured
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false  # don't kill a release mid-upload
+
+jobs:
+  release:
+    name: Build + upload release tarball
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # package-release.sh needs git history for the SHA
+
+      # ── Build deps + caches ────────────────────────────────────────────────
+      - name: Set up Bazel with caching
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: true
+          repository-cache: true
+          external-cache: true
+
+      - name: Set up JDK 17 (Aeron transport JAR)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends libssl-dev pkg-config
+
+      # ── Resolve version ────────────────────────────────────────────────────
+      # Tag pushes → the tag string. Manual dispatch → the input.
+      - name: Resolve version
+        id: ver
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF##*/}"
+          fi
+          SHA=$(git rev-parse --short=12 HEAD)
+          echo "version=$VERSION"   >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA"           >> "$GITHUB_OUTPUT"
+          echo "tarball=bpt-${VERSION}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      # ── Build + package ────────────────────────────────────────────────────
+      - name: Run package-release.sh
+        env:
+          SEMVER: ${{ steps.ver.outputs.version }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          ./deploy/package-release.sh
+          ls -lh dist/
+
+      # ── Upload to S3 ───────────────────────────────────────────────────────
+      # Two auth paths supported:
+      #   1. OIDC (preferred): set BPT_CI_OIDC_ROLE_ARN in repo secrets to
+      #      an IAM role with s3:PutObject on the releases bucket. No
+      #      long-lived keys.
+      #   2. Access keys (fallback): set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+      #      in repo secrets. Less secure; rotate manually.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ env.BPT_CI_OIDC_ROLE_ARN != '' }}
+        env:
+          BPT_CI_OIDC_ROLE_ARN: ${{ secrets.BPT_CI_OIDC_ROLE_ARN }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.BPT_CI_OIDC_ROLE_ARN }}
+          aws-region: ${{ vars.BPT_RELEASES_REGION || 'ap-southeast-1' }}
+
+      - name: Configure AWS credentials (access keys fallback)
+        if: ${{ env.BPT_CI_OIDC_ROLE_ARN == '' }}
+        env:
+          BPT_CI_OIDC_ROLE_ARN: ${{ secrets.BPT_CI_OIDC_ROLE_ARN }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.BPT_RELEASES_REGION || 'ap-southeast-1' }}
+
+      - name: Upload tarball + MANIFEST to S3
+        env:
+          BPT_RELEASES_BUCKET: ${{ vars.BPT_RELEASES_BUCKET || 'bpt-releases' }}
+          VERSION:             ${{ steps.ver.outputs.version }}
+          SHA:                 ${{ steps.ver.outputs.sha }}
+          TARBALL:             ${{ steps.ver.outputs.tarball }}
+        run: |
+          set -euxo pipefail
+
+          # Write a MANIFEST alongside the tarball — small text file for
+          # auditability. Captures everything bpt-deploy needs to verify
+          # the artifact independently of the S3 object key.
+          cat > dist/MANIFEST <<EOF
+          version: ${VERSION}
+          git_sha: ${SHA}
+          built_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          tarball: ${TARBALL}
+          sha256:  $(sha256sum dist/${TARBALL} | awk '{print $1}')
+          EOF
+          cat dist/MANIFEST
+
+          KEY_PREFIX="${SHA}"
+          aws s3 cp dist/${TARBALL} \
+              s3://${BPT_RELEASES_BUCKET}/${KEY_PREFIX}/${TARBALL} \
+              --content-type application/gzip
+          aws s3 cp dist/MANIFEST \
+              s3://${BPT_RELEASES_BUCKET}/${KEY_PREFIX}/MANIFEST \
+              --content-type text/plain
+
+          # Also write a "latest" pointer for the tag so bpt-deploy can
+          # resolve `<version>` → `<sha>` without scanning. Mutable; OK
+          # because the tag itself is immutable in git.
+          echo "${SHA}" > dist/LATEST_SHA
+          aws s3 cp dist/LATEST_SHA \
+              s3://${BPT_RELEASES_BUCKET}/by-tag/${VERSION}/LATEST_SHA \
+              --content-type text/plain
+
+      - name: Summary
+        run: |
+          echo "## Release ${{ steps.ver.outputs.version }} uploaded" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bucket**: \`s3://${{ vars.BPT_RELEASES_BUCKET || 'bpt-releases' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA**: \`${{ steps.ver.outputs.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Key**: \`${{ steps.ver.outputs.sha }}/${{ steps.ver.outputs.tarball }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deploy with:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "    bpt-deploy ${{ steps.ver.outputs.version }} --target testnet" >> $GITHUB_STEP_SUMMARY
