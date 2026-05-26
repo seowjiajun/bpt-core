@@ -198,6 +198,12 @@ echo ""
 echo "=== Packaged: $OUT ($(du -h "$OUT" | cut -f1)) ==="
 echo ""
 echo "Top-level contents:"
-tar -tzf "$OUT" | head -8
+# Read once to a temp file to avoid SIGPIPE killing tar when head closes
+# the pipe early under `set -o pipefail`. Bit it on the first CI release
+# of a 43M tarball — tar gets SIGPIPE → exit 141 → pipefail trips → CI dies.
+TARLIST=$(mktemp)
+tar -tzf "$OUT" > "$TARLIST"
+head -8 "$TARLIST"
 echo "..."
-echo "Total entries: $(tar -tzf "$OUT" | wc -l)"
+echo "Total entries: $(wc -l < "$TARLIST")"
+rm -f "$TARLIST"
