@@ -1,3 +1,12 @@
+// ── Naming convention ──────────────────────────────────────────────────────
+// Per feedback-host-naming memory: <loc>-<role>-<env>-<seq>, AWS Name tag
+// gets a `bpt-` prefix for grep-ability across accounts; OS hostname stays
+// unprefixed for shorter shell prompts. Sequence zero-padded to 2 digits.
+locals {
+  hostname     = "${var.loc_code}-${var.host_role}-${var.env_tag}-${format("%02d", var.host_seq)}"
+  name_prefix  = "bpt-${local.hostname}"
+}
+
 // ── AMI lookup ─────────────────────────────────────────────────────────────
 data "aws_ami" "ubuntu" {
   most_recent = true
@@ -27,7 +36,7 @@ resource "aws_vpc" "trading" {
   enable_dns_hostnames = true
   enable_dns_support   = true
   tags = {
-    Name      = "bpt-trading-vpc"
+    Name      = "${local.name_prefix}-vpc"
     Role      = "trading"
     Env       = var.env_tag
     Owner     = var.owner_tag
@@ -38,7 +47,7 @@ resource "aws_vpc" "trading" {
 resource "aws_internet_gateway" "trading" {
   vpc_id = aws_vpc.trading.id
   tags = {
-    Name      = "bpt-trading-igw"
+    Name      = "${local.name_prefix}-igw"
     Owner     = var.owner_tag
     ManagedBy = "terraform-trading-host"
   }
@@ -50,7 +59,7 @@ resource "aws_subnet" "trading" {
   availability_zone       = var.availability_zone
   map_public_ip_on_launch = true
   tags = {
-    Name      = "bpt-trading-subnet"
+    Name      = "${local.name_prefix}-subnet"
     Owner     = var.owner_tag
     ManagedBy = "terraform-trading-host"
   }
@@ -64,7 +73,7 @@ resource "aws_route_table" "trading" {
     gateway_id = aws_internet_gateway.trading.id
   }
   tags = {
-    Name      = "bpt-trading-rt"
+    Name      = "${local.name_prefix}-rt"
     Owner     = var.owner_tag
     ManagedBy = "terraform-trading-host"
   }
@@ -103,7 +112,7 @@ resource "aws_security_group" "trading" {
   }
 
   tags = {
-    Name      = "bpt-trading-sg"
+    Name      = "${local.name_prefix}-sg"
     Role      = "trading"
     Env       = var.env_tag
     Owner     = var.owner_tag
@@ -194,12 +203,23 @@ resource "aws_instance" "trading" {
       echo "WARNING: no unmounted data disk found — manual mount required" >&2
     fi
 
+    # Set the OS hostname per the bpt-core naming convention
+    # (feedback-host-naming memory). Unprefixed for short shell prompts;
+    # AWS Name tag carries the bpt- prefix for cross-account grep-ability.
+    hostnamectl set-hostname ${local.hostname}
+    # Persist across reboots — cloud-init's hostnamectl applies immediately,
+    # but Ubuntu cloud-init can reset hostname on next boot if the metadata
+    # source still claims a different name. Pin via /etc/hosts so resolvers
+    # don't fight the EC2 metadata-set name on subsequent boots.
+    sed -i "s/^127\.0\.1\.1.*/127.0.1.1 ${local.hostname}/" /etc/hosts || \
+      echo "127.0.1.1 ${local.hostname}" >> /etc/hosts
+
     # Drop a marker the operator's bootstrap.sh can poll on.
     echo "cloud-init complete at $(date -Iseconds)" > /var/log/bpt-cloud-init.done
   EOF
 
   tags = {
-    Name      = "bpt-trading-sg-01"
+    Name      = local.name_prefix
     Role      = "trading"
     Env       = var.env_tag
     Owner     = var.owner_tag
@@ -217,7 +237,7 @@ resource "aws_ebs_volume" "data" {
   type              = "gp3"
   encrypted         = true
   tags = {
-    Name      = "bpt-trading-data"
+    Name      = "${local.name_prefix}-data"
     Role      = "trading-data"
     Env       = var.env_tag
     Owner     = var.owner_tag
@@ -240,7 +260,7 @@ resource "aws_eip" "trading" {
   instance = aws_instance.trading.id
   domain   = "vpc"
   tags = {
-    Name      = "bpt-trading-eip"
+    Name      = "${local.name_prefix}-eip"
     Role      = "trading"
     Env       = var.env_tag
     Owner     = var.owner_tag

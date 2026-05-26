@@ -53,7 +53,25 @@ variable "owner_tag" {
 }
 
 variable "env_tag" {
-  description = "Env tag — dev / qa / prod. Drives downstream alerting policy."
+  description = "Env tag — dev / qa / test / prod. Drives downstream alerting policy AND appears in the hostname."
   type        = string
-  default     = "qa"
+  default     = "test"
+}
+
+variable "loc_code" {
+  description = "Location code for the hostname. sg1 = AWS ap-southeast-1, ty1 = AWS ap-northeast-1. Equinix-style 3-char codes — see feedback-host-naming memory."
+  type        = string
+  default     = "sg1"
+}
+
+variable "host_role" {
+  description = "Role segment of the hostname. trd = trading. Other roles (mon, rec, rsh, bst) live in their own modules; this var exists so future module reuse stays explicit."
+  type        = string
+  default     = "trd"
+}
+
+variable "host_seq" {
+  description = "Per-role sequence number, zero-padded to 2 digits. First host of a role = 1."
+  type        = number
+  default     = 1
 }

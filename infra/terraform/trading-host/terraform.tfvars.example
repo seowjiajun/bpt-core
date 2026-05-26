@@ -23,4 +23,10 @@ instance_type = "c7i.2xlarge"
 // Data disk for the source repo + bazel cache + binaries + logs.
 data_disk_gb = 50
 
-env_tag = "qa"
+// Naming convention (feedback-host-naming memory): <loc>-<role>-<env>-<seq>
+// First trading host on AWS Singapore testnet = sg1-trd-test-01.
+env_tag  = "test"
+loc_code = "sg1"
+host_seq = 1
+// host_role defaults to "trd" — override only if the module is reused
+// for a different role.
