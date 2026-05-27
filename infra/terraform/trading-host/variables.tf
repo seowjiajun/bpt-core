@@ -75,3 +75,15 @@ variable "host_seq" {
   type        = number
   default     = 1
 }
+
+variable "auto_stop_cron" {
+  description = "EventBridge cron expression for the daily auto-stop. Default is 23:00 SGT (15:00 UTC). Set to empty string to disable the schedule entirely."
+  type        = string
+  default     = "cron(0 15 * * ? *)"
+}
+
+variable "auto_stop_enabled" {
+  description = "Whether the daily auto-stop schedule is active. Set to false during long-running tests where you actually want to keep the instance up overnight."
+  type        = bool
+  default     = true
+}

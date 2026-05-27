@@ -27,3 +27,13 @@ output "start_command" {
   description = "Resume the instance. Boot takes ~30 s; the persistent EBS at /opt/bpt is already populated."
   value       = "aws ec2 start-instances --instance-ids ${aws_instance.trading.id} --region ${var.aws_region}"
 }
+
+output "auto_stop_schedule" {
+  description = "Daily auto-stop schedule details. Disable in tfvars for long-running tests."
+  value = {
+    name     = aws_scheduler_schedule.auto_stop.name
+    cron     = aws_scheduler_schedule.auto_stop.schedule_expression
+    state    = aws_scheduler_schedule.auto_stop.state
+    timezone = aws_scheduler_schedule.auto_stop.schedule_expression_timezone
+  }
+}

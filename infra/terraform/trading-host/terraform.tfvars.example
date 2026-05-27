@@ -30,3 +30,10 @@ loc_code = "sg1"
 host_seq = 1
 // host_role defaults to "trd" — override only if the module is reused
 // for a different role.
+
+// Daily auto-stop schedule (defends against "forgot to stop overnight"
+// $30 charges). Default: stop at 23:00 SGT = 15:00 UTC daily. Operator
+// manually starts via `aws ec2 start-instances` at session start.
+// Set auto_stop_enabled = false to override for long-running tests.
+auto_stop_cron    = "cron(0 15 * * ? *)"
+auto_stop_enabled = true

@@ -3,8 +3,8 @@
 // gets a `bpt-` prefix for grep-ability across accounts; OS hostname stays
 // unprefixed for shorter shell prompts. Sequence zero-padded to 2 digits.
 locals {
-  hostname     = "${var.loc_code}-${var.host_role}-${var.env_tag}-${format("%02d", var.host_seq)}"
-  name_prefix  = "bpt-${local.hostname}"
+  hostname    = "${var.loc_code}-${var.host_role}-${var.env_tag}-${format("%02d", var.host_seq)}"
+  name_prefix = "bpt-${local.hostname}"
 }
 
 // ── AMI lookup ─────────────────────────────────────────────────────────────
@@ -273,5 +273,81 @@ resource "aws_eip" "trading" {
     Env       = var.env_tag
     Owner     = var.owner_tag
     ManagedBy = "terraform-trading-host"
+  }
+}
+
+// ── Daily auto-stop ────────────────────────────────────────────────────────
+// Belt-and-braces against forgetting to stop the instance after a session.
+// EventBridge Scheduler fires the EC2 StopInstances API directly (no Lambda)
+// at auto_stop_cron each day. Operator manually starts the instance when
+// needed via the start_command from outputs.tf.
+//
+// Idempotent: if the instance is already stopped, the API call is a no-op.
+// Cost: $0 — EventBridge Scheduler is free for the first 14M invocations/mo.
+//
+// Disable for long-running tests via auto_stop_enabled=false in tfvars.
+
+data "aws_iam_policy_document" "scheduler_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "auto_stop" {
+  name               = "${local.name_prefix}-auto-stop"
+  description        = "Lets EventBridge Scheduler call StopInstances on this trading host."
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume.json
+
+  tags = {
+    Name      = "${local.name_prefix}-auto-stop"
+    ManagedBy = "terraform-trading-host"
+  }
+}
+
+resource "aws_iam_role_policy" "auto_stop" {
+  name = "stop-instance"
+  role = aws_iam_role.auto_stop.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ec2:StopInstances"]
+      Resource = "arn:aws:ec2:${var.aws_region}:*:instance/${aws_instance.trading.id}"
+    }]
+  })
+}
+
+resource "aws_scheduler_schedule" "auto_stop" {
+  name = "${local.name_prefix}-auto-stop"
+
+  flexible_time_window {
+    mode = "OFF" // fire on the dot — not flexible
+  }
+
+  schedule_expression          = var.auto_stop_cron
+  schedule_expression_timezone = "UTC"
+  state                        = var.auto_stop_enabled ? "ENABLED" : "DISABLED"
+
+  target {
+    // Universal target ARN — EventBridge Scheduler calls EC2 API directly,
+    // no Lambda or intermediate service. Input is the JSON body the
+    // StopInstances API expects.
+    arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
+    role_arn = aws_iam_role.auto_stop.arn
+
+    input = jsonencode({
+      InstanceIds = [aws_instance.trading.id]
+    })
+
+    retry_policy {
+      maximum_retry_attempts       = 3
+      maximum_event_age_in_seconds = 60
+    }
   }
 }
