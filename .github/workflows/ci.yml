@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# Force JS actions onto Node 24 ahead of GitHub's Node 20 deprecation
+# (effective 2026-06-02). Avoids per-action major-version bump churn until
+# the marketplace catches up uniformly. Remove this block once all actions
+# referenced in jobs natively support Node 24.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 # Cancel superseded PR runs (a force-push or new commit kills the older pipeline).
 # Don't cancel on main — every push there should populate caches to completion.
 concurrency:

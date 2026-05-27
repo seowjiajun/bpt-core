@@ -20,6 +20,11 @@ permissions:
   contents: read
   id-token: write  # for OIDC role assumption if BPT_CI_OIDC_ROLE_ARN is configured
 
+# Force JS actions onto Node 24 ahead of GitHub's Node 20 deprecation
+# (effective 2026-06-02). See same env block in ci.yml.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false  # don't kill a release mid-upload
