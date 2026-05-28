@@ -52,6 +52,13 @@ order_qty = 0.2
 requote_threshold = 0.0005
 max_inventory = 2.0
 
+# Subscribe to L2 ladder (depth 5). Without this the HL decoder only
+# publishes top-of-book BBO (enough for the strategy to quote) but never
+# the full MdOrderBook the matching engine needs to seed queue position
+# and produce fills — strategy quotes endlessly but books 0 fills. APE
+# config carries the same line; it was missing here.
+order_book_depth = 5
+
 # Disabled in backtest — simulator pushes $0 starting balance so equity-fraction
 # sizing collapses qty to 0. Use absolute order_qty / max_inventory above instead.
 order_qty_fraction      = 0
