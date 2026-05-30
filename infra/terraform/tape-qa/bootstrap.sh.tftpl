@@ -1,0 +1,56 @@
+#!/bin/bash
+# bootstrap.sh — QA box first-boot. Reads per-run params from IMDS tags, pulls
+# the harness scripts (from the QA bucket, versioned independently of the
+# tarball) and the release tarball under test (from the releases bucket), then
+# hands off to on_box_run.sh. Kept tiny on purpose — the real logic lives in
+# on_box_run.sh so we can iterate the harness without rebuilding the AMI.
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y awscli jq curl unzip rclone zstd
+
+# ── IMDSv2 + instance tags (launch template sets InstanceMetadataTags=enabled) ──
+TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 600")
+imds() { curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/$1"; }
+tag()  { imds "meta-data/tags/instance/$1"; }
+
+export QA_RUN_ID="$(tag qa_run_id)"
+export QA_DURATION_MIN="$(tag qa_duration_min)"
+export QA_ROTATE_SECONDS="$(tag qa_rotate_seconds)"
+export QA_SYNC_INTERVAL_MIN="$(tag qa_sync_interval_min)"
+export QA_RELEASE_KEY="$(tag qa_release_key)"
+export QA_BUCKET="$(tag qa_bucket)"
+
+# Reaper layer 1: hard self-terminate backstop. If SF never tears us down (or a
+# keep_on_failure run is left for debugging), the box kills itself at TTL.
+# Pairs with instance_initiated_shutdown_behavior=terminate on the LT.
+TTL_MIN=$(( QA_DURATION_MIN + 180 ))
+shutdown -h "+$TTL_MIN" "bpt-tape-qa TTL reached" || true
+
+# Injected by Terraform (not per-run):
+export RELEASES_BUCKET="${releases_bucket}"
+export AWS_DEFAULT_REGION="${qa_region}"
+export LOKI_URL="${loki_url}"
+export NTFY_URL="${ntfy_url}"
+
+# ── Fetch harness scripts from the QA bucket ────────────────────────────────
+mkdir -p /opt/bpt/qa
+aws s3 cp "s3://$QA_BUCKET/harness/on_box_run.sh"        /opt/bpt/qa/on_box_run.sh
+aws s3 cp "s3://$QA_BUCKET/harness/validate_tape_run.sh" /opt/bpt/qa/validate_tape_run.sh
+chmod +x /opt/bpt/qa/*.sh
+
+# ── Resolve + fetch the release tarball under test ──────────────────────────
+if [ "$QA_RELEASE_KEY" = "latest" ]; then
+  QA_RELEASE_KEY=$(aws s3 ls "s3://$RELEASES_BUCKET/" --recursive \
+    | awk '/\.tar\.gz$/ {print $4}' | sort | tail -1)
+fi
+mkdir -p /opt/bpt/releases/under-test
+aws s3 cp "s3://$RELEASES_BUCKET/$QA_RELEASE_KEY" /tmp/release.tar.gz
+tar -xzf /tmp/release.tar.gz -C /opt/bpt/releases/under-test
+export QA_RELEASE_ROOT=/opt/bpt/releases/under-test
+
+# Hand off. on_box_run.sh: deploy → run tape (rotate/sync overrides) → validate
+# → write verdict.json + progress.json to the QA bucket → ntfy. SF terminates.
+exec /opt/bpt/qa/on_box_run.sh

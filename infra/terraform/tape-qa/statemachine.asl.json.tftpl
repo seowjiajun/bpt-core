@@ -1,0 +1,168 @@
+{
+  "Comment": "bpt-tape ephemeral QA run. Provision a throwaway t3.micro, let it pull the release tarball, run the recorder for a bounded window, and self-report a verdict to S3. Teardown (TerminateInstances) is reached from EVERY state via Catch, so the box is never left running — even on validation failure, timeout, or an AWS API error (unless keep_on_failure=true, for post-mortem; the reaper still kills it at TTL). Runtime params arrive as the execution input from the SSM Automation form, as strings.",
+  "StartAt": "Provision",
+  "States": {
+    "Provision": {
+      "Type": "Task",
+      "Comment": "RunInstances from the QA launch template. Per-run params ride as IMDS-safe (no-colon) tags; the box reads them from IMDS (the launch template sets InstanceMetadataTags=enabled).",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:runInstances",
+      "Parameters": {
+        "LaunchTemplate": { "LaunchTemplateId": "${launch_template_id}" },
+        "InstanceType.$": "$.instance_type",
+        "MinCount": 1,
+        "MaxCount": 1,
+        "TagSpecifications": [
+          {
+            "ResourceType": "instance",
+            "Tags": [
+              { "Key": "Name", "Value.$": "States.Format('bpt-tape-qa-{}', $.run_id)" },
+              { "Key": "bpt_qa", "Value": "true" },
+              { "Key": "qa_run_id", "Value.$": "$.run_id" },
+              { "Key": "qa_duration_min", "Value.$": "States.Format('{}', $.duration_minutes)" },
+              { "Key": "qa_rotate_seconds", "Value.$": "States.Format('{}', $.rotate_seconds)" },
+              { "Key": "qa_sync_interval_min", "Value.$": "States.Format('{}', $.sync_interval_minutes)" },
+              { "Key": "qa_release_key", "Value.$": "$.release_key" },
+              { "Key": "qa_bucket", "Value": "${qa_bucket}" }
+            ]
+          }
+        ]
+      },
+      "ResultSelector": { "instanceId.$": "$.Instances[0].InstanceId" },
+      "ResultPath": "$.ec2",
+      "Retry": [
+        { "ErrorEquals": ["Ec2.Ec2Exception", "States.TaskFailed"], "IntervalSeconds": 15, "MaxAttempts": 2, "BackoffRate": 2.0 }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Notify" }
+      ],
+      "Next": "WaitForBoot"
+    },
+
+    "WaitForBoot": {
+      "Type": "Wait",
+      "Comment": "Give cloud-init + tarball pull + deploy.sh time before polling. Wait time is not billed.",
+      "Seconds": 180,
+      "Next": "InitPollState"
+    },
+
+    "InitPollState": {
+      "Type": "Pass",
+      "Comment": "Seed the poll loop. maxTicks = duration_minutes + 30 (buffer for boot/deploy/validate/upload); each tick is 60s. duration arrives as a string, so parse to a number first (intrinsics nest).",
+      "Parameters": {
+        "elapsed": 0,
+        "verdictKey.$": "States.Format('verdict/{}.json', $.run_id)",
+        "maxTicks.$": "States.MathAdd(States.StringToJson($.duration_minutes), 30)"
+      },
+      "ResultPath": "$.poll",
+      "Next": "PollVerdict"
+    },
+
+    "PollVerdict": {
+      "Type": "Task",
+      "Comment": "Try to read the box's verdict.json. NoSuchKey => not done yet => loop via CheckTimeout. Any present object => the run finished and self-reported.",
+      "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+      "Parameters": {
+        "Bucket": "${qa_bucket}",
+        "Key.$": "$.poll.verdictKey"
+      },
+      "ResultSelector": { "body.$": "States.StringToJson($.Body)" },
+      "ResultPath": "$.verdict",
+      "Catch": [
+        { "ErrorEquals": ["S3.NoSuchKeyException"], "ResultPath": "$.pollError", "Next": "CheckTimeout" },
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Terminate" }
+      ],
+      "Next": "Evaluate"
+    },
+
+    "CheckTimeout": {
+      "Type": "Choice",
+      "Comment": "Bound polling at duration + 30 min (60s ticks). If the box never reports, treat as failure and route to Evaluate (which honours keep_on_failure).",
+      "Choices": [
+        {
+          "Variable": "$.poll.elapsed",
+          "NumericGreaterThanEqualsPath": "$.poll.maxTicks",
+          "Next": "TimedOut"
+        }
+      ],
+      "Default": "WaitTick"
+    },
+
+    "WaitTick": { "Type": "Wait", "Seconds": 60, "Next": "IncrementPoll" },
+
+    "IncrementPoll": {
+      "Type": "Pass",
+      "Parameters": {
+        "elapsed.$": "States.MathAdd($.poll.elapsed, 1)",
+        "verdictKey.$": "$.poll.verdictKey",
+        "maxTicks.$": "$.poll.maxTicks"
+      },
+      "ResultPath": "$.poll",
+      "Next": "PollVerdict"
+    },
+
+    "TimedOut": {
+      "Type": "Pass",
+      "Parameters": { "passed": false, "reason": "timeout: box never wrote verdict.json within the polling window" },
+      "ResultPath": "$.verdict.body",
+      "Next": "Evaluate"
+    },
+
+    "Evaluate": {
+      "Type": "Choice",
+      "Comment": "passed => terminate + succeed. failed + keep_on_failure=true => leave the box up for post-mortem (reaper kills at TTL), skip to Notify. failed otherwise => terminate.",
+      "Choices": [
+        { "Variable": "$.verdict.body.passed", "BooleanEquals": true, "Next": "Terminate" },
+        {
+          "And": [
+            { "Variable": "$.verdict.body.passed", "BooleanEquals": false },
+            { "Variable": "$.keep_on_failure", "StringEquals": "true" }
+          ],
+          "Next": "Notify"
+        }
+      ],
+      "Default": "Terminate"
+    },
+
+    "Terminate": {
+      "Type": "Task",
+      "Comment": "GUARANTEED teardown — reached from success, failure, timeout, and caught errors.",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Parameters": { "InstanceIds.$": "States.Array($.ec2.instanceId)" },
+      "Retry": [
+        { "ErrorEquals": ["States.ALL"], "IntervalSeconds": 15, "MaxAttempts": 3, "BackoffRate": 2.0 }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Notify" }
+      ],
+      "ResultPath": "$.terminate",
+      "Next": "Notify"
+    },
+
+    "Notify": {
+      "Type": "Task",
+      "Comment": "Orchestration-level channel. The box curls ntfy on normal pass/fail; this SNS publish is the safety net for what the box can't report (launch error, timeout, dead box, terminate failure).",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_topic_arn}",
+        "Subject.$": "States.Format('bpt-tape QA run {}', $.run_id)",
+        "Message.$": "States.Format('run_id={}\\npassed={}\\nreason={}\\ninstance={}\\nGrafana: filter qa_run_id={}', $.run_id, $.verdict.body.passed, $.verdict.body.reason, $.ec2.instanceId, $.run_id)"
+      },
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Done" }
+      ],
+      "Next": "Done"
+    },
+
+    "Done": {
+      "Type": "Choice",
+      "Comment": "Surface pass/fail as the execution's terminal state, so the console + a CloudWatch alarm on FAILED executions reflect it.",
+      "Choices": [
+        { "Variable": "$.verdict.body.passed", "BooleanEquals": true, "Next": "Succeed" }
+      ],
+      "Default": "Fail"
+    },
+
+    "Succeed": { "Type": "Succeed" },
+    "Fail": { "Type": "Fail", "Error": "QaRunFailed", "Cause": "verdict.passed was false or the run errored — see SNS message / Grafana / verdict.json" }
+  }
+}
