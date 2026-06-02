@@ -8,6 +8,7 @@ the thing that separates "I wrote some code" from "I run a system."
 - [Monitoring](monitoring.md) — Prometheus + Alertmanager + Grafana + PagerDuty + Healthchecks.io
 - [Risk](risk.md) — six pre-trade gates + three post-trade latches in `bpt-order-gateway`
 - [Deployment](deployment.md) — tarball + atomic symlink flip; rollback; first-prod-host validation
+- [Host sleep / WSL suspend](host-sleep-recovery.md) — what the ~30s wake-recovery cascade looks like; keep dev hosts awake while baselining
 
 ## Operating principles
 

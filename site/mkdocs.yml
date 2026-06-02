@@ -96,6 +96,7 @@ nav:
     - Monitoring: ops/monitoring.md
     - Risk: ops/risk.md
     - Deployment: ops/deployment.md
+    - Host sleep: ops/host-sleep-recovery.md
 
 extra:
   social:
