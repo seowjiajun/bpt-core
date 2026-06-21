@@ -203,8 +203,6 @@ std::optional<FairValueMmStrategy::QuoteTarget> FairValueMmStrategy::compute_quo
     double bid = fv - half_spread - skew;
     double ask = fv + half_spread - skew;
 
-    // Clamp to keep quotes passive (post-only safe): bid must stay below the best
-    // ask and ask must stay above the best bid, each by at least one tick.
     if (st.tick_size > 0.0) {
         if (st.last_market_ask > 0.0)
             bid = std::min(bid, st.last_market_ask - st.tick_size);
@@ -225,12 +223,9 @@ void FairValueMmStrategy::maybe_requote(InstrumentState& st, double net_qty, con
     if (ts_ns < st.reject_backoff_until_ns)
         return;
 
-    // Drawdown pause.
     if (ts_ns < st.pause_until_ns) {
-        if (st.h_bid.live())
-            order_mgr_->send_cancel(st.h_bid);
-        if (st.h_ask.live())
-            order_mgr_->send_cancel(st.h_ask);
+        if (st.h_bid.live()) order_mgr_->send_cancel(st.h_bid);
+        if (st.h_ask.live()) order_mgr_->send_cancel(st.h_ask);
         return;
     }
 
@@ -238,12 +233,9 @@ void FairValueMmStrategy::maybe_requote(InstrumentState& st, double net_qty, con
     const double q_norm = (max_inv > 0.0) ? std::clamp(net_qty / max_inv, -1.0, 1.0) : 0.0;
     const double ord_qty = sizer_.effective_qty(st.last_mid, st.lot_size, last_equity_e8_, st.exchange);
 
-    // At inventory cap: cancel quotes, send unwind.
     if (std::abs(net_qty) >= max_inv) {
-        if (st.h_bid.live())
-            order_mgr_->send_cancel(st.h_bid);
-        if (st.h_ask.live())
-            order_mgr_->send_cancel(st.h_ask);
+        if (st.h_bid.live()) order_mgr_->send_cancel(st.h_bid);
+        if (st.h_ask.live()) order_mgr_->send_cancel(st.h_ask);
         if (!st.h_unwind.valid() || st.h_unwind.terminal()) {
             const auto side = (net_qty > 0.0) ? OrderSide::SELL : OrderSide::BUY;
             st.h_unwind = send_unwind_order(st, side, st.last_mid, std::abs(net_qty), kTagUnwindNormal);
@@ -251,39 +243,24 @@ void FairValueMmStrategy::maybe_requote(InstrumentState& st, double net_qty, con
         return;
     }
 
-    // Bid side.
-    const bool suppress_bid = (q_norm >= one_sided_threshold_);
-    if (suppress_bid) {
-        if (st.h_bid.live())
-            order_mgr_->send_cancel(st.h_bid);
-    } else {
-        if (st.h_bid.live()) {
-            const double move = std::abs(st.last_mid - st.bid_placed_mid) / st.last_mid;
-            if (move > requote_threshold_ && !st.h_bid.cancel_pending())
-                order_mgr_->send_cancel(st.h_bid);
-        } else if (!st.h_bid.cancel_pending()) {
-            st.h_bid = send_limit_order(st, OrderSide::BUY, q.bid, ord_qty);
-            if (st.h_bid.valid())
-                st.bid_placed_mid = st.last_mid;
+    auto manage_side = [&](order::OrderHandle& h, double& placed_mid_ref, bool suppressed,
+                            double new_px, OrderSide::Value side) {
+        if (suppressed) {
+            if (h.live()) order_mgr_->send_cancel(h);
+        } else {
+            if (h.live()) {
+                const double move = std::abs(st.last_mid - placed_mid_ref) / st.last_mid;
+                if (move > requote_threshold_ && !h.cancel_pending())
+                    order_mgr_->send_cancel(h);
+            } else if (!h.cancel_pending()) {
+                h = send_limit_order(st, side, new_px, ord_qty);
+                if (h.valid()) placed_mid_ref = st.last_mid;
+            }
         }
-    }
+    };
 
-    // Ask side.
-    const bool suppress_ask = (q_norm <= -one_sided_threshold_);
-    if (suppress_ask) {
-        if (st.h_ask.live())
-            order_mgr_->send_cancel(st.h_ask);
-    } else {
-        if (st.h_ask.live()) {
-            const double move = std::abs(st.last_mid - st.ask_placed_mid) / st.last_mid;
-            if (move > requote_threshold_ && !st.h_ask.cancel_pending())
-                order_mgr_->send_cancel(st.h_ask);
-        } else if (!st.h_ask.cancel_pending()) {
-            st.h_ask = send_limit_order(st, OrderSide::SELL, q.ask, ord_qty);
-            if (st.h_ask.valid())
-                st.ask_placed_mid = st.last_mid;
-        }
-    }
+    manage_side(st.h_bid, st.bid_placed_mid, q_norm >= one_sided_threshold_, q.bid, OrderSide::BUY);
+    manage_side(st.h_ask, st.ask_placed_mid, q_norm <= -one_sided_threshold_, q.ask, OrderSide::SELL);
 }
 
 // ── Order helpers ─────────────────────────────────────────────────────────────
@@ -381,7 +358,6 @@ void FairValueMmStrategy::on_exec_report(const bpt::messages::ExecutionReport& r
         st.consecutive_exchange_errors = 0;
     }
 
-    // Identify which of our handles this report belongs to, then clear on terminal.
     const auto h = order_mgr_->find_by_id(rpt.orderId());
     const uint8_t tag = h.valid() ? h.state->tag : kTagQuote;
 
@@ -422,12 +398,10 @@ std::size_t FairValueMmStrategy::on_account_snapshot(bpt::messages::AccountSnaps
     snap.sbeRewind();
     auto rows = extract_exchange_position_rows(snap);
 
-    // Cache snapshot quantities for shutdown flatten's exchange-authoritative path.
     last_snapshot_qty_e8_.clear();
     for (const auto& [sym, row] : rows)
         last_snapshot_qty_e8_[sym] = row.net_qty_e8;
 
-    // Seed PositionTracker from snapshot (startup position or resync after divergence).
     for (const auto& [id, st] : state_) {
         const auto rit = rows.find(st.symbol);
         if (rit == rows.end())
@@ -435,7 +409,6 @@ std::size_t FairValueMmStrategy::on_account_snapshot(bpt::messages::AccountSnaps
         positions_.seed(id, st.exchange_id, rit->second.net_qty_e8, rit->second.avg_entry_price);
     }
 
-    // Reconcile our tracker against the snapshot.
     std::unordered_map<std::string, int64_t> qty_by_sym;
     std::unordered_map<uint64_t, std::string> id_to_sym;
     for (const auto& [sym, row] : rows)
