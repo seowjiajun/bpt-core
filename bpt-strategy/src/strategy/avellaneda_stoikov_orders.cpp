@@ -5,7 +5,6 @@
 
 #include <messages/OrderType.h>
 #include <messages/TimeInForce.h>
-#include <messages/exec_inst.h>
 
 #include <bpt_common/logging.h>
 #include <bpt_common/util/tsc_clock.h>
@@ -46,10 +45,10 @@ void AvellanedaStoikovStrategy::maybe_requote(InstrumentState& st, const BboCont
     // unwind this tick uses the same qty (important: if equity /
     // price change between calls, downstream aggregation gets messy).
     // Also feeds the suppression policy's sizing inputs below.
-    const double eff_qty = effective_order_qty(st);
+    const double eff_qty = sizer_.effective_qty(st.last_mid, st.lot_size, last_equity_e8_, st.exchange);
 
-    const SuppressionState supp =
-        supp_policy_.evaluate(st, net_qty, new_bid, new_ask, effective_max_inventory(st), eff_qty);
+    const SuppressionState supp = supp_policy_.evaluate(
+        st, net_qty, new_bid, new_ask, sizer_.effective_max_inventory(st.last_mid, last_equity_e8_), eff_qty);
 
     // Info-level logging of the runtime triggers. Console reporting
     // consumes the same supp struct via get_strategy_state_json, so
@@ -237,66 +236,17 @@ order::OrderHandle AvellanedaStoikovStrategy::send_limit_order(InstrumentState& 
                                                                double price,
                                                                double qty) {
     const auto vex_it = venue_exec_.find(st.exchange);
-    if (vex_it == venue_exec_.end() || !vex_it->second.enabled) {
-        bpt::common::log::debug(kLog(), "Venue {} not enabled — quote suppressed", st.exchange);
+    if (vex_it == venue_exec_.end() || !vex_it->second.enabled || !order_mgr_)
         return {};
-    }
 
-    if (!order_mgr_) {
-        bpt::common::log::info(kLog(),
-                               "{} {} {} @ {:.6f} (no gateway)",
-                               (side == OrderSide::BUY ? "BID" : "ASK"),
-                               st.symbol,
-                               st.exchange,
-                               price);
-        return {};
-    }
-
-    // Note: OrderManager rounds BUY up and SELL down. For market-making, we want
-    // the opposite (bid floors, ask ceils) to preserve spread width, so pre-round here.
-    if (st.tick_size > 0.0) {
-        if (side == OrderSide::BUY)
-            price = std::floor(price / st.tick_size) * st.tick_size;
-        else
-            price = std::ceil(price / st.tick_size) * st.tick_size;
-    }
-
-    auto handle = order_mgr_->send_new_order(
-        order::NewOrderRequest{
-            .instrument_id = st.instrument_id,
-            .exchange_id = st.exchange_id,
-            .side = side,
-            .type = OrderType::LIMIT,
-            .tif = TimeInForce::GTC,
-            .price = price,
-            .qty = qty,
-            .exec_inst = {.post_only = true},
-        },
-        kTagQuote);
+    auto handle = order_mgr_->send_quote(st.instrument_id, st.exchange_id, side, price, qty, kTagQuote);
     if (!handle.valid())
         return {};
 
-    const uint64_t order_id = handle.order_id();
-    bpt::common::log::info(kLog(),
-                           "{} {} {} @ {:.6f} → order_id={}",
-                           (side == OrderSide::BUY ? "BID" : "ASK"),
-                           st.symbol,
-                           st.exchange,
-                           price,
-                           order_id);
-
-    st.queue.track(order_id, side, price, qty, bpt::common::util::WallClock::now_ns(), st.book);
-    if (const auto* e = st.queue.lookup(order_id)) {
-        bpt::common::log::info(kLog(),
-                               "Queue track order_id={} side={} px={:.4f} qty={:.6f} "
-                               "queue_ahead={:.6f} fill_prob={:.3f}",
-                               order_id,
-                               (side == OrderSide::BUY ? "BID" : "ASK"),
-                               e->price,
-                               e->our_qty,
-                               e->queue_ahead,
-                               st.queue.fill_probability(order_id));
-    }
+    bpt::common::log::info(kLog(), "{} {} {} @ {:.6f} → order_id={}",
+                           (side == OrderSide::BUY ? "BID" : "ASK"), st.symbol, st.exchange, price,
+                           handle.order_id());
+    st.queue.track(handle.order_id(), side, price, qty, bpt::common::util::WallClock::now_ns(), st.book);
     return handle;
 }
 

@@ -6,7 +6,6 @@
 #include "strategy/refdata/exchange_id.h"
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/reconciler.h"
-#include "strategy/venue/min_order_value.h"
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
@@ -52,13 +51,13 @@ FairValueMmStrategy::FairValueMmStrategy(uint64_t correlation_id,
       skew_alpha_(cfg.params["skew_alpha"].value<double>().value_or(0.1)),
       one_sided_threshold_(cfg.params["one_sided_threshold"].value<double>().value_or(0.8)),
       requote_threshold_(cfg.params["requote_threshold"].value<double>().value_or(0.0003)),
-      max_inventory_(cfg.params["max_inventory"].value<double>().value_or(100.0)),
-      order_qty_(cfg.params["order_qty"].value<double>().value_or(1.0)),
-      order_qty_fraction_(cfg.params["order_qty_fraction"].value<double>().value_or(0.0)),
-      order_qty_min_(cfg.params["order_qty_min"].value<double>().value_or(0.0)),
-      max_inventory_fraction_(cfg.params["max_inventory_fraction"].value<double>().value_or(0.0)),
       pause_below_rpnl_usd_(cfg.params["pause_below_rpnl_usd"].value<double>().value_or(0.0)),
       pause_cooldown_s_(cfg.params["pause_cooldown_s"].value<double>().value_or(300.0)),
+      sizer_{.order_qty = cfg.params["order_qty"].value<double>().value_or(1.0),
+             .order_qty_fraction = cfg.params["order_qty_fraction"].value<double>().value_or(0.0),
+             .order_qty_min = cfg.params["order_qty_min"].value<double>().value_or(0.0),
+             .max_inventory = cfg.params["max_inventory"].value<double>().value_or(100.0),
+             .max_inventory_fraction = cfg.params["max_inventory_fraction"].value<double>().value_or(0.0)},
       unwinder_(positions_,
                 *order_mgr,
                 {.passive_timeout_s = cfg.params["unwind_passive_timeout_s"].value<double>().value_or(45.0),
@@ -197,7 +196,7 @@ std::optional<FairValueMmStrategy::QuoteTarget> FairValueMmStrategy::compute_quo
     const double half_spread_bps = std::clamp(sigma_bps * spread_vol_mult_, min_spread_bps_, max_spread_bps_);
     const double half_spread = half_spread_bps / 10000.0 * fv;
 
-    const double max_inv = effective_max_inventory(st);
+    const double max_inv = sizer_.effective_max_inventory(st.last_mid, last_equity_e8_);
     const double q_norm = (max_inv > 0.0) ? std::clamp(net_qty / max_inv, -1.0, 1.0) : 0.0;
     const double skew = skew_alpha_ * q_norm * fv;
 
@@ -235,9 +234,9 @@ void FairValueMmStrategy::maybe_requote(InstrumentState& st, double net_qty, con
         return;
     }
 
-    const double max_inv = effective_max_inventory(st);
+    const double max_inv = sizer_.effective_max_inventory(st.last_mid, last_equity_e8_);
     const double q_norm = (max_inv > 0.0) ? std::clamp(net_qty / max_inv, -1.0, 1.0) : 0.0;
-    const double ord_qty = effective_order_qty(st);
+    const double ord_qty = sizer_.effective_qty(st.last_mid, st.lot_size, last_equity_e8_, st.exchange);
 
     // At inventory cap: cancel quotes, send unwind.
     if (std::abs(net_qty) >= max_inv) {
@@ -293,43 +292,13 @@ order::OrderHandle FairValueMmStrategy::send_limit_order(InstrumentState& st,
                                                          OrderSide::Value side,
                                                          double price,
                                                          double qty) {
-    qty = bpt::strategy::venue::bump_qty_for_min_notional(qty,
-                                                          st.last_mid,
-                                                          st.lot_size,
-                                                          bpt::strategy::venue::min_notional_usd(st.exchange));
-
-    // Passive rounding: BUY floors (post below), SELL ceils (post above).
-    if (st.tick_size > 0.0) {
-        if (side == OrderSide::BUY)
-            price = std::floor(price / st.tick_size) * st.tick_size;
-        else
-            price = std::ceil(price / st.tick_size) * st.tick_size;
-    }
-
-    const order::NewOrderRequest req{
-        .instrument_id = st.instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = OrderType::LIMIT,
-        .tif = TimeInForce::GTC,
-        .price = price,
-        .qty = qty,
-        .exec_inst = {.post_only = true},
-    };
-
-    auto h = order_mgr_->send_new_order(req, kTagQuote);
+    auto h = order_mgr_->send_quote(st.instrument_id, st.exchange_id, side, price, qty, kTagQuote);
     if (h.valid()) {
-        if (side == OrderSide::BUY)
-            st.last_bid_price = price;
-        else
-            st.last_ask_price = price;
-        bpt::common::log::debug(kLog(),
-                                "[FVMM:{}] {} LIMIT {:.6f} qty={:.4f} oid={}",
-                                correlation_id_,
-                                (side == OrderSide::BUY) ? "BUY" : "SELL",
-                                price,
-                                qty,
-                                h.order_id());
+        if (side == OrderSide::BUY) st.last_bid_price = price;
+        else st.last_ask_price = price;
+        bpt::common::log::debug(kLog(), "[FVMM:{}] {} LIMIT {:.6f} qty={:.4f} oid={}",
+                                correlation_id_, (side == OrderSide::BUY) ? "BUY" : "SELL",
+                                price, qty, h.order_id());
     }
     return h;
 }
@@ -368,24 +337,6 @@ order::OrderHandle FairValueMmStrategy::send_unwind_order(InstrumentState& st,
                                tag);
     }
     return h;
-}
-
-double FairValueMmStrategy::effective_order_qty(const InstrumentState& st) const {
-    if (order_qty_fraction_ > 0.0 && last_equity_e8_ > 0 && st.last_mid > 0.0) {
-        const double equity_usd = static_cast<double>(last_equity_e8_) / 1e8;
-        const double qty = order_qty_fraction_ * equity_usd / st.last_mid;
-        const double floor_qty = (order_qty_min_ > 0.0) ? order_qty_min_ : st.lot_size;
-        return std::max(qty, floor_qty);
-    }
-    return order_qty_;
-}
-
-double FairValueMmStrategy::effective_max_inventory(const InstrumentState& st) const {
-    if (max_inventory_fraction_ > 0.0 && last_equity_e8_ > 0 && st.last_mid > 0.0) {
-        const double equity_usd = static_cast<double>(last_equity_e8_) / 1e8;
-        return max_inventory_fraction_ * equity_usd / st.last_mid;
-    }
-    return max_inventory_;
 }
 
 // ── Execution ─────────────────────────────────────────────────────────────────
@@ -555,7 +506,7 @@ std::string FairValueMmStrategy::get_strategy_state_json() {
 
     const auto& [instrument_id, st] = *state_.begin();
     const double net_qty = static_cast<double>(positions_.net_qty(instrument_id, st.exchange_id)) / 1e8;
-    const double max_inv = effective_max_inventory(st);
+    const double max_inv = sizer_.effective_max_inventory(st.last_mid, last_equity_e8_);
     const auto pos = positions_.get(instrument_id, st.exchange_id);
 
     std::optional<QuoteTarget> q_opt;

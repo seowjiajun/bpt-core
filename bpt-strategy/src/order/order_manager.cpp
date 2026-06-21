@@ -5,6 +5,7 @@
 #include <messages/ExecStatus.h>
 #include <messages/OrderSide.h>
 #include <messages/OrderType.h>
+#include <messages/TimeInForce.h>
 
 #include <bpt_common/logging.h>
 #include <cmath>
@@ -61,6 +62,24 @@ bool normalise_and_validate(const refdata::InstrumentCache& cache,
 }
 
 }  // namespace
+
+OrderHandle OrderManager::send_quote(uint64_t instrument_id,
+                                      bpt::messages::ExchangeId::Value exchange_id,
+                                      bpt::messages::OrderSide::Value side,
+                                      double price, double qty, uint8_t tag) {
+    if (const auto inst = cache_.get(instrument_id); inst && inst->tick_size > 0.0)
+        price = (side == OrderSide::BUY) ? std::floor(price / inst->tick_size) * inst->tick_size
+                                         : std::ceil(price / inst->tick_size) * inst->tick_size;
+    return send_new_order({.instrument_id = instrument_id,
+                           .exchange_id = exchange_id,
+                           .side = side,
+                           .type = OrderType::LIMIT,
+                           .tif = bpt::messages::TimeInForce::GTC,
+                           .price = price,
+                           .qty = qty,
+                           .exec_inst = {.post_only = true}},
+                          tag);
+}
 
 OrderHandle OrderManager::send_new_order(const NewOrderRequest& req, uint8_t tag) {
     double price = req.price;

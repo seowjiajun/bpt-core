@@ -3,6 +3,7 @@
 #include "features/ewma.h"
 #include "features/fair_value.h"
 #include "strategy/config/config.h"
+#include "strategy/config/sizer.h"
 #include "strategy/md/i_md_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/i_refdata_client.h"
@@ -97,8 +98,6 @@ private:
                                                        double mid,
                                                        double qty,
                                                        uint8_t tag);
-    [[nodiscard]] double effective_order_qty(const InstrumentState& st) const;
-    [[nodiscard]] double effective_max_inventory(const InstrumentState& st) const;
 
     uint64_t correlation_id_;
     double vol_halflife_s_;
@@ -109,13 +108,9 @@ private:
     double skew_alpha_;
     double one_sided_threshold_;
     double requote_threshold_;
-    double max_inventory_;
-    double order_qty_;
-    double order_qty_fraction_;
-    double order_qty_min_;
-    double max_inventory_fraction_;
     double pause_below_rpnl_usd_;
     double pause_cooldown_s_;
+    config::Sizer sizer_;
     unwind::GracefulUnwinder unwinder_;
     FairValueEstimator::Config fv_cfg_;
 

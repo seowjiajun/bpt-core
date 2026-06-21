@@ -51,6 +51,13 @@ public:
     // `tag` is strategy-defined intent (e.g. Quote vs Unwind); OM does
     // not interpret it. Returns an invalid handle on validation failure.
     [[nodiscard]] OrderHandle send_new_order(const NewOrderRequest& req, uint8_t tag = 0);
+
+    // Passive LIMIT GTC with MM rounding (BUY floors, SELL ceils) and post_only=true.
+    [[nodiscard]] OrderHandle send_quote(uint64_t instrument_id,
+                                         bpt::messages::ExchangeId::Value exchange_id,
+                                         bpt::messages::OrderSide::Value side,
+                                         double price, double qty, uint8_t tag = 0);
+
     void send_cancel(OrderHandle& handle);
     void send_cancel(const CancelOrderRequest& req);
 

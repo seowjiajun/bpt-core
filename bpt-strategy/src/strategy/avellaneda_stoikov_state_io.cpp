@@ -53,7 +53,9 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     // from the struct, which is correct since st.book wouldn't be ready
     // during warmup anyway.
     const SuppressionState supp =
-        supp_policy_.evaluate(st, net_qty, bid_quote, ask_quote, effective_max_inventory(st), effective_order_qty(st));
+        supp_policy_.evaluate(st, net_qty, bid_quote, ask_quote,
+                              sizer_.effective_max_inventory(st.last_mid, last_equity_e8_),
+                              sizer_.effective_qty(st.last_mid, st.lot_size, last_equity_e8_, st.exchange));
     const double drift_bps = std::abs(st.ewma_drift.value()) * 1e4;  // used in driftBps JSON field below
     const double projected_fp_bid = supp.fp_bid;
     const double projected_fp_ask = supp.fp_ask;
@@ -124,7 +126,7 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     // Inventory — report the EFFECTIVE cap (adaptive when configured),
     // not the static fallback, so the console inventoryPct gauge
     // tracks the same threshold the strategy is actually enforcing.
-    const double max_inv = effective_max_inventory(st);
+    const double max_inv = sizer_.effective_max_inventory(st.last_mid, last_equity_e8_);
     j["inventory"] = net_qty;
     j["maxInventory"] = max_inv;
     j["inventoryPct"] = max_inv > 0 ? std::abs(net_qty) / max_inv * 100.0 : 0;

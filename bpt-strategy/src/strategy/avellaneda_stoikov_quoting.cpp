@@ -64,7 +64,8 @@ auto AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st, const 
     // (harder to get filled short), bids move up (easier to get filled long).
     // This counteracts the core AS weakness of accumulating adverse inventory
     // in momentum regimes.
-    const double q_normalized = (max_inventory_ > 0.0) ? std::clamp(net_qty / max_inventory_, -1.0, 1.0) : 0.0;
+    const double q_normalized =
+        (sizer_.max_inventory > 0.0) ? std::clamp(net_qty / sizer_.max_inventory, -1.0, 1.0) : 0.0;
     const double inventory_skew_frac = q_normalized * gamma_sigma_sq_T;
     // Drift contribution to reservation. ewma_drift is the EWMA of
     // log_ret/√dt — units of log-returns per √second. Integrating that
@@ -245,32 +246,6 @@ auto AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st, const 
         drift_adjustment);
 
     return QuoteTarget{bid, ask};
-}
-
-// ── Effective sizing — adaptive vs fixed ───────────────────────────────────
-double AvellanedaStoikovStrategy::effective_order_qty(const InstrumentState& st) const {
-    double qty = order_qty_;
-    if (order_qty_fraction_ > 0.0 && last_equity_e8_ > 0 && st.last_mid > 0.0) {
-        const double equity_usd = static_cast<double>(last_equity_e8_) / 1e8;
-        const double derived = order_qty_fraction_ * equity_usd / st.last_mid;
-        qty = std::max(order_qty_min_, derived);
-    }
-    // Bump qty up if the venue enforces a min-notional floor that the
-    // chosen qty (fixed or equity-fractional) doesn't clear. HL has a
-    // venue-wide $10 floor; without this, equity-fractional sizing on
-    // a small account would emit orders that always reject.
-    return bpt::strategy::venue::bump_qty_for_min_notional(qty,
-                                                           st.last_mid,
-                                                           st.lot_size,
-                                                           bpt::strategy::venue::min_notional_usd(st.exchange));
-}
-
-double AvellanedaStoikovStrategy::effective_max_inventory(const InstrumentState& st) const {
-    if (max_inventory_fraction_ > 0.0 && last_equity_e8_ > 0 && st.last_mid > 0.0) {
-        const double equity_usd = static_cast<double>(last_equity_e8_) / 1e8;
-        return max_inventory_fraction_ * equity_usd / st.last_mid;
-    }
-    return max_inventory_;
 }
 
 double AvellanedaStoikovStrategy::gamma_pnl_mult(const InstrumentState& st) const {
