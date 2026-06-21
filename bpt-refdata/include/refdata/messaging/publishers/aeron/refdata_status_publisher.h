@@ -7,6 +7,7 @@
 #include <messages/ExchangeId.h>
 #include <messages/RefDataErrorType.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 
@@ -15,7 +16,7 @@ namespace bpt::refdata::messaging::aeron {
 // Publishes RefDataReady (id=16) and RefDataError (id=17) on stream 1006.
 class RefdataStatusPublisher final : public api::RefdataStatusPublisher {
 public:
-    RefdataStatusPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    RefdataStatusPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     // Published once after all enabled exchange adapters have completed
     // their initial snapshot fetch.

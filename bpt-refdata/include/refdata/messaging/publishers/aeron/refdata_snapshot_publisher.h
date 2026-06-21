@@ -6,13 +6,14 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 
 namespace bpt::refdata::messaging::aeron {
 
 class RefdataSnapshotPublisher final : public api::RefdataSnapshotPublisher {
 public:
-    RefdataSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    RefdataSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish(const registry::InstrumentRegistry& registry,
                  const RefdataRequest& request,

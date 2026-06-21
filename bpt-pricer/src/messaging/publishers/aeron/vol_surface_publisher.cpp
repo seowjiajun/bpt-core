@@ -7,10 +7,11 @@
 namespace bpt::pricer::messaging::aeron {
 
 VolSurfacePublisher::VolSurfacePublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                         const std::string& channel,
-                                         int32_t stream_id) {
-    pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-    bpt::common::log::info("[aeron::VolSurfacePublisher] Publication ready on {} stream {}", channel, stream_id);
+                                         const bpt::common::config::StreamConfig& stream) {
+    pub_ = bpt::common::aeron::wait_for_publication(aeron, stream.channel, stream.stream_id);
+    bpt::common::log::info("[aeron::VolSurfacePublisher] Publication ready on {} stream {}",
+                           stream.channel,
+                           stream.stream_id);
 }
 
 void VolSurfacePublisher::publish(const surface::VolSurfaceGrid& grid, uint64_t timestamp_ns) {

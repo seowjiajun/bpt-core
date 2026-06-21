@@ -347,15 +347,17 @@ void OFIStrategy::fire_order(InstrumentState& st, bpt::messages::OrderSide::Valu
     const double cross = mid * (kAggressBps / 1e4);
     const double price = (side == OrderSide::BUY) ? (st.ask + cross) : (st.bid - cross);
 
-    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = st.instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = OrderType::LIMIT,
-        .tif = TimeInForce::IOC,
-        .price = price,
-        .qty = qty,
-    }).order_id();
+    const uint64_t oid = order_mgr_
+                             ->send_new_order(order::NewOrderRequest{
+                                 .instrument_id = st.instrument_id,
+                                 .exchange_id = st.exchange_id,
+                                 .side = side,
+                                 .type = OrderType::LIMIT,
+                                 .tif = TimeInForce::IOC,
+                                 .price = price,
+                                 .qty = qty,
+                             })
+                             .order_id();
     if (oid == 0) {
         bpt::common::log::warn(kLog(), "{} place_order rejected — preflight failed", st.symbol);
         return;

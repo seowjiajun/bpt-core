@@ -71,10 +71,10 @@ public:
     /// Push a `SendWorkItem` onto `send_work_queue_` and return.
     /// The send-executor thread drains and invokes `do_send_*_blocking`.
     /// @{
-    void send_new_order(const bpt::messages::NewOrder& order) final;
-    void send_cancel(const bpt::messages::CancelOrder& cancel, const std::string& native_symbol) final;
+    void send_new_order(const order::NewOrderEvent& order) final;
+    void send_cancel(const order::CancelOrderEvent& cancel, const std::string& native_symbol) final;
     void send_cancel_all(uint64_t instrument_id) final;
-    void send_modify(const bpt::messages::ModifyOrder& modify, const std::string& native_symbol) final;
+    void send_modify(const order::ModifyOrderEvent& modify, const std::string& native_symbol) final;
     /// @}
 
     /// \brief Drain pending exec events. Called from the main poll thread.

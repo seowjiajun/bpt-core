@@ -14,11 +14,10 @@
 /// templating the decoder selection on the --venue flag; the rest of
 /// this binary is venue-agnostic.
 
+#include "bpt_common/recorder/wslog_format.h"
 #include "canon/canon_format.h"
 #include "canon/canon_recording_publisher.h"
 #include "canon/canon_writer.h"
-
-#include "bpt_common/recorder/wslog_format.h"
 #include "md_gateway/adapter/common/subscription_map.h"
 #include "md_gateway/adapter/hyperliquid/hyperliquid_md_decoder.h"
 #include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"
@@ -116,7 +115,9 @@ int main(int argc, char* argv[]) {
         ->check(CLI::ExistingFile);
     cli.add_option("--output", output_path, "Output .canon path")->required();
     cli.add_option("--venue", venue_name, "Venue tag (only HYPERLIQUID supported today)")->capture_default_str();
-    cli.add_option("--producer-sha", producer_sha, "Git SHA stamped into the canon file header (truncated to 40 chars)");
+    cli.add_option("--producer-sha",
+                   producer_sha,
+                   "Git SHA stamped into the canon file header (truncated to 40 chars)");
 
     CLI11_PARSE(cli, argc, argv);
 
@@ -211,7 +212,8 @@ int main(int argc, char* argv[]) {
             recorder.publish(stamped);
         };
     bpt::md_gateway::messaging::InstrumentStatsCallback stats_cb =
-        [](const bpt::md_gateway::messaging::InstrumentStatsUpdate&) {};
+        [](const bpt::md_gateway::messaging::InstrumentStatsUpdate&) {
+        };
 
     // Decoder is templated on Pub — here Pub = CanonRecordingPublisher.
     bpt::md_gateway::adapter::HyperliquidMdDecoder<bpt::canon::CanonRecordingPublisher> decoder(subs);

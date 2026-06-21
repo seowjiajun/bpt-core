@@ -6,6 +6,7 @@
 #include <Aeron.h>
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -19,7 +20,7 @@ namespace bpt::order_gateway::messaging::aeron {
 /// OrderGatewayService::run heartbeat path).
 class HeartbeatPublisher final : public api::HeartbeatPublisher {
 public:
-    HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     /// \copydoc api::HeartbeatPublisher::publish
     void publish(uint8_t service_id, uint16_t orders_in_flight, uint8_t exchange_status) override;

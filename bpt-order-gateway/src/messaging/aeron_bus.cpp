@@ -18,18 +18,11 @@ namespace bpt::order_gateway::messaging {
 
 OrderGatewayBus OrderGatewayAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
     OrderGatewayBus bus;
-    bus.control_sub =
-        std::make_shared<aeron::OrderSubscriber>(aeron, settings.aeron.order.channel, settings.aeron.order.stream_id);
-    bus.exec_pub = std::make_shared<aeron::ExecReportPublisher>(aeron,
-                                                                settings.aeron.exec_report.channel,
-                                                                settings.aeron.exec_report.stream_id);
+    bus.control_sub = std::make_shared<aeron::OrderSubscriber>(aeron, settings.aeron.order);
+    bus.exec_pub = std::make_shared<aeron::ExecReportPublisher>(aeron, settings.aeron.exec_report);
     bus.account_snapshot_pub =
-        std::make_shared<aeron::AccountSnapshotPublisher>(aeron,
-                                                          settings.aeron.account_snapshot.channel,
-                                                          settings.aeron.account_snapshot.stream_id);
-    bus.heartbeat_pub = std::make_shared<aeron::HeartbeatPublisher>(aeron,
-                                                                    settings.aeron.heartbeat.channel,
-                                                                    settings.aeron.heartbeat.stream_id);
+        std::make_shared<aeron::AccountSnapshotPublisher>(aeron, settings.aeron.account_snapshot);
+    bus.heartbeat_pub = std::make_shared<aeron::HeartbeatPublisher>(aeron, settings.aeron.heartbeat);
     return bus;
 }
 

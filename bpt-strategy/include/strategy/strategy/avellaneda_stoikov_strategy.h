@@ -1,19 +1,21 @@
 #pragma once
 
+#include "bpt_common/book/order_book_state.h"
+#include "features/ewma.h"
+#include "features/fair_value.h"
+#include "features/ofi.h"
+#include "features/queue.h"
+#include "features/regime_detector.h"
+#include "features/vol_gate.h"
 #include "strategy/config/config.h"
 #include "strategy/md/md_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
-#include "features/ewma.h"
-#include "features/fair_value.h"
 #include "strategy/strategy/i_strategy.h"
-#include "features/ofi.h"
-#include "bpt_common/book/order_book_state.h"
 #include "strategy/strategy/position_tracker.h"
-#include "features/queue.h"
-#include "features/regime_detector.h"
-#include "features/vol_gate.h"
+#include "strategy/strategy/suppression_policy.h"
+#include "strategy/unwind/graceful_unwinder.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecutionReport.h>
@@ -24,6 +26,7 @@
 
 #include <atomic>
 #include <deque>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -31,15 +34,15 @@
 
 namespace bpt::strategy::strategy {
 
+using bpt::common::book::OrderBookState;
 using bpt::features::EwmaDrift;
 using bpt::features::EwmaVariance;
+using bpt::features::FairValueEstimator;
 using bpt::features::KappaEstimator;
 using bpt::features::OFICalculator;
-using bpt::features::TimeWeightedEwma;
-using bpt::common::book::OrderBookState;
-using bpt::features::FairValueEstimator;
 using bpt::features::QueueTracker;
 using bpt::features::RegimeDetector;
+using bpt::features::TimeWeightedEwma;
 using bpt::features::VolatilityGate;
 
 // Avellaneda-Stoikov market-making strategy.
@@ -96,6 +99,8 @@ public:
     std::string get_strategy_state_json() override;
     void on_shutdown_flatten() override;
     [[nodiscard]] bool has_pending_flatten() const override;
+    void on_flatten_tick() override;
+    [[nodiscard]] double shutdown_drain_budget_s() const override;
 
     // Persist per-instrument EWMA + regime state so a restart within
     // max_age_s doesn't eat the full vol/drift/kappa warmup.
@@ -104,15 +109,16 @@ public:
 
 private:
     // OrderState::tag values used by AS — dispatched on in on_exec_report.
-    static constexpr uint8_t kTagQuote = 0;            // resting bid/ask
-    static constexpr uint8_t kTagUnwindNormal = 1;     // inventory-cap auto-unwind
-    static constexpr uint8_t kTagUnwindShutdown = 2;   // shutdown-drain unwind
+    static constexpr uint8_t kTagQuote = 0;         // resting bid/ask
+    static constexpr uint8_t kTagUnwindNormal = 1;  // inventory-cap auto-unwind
 
     struct InstrumentState {
+        uint64_t instrument_id{0};  // map key, stored here to avoid passing it separately
+
         // EWMA estimators live in bpt-features. Halflives are passed via
         // designated init from on_snapshot/on_delta below.
-        EwmaVariance ewma_var;   // per-second variance σ²
-        EwmaDrift ewma_drift;    // per-√second drift µ
+        EwmaVariance ewma_var;      // per-second variance σ²
+        EwmaDrift ewma_drift;       // per-√second drift µ
         KappaEstimator ewma_kappa;  // per-side trade arrival rate κ
 
         // Cached separately from the EWMAs because other AS code paths
@@ -131,16 +137,6 @@ private:
         // LIMIT IOC order to unwind inventory when it hits max_inventory_.
         // valid() while an unwind is in flight.
         order::OrderHandle h_unwind;
-
-        // Remaining retry attempts if a shutdown-path unwind IOC is
-        // rejected or partial-fills + cancels leaving residual position.
-        // Non-zero only between on_shutdown_flatten() and drain
-        // completion. Zero during normal operation so non-shutdown
-        // unwinds (inventory-cap breaches) don't auto-retry.
-        uint32_t unwind_retries_left{0};
-
-        // Source-of-unwind (shutdown drain vs inventory-cap auto-unwind) is
-        // encoded in h_unwind.state->tag (kTagUnwindShutdown / kTagUnwindNormal).
 
         // Prices of the currently live (or most recently placed) orders.
         // Used to detect whether the quote has drifted beyond requote_threshold_.
@@ -294,147 +290,43 @@ private:
         uint64_t pause_until_ns{0};
     };
 
-    // Compute new bid/ask from the AS model.
-    // Returns false if the volatility window is not yet warmed up.
-    // Maker fee from FeeCache is added to the minimum half-spread floor so
-    // the spread always covers the round-trip cost (2 × maker_bps).
-    bool compute_quotes(const InstrumentState& st,
-                        uint64_t instrument_id,
-                        double net_qty,
-                        double mid,
-                        uint64_t timestamp_ns,
-                        double& out_bid,
-                        double& out_ask) const;
-
-    // Evaluate whether each side needs a cancel+requote and act accordingly.
-    void maybe_requote(uint64_t instrument_id,
-                       InstrumentState& st,
-                       double net_qty,
-                       double mid,
-                       double new_bid,
-                       double new_ask);
-
-    // Aggregated suppression state — one per-tick snapshot of every
-    // reason a side might be blocked from quoting. Exists to keep
-    // maybe_requote's runtime decisions and get_strategy_state_json's
-    // console reporting in lockstep: prior to extraction, each path
-    // had its own copy of the logic and a new reason (e.g. today's
-    // trend_suppress) had to be added in two places or the console
-    // would silently disagree with the actual decision.
-    //
-    // Organization: raw per-reason booleans for both sides, plus
-    // aggregate convenience accessors. Priority-ordered reason string
-    // comes out of the accessor so the string and the boolean can
-    // never drift.
-    struct SuppressionState {
-        bool drift_bid{false}, drift_ask{false};          // per-√s EWMA drift
-        bool trend_bid{false}, trend_ask{false};          // cumulative return over slow_drift_window_s
-        bool tox_bid{false}, tox_ask{false};              // analytics toxicity score
-        bool queue_bid{false}, queue_ask{false};          // projected fill-prob too low
-        bool inventory_bid{false}, inventory_ask{false};  // |net_qty| >= max_inventory
-        bool post_fill_bid{false}, post_fill_ask{false};  // post-fill markout cooldown (Phase 2.1)
-        bool ofi_cancel_bid{false}, ofi_cancel_ask{false};  // OFI > θσ rule (research +0.915 bps/fill)
-        bool vol_halted{false};                           // intra-tick realized-vol gate
-        bool pause_active{false};                         // PnL drawdown circuit-breaker
-
-        // Queue projection side outputs — populated when queue check
-        // runs, cached here so logging + console don't recompute.
-        double fp_bid{1.0}, fp_ask{1.0};
-
-        // Full aggregate — every reason counted. Used by the console
-        // bidSuppressed / askSuppressed flags.
-        [[nodiscard]] bool bid_suppressed() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || inventory_bid || post_fill_bid || ofi_cancel_bid ||
-                   vol_halted || pause_active;
-        }
-        [[nodiscard]] bool ask_suppressed() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || inventory_ask || post_fill_ask || ofi_cancel_ask ||
-                   vol_halted || pause_active;
-        }
-
-        // "Signal-only" aggregate — drift/trend/toxicity/queue/post_fill/ofi_cancel. Used by
-        // maybe_requote for the "cancel + don't replace" logic; the
-        // caller checks inventory + vol_gate separately because it
-        // wants different log strings for those cases.
-        [[nodiscard]] bool bid_signal() const noexcept {
-            return drift_bid || trend_bid || tox_bid || queue_bid || post_fill_bid || ofi_cancel_bid || pause_active;
-        }
-        [[nodiscard]] bool ask_signal() const noexcept {
-            return drift_ask || trend_ask || tox_ask || queue_ask || post_fill_ask || ofi_cancel_ask || pause_active;
-        }
-
-        // Priority-ordered reason string. Priority: vol_gate →
-        // inventory → post_fill → ofi_cancel → drift → trend → tox →
-        // queue (most to least severe). post_fill ranks above ofi_cancel
-        // because it's a direct response to a confirmed adverse fill,
-        // not a forecast; ofi_cancel ranks above drift because OFI is
-        // current-tick book pressure, drift is a per-√s rate estimate.
-        [[nodiscard]] std::string_view bid_reason() const noexcept {
-            if (pause_active)
-                return "pause";
-            if (vol_halted)
-                return "vol_gate";
-            if (inventory_bid)
-                return "inventory";
-            if (post_fill_bid)
-                return "post_fill";
-            if (ofi_cancel_bid)
-                return "ofi_cancel";
-            if (drift_bid)
-                return "drift";
-            if (trend_bid)
-                return "trend";
-            if (tox_bid)
-                return "toxicity";
-            if (queue_bid)
-                return "queue";
-            return "";
-        }
-        [[nodiscard]] std::string_view ask_reason() const noexcept {
-            if (pause_active)
-                return "pause";
-            if (vol_halted)
-                return "vol_gate";
-            if (inventory_ask)
-                return "inventory";
-            if (post_fill_ask)
-                return "post_fill";
-            if (ofi_cancel_ask)
-                return "ofi_cancel";
-            if (drift_ask)
-                return "drift";
-            if (trend_ask)
-                return "trend";
-            if (tox_ask)
-                return "toxicity";
-            if (queue_ask)
-                return "queue";
-            return "";
-        }
+    // Per-BBO-tick context shared by compute_quotes and maybe_requote.
+    struct BboContext {
+        double net_qty;
+        double mid;  // fair-value reference price (s)
+        uint64_t ts_ns;
     };
 
-    // Compute the full suppression snapshot. Pure function of the
-    // instrument state + inventory + candidate quote prices; does not
-    // mutate state or log. maybe_requote does its own info-level
-    // logging of drift/trend/toxicity/queue triggers using the values on
-    // the returned struct.
-    [[nodiscard]] SuppressionState compute_suppression(const InstrumentState& st,
-                                                       double net_qty,
-                                                       double new_bid,
-                                                       double new_ask) const;
+    // Output of compute_quotes — passed directly into maybe_requote.
+    struct QuoteTarget {
+        double bid;
+        double ask;
+    };
 
-    // Place a LIMIT IOC order at an aggressive price to unwind inventory.
-    // `tag` is kTagUnwindNormal for inventory-cap unwinds, kTagUnwindShutdown
-    // when called from on_shutdown_flatten.
-    order::OrderHandle send_unwind_order(uint64_t instrument_id,
-                                         InstrumentState& st,
+    // Compute new bid/ask from the AS model.
+    // Returns nullopt if the volatility window is not yet warmed up.
+    // Maker fee from FeeCache is added to the minimum half-spread floor so
+    // the spread always covers the round-trip cost (2 × maker_bps).
+    [[nodiscard]] std::optional<QuoteTarget> compute_quotes(const InstrumentState& st, const BboContext& ctx) const;
+
+    // Evaluate whether each side needs a cancel+requote and act accordingly.
+    void maybe_requote(InstrumentState& st, const BboContext& ctx, const QuoteTarget& quotes);
+
+    // SuppressionState + the per-tick suppression decision live in
+    // suppression_policy.h, owned by supp_policy_ below. Kept as one
+    // snapshot so maybe_requote's runtime decisions and
+    // get_strategy_state_json's console reporting stay in lockstep —
+    // a new reason can't be added to one path and silently missed by the
+    // other. Call supp_policy_.evaluate(st, net_qty, bid, ask, max_inv,
+    // eff_qty); max_inv/eff_qty come from the sizer (effective_*).
+
+    order::OrderHandle send_unwind_order(InstrumentState& st,
                                          bpt::messages::OrderSide::Value side,
                                          double mid,
                                          double qty,
                                          uint8_t tag);
 
-    order::OrderHandle send_limit_order(uint64_t instrument_id,
-                                        InstrumentState& st,
+    order::OrderHandle send_limit_order(InstrumentState& st,
                                         bpt::messages::OrderSide::Value side,
                                         double price,
                                         double qty);
@@ -533,14 +425,8 @@ private:
     // that drives quotes deep into the book. Cap defaults to 10 bps;
     // 0 disables the cap (legacy behaviour).
     double max_drift_skew_bps_;
-    double drift_suppress_bps_;  // suppress adverse side when |µ| > this (bps/√s, fixed floor)
-    // σ-multiple adaptive companion to drift_suppress_bps_. Effective
-    // threshold at runtime = max(drift_suppress_bps_,
-    //                            drift_suppress_sigma_mult_ × σ_ewma_bps).
-    // Makes the knob asset-independent: tune once as "k SDs of realized
-    // vol" rather than re-tuning bps for each venue / vol regime.
-    // 0 disables adaptive part (purely fixed threshold).
-    double drift_suppress_sigma_mult_;
+    // Fast/slow drift + toxicity + queue suppression knobs moved into
+    // supp_policy_ (suppression_policy.h). See SuppressionPolicy::Config.
 
     // Slow-drift (trend) detection — complements the per-√s EWMA drift
     // above. The fast signal is tuned for flash moves (threshold in
@@ -556,51 +442,17 @@ private:
     // Window-based (not EWMA) because the cumulative-return framing gives
     // a predictable threshold in absolute bps; EWMA would require an
     // adaptive threshold keyed to halflife.
-    double slow_drift_window_s_;      // rolling anchor window (seconds)
-    double slow_drift_suppress_bps_;  // suppress when |cum_return| > this (bps, fixed floor). 0 disables.
-    // σ-multiple adaptive companion. Effective threshold at runtime =
-    //   max(slow_drift_suppress_bps_,
-    //       slow_drift_suppress_sigma_mult_ × σ_ewma_bps × √window_s).
-    // The √window_s factor converts per-√s σ into a "typical cumulative
-    // return magnitude over `window_s` seconds" — i.e., the expected
-    // stdev of the cumulative-return measure we're thresholding. Setting
-    // sigma_mult = 3 ≈ "fire on 3-SD cumulative moves over the window."
-    // 0 disables adaptive part.
-    double slow_drift_suppress_sigma_mult_;
+    // slow_drift_window_s_ owns the anchor-advance cadence (used in on_bbo);
+    // the slow-drift *suppression* threshold lives in supp_policy_.
+    double slow_drift_window_s_;  // rolling anchor window (seconds)
 
-    // Analytics toxicity suppression — suppress side when toxicity score < threshold.
-    // 0 disables. Typical value: -2.0 (suppress when 5s markout is -2bps or worse).
-    double tox_suppress_threshold_;  // negative value; 0 disables
-
-    // Queue-position suppression — suppress a side if the projected
-    // fill probability at the candidate quote price drops below this
-    // floor. 0 disables.
-    //
-    // Two formulations:
-    //   - Time-aware (preferred): P(fill within queue_suppress_horizon_s_) ≈
-    //       1 - exp(-κ × T / queue_ahead). Uses the κ estimate AS already
-    //       maintains. Threshold becomes a real probability ("P(fill in
-    //       5s) < min") rather than an ordinal ratio.
-    //   - Geometric (fallback): our_qty / (our_qty + queue_ahead). Used
-    //       when queue_suppress_horizon_s_ = 0 or κ has not warmed up.
-    double queue_suppress_fill_prob_min_;
-    double queue_suppress_horizon_s_;
+    // Toxicity + queue-position suppression knobs moved into supp_policy_.
+    // The strategy still owns the per-tick suppression *snapshot* via
+    // supp_policy_.evaluate(); these were the last flat suppression scalars.
+    SuppressionPolicy supp_policy_;
 
     // Shutdown-unwind aggression, expressed in basis points through
-    // mid. Used by send_unwind_order() to price the IOC that flattens
-    // residual inventory at shutdown. Default 20 bps is enough to cross
-    // major-pair spreads in normal regimes; raise for thinner venues or
-    // volatile markets where 20 bps no-fills and positions leak past
-    // the drain budget. Retry logic re-reads this value on each attempt.
-    double shutdown_cross_bps_;
-
-    // Max retry attempts per instrument if the initial shutdown unwind
-    // IOC is rejected or leaves residual position (partial fill then
-    // IOC remainder cancels). Each retry refetches st.last_mid so the
-    // IOC is priced against a current BBO. Total attempts per
-    // instrument = 1 initial + shutdown_max_unwind_retries_. Default 3
-    // gives ~4 attempts against the 5s post-drain budget.
-    uint32_t shutdown_max_unwind_retries_;
+    unwind::GracefulUnwinder unwinder_;
 
     // Regime detector config — applied per-instrument at snapshot time.
     RegimeDetector::Config regime_cfg_;
@@ -647,6 +499,13 @@ private:
     // makes the feature a no-op so legacy configs are unchanged.
     double ofi_weight_bps_;
     uint64_t ofi_window_ns_;
+
+    // Book-imbalance quote-skew. Additive offset to the AS reservation
+    // proportional to L1 queue imbalance (bid_qty - ask_qty)/(bid_qty + ask_qty).
+    // Same sign as ofi_weight_bps_: positive (bid-heavy) lifts reservation.
+    // Research: book imbalance shows stable Spearman IC ~0.45 @ 5s on HL
+    // (notebooks/signal_research_book_imbalance.ipynb). Default 0 = no-op.
+    double imbalance_weight_bps_;
 
     // OFI cancel suppression — research-validated +0.915 bps/fill uplift
     // from per-fill markout sim across 5 spread regimes (see

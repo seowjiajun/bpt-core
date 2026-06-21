@@ -15,7 +15,6 @@
 #include "canon/canon_format.h"
 #include "canon/canon_sbe.h"
 #include "canon/canon_writer.h"
-
 #include "md_gateway/md/md_publisher_concept.h"
 #include "md_gateway/md/md_types.h"
 #include "md_gateway/messaging/publishers/api/funding_rate_publisher.h"

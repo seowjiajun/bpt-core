@@ -60,7 +60,7 @@ struct Settings {
     bpt::common::config::StreamConfig refdata_control;
 
     // Exchange-sourced refdata streams.
-    // Note: stream 1005 (FundingRate) is published by MdGateway, not here.
+    // Note: stream 2005 (FundingRate) is published by MdGateway, not here.
     bpt::common::config::StreamConfig fee_schedule;
     bpt::common::config::StreamConfig refdata_status;
 

@@ -7,13 +7,12 @@
 namespace bpt::strategy::console {
 
 PortfolioSnapshotPublisher::PortfolioSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron,
-                                                       const std::string& channel,
-                                                       int32_t stream_id) {
-    if (channel.empty() || stream_id == 0)
+                                                       const bpt::common::config::StreamConfig& stream) {
+    if (stream.channel.empty() || stream.stream_id == 0)
         return;
 
-    pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-    bpt::common::log::info("Console snapshot publication ready on stream {}", stream_id);
+    pub_ = bpt::common::aeron::wait_for_publication(aeron, stream.channel, stream.stream_id);
+    bpt::common::log::info("Console snapshot publication ready on stream {}", stream.stream_id);
 }
 
 void PortfolioSnapshotPublisher::publish_if_due(const strategy::PortfolioState& state, uint64_t now_ns) {

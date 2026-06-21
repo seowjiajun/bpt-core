@@ -10,14 +10,14 @@
 #include <Aeron.h>
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
-#include <string>
 
 namespace bpt::pms::messaging::aeron {
 
 class BalanceSnapshotPublisher : public api::BalanceSnapshotPublisher {
 public:
-    BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish(const adapter::BalanceSnapshot& snapshot) override;
 

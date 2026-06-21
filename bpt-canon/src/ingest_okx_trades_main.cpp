@@ -26,7 +26,6 @@
 #include "canon/canon_format.h"
 #include "canon/canon_sbe.h"
 #include "canon/canon_writer.h"
-
 #include "md_gateway/md/md_types.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 
@@ -37,11 +36,11 @@
 #include <CLI/CLI.hpp>
 #include <bpt_common/logging.h>
 #include <charconv>
-#include <fast_float/fast_float.h>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
+#include <fast_float/fast_float.h>
 #include <fmt/format.h>
 #include <fstream>
 #include <iostream>
@@ -246,8 +245,7 @@ int main(int argc, char* argv[]) {
         trade.instrument_id = it->second;
         trade.price = parse_double_sv(row.price);
         trade.qty = parse_double_sv(row.size);
-        trade.side =
-            (row.side == "buy") ? bpt::messages::TradeSide::BUY : bpt::messages::TradeSide::SELL;
+        trade.side = (row.side == "buy") ? bpt::messages::TradeSide::BUY : bpt::messages::TradeSide::SELL;
 
         char buf[bpt::canon::CanonScratch::kTradeSize];
         const std::size_t n = bpt::canon::encode_trade(trade, /*seq_num=*/++emitted, buf, sizeof(buf));

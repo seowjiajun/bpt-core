@@ -9,6 +9,7 @@
 #include <messages/ExecutionReport.h>
 #include <messages/MessageHeader.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <bpt_common/aeron/subscriber.h>
 #include <cstdint>
 #include <memory>
@@ -20,11 +21,11 @@ namespace bpt::analytics::messaging::aeron {
 template <class Handler>
 class ExecReportSubscriber final : public api::ExecReportSubscriber {
 public:
-    ExecReportSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
+    ExecReportSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream)
         : sub_(std::make_unique<bpt::common::aeron::Subscriber>(
               std::move(aeron),
-              channel,
-              stream_id,
+              stream.channel,
+              stream.stream_id,
               [this](::aeron::AtomicBuffer& buffer,
                      ::aeron::util::index_t offset,
                      ::aeron::util::index_t length,

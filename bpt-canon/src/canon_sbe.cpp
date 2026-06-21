@@ -84,7 +84,10 @@ namespace {
 /// Verify the SBE message header, then return true if the template id
 /// matches `expected` and the buffer is long enough to wrap the block.
 template <typename MsgT>
-bool wrap_for_decode_header(const char* buf, std::size_t len, sbe::MessageHeader& hdr, std::uint16_t expected) noexcept {
+bool wrap_for_decode_header(const char* buf,
+                            std::size_t len,
+                            sbe::MessageHeader& hdr,
+                            std::uint16_t expected) noexcept {
     if (len < sbe::MessageHeader::encodedLength())
         return false;
     hdr.wrap(const_cast<char*>(buf), 0, MsgT::sbeSchemaVersion(), len);
@@ -102,7 +105,11 @@ bool decode_bbo(const char* buf, std::size_t len, bpt::md_gateway::md::MdBbo& ou
     if (!wrap_for_decode_header<sbe::MdMarketData>(buf, len, hdr, sbe::MdMarketData::sbeTemplateId()))
         return false;
     sbe::MdMarketData msg;
-    msg.wrapForDecode(const_cast<char*>(buf), sbe::MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), len);
+    msg.wrapForDecode(const_cast<char*>(buf),
+                      sbe::MessageHeader::encodedLength(),
+                      hdr.blockLength(),
+                      hdr.version(),
+                      len);
     out.timestamp_ns = msg.timestampNs();
     out.instrument_id = msg.instrumentId();
     out.bid_price = msg.bidPrice();
@@ -117,7 +124,11 @@ bool decode_trade(const char* buf, std::size_t len, bpt::md_gateway::md::MdTrade
     if (!wrap_for_decode_header<sbe::MdTrade>(buf, len, hdr, sbe::MdTrade::sbeTemplateId()))
         return false;
     sbe::MdTrade msg;
-    msg.wrapForDecode(const_cast<char*>(buf), sbe::MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), len);
+    msg.wrapForDecode(const_cast<char*>(buf),
+                      sbe::MessageHeader::encodedLength(),
+                      hdr.blockLength(),
+                      hdr.version(),
+                      len);
     out.timestamp_ns = msg.timestampNs();
     out.instrument_id = msg.instrumentId();
     out.price = msg.price();
@@ -131,7 +142,11 @@ bool decode_book(const char* buf, std::size_t len, bpt::md_gateway::md::MdOrderB
     if (!wrap_for_decode_header<sbe::MdOrderBook>(buf, len, hdr, sbe::MdOrderBook::sbeTemplateId()))
         return false;
     sbe::MdOrderBook msg;
-    msg.wrapForDecode(const_cast<char*>(buf), sbe::MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), len);
+    msg.wrapForDecode(const_cast<char*>(buf),
+                      sbe::MessageHeader::encodedLength(),
+                      hdr.blockLength(),
+                      hdr.version(),
+                      len);
     out.timestamp_ns = msg.timestampNs();
     out.instrument_id = msg.instrumentId();
     out.bids.clear();
@@ -154,14 +169,16 @@ bool decode_book(const char* buf, std::size_t len, bpt::md_gateway::md::MdOrderB
     return true;
 }
 
-bool decode_funding(const char* buf,
-                    std::size_t len,
-                    bpt::md_gateway::messaging::FundingRateUpdate& out) noexcept {
+bool decode_funding(const char* buf, std::size_t len, bpt::md_gateway::messaging::FundingRateUpdate& out) noexcept {
     sbe::MessageHeader hdr;
     if (!wrap_for_decode_header<sbe::FundingRate>(buf, len, hdr, sbe::FundingRate::sbeTemplateId()))
         return false;
     sbe::FundingRate msg;
-    msg.wrapForDecode(const_cast<char*>(buf), sbe::MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), len);
+    msg.wrapForDecode(const_cast<char*>(buf),
+                      sbe::MessageHeader::encodedLength(),
+                      hdr.blockLength(),
+                      hdr.version(),
+                      len);
     out.exchange_id = msg.exchangeId();
     out.instrument_id = msg.instrumentId();
     out.rate_bps = msg.rateBps();

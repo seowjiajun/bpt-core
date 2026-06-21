@@ -195,15 +195,17 @@ void MomentumStrategy::emit_signal(uint64_t instrument_id,
                            current_mid,
                            momentum * 100.0);
 
-    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = instrument_id,
-        .exchange_id = state.exchange_id,
-        .side = side,
-        .type = order_type,
-        .tif = tif,
-        .price = price_f,
-        .qty = kQty,
-    }).order_id();
+    const uint64_t order_id = order_mgr_
+                                  ->send_new_order(order::NewOrderRequest{
+                                      .instrument_id = instrument_id,
+                                      .exchange_id = state.exchange_id,
+                                      .side = side,
+                                      .type = order_type,
+                                      .tif = tif,
+                                      .price = price_f,
+                                      .qty = kQty,
+                                  })
+                                  .order_id();
     if (order_id != 0)
         bpt::common::log::info(kLog(), "order placed → order_id={}", order_id);
 }

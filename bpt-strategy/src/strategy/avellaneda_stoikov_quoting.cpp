@@ -1,8 +1,6 @@
 // AS pricing + sizing + suppression math. No order I/O.
 
 #include "strategy/strategy/avellaneda_stoikov_strategy.h"
-
-#include "features/fill_prob.h"
 #include "strategy/venue/min_order_value.h"
 
 #include <algorithm>
@@ -18,17 +16,16 @@ quill::Logger* kLog() {
 }
 }  // namespace
 
-bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
-                                               uint64_t instrument_id,
-                                               double net_qty,
-                                               double mid,
-                                               uint64_t timestamp_ns,
-                                               double& out_bid,
-                                               double& out_ask) const {
+auto AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st, const BboContext& ctx) const
+    -> std::optional<QuoteTarget> {
     if (st.ewma_var.count() < vol_warmup_ticks_)
-        return false;
+        return std::nullopt;
     if (st.ewma_var.value() <= 0.0)
-        return false;
+        return std::nullopt;
+
+    const double net_qty = ctx.net_qty;
+    const double mid = ctx.mid;
+    const uint64_t timestamp_ns = ctx.ts_ns;
 
     // Remaining session time — clamp to [0, session_duration_s_].
     // After the session ends we keep quoting at the minimum spread (T-t = 0).
@@ -84,7 +81,8 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
     // noisy enough to push reservation through the touch. After
     // drift_warmup_ticks_ BBO updates, the EWMA has settled enough that
     // its sqrt(T - t) projection is a meaningful directional bias.
-    double drift_skew_frac = (st.ewma_drift.count() >= drift_warmup_ticks_) ? st.ewma_drift.value() * std::sqrt(T_minus_t) : 0.0;
+    double drift_skew_frac =
+        (st.ewma_drift.count() >= drift_warmup_ticks_) ? st.ewma_drift.value() * std::sqrt(T_minus_t) : 0.0;
     // Hard cap on drift skew magnitude. Without it, strong intraday
     // trends amplified by √(T-t) at session start drive reservation
     // 50+ bps from mid, putting quotes deeper than any realistic book
@@ -102,7 +100,20 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
     // bids move up (easier to fill long), opposite of how AS handles
     // accumulating inventory. ofi_weight_bps_ = 0 (default) → no-op.
     const double ofi_skew_frac = ofi_weight_bps_ * 1e-4 * st.ofi.value();
-    const double reservation = mid * (1.0 + drift_skew_frac + ofi_skew_frac - inventory_skew_frac);
+    // Book-imbalance skew — L1 queue imbalance (bid_qty − ask_qty)/(bid_qty + ask_qty)
+    // leans the reservation toward the predicted short-horizon move. Same sign as
+    // OFI: bid-heavy (imb > 0) lifts reservation. Guard the 0/0 case (empty book,
+    // e.g. order_book_depth=0). imbalance_weight_bps_ = 0 (default) → no-op.
+    double book_imbalance_skew_frac = 0.0;
+    if (imbalance_weight_bps_ != 0.0) {
+        const double bq = st.book.best_bid_qty();
+        const double aq = st.book.best_ask_qty();
+        const double denom = bq + aq;
+        if (denom > 0.0)
+            book_imbalance_skew_frac = imbalance_weight_bps_ * 1e-4 * (bq - aq) / denom;
+    }
+    const double reservation =
+        mid * (1.0 + drift_skew_frac + ofi_skew_frac + book_imbalance_skew_frac - inventory_skew_frac);
     // Kept for the debug log below; same as drift_skew_frac * mid.
     const double drift_adjustment = drift_skew_frac * mid;
 
@@ -111,14 +122,15 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
     // fee_half = maker_bps / 10000 * mid (one leg); both legs = 2x, so each
     // side of the spread must cover at least 1x maker fee.
     double fee_half_spread = 0.0;
-    const auto fee_entry = refdata_.fee_cache().get(st.exchange_id, instrument_id, timestamp_ns);
+    const auto fee_entry = refdata_.fee_cache().get(st.exchange_id, st.instrument_id, timestamp_ns);
     if (fee_entry) {
         fee_half_spread = (static_cast<double>(fee_entry->maker_bps) / 10000.0) * mid;
     }
 
     // Use live EWMA κ once warmed up; fall back to config kappa_ before then.
     // Floor at kappa_min_ to prevent ln(1 + γ/κ) → ∞ as κ → 0.
-    const double kappa = (st.ewma_kappa.count() >= kappa_warmup_ticks_) ? std::max(kappa_min_, st.ewma_kappa.value()) : kappa_;
+    const double kappa =
+        (st.ewma_kappa.count() >= kappa_warmup_ticks_) ? std::max(kappa_min_, st.ewma_kappa.value()) : kappa_;
 
     const double min_half_spread = std::max((min_half_spread_bps_ / 10000.0) * mid, fee_half_spread);
     const double raw_half_spread =
@@ -150,8 +162,8 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
         }
     }
 
-    out_bid = reservation - half_spread;
-    out_ask = reservation + half_spread;
+    double bid = reservation - half_spread;
+    double ask = reservation + half_spread;
 
     // ── Reservation-skew cap ────────────────────────────────────────────
     //
@@ -174,15 +186,15 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
     if (st.tick_size > 0.0 && st.last_market_bid > 0.0 && st.last_market_ask > 0.0) {
         const double bid_cap = st.last_market_ask - st.tick_size;
         const double ask_floor = st.last_market_bid + st.tick_size;
-        if (out_bid > bid_cap)
-            out_bid = bid_cap;
-        if (out_ask < ask_floor)
-            out_ask = ask_floor;
+        if (bid > bid_cap)
+            bid = bid_cap;
+        if (ask < ask_floor)
+            ask = ask_floor;
         // Defensive: if the clamp inverts the spread (only possible on
         // a crossed market, which shouldn't happen but might in
         // transient feed states), treat as "don't quote this tick."
-        if (out_bid >= out_ask)
-            return false;
+        if (bid >= ask)
+            return std::nullopt;
     }
 
     // ── Final sanity check on quote level ───────────────────────────────
@@ -201,7 +213,7 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
         const double bound = st.last_mid * (quote_sanity_bps_ / 10000.0);
         const double lo = st.last_mid - bound;
         const double hi = st.last_mid + bound;
-        if (out_bid < lo || out_ask > hi || out_bid <= 0.0) {
+        if (bid < lo || ask > hi || bid <= 0.0) {
             static std::size_t skip_count = 0;
             if (++skip_count <= 5 || skip_count % 1000 == 0) {
                 bpt::common::log::warn(kLog(),
@@ -209,15 +221,15 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
                                        "bid={:.6f} ask={:.6f} mid={:.6f} reservation={:.6f} "
                                        "half_spread={:.6f} (sanity_bps={:.1f}; {} skips so far)",
                                        st.symbol,
-                                       out_bid,
-                                       out_ask,
+                                       bid,
+                                       ask,
                                        st.last_mid,
                                        reservation,
                                        half_spread,
                                        quote_sanity_bps_,
                                        skip_count);
             }
-            return false;
+            return std::nullopt;
         }
     }
 
@@ -232,7 +244,7 @@ bool AvellanedaStoikovStrategy::compute_quotes(const InstrumentState& st,
         reservation,
         drift_adjustment);
 
-    return true;
+    return QuoteTarget{bid, ask};
 }
 
 // ── Effective sizing — adaptive vs fixed ───────────────────────────────────
@@ -277,123 +289,8 @@ double AvellanedaStoikovStrategy::gamma_pnl_mult(const InstrumentState& st) cons
     return 1.0;
 }
 
-// ── Suppression state — single source of truth for both runtime
-//    (maybe_requote) and console (get_strategy_state_json) ────────────────
-AvellanedaStoikovStrategy::SuppressionState AvellanedaStoikovStrategy::compute_suppression(const InstrumentState& st,
-                                                                                           double net_qty,
-                                                                                           double new_bid,
-                                                                                           double new_ask) const {
-    SuppressionState s;
-
-    // Inventory cap — hardest blocker (we never want to add beyond max).
-    const double max_inv = effective_max_inventory(st);
-    s.inventory_bid = net_qty >= max_inv;
-    s.inventory_ask = net_qty <= -max_inv;
-
-    // Phase 2.1 — per-side post-fill cooldown after an adverse fill.
-    // Driven by the markout evaluation in on_bbo (writes
-    // post_fill_suspend_until_*); 0 means no cooldown active. Compares
-    // against st.last_tick_ns (simulation time) so backtest replays —
-    // which compress 11h of sim time into a few seconds of wall clock —
-    // honor the cooldown window correctly.
-    if (post_fill_markout_threshold_bps_ < 0.0) {
-        s.post_fill_bid = st.post_fill_suspend_until_bid > 0 && st.last_tick_ns < st.post_fill_suspend_until_bid;
-        s.post_fill_ask = st.post_fill_suspend_until_ask > 0 && st.last_tick_ns < st.post_fill_suspend_until_ask;
-    }
-
-    // Intra-tick realized-vol gate — blocks BOTH sides during fast moves.
-    s.vol_halted = st.vol_gate.is_halted(st.last_tick_ns);
-
-    // Drawdown circuit-breaker — blocks BOTH sides while pause window
-    // is active. Set in on_exec_report when realized PnL crosses the
-    // configured loss threshold; resumes implicitly via the timestamp
-    // check (no explicit resume event).
-    s.pause_active = st.pause_until_ns > 0 && st.last_tick_ns < st.pause_until_ns;
-
-    // Current σ in bps/√s — derived from the per-√s² variance EWMA
-    // AS already maintains. Used to scale drift, slow-drift, and
-    // vol-gate thresholds adaptively so one set of k-multiples works
-    // across assets and vol regimes (see drift_suppress_sigma_mult_
-    // docstring). 0 when EWMA hasn't warmed; adaptive part is then
-    // a no-op (threshold stays at the fixed floor).
-    const double sigma_bps = st.ewma_var.value() > 0.0 ? std::sqrt(st.ewma_var.value()) * 1e4 : 0.0;
-
-    // Drift (fast): suppress the adverse side when |µ| > threshold.
-    // Threshold = max(fixed_floor, sigma_mult × σ_bps). With sigma_mult
-    // = 3, this fires on ~3-SD-per-√s moves regardless of asset.
-    const double drift_bps = std::abs(st.ewma_drift.value()) * 1e4;
-    const double drift_threshold_bps = std::max(drift_suppress_bps_, drift_suppress_sigma_mult_ * sigma_bps);
-    const bool drift_on = drift_threshold_bps > 0.0 && drift_bps > drift_threshold_bps;
-    s.drift_ask = drift_on && st.ewma_drift.value() > 0.0;  // uptrend → don't sell
-    s.drift_bid = drift_on && st.ewma_drift.value() < 0.0;  // downtrend → don't buy
-
-    // Trend (slow): keyed on cumulative return over slow_drift_window_s_.
-    // Expected stdev of a window-cumulative return ≈ σ × √window_s in
-    // per-√s units, so the adaptive threshold multiplies σ_bps by the
-    // window time-scale √window_s. Setting sigma_mult = 3 ≈ "3-SD
-    // cumulative move over the window."
-    const double trend_bps = std::abs(st.slow_drift_bps);
-    const double trend_threshold_bps =
-        std::max(slow_drift_suppress_bps_,
-                 slow_drift_suppress_sigma_mult_ * sigma_bps * std::sqrt(slow_drift_window_s_));
-    const bool trend_on = trend_threshold_bps > 0.0 && trend_bps > trend_threshold_bps;
-    s.trend_ask = trend_on && st.slow_drift_bps > 0.0;
-    s.trend_bid = trend_on && st.slow_drift_bps < 0.0;
-
-    // Toxicity: suppress a side when analytics reports its 5s markout
-    // below threshold. Outcome-based (realized markout from our own
-    // fills), complements drift's signal-based approach. Threshold is
-    // negative; 0 disables.
-    if (tox_suppress_threshold_ < 0.0 && st.tox_data_received) {
-        s.tox_bid = st.tox_bid_toxicity < tox_suppress_threshold_;
-        s.tox_ask = st.tox_ask_toxicity < tox_suppress_threshold_;
-    }
-
-    // Queue position: project fill_prob at the candidate quote price
-    // using the live ladder. Two formulations:
-    //   - Time-aware (preferred): P(fill within T) ≈ 1 - exp(-κ·T / queue_ahead).
-    //     Models taker arrival as a Poisson process at rate κ; fill
-    //     happens when cumulative volume crosses queue_ahead. Gives a
-    //     real probability with units of time, not just an ordinal ratio.
-    //   - Geometric (fallback): our_qty / (our_qty + queue_ahead). Used
-    //     when queue_suppress_horizon_s_ = 0 or κ hasn't warmed up.
-    // Default fp = 1.0 when book isn't ready — don't suppress, quoting wins.
-    if (queue_suppress_fill_prob_min_ > 0.0 && st.book.ready()) {
-        const double qa_bid = st.book.bid_vol_above(new_bid) + st.book.size_at_bid(new_bid);
-        const double qa_ask = st.book.ask_vol_below(new_ask) + st.book.size_at_ask(new_ask);
-        const bool kappa_warm = st.ewma_kappa.count() >= kappa_warmup_ticks_;
-        if (queue_suppress_horizon_s_ > 0.0 && kappa_warm) {
-            const double kappa = std::max(kappa_min_, st.ewma_kappa.value());
-            s.fp_bid = bpt::features::fill_probability_poisson(kappa, queue_suppress_horizon_s_, qa_bid);
-            s.fp_ask = bpt::features::fill_probability_poisson(kappa, queue_suppress_horizon_s_, qa_ask);
-        } else {
-            const double qty = effective_order_qty(st);
-            s.fp_bid = bpt::features::fill_probability_geometric(qty, qa_bid);
-            s.fp_ask = bpt::features::fill_probability_geometric(qty, qa_ask);
-        }
-        s.queue_bid = s.fp_bid < queue_suppress_fill_prob_min_;
-        s.queue_ask = s.fp_ask < queue_suppress_fill_prob_min_;
-    }
-
-    // OFI cancel suppression — research-validated +0.915 bps/fill uplift
-    // from per-fill markout sim across 5 spread regimes (see
-    // bpt-research/findings/2026-05-24_ofi_cancel_spread_aware.md).
-    // Suppress the side opposite the OFI signal when |OFI(t)| > θ × σ(OFI):
-    //   OFI > +θσ (buy pressure) → suppress ASK (about to be lifted adversely)
-    //   OFI < -θσ (sell pressure) → suppress BID (about to be hit adversely)
-    // θ=inf disables (default); θ=0 cancels on any directional OFI.
-    // 50-sample warmup on the EWMA of OFI² to avoid firing on early noise.
-    if (!std::isinf(ofi_cancel_threshold_sigma_) && st.ewma_ofi_sq.count() > 50) {
-        const double sigma_ofi = std::sqrt(st.ewma_ofi_sq.value());
-        if (sigma_ofi > 0.0) {
-            const double gate = ofi_cancel_threshold_sigma_ * sigma_ofi;
-            const double v = st.ofi.value();
-            s.ofi_cancel_ask = v > gate;
-            s.ofi_cancel_bid = v < -gate;
-        }
-    }
-
-    return s;
-}
+// Suppression policy (per-side cancel/requote decision) moved to
+// suppression_policy.h — owned by supp_policy_, called from maybe_requote
+// and get_strategy_state_json via supp_policy_.evaluate(...).
 
 }  // namespace bpt::strategy::strategy

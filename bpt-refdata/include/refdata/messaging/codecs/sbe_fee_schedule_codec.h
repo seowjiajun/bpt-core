@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bpt_common/codec/codec.h"
-#include "refdata/model/funding_rate.h"  // FeeScheduleState
+#include "refdata/model/fee_schedule.h"
 
 #include <cstddef>
 #include <span>

@@ -5,28 +5,25 @@
 ///
 /// Drains five SBE message types off Aeron stream 3001:
 /// NewOrder, CancelOrder, CancelAll, ModifyOrder, AccountSnapshotRequest.
-/// Each fragment is dispatched to the appropriate user-supplied
-/// callback. The poll() loop is driven from the main poll thread
-/// inside OrderGatewayService::run().
+/// SBE is decoded at the Aeron boundary; callbacks receive domain event types.
+/// The poll() loop is driven from the main poll thread inside OrderGatewayService::run().
 ///
 /// Implementations: aeron::OrderSubscriber in prod; a fake
 /// implementation can drive the five message types directly into the
 /// callbacks for seam testing without an Aeron MediaDriver.
 
+#include "order_gateway/order/inbound_order_events.h"
+
 #include <messages/AccountSnapshotRequest.h>
-#include <messages/CancelAll.h>
-#include <messages/CancelOrder.h>
-#include <messages/ModifyOrder.h>
-#include <messages/NewOrder.h>
 
 #include <functional>
 
 namespace bpt::order_gateway::messaging {
 
-using OnNewOrderFn = std::function<void(const bpt::messages::NewOrder&)>;
-using OnCancelFn = std::function<void(const bpt::messages::CancelOrder&)>;
-using OnCancelAllFn = std::function<void(const bpt::messages::CancelAll&)>;
-using OnModifyFn = std::function<void(const bpt::messages::ModifyOrder&)>;
+using OnNewOrderFn = std::function<void(const order::NewOrderEvent&)>;
+using OnCancelFn = std::function<void(const order::CancelOrderEvent&)>;
+using OnCancelAllFn = std::function<void(const order::CancelAllEvent&)>;
+using OnModifyFn = std::function<void(const order::ModifyOrderEvent&)>;
 using OnAccountSnapshotRequestFn = std::function<void(const bpt::messages::AccountSnapshotRequest&)>;
 
 namespace api {

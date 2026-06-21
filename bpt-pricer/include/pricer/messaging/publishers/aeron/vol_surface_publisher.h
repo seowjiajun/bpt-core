@@ -15,6 +15,7 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -23,7 +24,7 @@ namespace bpt::pricer::messaging::aeron {
 
 class VolSurfacePublisher : public api::VolSurfacePublisher {
 public:
-    VolSurfacePublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
+    VolSurfacePublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish(const surface::VolSurfaceGrid& grid, uint64_t timestamp_ns) override;
 

@@ -9,6 +9,7 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -20,12 +21,12 @@ namespace bpt::strategy::messaging::aeron {
 template <class Handler>
 class ConsoleControlSubscriber final : public api::ConsoleControlSubscriber {
 public:
-    ConsoleControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id) {
+    ConsoleControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream) {
         // Same 5-second poll-and-wait as the inline construction the app
         // used previously. The console publisher may not be up yet; if we
         // can't bind, log at the call site (is_ready() = false) and the
         // poll loop becomes a no-op.
-        const int64_t reg_id = aeron->addSubscription(channel, stream_id);
+        const int64_t reg_id = aeron->addSubscription(stream.channel, stream.stream_id);
         for (int i = 0; i < 500; ++i) {
             sub_ = aeron->findSubscription(reg_id);
             if (sub_)

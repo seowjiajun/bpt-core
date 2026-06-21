@@ -83,16 +83,19 @@ InProcessOrderGatewayClient::InProcessOrderGatewayClient(matching::MatchingEngin
     matching_.set_fill_callback([this](matching::FillReport fr) { publish_fill(fr); });
 }
 
-bool InProcessOrderGatewayClient::send_new_order(uint64_t order_id,
-                                                 bpt::messages::ExchangeId::Value exchange_id,
-                                                 uint64_t instrument_id,
-                                                 bpt::messages::OrderSide::Value side,
-                                                 bpt::messages::OrderType::Value order_type,
-                                                 bpt::messages::TimeInForce::Value tif,
-                                                 int64_t price,
-                                                 uint64_t quantity,
-                                                 uint8_t exec_inst,
-                                                 const std::string& exchange_symbol) {
+bool InProcessOrderGatewayClient::send_new_order(const bpt::strategy::order::OutboundNewOrder& order) {
+    // Destructure once at the destination — the matching-engine driver.
+    const uint64_t order_id = order.order_id;
+    const auto exchange_id = order.exchange_id;
+    const uint64_t instrument_id = order.instrument_id;
+    const auto side = order.side;
+    const auto order_type = order.order_type;
+    const auto tif = order.tif;
+    const int64_t price = order.price;
+    const uint64_t quantity = order.quantity;
+    const uint8_t exec_inst = order.exec_inst;
+    const std::string& exchange_symbol = order.exchange_symbol;
+
     if (quantity == 0)
         return false;
     if (order_type != bpt::messages::OrderType::MARKET && price <= 0)
@@ -172,23 +175,27 @@ bool InProcessOrderGatewayClient::send_new_order(uint64_t order_id,
     if (it != live_.end()) {
         const uint64_t cumfilled = it->second.cumulative_filled_qty;
         if (cumfilled < quantity) {
-            publish_exec_status(order_id,
-                                exchange_id,
-                                instrument_id,
-                                bpt::messages::ExecStatus::ACKED,
-                                side,
-                                order_type,
-                                price,
-                                quantity,
-                                cumfilled);
+            publish_exec_status({
+                .order_id = order_id,
+                .exchange_id = exchange_id,
+                .instrument_id = instrument_id,
+                .status = bpt::messages::ExecStatus::ACKED,
+                .side = side,
+                .order_type = order_type,
+                .price = price,
+                .quantity = quantity,
+                .cumulative_filled_qty = cumfilled,
+            });
         }
     }
     return true;
 }
 
-void InProcessOrderGatewayClient::send_cancel(uint64_t order_id,
-                                              bpt::messages::ExchangeId::Value exchange_id,
-                                              uint64_t instrument_id) {
+void InProcessOrderGatewayClient::send_cancel(const bpt::strategy::order::CancelOrderRequest& cancel) {
+    const uint64_t order_id = cancel.order_id;
+    const auto exchange_id = cancel.exchange_id;
+    const uint64_t instrument_id = cancel.instrument_id;
+
     auto it = live_.find(order_id);
     if (it == live_.end())
         return;
@@ -196,15 +203,17 @@ void InProcessOrderGatewayClient::send_cancel(uint64_t order_id,
 
     const bool ok = matching_.cancel_order(lo.exchange, lo.exchange_symbol, std::to_string(order_id));
     if (ok) {
-        publish_exec_status(order_id,
-                            exchange_id,
-                            instrument_id,
-                            bpt::messages::ExecStatus::CANCELLED,
-                            lo.side,
-                            lo.order_type,
-                            lo.price,
-                            lo.quantity,
-                            lo.cumulative_filled_qty);
+        publish_exec_status({
+            .order_id = order_id,
+            .exchange_id = exchange_id,
+            .instrument_id = instrument_id,
+            .status = bpt::messages::ExecStatus::CANCELLED,
+            .side = lo.side,
+            .order_type = lo.order_type,
+            .price = lo.price,
+            .quantity = lo.quantity,
+            .cumulative_filled_qty = lo.cumulative_filled_qty,
+        });
         live_.erase(it);
     }
     // Engine's cancel_order returns false when the order has already
@@ -225,15 +234,15 @@ void InProcessOrderGatewayClient::send_cancel_all(bpt::messages::ExchangeId::Val
             targets.push_back(oid);
     }
     for (auto oid : targets) {
-        send_cancel(oid, exchange_id, instrument_id);
+        send_cancel(bpt::strategy::order::CancelOrderRequest{oid, exchange_id, instrument_id});
     }
 }
 
-void InProcessOrderGatewayClient::send_modify(uint64_t order_id,
-                                              bpt::messages::ExchangeId::Value /*exchange_id*/,
-                                              uint64_t /*instrument_id*/,
-                                              int64_t new_price,
-                                              uint64_t new_quantity) {
+void InProcessOrderGatewayClient::send_modify(const bpt::strategy::order::ModifyOrderRequest& modify) {
+    const uint64_t order_id = modify.order_id;
+    const int64_t new_price = modify.new_price;
+    const uint64_t new_quantity = modify.new_quantity;
+
     auto it = live_.find(order_id);
     if (it == live_.end())
         return;
@@ -272,15 +281,17 @@ void InProcessOrderGatewayClient::send_modify(uint64_t order_id,
     // Fire CANCELLED in that case — strategy treats it as the order
     // ending, the natural outcome for a cross-on-modify on HL Alo.
     if (result.rejected) {
-        publish_exec_status(order_id,
-                            lo.exchange_id,
-                            lo.instrument_id,
-                            bpt::messages::ExecStatus::CANCELLED,
-                            lo.side,
-                            lo.order_type,
-                            new_price,
-                            new_quantity,
-                            lo.cumulative_filled_qty);
+        publish_exec_status({
+            .order_id = order_id,
+            .exchange_id = lo.exchange_id,
+            .instrument_id = lo.instrument_id,
+            .status = bpt::messages::ExecStatus::CANCELLED,
+            .side = lo.side,
+            .order_type = lo.order_type,
+            .price = new_price,
+            .quantity = new_quantity,
+            .cumulative_filled_qty = lo.cumulative_filled_qty,
+        });
         live_.erase(it);
     }
 }
@@ -359,33 +370,38 @@ void InProcessOrderGatewayClient::publish_fill(const matching::FillReport& fr) {
 
     const auto status = fr.is_fully_filled ? bpt::messages::ExecStatus::FILLED : bpt::messages::ExecStatus::PARTIAL;
 
-    publish_exec_status(order_id,
-                        lo.exchange_id,
-                        lo.instrument_id,
-                        status,
-                        to_msg_side(fr.side),
-                        to_msg_type(fr.order_type),
-                        fill_px_scaled,
-                        fill_qty_scaled,
-                        lo.cumulative_filled_qty);
+    publish_exec_status({
+        .order_id = order_id,
+        .exchange_id = lo.exchange_id,
+        .instrument_id = lo.instrument_id,
+        .status = status,
+        .side = to_msg_side(fr.side),
+        .order_type = to_msg_type(fr.order_type),
+        .price = fill_px_scaled,
+        .quantity = fill_qty_scaled,
+        .cumulative_filled_qty = lo.cumulative_filled_qty,
+    });
 
     if (fr.is_fully_filled) {
         live_.erase(it);
     }
 }
 
-void InProcessOrderGatewayClient::publish_exec_status(uint64_t order_id,
-                                                      bpt::messages::ExchangeId::Value exchange_id,
-                                                      uint64_t instrument_id,
-                                                      bpt::messages::ExecStatus::Value status,
-                                                      bpt::messages::OrderSide::Value side,
-                                                      bpt::messages::OrderType::Value order_type,
-                                                      int64_t price,
-                                                      uint64_t quantity,
-                                                      uint64_t cumulative_filled_qty,
-                                                      bpt::messages::RejectSource::Value reject_source) {
+void InProcessOrderGatewayClient::publish_exec_status(const ExecStatusEvent& ev) {
     if (!on_exec_report)
         return;
+
+    // Destructure once at the destination — the SBE report builder.
+    const uint64_t order_id = ev.order_id;
+    const auto exchange_id = ev.exchange_id;
+    const uint64_t instrument_id = ev.instrument_id;
+    const auto status = ev.status;
+    const auto side = ev.side;
+    const auto order_type = ev.order_type;
+    const int64_t price = ev.price;
+    const uint64_t quantity = ev.quantity;
+    const uint64_t cumulative_filled_qty = ev.cumulative_filled_qty;
+    const auto reject_source = ev.reject_source;
 
     constexpr std::size_t kBufSize = MessageHeader::encodedLength() + ExecutionReport::sbeBlockLength();
     char buf[kBufSize]{};

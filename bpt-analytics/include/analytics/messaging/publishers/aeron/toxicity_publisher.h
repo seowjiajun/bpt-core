@@ -10,6 +10,7 @@
 #include "analytics/messaging/publishers/api/toxicity_publisher.h"
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 #include <string>
 
@@ -17,7 +18,7 @@ namespace bpt::analytics::messaging::aeron {
 
 class ToxicityPublisher : public api::ToxicityPublisher {
 public:
-    ToxicityPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    ToxicityPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     bool publish(const ToxicityUpdate& update) override;
 

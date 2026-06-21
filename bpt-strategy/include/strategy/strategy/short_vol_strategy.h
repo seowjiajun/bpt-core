@@ -1,5 +1,6 @@
 #pragma once
 
+#include "features/realized_vol.h"
 #include "strategy/config/config.h"
 #include "strategy/md/md_client.h"
 #include "strategy/order/order_manager.h"
@@ -7,7 +8,6 @@
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
 #include "strategy/strategy/position_tracker.h"
-#include "features/realized_vol.h"
 #include "strategy/vol/vol_surface_client.h"
 
 #include <messages/ExchangeId.h>

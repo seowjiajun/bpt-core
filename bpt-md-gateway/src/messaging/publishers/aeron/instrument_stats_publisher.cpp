@@ -10,9 +10,8 @@ namespace bpt::md_gateway::messaging::aeron {
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 InstrumentStatsPublisher::InstrumentStatsPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                                   const std::string& channel,
-                                                   int stream_id)
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
+                                                   const bpt::common::config::StreamConfig& stream)
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kRetryOnBackpressure) {}
 
 void InstrumentStatsPublisher::publish(const InstrumentStatsUpdate& stats) {
     alignas(8) std::byte scratch[SbeInstrumentStatsCodec::kRecommendedScratchSize];

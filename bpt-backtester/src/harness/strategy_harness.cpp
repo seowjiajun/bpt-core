@@ -9,11 +9,10 @@
 #include <messages/ExchangeRegistry.h>
 
 #include <bpt_common/logging.h>
-#include <nlohmann/json.hpp>
-
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
@@ -41,13 +40,11 @@ bpt::strategy::refdata::InstrumentType map_inst_type(const std::string& t) {
 // when the HL universe changes (rare for established coins).
 std::unordered_map<std::string, int> load_hl_sz_decimals(const std::string& mapping_path) {
     std::unordered_map<std::string, int> out;
-    const auto meta_path =
-        std::filesystem::path(mapping_path).parent_path() / "hyperliquid_meta.json";
+    const auto meta_path = std::filesystem::path(mapping_path).parent_path() / "hyperliquid_meta.json";
     std::ifstream f(meta_path);
     if (!f) {
-        bpt::common::log::warn(
-            "[StrategyHarness] no HL meta snapshot at {} — HL tick/lot fall back to flat defaults",
-            meta_path.string());
+        bpt::common::log::warn("[StrategyHarness] no HL meta snapshot at {} — HL tick/lot fall back to flat defaults",
+                               meta_path.string());
         return out;
     }
     try {
@@ -329,49 +326,49 @@ uint64_t StrategyHarness::replay_canon() {
             const std::size_t sbe_len = rec->sbe.size();
 
             switch (rec->type) {
-            case bpt::canon::EventType::BBO: {
-                bpt::md_gateway::md::MdBbo bbo{};
-                if (!bpt::canon::decode_bbo(sbe_buf, sbe_len, bbo))
-                    break;
-                // Strategy-subscription filter — same as wslog HL
-                // decoder's `subs_.find_id(coin) == 0 → return`.
-                if (!strategy_instrument_ids_.contains(bbo.instrument_id)) {
-                    ++bbo_filtered;
-                    break;
-                }
-                ++bbo_kept;
-                bbo.timestamp_ns = rec->ts_ns;
-                hl_publisher_->publish(bbo);
-                break;
-            }
-            case bpt::canon::EventType::TRADE: {
-                bpt::md_gateway::md::MdTrade trade{};
-                if (!bpt::canon::decode_trade(sbe_buf, sbe_len, trade))
-                    break;
-                if (!strategy_instrument_ids_.contains(trade.instrument_id)) {
-                    ++trade_filtered;
+                case bpt::canon::EventType::BBO: {
+                    bpt::md_gateway::md::MdBbo bbo{};
+                    if (!bpt::canon::decode_bbo(sbe_buf, sbe_len, bbo))
+                        break;
+                    // Strategy-subscription filter — same as wslog HL
+                    // decoder's `subs_.find_id(coin) == 0 → return`.
+                    if (!strategy_instrument_ids_.contains(bbo.instrument_id)) {
+                        ++bbo_filtered;
+                        break;
+                    }
+                    ++bbo_kept;
+                    bbo.timestamp_ns = rec->ts_ns;
+                    hl_publisher_->publish(bbo);
                     break;
                 }
-                ++trade_kept;
-                trade.timestamp_ns = rec->ts_ns;
-                hl_publisher_->publish(trade);
-                break;
-            }
-            case bpt::canon::EventType::BOOK: {
-                bpt::md_gateway::md::MdOrderBook book{};
-                if (!bpt::canon::decode_book(sbe_buf, sbe_len, book))
+                case bpt::canon::EventType::TRADE: {
+                    bpt::md_gateway::md::MdTrade trade{};
+                    if (!bpt::canon::decode_trade(sbe_buf, sbe_len, trade))
+                        break;
+                    if (!strategy_instrument_ids_.contains(trade.instrument_id)) {
+                        ++trade_filtered;
+                        break;
+                    }
+                    ++trade_kept;
+                    trade.timestamp_ns = rec->ts_ns;
+                    hl_publisher_->publish(trade);
                     break;
-                if (!strategy_instrument_ids_.contains(book.instrument_id))
+                }
+                case bpt::canon::EventType::BOOK: {
+                    bpt::md_gateway::md::MdOrderBook book{};
+                    if (!bpt::canon::decode_book(sbe_buf, sbe_len, book))
+                        break;
+                    if (!strategy_instrument_ids_.contains(book.instrument_id))
+                        break;
+                    book.timestamp_ns = rec->ts_ns;
+                    hl_publisher_->publish(book);
                     break;
-                book.timestamp_ns = rec->ts_ns;
-                hl_publisher_->publish(book);
-                break;
-            }
-            case bpt::canon::EventType::FUNDING:
-            case bpt::canon::EventType::MARK:
-                // AS strategy doesn't react to funding/mark directly —
-                // see noop_funding_cb_ on the wslog path.
-                break;
+                }
+                case bpt::canon::EventType::FUNDING:
+                case bpt::canon::EventType::MARK:
+                    // AS strategy doesn't react to funding/mark directly —
+                    // see noop_funding_cb_ on the wslog path.
+                    break;
             }
         }
     }

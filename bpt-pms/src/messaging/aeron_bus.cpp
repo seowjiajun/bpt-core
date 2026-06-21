@@ -7,9 +7,8 @@ namespace bpt::pms::messaging {
 
 PmsBus PmsAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
     PmsBus bus;
-    bus.snapshot_pub = std::make_unique<aeron::BalanceSnapshotPublisher>(std::move(aeron),
-                                                                         settings.aeron.balance_snapshot.channel,
-                                                                         settings.aeron.balance_snapshot.stream_id);
+    bus.snapshot_pub =
+        std::make_unique<aeron::BalanceSnapshotPublisher>(std::move(aeron), settings.aeron.balance_snapshot);
     return bus;
 }
 

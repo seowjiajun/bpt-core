@@ -13,9 +13,10 @@ solve_iv(bool is_call, double market_price, double S, double K, double T, double
         return std::nullopt;
     }
 
-    // Check vs intrinsic — price must exceed intrinsic value
+    // Check vs intrinsic — price must exceed (discounted) intrinsic value.
+    // Black-76: intrinsic = df * max(0, F - K) for a call.
     const double df = std::exp(-r * T);
-    const double intrinsic = is_call ? std::max(0.0, S - K * df) : std::max(0.0, K * df - S);
+    const double intrinsic = is_call ? std::max(0.0, df * (S - K)) : std::max(0.0, df * (K - S));
     if (market_price < intrinsic - 1e-10) {
         return std::nullopt;  // Below intrinsic — bad data or arbitrage
     }

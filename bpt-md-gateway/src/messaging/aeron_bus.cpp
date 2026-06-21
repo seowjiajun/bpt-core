@@ -16,12 +16,8 @@ namespace bpt::md_gateway::messaging {
 
 MdGatewayBus MdGatewayAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
     MdGatewayBus bus;
-    bus.control_sub = std::make_unique<aeron::MdControlSubscriber>(aeron,
-                                                                   settings.aeron.md_control.channel,
-                                                                   settings.aeron.md_control.stream_id);
-    bus.ack_pub = std::make_unique<aeron::AckPublisher>(aeron,
-                                                        settings.aeron.md_ack_hb.channel,
-                                                        settings.aeron.md_ack_hb.stream_id);
+    bus.control_sub = std::make_unique<aeron::MdControlSubscriber>(aeron, settings.aeron.md_control);
+    bus.ack_pub = std::make_unique<aeron::AckPublisher>(aeron, settings.aeron.md_ack_hb);
     return bus;
 }
 

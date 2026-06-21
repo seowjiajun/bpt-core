@@ -11,6 +11,7 @@
 #include "radar/messaging/publishers/api/market_color_publisher.h"
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 #include <string>
 
@@ -18,7 +19,7 @@ namespace bpt::radar::messaging::aeron {
 
 class MarketColorPublisher final : public api::MarketColorPublisher {
 public:
-    MarketColorPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    MarketColorPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     /// \brief Returns true if Aeron accepted the offer.
     bool publish(const MarketColor& color) override;

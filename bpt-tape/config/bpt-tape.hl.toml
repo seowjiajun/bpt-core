@@ -57,7 +57,11 @@ default_depth = 5
 
 [recording]
 output_dir = "/opt/bpt/data/raw"
-rotate_interval_seconds = 3600
+# 10-min rotation (was 3600): a file isn't eligible for S3 sync until it
+# rotates closed, so rotation — not sync cadence — gates the off-host loss
+# window. 600s + 5-min sync + 2-min min-age ⇒ worst-case loss ~17 min vs ~1h.
+# Cost: ~144 files/venue/day (~70 MB each), more S3 PUTs. Acceptable.
+rotate_interval_seconds = 600
 fsync_interval_ms = 1000
 buffer_bytes = 1048576
 

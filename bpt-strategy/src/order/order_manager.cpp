@@ -62,31 +62,6 @@ bool normalise_and_validate(const refdata::InstrumentCache& cache,
 
 }  // namespace
 
-uint64_t OrderManager::place_order(uint64_t instrument_id,
-                                   bpt::messages::ExchangeId::Value exchange_id,
-                                   bpt::messages::OrderSide::Value side,
-                                   bpt::messages::OrderType::Value order_type,
-                                   bpt::messages::TimeInForce::Value tif,
-                                   double price,
-                                   double quantity,
-                                   uint8_t exec_inst) {
-    std::string symbol;
-    if (!normalise_and_validate(cache_, instrument_id, side, order_type, price, quantity, symbol))
-        return 0;
-
-    const int64_t price_fp = static_cast<int64_t>(std::round(price * 1e8));
-    const uint64_t qty_fp = static_cast<uint64_t>(std::round(quantity * 1e8));
-    const uint64_t order_id = next_order_id_.fetch_add(1, std::memory_order_relaxed);
-
-    if (!gw_.send_new_order(order_id, exchange_id, instrument_id, side, order_type, tif,
-                            price_fp, qty_fp, exec_inst, symbol))
-        return 0;
-
-    if (on_order_placed)
-        on_order_placed(order_id);
-    return order_id;
-}
-
 OrderHandle OrderManager::send_new_order(const NewOrderRequest& req, uint8_t tag) {
     double price = req.price;
     double quantity = req.qty;
@@ -98,8 +73,18 @@ OrderHandle OrderManager::send_new_order(const NewOrderRequest& req, uint8_t tag
     const uint64_t qty_fp = static_cast<uint64_t>(std::round(quantity * 1e8));
     const uint64_t order_id = next_order_id_.fetch_add(1, std::memory_order_relaxed);
 
-    if (!gw_.send_new_order(order_id, req.exchange_id, req.instrument_id, req.side, req.type, req.tif,
-                            price_fp, qty_fp, req.exec_inst.to_bitmask(), symbol))
+    if (!gw_.send_new_order(OutboundNewOrder{
+            .order_id = order_id,
+            .exchange_id = req.exchange_id,
+            .instrument_id = req.instrument_id,
+            .side = req.side,
+            .order_type = req.type,
+            .tif = req.tif,
+            .price = price_fp,
+            .quantity = qty_fp,
+            .exec_inst = req.exec_inst.to_bitmask(),
+            .exchange_symbol = symbol,
+        }))
         return {};
 
     const uint64_t now_ns = bpt::common::util::WallClock::now_ns();
@@ -125,12 +110,6 @@ OrderHandle OrderManager::send_new_order(const NewOrderRequest& req, uint8_t tag
     return OrderHandle{state};
 }
 
-void OrderManager::cancel_order(uint64_t order_id,
-                                bpt::messages::ExchangeId::Value exchange_id,
-                                uint64_t instrument_id) {
-    gw_.send_cancel(order_id, exchange_id, instrument_id);
-}
-
 void OrderManager::send_cancel(OrderHandle& handle) {
     if (!handle.live())
         return;  // terminal or already-pending — nothing to send
@@ -143,7 +122,7 @@ void OrderManager::send_cancel(OrderHandle& handle) {
     // never see the order terminate.
     s->status = OrderState::Status::CancelPending;
     s->last_update_ns = bpt::common::util::WallClock::now_ns();
-    gw_.send_cancel(s->order_id, s->exchange_id, s->instrument_id);
+    gw_.send_cancel(CancelOrderRequest{s->order_id, s->exchange_id, s->instrument_id});
 }
 
 void OrderManager::send_cancel(const CancelOrderRequest& req) {
@@ -152,19 +131,15 @@ void OrderManager::send_cancel(const CancelOrderRequest& req) {
         it->second->status = OrderState::Status::CancelPending;
         it->second->last_update_ns = bpt::common::util::WallClock::now_ns();
     }
-    gw_.send_cancel(req.order_id, req.exchange_id, req.instrument_id);
+    gw_.send_cancel(req);
 }
 
 void OrderManager::cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) {
     gw_.send_cancel_all(exchange_id, instrument_id);
 }
 
-void OrderManager::modify_order(uint64_t order_id,
-                                bpt::messages::ExchangeId::Value exchange_id,
-                                uint64_t instrument_id,
-                                int64_t new_price,
-                                uint64_t new_quantity) {
-    gw_.send_modify(order_id, exchange_id, instrument_id, new_price, new_quantity);
+void OrderManager::modify_order(const ModifyOrderRequest& req) {
+    gw_.send_modify(req);
 }
 
 void OrderManager::on_exec_report(const bpt::messages::ExecutionReport& rpt) {

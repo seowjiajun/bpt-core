@@ -15,28 +15,30 @@ RefdataMetrics::RefdataMetrics(uint16_t port) {
         exposer->RegisterCollectable(registry);
     }
 
-    auto& healthy_fam =
-        prometheus::BuildGauge().Name("refdata_healthy").Help("1 if Refdata is running normally").Register(*registry);
-    healthy = &healthy_fam.Add({});
+    healthy = &prometheus::BuildGauge()
+                   .Name("refdata_healthy")
+                   .Help("1 if Refdata is running normally")
+                   .Register(*registry)
+                   .Add({});
     healthy->Set(1.0);
 
-    auto& inst_fam = prometheus::BuildGauge()
-                         .Name("refdata_instruments_total")
-                         .Help("Total instruments known to the registry")
-                         .Register(*registry);
-    instruments_total = &inst_fam.Add({});
+    instruments_total = &prometheus::BuildGauge()
+                             .Name("refdata_instruments_total")
+                             .Help("Total instruments known to the registry")
+                             .Register(*registry)
+                             .Add({});
 
-    auto& req_fam = prometheus::BuildCounter()
-                        .Name("refdata_requests_served_total")
-                        .Help("Total RefDataSubscriptionRequest messages served")
-                        .Register(*registry);
-    requests_served_total = &req_fam.Add({});
+    requests_served_total = &prometheus::BuildCounter()
+                                 .Name("refdata_requests_served_total")
+                                 .Help("Total RefDataSubscriptionRequest messages served")
+                                 .Register(*registry)
+                                 .Add({});
 
-    auto& lu = prometheus::BuildGauge()
-                   .Name("refdata_last_update_ns")
-                   .Help("Unix ns timestamp of the most recent instrument publish (snapshot or delta)")
-                   .Register(*registry);
-    last_update_ns = &lu.Add({});
+    last_update_ns = &prometheus::BuildGauge()
+                          .Name("refdata_last_update_ns")
+                          .Help("Unix ns timestamp of the most recent instrument publish (snapshot or delta)")
+                          .Register(*registry)
+                          .Add({});
 
     exchange_ready_fam = &prometheus::BuildGauge()
                               .Name("refdata_exchange_ready")
@@ -57,6 +59,31 @@ RefdataMetrics::RefdataMetrics(uint16_t port) {
                            .Name("refdata_fee_schedule_updates_total")
                            .Help("Total fee schedule updates published per exchange")
                            .Register(*registry);
+}
+
+RefdataMetrics::PerExchangeMetrics& RefdataMetrics::exchange_entry(const std::string& exchange) {
+    auto it = exchange_cache_.find(exchange);
+    if (it != exchange_cache_.end())
+        return it->second;
+    auto& e = exchange_cache_[exchange];
+    e.exchange_ready = &exchange_ready_fam->Add({{"exchange", exchange}});
+    e.snapshot_failures = &snapshot_failures_fam->Add({{"exchange", exchange}});
+    e.listing_refreshes = &listing_refreshes_fam->Add({{"exchange", exchange}});
+    e.fee_updates = &fee_updates_fam->Add({{"exchange", exchange}});
+    return e;
+}
+
+prometheus::Gauge& RefdataMetrics::exchange_ready(const std::string& exchange) {
+    return *exchange_entry(exchange).exchange_ready;
+}
+prometheus::Counter& RefdataMetrics::snapshot_failure(const std::string& exchange) {
+    return *exchange_entry(exchange).snapshot_failures;
+}
+prometheus::Counter& RefdataMetrics::listing_refresh(const std::string& exchange) {
+    return *exchange_entry(exchange).listing_refreshes;
+}
+prometheus::Counter& RefdataMetrics::fee_update(const std::string& exchange) {
+    return *exchange_entry(exchange).fee_updates;
 }
 
 }  // namespace bpt::refdata::metrics

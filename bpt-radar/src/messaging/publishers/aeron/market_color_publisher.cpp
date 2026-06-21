@@ -9,14 +9,13 @@ namespace bpt::radar::messaging::aeron {
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 MarketColorPublisher::MarketColorPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                           const std::string& channel,
-                                           int stream_id)
+                                           const bpt::common::config::StreamConfig& stream)
     // kBoundedRetry mirrors ToxicityPublisher's policy — periodic snapshot
     // stream, the next interval produces a fresh frame so we don't spin
     // forever on a slow consumer.
     : pub_(std::make_unique<bpt::common::aeron::Publisher>(std::move(aeron),
-                                                           channel,
-                                                           stream_id,
+                                                           stream.channel,
+                                                           stream.stream_id,
                                                            Policy::kBoundedRetry)) {}
 
 bool MarketColorPublisher::publish(const MarketColor& color) {

@@ -8,10 +8,10 @@ namespace bpt::md_gateway::messaging::aeron {
 using bpt::common::util::WallClock;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
-AckPublisher::AckPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
+AckPublisher::AckPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream)
     // Subscription acks + heartbeats are idempotent/republished. Bounded
     // retry on back-pressure, drop on no subscriber.
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kBoundedRetry) {}
 
 void AckPublisher::publish_ack(uint64_t correlation_id,
                                uint64_t instrument_id,

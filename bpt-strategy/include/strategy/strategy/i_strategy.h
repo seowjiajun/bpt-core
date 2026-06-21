@@ -166,6 +166,18 @@ public:
     // appropriate for stateless / non-inventory strategies.
     [[nodiscard]] virtual bool has_pending_flatten() const { return false; }
 
+    // Called on every iteration of the shutdown drain loop. Implementations
+    // advance timer-based unwind state: stepping the passive limit price,
+    // transitioning from passive → IOC when patience expires. Sending orders
+    // and cancels from here is safe — the drain loop keeps the order path alive.
+    // Default no-op.
+    virtual void on_flatten_tick() {}
+
+    // Total time budget the StrategyService drain loop should wait before
+    // giving up and exiting. Strategies with passive unwind phases need more
+    // than the default. Default: 30s (covers IOC-only paths with retries).
+    [[nodiscard]] virtual double shutdown_drain_budget_s() const { return 30.0; }
+
     // Persist warm-start state (EWMA estimators, regime detector, etc.)
     // to `path`. StrategyService calls this on graceful shutdown AFTER the
     // flatten drain completes, so positions are flat and state is

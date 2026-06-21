@@ -7,6 +7,7 @@
 #include <prometheus/gauge.h>
 #include <prometheus/registry.h>
 #include <string>
+#include <unordered_map>
 
 namespace bpt::refdata::metrics {
 
@@ -14,21 +15,10 @@ struct RefdataMetrics {
     std::shared_ptr<prometheus::Registry> registry;
     std::unique_ptr<prometheus::Exposer> exposer;
 
-    // Unlabelled metrics
     prometheus::Gauge* healthy{};
     prometheus::Gauge* instruments_total{};
     prometheus::Counter* requests_served_total{};
-    // Unix wall-clock nanoseconds of the most recent instrument publish
-    // (snapshot or delta). Alertmanager fires a "RefdataStale" rule on
-    // (time() - gauge/1e9) > threshold, catching the case where the
-    // service is alive (healthy == 1) but has stopped actually producing.
     prometheus::Gauge* last_update_ns{};
-
-    // Per-exchange metric families (use Add({{"exchange","X"}}) to get child)
-    prometheus::Family<prometheus::Gauge>* exchange_ready_fam{};
-    prometheus::Family<prometheus::Counter>* snapshot_failures_fam{};
-    prometheus::Family<prometheus::Counter>* listing_refreshes_fam{};
-    prometheus::Family<prometheus::Counter>* fee_updates_fam{};
 
     explicit RefdataMetrics(uint16_t port);
 
@@ -37,18 +27,25 @@ struct RefdataMetrics {
             healthy->Set(0.0);
     }
 
-    prometheus::Gauge& exchange_ready(const std::string& exchange) {
-        return exchange_ready_fam->Add({{"exchange", exchange}});
-    }
-    prometheus::Counter& snapshot_failure(const std::string& exchange) {
-        return snapshot_failures_fam->Add({{"exchange", exchange}});
-    }
-    prometheus::Counter& listing_refresh(const std::string& exchange) {
-        return listing_refreshes_fam->Add({{"exchange", exchange}});
-    }
-    prometheus::Counter& fee_update(const std::string& exchange) {
-        return fee_updates_fam->Add({{"exchange", exchange}});
-    }
+    prometheus::Gauge& exchange_ready(const std::string& exchange);
+    prometheus::Counter& snapshot_failure(const std::string& exchange);
+    prometheus::Counter& listing_refresh(const std::string& exchange);
+    prometheus::Counter& fee_update(const std::string& exchange);
+
+private:
+    prometheus::Family<prometheus::Gauge>* exchange_ready_fam{};
+    prometheus::Family<prometheus::Counter>* snapshot_failures_fam{};
+    prometheus::Family<prometheus::Counter>* listing_refreshes_fam{};
+    prometheus::Family<prometheus::Counter>* fee_updates_fam{};
+
+    struct PerExchangeMetrics {
+        prometheus::Gauge* exchange_ready{};
+        prometheus::Counter* snapshot_failures{};
+        prometheus::Counter* listing_refreshes{};
+        prometheus::Counter* fee_updates{};
+    };
+    std::unordered_map<std::string, PerExchangeMetrics> exchange_cache_;
+    PerExchangeMetrics& exchange_entry(const std::string& exchange);
 };
 
 }  // namespace bpt::refdata::metrics

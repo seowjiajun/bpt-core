@@ -11,6 +11,7 @@
 
 #include <messages/AccountSnapshot.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <bpt_common/aeron/subscriber.h>
 #include <bpt_common/logging.h>
 #include <cstddef>
@@ -24,15 +25,15 @@ namespace bpt::bridge::messaging::aeron {
 template <class Handler>
 class AccountSubscriber final : public api::AccountSubscriber {
 public:
-    AccountSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
+    AccountSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream) {
         sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             std::move(aeron),
-            channel,
-            stream_id,
+            stream.channel,
+            stream.stream_id,
             [this](::aeron::AtomicBuffer& b, ::aeron::util::index_t o, ::aeron::util::index_t l, ::aeron::Header& h) {
                 on_fragment(b, o, l, h);
             });
-        bpt::common::log::info("[bridge/Account] subscribed on {} stream {}", channel, stream_id);
+        bpt::common::log::info("[bridge/Account] subscribed on {} stream {}", stream.channel, stream.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }
@@ -46,7 +47,10 @@ private:
                      ::aeron::Header& /*header*/) {
         constexpr double kE8 = 1e8;
         decode_sbe_fragment<bpt::messages::AccountSnapshot>(
-            buffer, offset, length, [this, kE8](bpt::messages::AccountSnapshot& msg) {
+            buffer,
+            offset,
+            length,
+            [this, kE8](bpt::messages::AccountSnapshot& msg) {
                 if (handler_ == nullptr) [[unlikely]]
                     return;
 

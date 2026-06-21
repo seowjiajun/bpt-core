@@ -124,5 +124,4 @@ private:
     uint64_t last_trade_ns_{0};
 };
 
-
 }  // namespace bpt::features

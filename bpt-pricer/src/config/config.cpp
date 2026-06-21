@@ -40,13 +40,13 @@ Settings load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    s.md_data = resolve_stream(shared_streams, "md_data", 2002);
-    s.md_control = resolve_stream(shared_streams, "md_control", 2001);
-    s.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
-    s.refdata_delta = resolve_stream(shared_streams, "refdata_delta", 1002);
-    s.refdata_control = resolve_stream(shared_streams, "refdata_control", 1003);
-    s.vol_surface = resolve_stream(shared_streams, "vol_surface", 4001);
-    s.pricer_status = resolve_stream(shared_streams, "pricer_status", 4002);
+    s.aeron.md.data = resolve_stream(shared_streams, "md.feed", 2002);
+    s.aeron.md.control = resolve_stream(shared_streams, "md.control", 2001);
+    s.aeron.refdata.snapshot = resolve_stream(shared_streams, "refdata.snapshot", 1001);
+    s.aeron.refdata.delta = resolve_stream(shared_streams, "refdata.delta", 1002);
+    s.aeron.refdata.control = resolve_stream(shared_streams, "refdata.control", 1003);
+    s.aeron.vol_surface = resolve_stream(shared_streams, "pricer.vol_surface", 4001);
+    s.aeron.pricer_status = resolve_stream(shared_streams, "pricer.status", 4002);
 
     if (auto* arr = root["exchanges"].as_array()) {
         for (auto& elem : *arr)

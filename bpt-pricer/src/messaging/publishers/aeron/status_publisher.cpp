@@ -6,9 +6,12 @@
 
 namespace bpt::pricer::messaging::aeron {
 
-StatusPublisher::StatusPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
-    pub_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
-    bpt::common::log::info("[aeron::StatusPublisher] Publication ready on {} stream {}", channel, stream_id);
+StatusPublisher::StatusPublisher(std::shared_ptr<::aeron::Aeron> aeron,
+                                 const bpt::common::config::StreamConfig& stream) {
+    pub_ = bpt::common::aeron::wait_for_publication(aeron, stream.channel, stream.stream_id);
+    bpt::common::log::info("[aeron::StatusPublisher] Publication ready on {} stream {}",
+                           stream.channel,
+                           stream.stream_id);
 }
 
 void StatusPublisher::publish_heartbeat(uint64_t timestamp_ns, uint64_t seq_num) {

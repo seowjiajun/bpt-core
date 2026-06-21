@@ -10,9 +10,9 @@
 /// Implementations: aeron::ExecReportPublisher in prod;
 /// CapturingExecReportPublisher in unit tests.
 ///
-/// The 15-argument publish() signature is preserved verbatim from the
-/// pre-port-extraction ExecReportPublisher. Callers upcast the concrete
-/// instance to `api::ExecReportPublisher&` at the OrderProcessor boundary.
+/// publish() takes an ExecReport parameter object — the fields were
+/// previously 15 positional args (seven of them uint64_t), a transposition
+/// hazard. The struct is codec-free so the port stays SBE-agnostic.
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
@@ -21,9 +21,27 @@
 #include <messages/RejectReason.h>
 
 #include <cstdint>
-#include <string_view>
+#include <string>
 
 namespace bpt::order_gateway::messaging::api {
+
+struct ExecReport {
+    uint64_t order_id;
+    uint64_t exchange_order_id;
+    bpt::messages::ExchangeId::Value exchange_id;
+    uint64_t instrument_id;
+    bpt::messages::ExecStatus::Value status;
+    bpt::messages::OrderSide::Value side;
+    bpt::messages::OrderType::Value order_type;
+    int64_t price;
+    uint64_t filled_qty;
+    uint64_t remaining_qty;
+    bpt::messages::RejectReason::Value reject_reason;
+    int64_t fee;
+    std::string fee_currency;  ///< ≤ 8 chars; encoded into SBE Char8 slot
+    uint64_t exchange_ts_ns;
+    uint64_t local_ts_ns;
+};
 
 /// \brief Contract for the exec-report outbound port.
 ///
@@ -36,21 +54,7 @@ class ExecReportPublisher {
 public:
     virtual ~ExecReportPublisher() = default;
 
-    virtual void publish(uint64_t order_id,
-                         uint64_t exchange_order_id,
-                         bpt::messages::ExchangeId::Value exchange_id,
-                         uint64_t instrument_id,
-                         bpt::messages::ExecStatus::Value status,
-                         bpt::messages::OrderSide::Value side,
-                         bpt::messages::OrderType::Value order_type,
-                         int64_t price,
-                         uint64_t filled_qty,
-                         uint64_t remaining_qty,
-                         bpt::messages::RejectReason::Value reject_reason,
-                         int64_t fee,
-                         std::string_view fee_currency,
-                         uint64_t exchange_ts_ns,
-                         uint64_t local_ts_ns) = 0;
+    virtual void publish(const ExecReport& report) = 0;
 };
 
 }  // namespace bpt::order_gateway::messaging::api

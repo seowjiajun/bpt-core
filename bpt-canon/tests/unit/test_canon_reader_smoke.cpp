@@ -8,7 +8,6 @@
 /// monotonic-or-equal within the file.
 
 #include <canon/canon_reader.h>
-
 #include <cstdlib>
 #include <filesystem>
 #include <gtest/gtest.h>

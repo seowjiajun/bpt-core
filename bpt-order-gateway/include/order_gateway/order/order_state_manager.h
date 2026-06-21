@@ -1,9 +1,12 @@
 #pragma once
 
+#include "order_gateway/messaging/publishers/api/exec_report_publisher.h"
+
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
 #include <messages/OrderSide.h>
 #include <messages/OrderType.h>
+#include <messages/RejectReason.h>
 
 #include <cstdint>
 #include <string>
@@ -37,6 +40,28 @@ struct OrderState {
     OrderLifecycle lifecycle{OrderLifecycle::PENDING};
     uint64_t created_ns;
     uint64_t last_update_ns;
+
+    /// \brief Build the synthetic CANCELLED exec-report for a stale order
+    /// (timed out with no exchange confirmation). `ts` stamps both clocks.
+    [[nodiscard]] messaging::api::ExecReport to_cancel_report(uint64_t ts) const {
+        return messaging::api::ExecReport{
+            .order_id = order_id,
+            .exchange_order_id = exchange_order_id,
+            .exchange_id = exchange_id,
+            .instrument_id = instrument_id,
+            .status = bpt::messages::ExecStatus::CANCELLED,
+            .side = side,
+            .order_type = order_type,
+            .price = price,
+            .filled_qty = filled_qty,
+            .remaining_qty = remaining_qty,
+            .reject_reason = bpt::messages::RejectReason::OK,
+            .fee = 0,
+            .fee_currency = "USDT",
+            .exchange_ts_ns = ts,
+            .local_ts_ns = ts,
+        };
+    }
 };
 
 // Single-writer order state manager — designed for the hot path thread only.

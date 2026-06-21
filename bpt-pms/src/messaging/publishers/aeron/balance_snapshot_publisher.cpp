@@ -8,12 +8,11 @@ namespace bpt::pms::messaging::aeron {
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 BalanceSnapshotPublisher::BalanceSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                                   const std::string& channel,
-                                                   int stream_id)
+                                                   const bpt::common::config::StreamConfig& stream)
     // BalanceSnapshot is idempotent — next poll replaces stale data —
     // so kBoundedRetry on back-pressure + drop on no-subscriber is the
     // right shape.
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kBoundedRetry) {}
 
 void BalanceSnapshotPublisher::publish(const adapter::BalanceSnapshot& snapshot) {
     alignas(8) std::byte scratch[SbeBalanceSnapshotCodec::kRecommendedScratchSize];

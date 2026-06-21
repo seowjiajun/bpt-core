@@ -26,9 +26,9 @@ TEST(CanonicalResolverParse, PerpAndPerpetualAliases) {
 }
 
 TEST(CanonicalResolverParse, MalformedReturnsNullopt) {
-    EXPECT_FALSE(CanonicalResolver::parse("BTC-USDT-SPOT"));   // no slash, no colon
-    EXPECT_FALSE(CanonicalResolver::parse("BTC/USDT"));        // no colon
-    EXPECT_FALSE(CanonicalResolver::parse("BTC:USDT/SPOT"));   // colon before slash
+    EXPECT_FALSE(CanonicalResolver::parse("BTC-USDT-SPOT"));  // no slash, no colon
+    EXPECT_FALSE(CanonicalResolver::parse("BTC/USDT"));       // no colon
+    EXPECT_FALSE(CanonicalResolver::parse("BTC:USDT/SPOT"));  // colon before slash
 }
 
 // ─── build_filters() ────────────────────────────────────────────────────────

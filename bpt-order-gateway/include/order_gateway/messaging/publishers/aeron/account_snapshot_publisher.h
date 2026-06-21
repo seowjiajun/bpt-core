@@ -6,6 +6,7 @@
 #include <Aeron.h>
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 #include <string>
 
@@ -19,7 +20,7 @@ namespace bpt::order_gateway::messaging::aeron {
 /// REST fetch.
 class AccountSnapshotPublisher final : public api::AccountSnapshotPublisher {
 public:
-    AccountSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    AccountSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish(const adapter::AccountSnapshotData& snapshot) override;
 

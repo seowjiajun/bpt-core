@@ -1,8 +1,16 @@
 # Single source of truth for Aeron wiring across all bpt-* services.
 #
 # Each service's TOML references this file via `aeron_config = "..."`.
-# Its loader calls `bpt::common::config::resolve_stream(shared, "<name>", fallback)`
-# to fetch its own streams by their global name.
+# Its loader resolves each stream by its global name (the dotted path,
+# e.g. "md.feed") — see resolve_stream.
+#
+# Streams are grouped under their PRODUCING service: a stream has exactly
+# one producer but N consumers across processes, so producer is the only
+# coherent owner. Leaf names drop the redundant producer prefix (the table
+# supplies it), so "md_data" → md.feed, "refdata_snapshot" → refdata.snapshot.
+# The thousands-digit of the ID encodes the same domain (1xxx refdata,
+# 2xxx md, 3xxx order, 4xxx pricer, 5xxx analytics, 6xxx pms/radar,
+# 9xxx infra). IDs are unchanged from the previous flat layout.
 #
 # Changing a stream ID here updates every service simultaneously on the
 # next restart — no per-service drift, no silent disconnect.
@@ -12,50 +20,54 @@
 # duplicated in each service's [aeron] block.
 media_driver_dir = "/dev/shm/aeron-bpt"
 
-[streams]
-# Refdata service → consumers
-refdata_snapshot = 1001
-refdata_delta    = 1002
-refdata_control  = 1003
-fee_schedule     = 1004
-funding_rate     = 1005
-refdata_status   = 1006
+# ── Stream registry, grouped by producing service ──────────────────────
 
-# MD-gateway → consumers
-md_control       = 2001
-md_data          = 2002
-md_ack_hb        = 2003
-instrument_stats    = 2004
+[streams.refdata]      # bpt-refdata → consumers
+snapshot     = 1001
+delta        = 1002
+control      = 1003
+fee_schedule = 1004    # FeeSchedule id=19
+status       = 1006    # RefDataReady id=16, RefDataError id=17
 
-# Order-gateway / strategy
-order            = 3001
+[streams.md]           # bpt-md-gateway → consumers
+control          = 2001
+feed             = 2002    # the market-data feed (BBO / trades / book) — was md_data
+ack_hb           = 2003
+instrument_stats = 2004
+funding_rate     = 2005    # FundingRate id=18 — PRODUCED by md-gateway (refdata/loader.cpp:106);
+                           # strategy bundles it into its refdata client. Renumbered 1005→2005 so
+                           # the thousands-digit tracks the producer (md), not its refdata origin.
+
+[streams.order]        # bpt-order-gateway ↔ strategy
+submit           = 3001    # strategy → order-gateway — was `order`
 exec_report      = 3002
 heartbeat        = 3003
 account_snapshot = 3004
 
-# Pricer → strategy
-vol_surface      = 4001
-pricer_status    = 4002
+[streams.pricer]       # bpt-pricer → strategy
+vol_surface = 4001
+status      = 4002     # PricerHeartbeat id=22, PricerReady id=23 — was pricer_status
 
-# Analytics → strategy / bridge
-toxicity         = 5001
+[streams.analytics]    # bpt-analytics → strategy / bridge
+toxicity = 5001
 
-# Bpt-pms → consumers
+[streams.pms]          # bpt-pms → consumers
 balance_snapshot = 6001
 
-# Bpt-radar → strategy / bridge
-market_color     = 6002
+[streams.radar]        # bpt-radar → strategy / bridge
+market_color = 6002
 
-# Backtester ↔ strategy
-backtest_ack     = 9001
-backtest_control = 9002
+[streams.backtest]     # backtester ↔ strategy
+ack     = 9001
+control = 9002
 
-# Bridge ↔ strategy
+[streams.bridge]       # bridge ↔ strategy
 console_control = 9003   # bridge → strategy (kill-switch)
-portfolio         = 9004   # strategy → bridge (portfolio snapshot)
+portfolio       = 9004   # strategy → bridge (portfolio snapshot)
 
 [channels]
 # Per-stream channel override. Default for everything is "aeron:ipc"
 # (loopback shared-memory, the prod transport). Add entries here only
-# when you need UDP / multicast for a specific stream:
-#   refdata_snapshot = "aeron:udp?endpoint=10.0.0.5:50001"
+# when you need UDP / multicast for a specific stream. Key by the dotted
+# global name:
+#   "refdata.snapshot" = "aeron:udp?endpoint=10.0.0.5:50001"

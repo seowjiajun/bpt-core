@@ -118,26 +118,37 @@ export function PriceChart() {
     }
   }, [])
 
-  // Stream candles as they update. Using series.update(latestBar) — NOT
-  // setData — is critical: setData replaces the full series on every tick
-  // and caused visible lag. series.update is O(1): if the bar's time
-  // matches the current last bar it updates in place, otherwise it
-  // appends. That handles both "tick inside current bucket" and
-  // "tick crossed into a new bucket" cases.
+  // Candle updates: seed the full history on first render, then use
+  // series.update(last) for incremental ticks. setData on every tick
+  // causes visible flicker; update() is O(1) — updates in place when
+  // the time matches the current bar, appends when the bucket flips.
+  // On mount (or remount after cleanup resets didFitRef) the store may
+  // already hold N candles — setData seeds them all at once so the chart
+  // shows full history rather than just the latest bar.
   useEffect(() => {
     const series = seriesRef.current
     if (!series || candles.length === 0) return
-    const last = candles[candles.length - 1]
-    series.update({
-      time: last.time as UTCTimestamp,
-      open: last.open,
-      high: last.high,
-      low: last.low,
-      close: last.close,
-    })
-    if (!didFitRef.current && candles.length >= 5) {
+    if (!didFitRef.current) {
+      series.setData(
+        candles.map((c) => ({
+          time: c.time as UTCTimestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }))
+      )
       chartRef.current?.timeScale().fitContent()
       didFitRef.current = true
+    } else {
+      const last = candles[candles.length - 1]
+      series.update({
+        time: last.time as UTCTimestamp,
+        open: last.open,
+        high: last.high,
+        low: last.low,
+        close: last.close,
+      })
     }
   }, [candles])
 

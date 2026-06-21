@@ -33,9 +33,8 @@ int main(int argc, char* argv[]) {
         ->check(CLI::ExistingFile);
     auto* wslog_opt = cli.add_option("--wslog", wslog_paths, "One or more .wslog files to replay (raw venue capture)")
                           ->check(CLI::ExistingFile);
-    auto* canon_opt =
-        cli.add_option("--canon", canon_paths, "One or more .canon files to replay (derived SBE events)")
-            ->check(CLI::ExistingFile);
+    auto* canon_opt = cli.add_option("--canon", canon_paths, "One or more .canon files to replay (derived SBE events)")
+                          ->check(CLI::ExistingFile);
     wslog_opt->excludes(canon_opt);
     canon_opt->excludes(wslog_opt);
     cli.add_option("--output-dir", output_dir, "Where to write results")->capture_default_str();

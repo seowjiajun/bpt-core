@@ -4,7 +4,7 @@
 /// \brief Outbound port: per-instrument funding-rate updates.
 ///
 /// Funding rates ride a separate Aeron stream from the main MD feed
-/// (`settings.aeron.funding_rate.stream_id` — typically 1005) so that
+/// (`settings.aeron.funding_rate.stream_id` — typically 2005) so that
 /// strategy can subscribe to them independently of the high-frequency
 /// BBO/Trade fan-out on stream 2002. Adapters surface funding-rate
 /// events via the `on_funding_rate` callback set by MdGatewayService; that

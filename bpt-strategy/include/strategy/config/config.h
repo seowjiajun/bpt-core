@@ -3,6 +3,7 @@
 #include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
+#include <strategy/config/aeron_config.h>
 #include <string>
 #include <toml++/toml.hpp>
 #include <unordered_map>
@@ -13,40 +14,8 @@
 namespace bpt::strategy {
 namespace config {
 
-struct AeronConfig {
-    // media_driver_dir moved to BaseSettings; kept streams-only.
-    // Reference data streams (required)
-    bpt::common::config::StreamConfig refdata_control{"aeron:ipc", 1003};
-    bpt::common::config::StreamConfig refdata_snapshot{"aeron:ipc", 1001};
-    bpt::common::config::StreamConfig refdata_delta{"aeron:ipc", 1002};
-    // Refdata live streams
-    bpt::common::config::StreamConfig fee_schedule{"aeron:ipc", 1004};    // FeeSchedule id=19
-    bpt::common::config::StreamConfig funding_rate{"aeron:ipc", 1005};    // FundingRate id=18
-    bpt::common::config::StreamConfig refdata_status{"aeron:ipc", 1006};  // RefDataReady id=16, RefDataError id=17
-    // Market data streams (optional — stream_id 0 means MD client is not started)
-    bpt::common::config::StreamConfig md_control{"aeron:ipc", 0};
-    bpt::common::config::StreamConfig md_data{"aeron:ipc", 0};
-    bpt::common::config::StreamConfig md_ack_hb{"aeron:ipc", 0};
-    // Order gateway streams (optional — stream_id 0 means OrderGateway client is not started)
-    bpt::common::config::StreamConfig order{"aeron:ipc", 0};        // Strategy → OrderGateway
-    bpt::common::config::StreamConfig exec_report{"aeron:ipc", 0};  // OrderGateway → Strategy (ExecutionReport)
-    bpt::common::config::StreamConfig heartbeat{"aeron:ipc", 0};    // OrderGateway → Strategy (OrderGatewayHeartbeat)
-    bpt::common::config::StreamConfig account_snapshot{"aeron:ipc",
-                                                       0};  // OrderGateway → Strategy (AccountSnapshot id=27)
-    // Pricer vol surface streams (optional — stream_id 0 means vol surface client is not started)
-    bpt::common::config::StreamConfig vol_surface{"aeron:ipc", 0};    // Pricer → Strategy (VolSurface id=21)
-    bpt::common::config::StreamConfig pricer_status{"aeron:ipc", 0};  // PricerHeartbeat id=22, PricerReady id=23
-    // Analytics toxicity stream (optional — stream_id 0 disables)
-    bpt::common::config::StreamConfig toxicity{"aeron:ipc", 0};  // Analytics → Strategy (ToxicityUpdate)
-    // Backtest streams (optional — only used when backtest_mode = true)
-    bpt::common::config::StreamConfig backtest_control{"aeron:ipc",
-                                                       9002};           // Backtester → Strategy (BacktestControl id=25)
-    bpt::common::config::StreamConfig backtest_ack{"aeron:ipc", 9001};  // Strategy → Backtester (BacktestAck id=24)
-    // Console control (optional — stream_id 0 disables; bridge → Strategy)
-    bpt::common::config::StreamConfig console_control{"aeron:ipc", 9003};
-    // Portfolio snapshot (optional — Strategy → bridge; published every ~100ms)
-    bpt::common::config::StreamConfig portfolio{"aeron:ipc", 9004};
-};
+// AeronConfig lives in aeron_config.h so messaging clients can take its
+// per-consumer slices by const-ref without pulling in toml++.
 
 // Per-venue execution parameters.
 // Venue keys match exchange names used in refdata (e.g. "BINANCE", "OKX", "HYPERLIQUID").

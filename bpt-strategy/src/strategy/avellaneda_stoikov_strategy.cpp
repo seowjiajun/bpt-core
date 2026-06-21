@@ -1,32 +1,31 @@
+// AS construction + market-data inbound path: ctor/config parsing, universe
+// resolution + tick handlers (book, trade, BBO → quote), toxicity feedback,
+// and refdata-stale gating.
+//
+// Sibling translation units share this class via the header:
+//   pricing / sizing / suppression → avellaneda_stoikov_quoting.cpp
+//   execution-report handling      → avellaneda_stoikov_exec.cpp
+//   order I/O (requote / unwind)   → avellaneda_stoikov_orders.cpp
+//   state save/load + console JSON → avellaneda_stoikov_state_io.cpp
+//   shutdown flatten / account     → avellaneda_stoikov_shutdown.cpp
+
 #include "strategy/strategy/avellaneda_stoikov_strategy.h"
 
-#include "strategy/clock/sim_clock.h"
+#include "strategy/config/fair_value_config.h"
 #include "strategy/md/subscribe_helpers.h"
 #include "strategy/refdata/exchange_id.h"
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
-#include <messages/ExecStatus.h>
 #include <messages/InstrumentType.h>
-#include <messages/OrderType.h>
-#include <messages/RejectSource.h>
-#include <messages/TimeInForce.h>
 #include <messages/TradeSide.h>
-#include <messages/exec_inst.h>
 
 #include <algorithm>
-#include <limits>
 #include <bpt_common/logging.h>
-#include <bpt_common/util/tsc_clock.h>
-#include <chrono>
 #include <cmath>
+#include <limits>
 
-using bpt::messages::ExchangeId;
-using bpt::messages::ExecStatus;
 using bpt::messages::OrderSide;
-using bpt::messages::OrderType;
-using bpt::messages::RejectSource;
-using bpt::messages::TimeInForce;
 
 namespace bpt::strategy::strategy {
 
@@ -40,35 +39,9 @@ quill::Logger* kLog() {
     return l;
 }
 
-FairValueEstimator::Config parse_fair_value_config(const toml::table& params) {
-    FairValueEstimator::Config c;
-    auto fv = params["fair_value"];
-    if (!fv)
-        return c;  // No table → keep defaults (Mode::kMid).
-    const std::string mode = fv["mode"].value<std::string>().value_or("mid");
-    if (mode == "mid")
-        c.mode = FairValueEstimator::Mode::kMid;
-    else if (mode == "micro")
-        c.mode = FairValueEstimator::Mode::kMicro;
-    else if (mode == "micro_capped")
-        c.mode = FairValueEstimator::Mode::kMicroSizeCapped;
-    else if (mode == "l2_weighted")
-        c.mode = FairValueEstimator::Mode::kL2WeightedMicro;
-    else if (mode == "ewma_micro")
-        c.mode = FairValueEstimator::Mode::kEwmaMicro;
-    else
-        bpt::common::log::warn(kLog(), "[fair_value] unknown mode='{}' — falling back to 'mid'", mode);
-    c.size_cap_qty = fv["size_cap_qty"].value<double>().value_or(c.size_cap_qty);
-    c.ladder_depth =
-        static_cast<std::size_t>(fv["ladder_depth"].value<int64_t>().value_or(static_cast<int64_t>(c.ladder_depth)));
-    c.ladder_decay = fv["ladder_decay"].value<double>().value_or(c.ladder_decay);
-    c.ewma_alpha = fv["ewma_alpha"].value<double>().value_or(c.ewma_alpha);
-    return c;
-}
 }  // namespace
 
-static constexpr double kPriceScale = 1e8;
-
+// ── Construction ─────────────────────────────────────────────────────────────
 AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                                                      const config::StrategyConfig& cfg,
                                                      refdata::IRefdataClient& refdata,
@@ -93,7 +66,7 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       max_half_spread_bps_(cfg.params["max_half_spread_bps"].value<double>().value_or(50.0)),
       quote_sanity_bps_(cfg.params["quote_sanity_bps"].value<double>().value_or(5000.0)),
       order_book_depth_(static_cast<uint8_t>(cfg.params["order_book_depth"].value<int64_t>().value_or(0))),
-      fv_cfg_(parse_fair_value_config(cfg.params)),
+      fv_cfg_(config::parse_fv_config(cfg.params)),
       pause_below_rpnl_usd_(cfg.params["pause_below_rpnl_usd"].value<double>().value_or(0.0)),
       pause_cooldown_s_(cfg.params["pause_cooldown_s"].value<double>().value_or(300.0)),
       post_fill_markout_threshold_bps_(cfg.params["post_fill_markout_threshold_bps"].value<double>().value_or(0.0)),
@@ -101,17 +74,31 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
       drift_warmup_ticks_(static_cast<std::size_t>(cfg.params["drift_warmup_ticks"].value<int64_t>().value_or(50))),
       max_drift_skew_bps_(cfg.params["max_drift_skew_bps"].value<double>().value_or(10.0)),
-      drift_suppress_bps_(cfg.params["drift_suppress_bps"].value<double>().value_or(0.0)),
-      drift_suppress_sigma_mult_(cfg.params["drift_suppress_sigma_mult"].value<double>().value_or(0.0)),
       slow_drift_window_s_(cfg.params["slow_drift_window_s"].value<double>().value_or(300.0)),
-      slow_drift_suppress_bps_(cfg.params["slow_drift_suppress_bps"].value<double>().value_or(0.0)),
-      slow_drift_suppress_sigma_mult_(cfg.params["slow_drift_suppress_sigma_mult"].value<double>().value_or(0.0)),
-      tox_suppress_threshold_(cfg.params["tox_suppress_threshold"].value<double>().value_or(0.0)),
-      queue_suppress_fill_prob_min_(cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0)),
-      queue_suppress_horizon_s_(cfg.params["queue_suppress_horizon_s"].value<double>().value_or(5.0)),
-      shutdown_cross_bps_(cfg.params["shutdown_cross_bps"].value<double>().value_or(20.0)),
-      shutdown_max_unwind_retries_(
-          static_cast<uint32_t>(cfg.params["shutdown_max_unwind_retries"].value<int64_t>().value_or(3))),
+      supp_policy_(SuppressionPolicy::Config{
+          .post_fill_markout_threshold_bps =
+              cfg.params["post_fill_markout_threshold_bps"].value<double>().value_or(0.0),
+          .drift_suppress_bps = cfg.params["drift_suppress_bps"].value<double>().value_or(0.0),
+          .drift_suppress_sigma_mult = cfg.params["drift_suppress_sigma_mult"].value<double>().value_or(0.0),
+          .slow_drift_suppress_bps = cfg.params["slow_drift_suppress_bps"].value<double>().value_or(0.0),
+          .slow_drift_suppress_sigma_mult = cfg.params["slow_drift_suppress_sigma_mult"].value<double>().value_or(0.0),
+          .slow_drift_window_s = cfg.params["slow_drift_window_s"].value<double>().value_or(300.0),
+          .tox_suppress_threshold = cfg.params["tox_suppress_threshold"].value<double>().value_or(0.0),
+          .queue_suppress_fill_prob_min = cfg.params["queue_suppress_fill_prob_min"].value<double>().value_or(0.0),
+          .queue_suppress_horizon_s = cfg.params["queue_suppress_horizon_s"].value<double>().value_or(5.0),
+          .kappa_min = cfg.params["kappa_min"].value<double>().value_or(0.01),
+          .kappa_warmup_ticks =
+              static_cast<std::size_t>(cfg.params["kappa_warmup_ticks"].value<int64_t>().value_or(10)),
+          .ofi_cancel_threshold_sigma = cfg.params["ofi_cancel_threshold_sigma"].value<double>().value_or(
+              std::numeric_limits<double>::infinity()),
+      }),
+      unwinder_(positions_,
+                *order_mgr,
+                {.passive_timeout_s = cfg.params["unwind_passive_timeout_s"].value<double>().value_or(45.0),
+                 .step_interval_s = cfg.params["unwind_step_interval_s"].value<double>().value_or(8.0),
+                 .cross_bps = cfg.params["shutdown_cross_bps"].value<double>().value_or(20.0),
+                 .max_retries =
+                     static_cast<uint32_t>(cfg.params["shutdown_max_unwind_retries"].value<int64_t>().value_or(3))}),
       regime_cfg_{
           cfg.params["regime_mean_revert_h"].value<double>().value_or(0.45),
           cfg.params["regime_trend_h"].value<double>().value_or(0.55),
@@ -136,6 +123,7 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
       gamma_pnl_tighten_mult_(cfg.params["gamma_pnl_tighten_mult"].value<double>().value_or(1.0)),
       ofi_weight_bps_(cfg.params["ofi_weight_bps"].value<double>().value_or(0.0)),
       ofi_window_ns_(static_cast<uint64_t>(cfg.params["ofi_window_ms"].value<double>().value_or(1000.0) * 1e6)),
+      imbalance_weight_bps_(cfg.params["imbalance_weight_bps"].value<double>().value_or(0.0)),
       ofi_cancel_threshold_sigma_(
           cfg.params["ofi_cancel_threshold_sigma"].value<double>().value_or(std::numeric_limits<double>::infinity())),
       ofi_sigma_halflife_s_(cfg.params["ofi_sigma_halflife_s"].value<double>().value_or(60.0)),
@@ -167,11 +155,11 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                            min_half_spread_bps_,
                            max_half_spread_bps_,
                            drift_halflife_s_,
-                           drift_suppress_bps_,
-                           drift_suppress_sigma_mult_,
+                           supp_policy_.config().drift_suppress_bps,
+                           supp_policy_.config().drift_suppress_sigma_mult,
                            slow_drift_window_s_,
-                           slow_drift_suppress_bps_,
-                           slow_drift_suppress_sigma_mult_);
+                           supp_policy_.config().slow_drift_suppress_bps,
+                           supp_policy_.config().slow_drift_suppress_sigma_mult);
     bpt::common::log::info(kLog(),
                            "risk: max_position_usd={} max_order_size_usd={}",
                            cfg.risk.max_position_usd,
@@ -179,7 +167,7 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
     bpt::common::log::info(kLog(),
                            "order_book_depth={} queue_suppress_fill_prob_min={:.4f}",
                            static_cast<int>(order_book_depth_),
-                           queue_suppress_fill_prob_min_);
+                           supp_policy_.config().queue_suppress_fill_prob_min);
     {
         const char* fv_mode_str = "mid";
         switch (fv_cfg_.mode) {
@@ -251,7 +239,8 @@ void AvellanedaStoikovStrategy::on_snapshot(const refdata::InstrumentCache& cach
 
     for (const auto& r : CanonicalResolver::resolve_instruments(cache, instruments_, md_exchanges_)) {
         auto [it, inserted] = state_.emplace(r.instrument_id,
-                                             InstrumentState{.ewma_var = EwmaVariance(vol_halflife_s_),
+                                             InstrumentState{.instrument_id = r.instrument_id,
+                                                             .ewma_var = EwmaVariance(vol_halflife_s_),
                                                              .ewma_drift = EwmaDrift(drift_halflife_s_),
                                                              .ewma_kappa = KappaEstimator(kappa_halflife_s_),
                                                              .symbol = r.instrument.symbol,
@@ -300,7 +289,8 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
         const auto ex_id = refdata::to_exchange_id(inst.exchange);
 
         auto [it, inserted] = state_.emplace(inst.instrument_id,
-                                             InstrumentState{.ewma_var = EwmaVariance(vol_halflife_s_),
+                                             InstrumentState{.instrument_id = inst.instrument_id,
+                                                             .ewma_var = EwmaVariance(vol_halflife_s_),
                                                              .ewma_drift = EwmaDrift(drift_halflife_s_),
                                                              .ewma_kappa = KappaEstimator(kappa_halflife_s_),
                                                              .symbol = inst.symbol,
@@ -379,9 +369,8 @@ void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& 
         // ofi_weight_bps-only hot path identical.
         if (cancel_armed) {
             const double v = st.ofi.value();
-            const double dt_s = st.ewma_ofi_last_ns > 0
-                                    ? static_cast<double>(book.timestampNs() - st.ewma_ofi_last_ns) * 1e-9
-                                    : 0.0;
+            const double dt_s =
+                st.ewma_ofi_last_ns > 0 ? static_cast<double>(book.timestampNs() - st.ewma_ofi_last_ns) * 1e-9 : 0.0;
             st.ewma_ofi_sq.update(v * v, dt_s);
             st.ewma_ofi_last_ns = book.timestampNs();
         }
@@ -590,541 +579,11 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     const double s_est = st.fv.estimate(bid_px, ask_px, tick.bidQty(), tick.askQty());
     const double s = std::isnan(s_est) ? mid : s_est;
 
-    double new_bid{0.0}, new_ask{0.0};
-    if (!compute_quotes(st, tick.instrumentId(), net_qty, s, ts_ns, new_bid, new_ask))
+    const BboContext ctx{.net_qty = net_qty, .mid = s, .ts_ns = ts_ns};
+    const auto quotes = compute_quotes(st, ctx);
+    if (!quotes)
         return;
-
-    maybe_requote(tick.instrumentId(), st, net_qty, s, new_bid, new_ask);
-}
-
-void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionReport& rpt) {
-    // OM owns lifecycle — let it update OrderState before we dispatch.
-    order_mgr_->on_exec_report(rpt);
-
-    const uint64_t order_id = rpt.orderId();
-    const auto status = rpt.status();
-
-    auto handle = order_mgr_->find_by_id(order_id);
-    if (!handle.valid())
-        return;
-    order::OrderState* const os = handle.state;
-    const uint64_t canonical_id = os->instrument_id;
-
-    auto state_it = state_.find(canonical_id);
-    if (state_it == state_.end())
-        return;
-
-    InstrumentState& st = state_it->second;
-
-    if (status == ExecStatus::ACKED) {
-        bpt::common::log::debug(kLog(), "ExecReport order_id={} {} {} ACKED", order_id, st.symbol, st.exchange);
-    } else if (status == ExecStatus::REJECTED) {
-        const auto src = rpt.rejectSource();
-        const bool gateway_reject = (src == RejectSource::GATEWAY || src == RejectSource::RISK);
-        if (gateway_reject)
-            bpt::common::log::error(kLog(),
-                                    "ExecReport order_id={} {} {} REJECTED reason={} source={}",
-                                    order_id,
-                                    st.symbol,
-                                    st.exchange,
-                                    bpt::messages::RejectReason::c_str(rpt.rejectReason()),
-                                    bpt::messages::RejectSource::c_str(src));
-        else
-            bpt::common::log::warn(kLog(),
-                                   "ExecReport order_id={} {} {} REJECTED reason={} source={}",
-                                   order_id,
-                                   st.symbol,
-                                   st.exchange,
-                                   bpt::messages::RejectReason::c_str(rpt.rejectReason()),
-                                   bpt::messages::RejectSource::c_str(src));
-    } else {
-        bpt::common::log::info(kLog(),
-                               "ExecReport order_id={} {} {} status={} filled={:.6f} price={:.2f}",
-                               order_id,
-                               st.symbol,
-                               st.exchange,
-                               bpt::messages::ExecStatus::c_str(status),
-                               static_cast<double>(rpt.filledQty()) / 1e8,
-                               static_cast<double>(rpt.price()) / 1e8);
-    }
-
-    if (status == ExecStatus::FILLED || status == ExecStatus::PARTIAL) {
-        // Capture rpnl baseline before the fill so we can derive this
-        // fill's CONTRIBUTION to realized PnL (PositionTracker holds
-        // session-cumulative; γ-feedback wants per-fill delta). When
-        // there's no prior position, baseline = 0.
-        const auto before = positions_.get(canonical_id, st.exchange_id);
-        const double prior_rpnl = before ? before->realized_pnl : 0.0;
-
-        positions_.on_fill(canonical_id, st.exchange_id, rpt.side(), rpt.filledQty(), rpt.price());
-        st.queue.on_fill(order_id, static_cast<double>(rpt.filledQty()) / 1e8);
-
-        // Phase 2.1 — record the fill for post-fill markout evaluation
-        // on the next BBO tick. Skip when the feature is disabled
-        // (threshold == 0). Excludes unwind orders: those are
-        // intentionally aggressive and we don't want their adverse
-        // markout to trip the cooldown for the passive side.
-        // Timestamps are simulation time (st.last_tick_ns), not wall
-        // clock — backtest replays compress 11h of sim time into a few
-        // seconds of wall clock, so a wall-clock cooldown would span
-        // the whole run.
-        if (post_fill_markout_threshold_bps_ < 0.0 && os->tag == kTagQuote) {
-            const double fill_px = static_cast<double>(rpt.price()) / 1e8;
-            if (rpt.side() == bpt::messages::TradeSide::BUY) {
-                st.pending_buy_fill_price = fill_px;
-                st.pending_buy_fill_ts = st.last_tick_ns;
-            } else {
-                st.pending_sell_fill_price = fill_px;
-                st.pending_sell_fill_ts = st.last_tick_ns;
-            }
-        }
-
-        if (const auto pos = positions_.get(canonical_id, st.exchange_id)) {
-            bpt::common::log::info(kLog(),
-                                   "Position {} @ {}  net_qty={:.6f}  avg_price={:.2f}  rpnl={:.4f}",
-                                   st.symbol,
-                                   st.exchange,
-                                   static_cast<double>(pos->net_qty) / 1e8,
-                                   pos->avg_price,
-                                   pos->realized_pnl);
-
-            // γ-feedback rolling window — only push when feature enabled
-            // and the fill actually realized PnL (opening fills don't
-            // realize anything; deltas of 0 would dilute the window).
-            if (gamma_pnl_window_n_ > 0) {
-                const double delta = pos->realized_pnl - prior_rpnl;
-                if (delta != 0.0) {
-                    st.recent_rpnl.push_back(delta);
-                    while (st.recent_rpnl.size() > gamma_pnl_window_n_)
-                        st.recent_rpnl.pop_front();
-                }
-            }
-
-            // Drawdown circuit-breaker. Trigger when realized PnL crosses
-            // the configured loss threshold AND we're not already in a
-            // pause window. The pause_active flag in SuppressionState
-            // prevents NEW quotes; we ALSO have to actively cancel any
-            // resting bid/ask here — otherwise pre-existing live orders
-            // sit in the book and keep filling during the pause window.
-            // (Same pattern as the vol_halted cancel block in on_bbo:
-            // suppression alone doesn't pull live orders, only stops
-            // requotes; explicit cancel is required.)
-            if (pause_below_rpnl_usd_ < 0.0 && pos->realized_pnl < pause_below_rpnl_usd_ &&
-                prior_rpnl >= pause_below_rpnl_usd_) {
-                const uint64_t now_ns = bpt::common::util::TscClock::now_epoch_ns();
-                st.pause_until_ns = now_ns + static_cast<uint64_t>(pause_cooldown_s_ * 1e9);
-                bpt::common::log::warn(kLog(),
-                                       "{} PAUSE TRIGGERED rpnl={:.4f} crossed below threshold={:.4f} — "
-                                       "halting both sides for {:.0f}s",
-                                       st.symbol,
-                                       pos->realized_pnl,
-                                       pause_below_rpnl_usd_,
-                                       pause_cooldown_s_);
-                if (order_mgr_) {
-                    if (st.h_bid.live())
-                        order_mgr_->send_cancel(st.h_bid);
-                    if (st.h_ask.live())
-                        order_mgr_->send_cancel(st.h_ask);
-                }
-            }
-        }
-    }
-
-    // Terminal statuses: drop our handle so the next requote can place a fresh order.
-    // The OrderState itself stays in OM's store_ for the process lifetime.
-    bool was_unwind_terminal = false;
-    bool was_shutdown_unwind = (os->tag == kTagUnwindShutdown);
-    if (status == ExecStatus::FILLED || status == ExecStatus::CANCELLED || status == ExecStatus::REJECTED) {
-        st.queue.on_cancel(order_id);
-        if (st.h_bid.state == os)
-            st.h_bid.reset();
-        else if (st.h_ask.state == os)
-            st.h_ask.reset();
-        else if (st.h_unwind.state == os) {
-            st.h_unwind.reset();
-            was_unwind_terminal = true;
-        }
-    }
-    // PARTIAL: order still live — handles untouched.
-    // ACKED:   acknowledged but not yet filled — handles untouched.
-
-    // Shutdown retry: if this terminal was an unwind and residual
-    // position remains (reject with no fill, or partial+IOC-cancel),
-    // re-fire against a fresh mid while the retry budget is non-zero.
-    // Budget is armed only by on_shutdown_flatten(); normal-path
-    // inventory unwinds don't enter this branch.
-    if (was_unwind_terminal && st.unwind_retries_left > 0) {
-        const int64_t net_qty_e8 = positions_.net_qty(canonical_id, st.exchange_id);
-        if (net_qty_e8 != 0 && st.last_mid > 0.0) {
-            const double residual = static_cast<double>(std::abs(net_qty_e8)) / 1e8;
-            const auto retry_side = (net_qty_e8 > 0) ? OrderSide::SELL : OrderSide::BUY;
-            --st.unwind_retries_left;
-            bpt::common::log::warn(kLog(),
-                                   "SHUTDOWN RETRY {} {} residual_qty={:.8f} retries_left={}",
-                                   st.symbol,
-                                   st.exchange,
-                                   residual,
-                                   st.unwind_retries_left);
-            const uint8_t retry_tag = was_shutdown_unwind ? kTagUnwindShutdown : kTagUnwindNormal;
-            auto h = send_unwind_order(canonical_id, st, retry_side, st.last_mid, residual, retry_tag);
-            if (h.valid())
-                st.h_unwind = h;
-        } else {
-            // Flat — clear budget so has_pending_flatten() settles.
-            st.unwind_retries_left = 0;
-        }
-    } else if (was_unwind_terminal && st.unwind_retries_left == 0 && was_shutdown_unwind) {
-        const int64_t net_qty_e8 = positions_.net_qty(canonical_id, st.exchange_id);
-        if (net_qty_e8 != 0) {
-            bpt::common::log::error(
-                kLog(),
-                "SHUTDOWN RETRIES EXHAUSTED {} {} residual_qty={:.8f} — position leaking past drain",
-                st.symbol,
-                st.exchange,
-                static_cast<double>(std::abs(net_qty_e8)) / 1e8);
-        }
-    }
-
-    // Exchange-error backoff: consecutive EXCHANGE-sourced rejections trigger
-    // increasing cooldowns so we don't flood a broken/unfunded account.
-    if (status == ExecStatus::REJECTED && rpt.rejectSource() == RejectSource::EXCHANGE) {
-        ++st.consecutive_exchange_errors;
-        const uint64_t backoff_s = (st.consecutive_exchange_errors == 1)   ? 5
-                                   : (st.consecutive_exchange_errors == 2) ? 15
-                                                                           : 30;
-        const uint64_t now_ns = bpt::strategy::clock::SimClock::now_ns();
-        st.reject_backoff_until_ns = now_ns + backoff_s * 1'000'000'000ULL;
-        bpt::common::log::warn(kLog(),
-                               "Exchange rejection backoff {} @ {}: {}s (consecutive={})",
-                               st.symbol,
-                               st.exchange,
-                               backoff_s,
-                               st.consecutive_exchange_errors);
-    } else if (status == ExecStatus::ACKED) {
-        st.consecutive_exchange_errors = 0;
-        st.reject_backoff_until_ns = 0;
-    }
-}
-
-// ── Private ─────────────────────────────────────────────────────────────────
-// compute_quotes / effective_order_qty / effective_max_inventory /
-// gamma_pnl_mult / compute_suppression → avellaneda_stoikov_quoting.cpp
-
-
-void AvellanedaStoikovStrategy::maybe_requote(uint64_t instrument_id,
-                                              InstrumentState& st,
-                                              double net_qty,
-                                              double mid,
-                                              double new_bid,
-                                              double new_ask) {
-    // Honour exchange-error backoff before touching orders on this instrument.
-    if (st.reject_backoff_until_ns > 0) {
-        const uint64_t now_ns = bpt::strategy::clock::SimClock::now_ns();
-        if (now_ns < st.reject_backoff_until_ns)
-            return;
-        // Backoff expired — clear it and allow quoting to resume.
-        st.reject_backoff_until_ns = 0;
-        bpt::common::log::info(kLog(), "Exchange backoff expired for {} @ {}, resuming quotes", st.symbol, st.exchange);
-    }
-
-    const SuppressionState supp = compute_suppression(st, net_qty, new_bid, new_ask);
-
-    // Resolve per-tick sizing — adaptive when order_qty_fraction_ > 0,
-    // fixed otherwise. Computed once so every order submit / modify /
-    // unwind this tick uses the same qty (important: if equity /
-    // price change between calls, downstream aggregation gets messy).
-    const double eff_qty = effective_order_qty(st);
-
-    // Info-level logging of the runtime triggers. Console reporting
-    // consumes the same supp struct via get_strategy_state_json, so
-    // these log lines and the rendered badge can't drift.
-    if (supp.trend_bid || supp.trend_ask) {
-        bpt::common::log::info(kLog(),
-                               "{} trend suppress |Δ|={:.1f}bps > {:.1f}bps over {:.0f}s window — suppressing {}",
-                               st.symbol,
-                               std::abs(st.slow_drift_bps),
-                               slow_drift_suppress_bps_,
-                               slow_drift_window_s_,
-                               supp.trend_ask ? "asks" : "bids");
-    }
-    if (supp.drift_bid || supp.drift_ask) {
-        bpt::common::log::info(kLog(),
-                               "{} drift suppress |µ|={:.1f}bps > {:.1f}bps — suppressing {}",
-                               st.symbol,
-                               std::abs(st.ewma_drift.value()) * 1e4,
-                               drift_suppress_bps_,
-                               supp.drift_ask ? "asks" : "bids");
-    }
-    if (supp.tox_bid) {
-        bpt::common::log::info(kLog(),
-                               "{} tox suppress bids: score={:.2f} < {:.2f}",
-                               st.symbol,
-                               st.tox_bid_toxicity,
-                               tox_suppress_threshold_);
-    }
-    if (supp.tox_ask) {
-        bpt::common::log::info(kLog(),
-                               "{} tox suppress asks: score={:.2f} < {:.2f}",
-                               st.symbol,
-                               st.tox_ask_toxicity,
-                               tox_suppress_threshold_);
-    }
-    if (supp.queue_bid) {
-        bpt::common::log::info(kLog(),
-                               "{} queue suppress bids: fp={:.5f} < {:.5f} at px={:.4f}",
-                               st.symbol,
-                               supp.fp_bid,
-                               queue_suppress_fill_prob_min_,
-                               new_bid);
-    }
-    if (supp.queue_ask) {
-        bpt::common::log::info(kLog(),
-                               "{} queue suppress asks: fp={:.5f} < {:.5f} at px={:.4f}",
-                               st.symbol,
-                               supp.fp_ask,
-                               queue_suppress_fill_prob_min_,
-                               new_ask);
-    }
-
-    // Legacy variable names retained for the side-decision blocks below
-    // — match existing log-message key naming (`max_inv` vs `suppress`)
-    // so the operational log format is unchanged by the refactor.
-    const bool at_max_long = supp.inventory_bid;
-    const bool at_max_short = supp.inventory_ask;
-    const bool final_suppress_bids = supp.bid_signal();
-    const bool final_suppress_asks = supp.ask_signal();
-
-    // ── Bid side ──────────────────────────────────────────────────────────
-    if (st.h_bid.live()) {
-        // Adverse selection guard: cancel if mid has risen significantly since
-        // we placed this bid — informed flow is pushing against us.
-        const bool adverse =
-            st.bid_placed_mid > 0.0 && (mid - st.bid_placed_mid) / st.bid_placed_mid > requote_threshold_;
-        // Model drift: modify-in-place if the AS model wants a different price.
-        const bool stale =
-            st.last_bid_price > 0.0 && std::abs(new_bid - st.last_bid_price) / st.last_bid_price > requote_threshold_;
-        if (at_max_long || adverse || final_suppress_bids) {
-            // Hard cancel — don't amend. OM marks CancelPending before the
-            // gateway call so the sync backtest path can't lose the
-            // terminal status (see OrderManager::send_cancel comment).
-            if (order_mgr_) {
-                bpt::common::log::debug(kLog(),
-                                        "Cancel bid order_id={} {} @ {} reason={}",
-                                        st.h_bid.order_id(),
-                                        st.symbol,
-                                        st.exchange,
-                                        at_max_long           ? "max_inv"
-                                        : final_suppress_bids ? "suppress"
-                                                              : "adverse");
-                order_mgr_->send_cancel(st.h_bid);
-            }
-        } else if (stale) {
-            if (order_mgr_) {
-                double price = new_bid;
-                if (st.tick_size > 0.0)
-                    price = std::floor(price / st.tick_size) * st.tick_size;
-                const int64_t price_fixed = static_cast<int64_t>(std::round(price * kPriceScale));
-                const uint64_t qty_fp = static_cast<uint64_t>(std::round(eff_qty * 1e8));
-                bpt::common::log::debug(kLog(),
-                                        "Modify bid order_id={} {} @ {} → {:.6f}",
-                                        st.h_bid.order_id(),
-                                        st.symbol,
-                                        st.exchange,
-                                        price);
-                order_mgr_->modify_order(st.h_bid.order_id(), st.exchange_id, instrument_id, price_fixed, qty_fp);
-            }
-            st.last_bid_price = new_bid;
-            st.bid_placed_mid = mid;
-        }
-    }
-
-    if (!st.h_bid.valid() && !at_max_long && !final_suppress_bids) {
-        auto h = send_limit_order(instrument_id, st, bpt::messages::OrderSide::BUY, new_bid, eff_qty);
-        if (h.valid()) {
-            st.h_bid = h;
-            st.last_bid_price = new_bid;
-            st.bid_placed_mid = mid;
-        }
-    }
-
-    // ── Ask side ──────────────────────────────────────────────────────────
-    if (st.h_ask.live()) {
-        const bool adverse =
-            st.ask_placed_mid > 0.0 && (st.ask_placed_mid - mid) / st.ask_placed_mid > requote_threshold_;
-        const bool stale =
-            st.last_ask_price > 0.0 && std::abs(new_ask - st.last_ask_price) / st.last_ask_price > requote_threshold_;
-        if (at_max_short || adverse || final_suppress_asks) {
-            if (order_mgr_) {
-                bpt::common::log::debug(kLog(),
-                                        "Cancel ask order_id={} {} @ {} reason={}",
-                                        st.h_ask.order_id(),
-                                        st.symbol,
-                                        st.exchange,
-                                        at_max_short          ? "max_inv"
-                                        : final_suppress_asks ? "suppress"
-                                                              : "adverse");
-                order_mgr_->send_cancel(st.h_ask);
-            }
-        } else if (stale) {
-            if (order_mgr_) {
-                double price = new_ask;
-                if (st.tick_size > 0.0)
-                    price = std::ceil(price / st.tick_size) * st.tick_size;
-                const int64_t price_fixed = static_cast<int64_t>(std::round(price * kPriceScale));
-                const uint64_t qty_fp = static_cast<uint64_t>(std::round(eff_qty * 1e8));
-                bpt::common::log::debug(kLog(),
-                                        "Modify ask order_id={} {} @ {} → {:.6f}",
-                                        st.h_ask.order_id(),
-                                        st.symbol,
-                                        st.exchange,
-                                        price);
-                order_mgr_->modify_order(st.h_ask.order_id(), st.exchange_id, instrument_id, price_fixed, qty_fp);
-            }
-            st.last_ask_price = new_ask;
-            st.ask_placed_mid = mid;
-        }
-    }
-
-    if (!st.h_ask.valid() && !at_max_short && !final_suppress_asks) {
-        auto h = send_limit_order(instrument_id, st, bpt::messages::OrderSide::SELL, new_ask, eff_qty);
-        if (h.valid()) {
-            st.h_ask = h;
-            st.last_ask_price = new_ask;
-            st.ask_placed_mid = mid;
-        }
-    }
-
-    // ── Active inventory unwind ────────────────────────────────────────────
-    if (!st.h_unwind.valid()) {
-        if (at_max_long) {
-            auto h = send_unwind_order(instrument_id, st, bpt::messages::OrderSide::SELL, mid, eff_qty, kTagUnwindNormal);
-            if (h.valid())
-                st.h_unwind = h;
-        } else if (at_max_short) {
-            auto h = send_unwind_order(instrument_id, st, bpt::messages::OrderSide::BUY, mid, eff_qty, kTagUnwindNormal);
-            if (h.valid())
-                st.h_unwind = h;
-        }
-    }
-}
-
-order::OrderHandle AvellanedaStoikovStrategy::send_limit_order(uint64_t instrument_id,
-                                                                InstrumentState& st,
-                                                                bpt::messages::OrderSide::Value side,
-                                                                double price,
-                                                                double qty) {
-    const auto vex_it = venue_exec_.find(st.exchange);
-    if (vex_it == venue_exec_.end() || !vex_it->second.enabled) {
-        bpt::common::log::debug(kLog(), "Venue {} not enabled — quote suppressed", st.exchange);
-        return {};
-    }
-
-    if (!order_mgr_) {
-        bpt::common::log::info(kLog(),
-                               "{} {} {} @ {:.6f} (no gateway)",
-                               (side == OrderSide::BUY ? "BID" : "ASK"),
-                               st.symbol,
-                               st.exchange,
-                               price);
-        return {};
-    }
-
-    // Note: OrderManager rounds BUY up and SELL down. For market-making, we want
-    // the opposite (bid floors, ask ceils) to preserve spread width, so pre-round here.
-    if (st.tick_size > 0.0) {
-        if (side == OrderSide::BUY)
-            price = std::floor(price / st.tick_size) * st.tick_size;
-        else
-            price = std::ceil(price / st.tick_size) * st.tick_size;
-    }
-
-    auto handle = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = OrderType::LIMIT,
-        .tif = TimeInForce::GTC,
-        .price = price,
-        .qty = qty,
-        .exec_inst = {.post_only = true},
-    }, kTagQuote);
-    if (!handle.valid())
-        return {};
-
-    const uint64_t order_id = handle.order_id();
-    bpt::common::log::info(kLog(),
-                           "{} {} {} @ {:.6f} → order_id={}",
-                           (side == OrderSide::BUY ? "BID" : "ASK"),
-                           st.symbol,
-                           st.exchange,
-                           price,
-                           order_id);
-
-    st.queue.track(order_id, side, price, qty, bpt::common::util::WallClock::now_ns(), st.book);
-    if (const auto* e = st.queue.lookup(order_id)) {
-        bpt::common::log::info(kLog(),
-                               "Queue track order_id={} side={} px={:.4f} qty={:.6f} "
-                               "queue_ahead={:.6f} fill_prob={:.3f}",
-                               order_id,
-                               (side == OrderSide::BUY ? "BID" : "ASK"),
-                               e->price,
-                               e->our_qty,
-                               e->queue_ahead,
-                               st.queue.fill_probability(order_id));
-    }
-    return handle;
-}
-
-order::OrderHandle AvellanedaStoikovStrategy::send_unwind_order(uint64_t instrument_id,
-                                                                 InstrumentState& st,
-                                                                 bpt::messages::OrderSide::Value side,
-                                                                 double mid,
-                                                                 double qty,
-                                                                 uint8_t tag) {
-    const auto vex_it = venue_exec_.find(st.exchange);
-    if (vex_it == venue_exec_.end() || !vex_it->second.enabled)
-        return {};
-
-    if (!order_mgr_) {
-        bpt::common::log::info(kLog(),
-                               "UNWIND {} {} @ {} mid={:.6f} (no gateway)",
-                               (side == OrderSide::BUY ? "BUY" : "SELL"),
-                               st.symbol,
-                               st.exchange,
-                               mid);
-        return {};
-    }
-
-    // Cross the spread aggressively — shutdown_cross_bps through mid — to
-    // ensure immediate fill. Default 20 bps fits major pairs in normal
-    // regimes; raise for thin venues or volatile shutdowns (see the
-    // shutdown_cross_bps knob in [strategy.params]).
-    // Use LIMIT IOC rather than MARKET to avoid OKX SPOT market-buy qty quirks
-    // (OKX interprets SPOT market BUY sz as quote currency, not base).
-    const double cross_factor = 1.0 + (shutdown_cross_bps_ / 10000.0);
-    const double price = (side == OrderSide::BUY) ? mid * cross_factor : mid / cross_factor;
-
-    auto handle = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = OrderType::LIMIT,
-        .tif = TimeInForce::IOC,
-        .price = price,
-        .qty = qty,
-    }, tag);
-    if (!handle.valid())
-        return {};
-
-    bpt::common::log::info(kLog(),
-                           "UNWIND {} {} @ {} price={:.6f} mid={:.6f} → order_id={}",
-                           (side == OrderSide::BUY ? "BUY" : "SELL"),
-                           st.symbol,
-                           st.exchange,
-                           price,
-                           mid,
-                           handle.order_id());
-    return handle;
+    maybe_requote(st, ctx, *quotes);
 }
 
 // ── Toxicity feedback from Analytics ──────────────────────────────────────────────
@@ -1177,8 +636,5 @@ void AvellanedaStoikovStrategy::on_refdata_stale_changed(bool stale) {
         bpt::common::log::info(kLog(), "Refdata heartbeat resumed — quoting re-enabled");
     }
 }
-
-// get_strategy_state_json / save_state / load_state → avellaneda_stoikov_state_io.cpp
-// on_shutdown_flatten / on_account_snapshot / has_pending_flatten → avellaneda_stoikov_shutdown.cpp
 
 }  // namespace bpt::strategy::strategy

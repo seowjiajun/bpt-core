@@ -90,10 +90,10 @@ Settings load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    s.aeron.order = resolve_stream(shared_streams, "order", 3001);
-    s.aeron.exec_report = resolve_stream(shared_streams, "exec_report", 3002);
-    s.aeron.heartbeat = resolve_stream(shared_streams, "heartbeat", 3003);
-    s.aeron.account_snapshot = resolve_stream(shared_streams, "account_snapshot", 3004);
+    s.aeron.order = resolve_stream(shared_streams, "order.submit", 3001);
+    s.aeron.exec_report = resolve_stream(shared_streams, "order.exec_report", 3002);
+    s.aeron.heartbeat = resolve_stream(shared_streams, "order.heartbeat", 3003);
+    s.aeron.account_snapshot = resolve_stream(shared_streams, "order.account_snapshot", 3004);
 
     // TOML section is [order-gateway] / [order-gateway.risk] across every
     // config file in bpt-order-gateway/config/. Previously the loader

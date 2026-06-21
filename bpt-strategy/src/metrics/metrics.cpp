@@ -1,7 +1,6 @@
 #include "strategy/metrics/metrics.h"
 
 #include <prometheus/histogram.h>
-#include <string>
 
 namespace bpt::strategy::metrics {
 
@@ -30,70 +29,70 @@ const prometheus::Histogram::BucketBoundaries& StrategyMetrics::kDefaultLatencyB
 
 StrategyMetrics::StrategyMetrics(int port) {
     registry = std::make_shared<prometheus::Registry>();
-
     exposer = std::make_unique<prometheus::Exposer>("0.0.0.0:" + std::to_string(port));
     exposer->RegisterCollectable(registry);
 
-    auto& h = prometheus::BuildGauge().Name("strategy_healthy").Help("1 if Strategy is running").Register(*registry);
-    healthy = &h.Add({});
+    healthy =
+        &prometheus::BuildGauge().Name("strategy_healthy").Help("1 if Strategy is running").Register(*registry).Add({});
     healthy->Set(1.0);
 
-    auto& sa = prometheus::BuildGauge()
-                   .Name("strategy_strategy_active")
-                   .Help("1 if the strategy has started (past the startup gate)")
-                   .Register(*registry);
-    strategy_active = &sa.Add({});
+    strategy_active = &prometheus::BuildGauge()
+                           .Name("strategy_strategy_active")
+                           .Help("1 if the strategy has started (past the startup gate)")
+                           .Register(*registry)
+                           .Add({});
     strategy_active->Set(0.0);
 
-    auto& tp = prometheus::BuildGauge()
-                   .Name("strategy_trading_paused")
-                   .Help("1 if trading is paused (service heartbeat stale or kill switch)")
-                   .Register(*registry);
-    trading_paused = &tp.Add({});
+    trading_paused = &prometheus::BuildGauge()
+                          .Name("strategy_trading_paused")
+                          .Help("1 if trading is paused (service heartbeat stale or kill switch)")
+                          .Register(*registry)
+                          .Add({});
     trading_paused->Set(0.0);
 
-    auto& th = prometheus::BuildGauge()
-                   .Name("strategy_trading_halted")
-                   .Help("1 if console kill-switch latched — no automatic recovery")
-                   .Register(*registry);
-    trading_halted = &th.Add({});
+    trading_halted = &prometheus::BuildGauge()
+                          .Name("strategy_trading_halted")
+                          .Help("1 if console kill-switch latched — no automatic recovery")
+                          .Register(*registry)
+                          .Add({});
     trading_halted->Set(0.0);
 
-    auto& rs = prometheus::BuildGauge()
-                   .Name("strategy_refdata_stale")
-                   .Help("1 if strategy detected stale refdata heartbeat and paused new quotes")
-                   .Register(*registry);
-    refdata_stale = &rs.Add({});
+    refdata_stale = &prometheus::BuildGauge()
+                         .Name("strategy_refdata_stale")
+                         .Help("1 if strategy detected stale refdata heartbeat and paused new quotes")
+                         .Register(*registry)
+                         .Add({});
     refdata_stale->Set(0.0);
 
-    auto& rd = prometheus::BuildCounter()
-                   .Name("strategy_reconciliation_divergences_total")
-                   .Help("Count of reconciliation passes that produced at least one divergence")
-                   .Register(*registry);
-    reconciliation_divergences_total = &rd.Add({});
+    reconciliation_divergences_total =
+        &prometheus::BuildCounter()
+             .Name("strategy_reconciliation_divergences_total")
+             .Help("Count of reconciliation passes that produced at least one divergence")
+             .Register(*registry)
+             .Add({});
+
+    md_ticks_total = &prometheus::BuildCounter()
+                          .Name("strategy_md_ticks_total")
+                          .Help("Total MD ticks received from MdGateway")
+                          .Register(*registry)
+                          .Add({});
+
+    exec_reports_total = &prometheus::BuildCounter()
+                              .Name("strategy_exec_reports_total")
+                              .Help("Total ExecReports received from OrderGateway")
+                              .Register(*registry)
+                              .Add({});
+
+    refdata_ready_fam = &prometheus::BuildGauge()
+                             .Name("strategy_refdata_ready")
+                             .Help("1 if refdata has loaded for this exchange")
+                             .Register(*registry);
 
     account_snapshot_last_recv_ns_fam =
         &prometheus::BuildGauge()
              .Name("strategy_account_snapshot_last_recv_ns")
              .Help("Unix ns timestamp of the last AccountSnapshot received per exchange")
              .Register(*registry);
-
-    auto& mdt = prometheus::BuildCounter()
-                    .Name("strategy_md_ticks_total")
-                    .Help("Total MD ticks received from MdGateway")
-                    .Register(*registry);
-    md_ticks_total = &mdt.Add({});
-
-    auto& er = prometheus::BuildCounter()
-                   .Name("strategy_exec_reports_total")
-                   .Help("Total ExecReports received from OrderGateway")
-                   .Register(*registry);
-    exec_reports_total = &er.Add({});
-
-    refdata_ready_fam = &prometheus::BuildGauge()
-                             .Name("strategy_refdata_ready")
-                             .Help("1 if refdata has loaded for this exchange")
-                             .Register(*registry);
 
     tick_to_strategy_ns_fam = &prometheus::BuildHistogram()
                                    .Name("strategy_tick_to_strategy_ns")
@@ -105,11 +104,25 @@ StrategyMetrics::StrategyMetrics(int port) {
                                 .Help("Latency from MD tick timestamp to order placed (ns)")
                                 .Register(*registry);
 
-    // Pre-allocate the unlabeled histograms and cache direct pointers so
-    // hot-path Observe() calls avoid the Family::Add() hash lookup on
-    // every tick.
-    tick_to_strategy_ns_hist = &tick_to_strategy_ns();
-    tick_to_order_ns_hist = &tick_to_order_ns();
+    tick_to_strategy_ns_hist = &tick_to_strategy_ns_fam->Add({}, kDefaultLatencyBucketsNs());
+    tick_to_order_ns_hist = &tick_to_order_ns_fam->Add({}, kDefaultLatencyBucketsNs());
+}
+
+StrategyMetrics::PerExchangeGauges& StrategyMetrics::exchange_entry(const std::string& exchange) {
+    auto it = exchange_cache_.find(exchange);
+    if (it != exchange_cache_.end())
+        return it->second;
+    auto& e = exchange_cache_[exchange];
+    e.refdata_ready = &refdata_ready_fam->Add({{"exchange", exchange}});
+    e.account_snapshot_last_recv_ns = &account_snapshot_last_recv_ns_fam->Add({{"exchange", exchange}});
+    return e;
+}
+
+prometheus::Gauge& StrategyMetrics::refdata_ready(const std::string& exchange) {
+    return *exchange_entry(exchange).refdata_ready;
+}
+prometheus::Gauge& StrategyMetrics::account_snapshot_last_recv_ns(const std::string& exchange) {
+    return *exchange_entry(exchange).account_snapshot_last_recv_ns;
 }
 
 }  // namespace bpt::strategy::metrics

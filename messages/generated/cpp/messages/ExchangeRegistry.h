@@ -22,14 +22,12 @@
 namespace bpt {
 namespace messages {
 
-class ExchangeRegistry
-{
+class ExchangeRegistry {
 public:
-    struct Entry
-    {
+    struct Entry {
         ExchangeId::Value id;
-        std::string_view  name;          // UPPERCASE wire-format name (matches ExchangeId::c_str)
-        std::string_view  display_name;  // human-readable, dashboard-friendly
+        std::string_view name;          // UPPERCASE wire-format name (matches ExchangeId::c_str)
+        std::string_view display_name;  // human-readable, dashboard-friendly
     };
 
     static constexpr std::array<Entry, 4> kEntries = {{
@@ -41,8 +39,7 @@ public:
 
     // Wire-name → enum lookup. Returns nullopt if the name is unknown so
     // callers can fail fast at the boundary (e.g. config load).
-    static constexpr std::optional<ExchangeId::Value> from_name(std::string_view s) noexcept
-    {
+    static constexpr std::optional<ExchangeId::Value> from_name(std::string_view s) noexcept {
         for (const auto& e : kEntries)
             if (e.name == s)
                 return e.id;
@@ -52,8 +49,7 @@ public:
     // Enum → display name. Returns empty view for unknown values; callers
     // typically pass values that came from from_name(), so unknown is a
     // logic-error path. Use ExchangeId::c_str for the wire-format name.
-    static constexpr std::string_view display_name(ExchangeId::Value id) noexcept
-    {
+    static constexpr std::string_view display_name(ExchangeId::Value id) noexcept {
         for (const auto& e : kEntries)
             if (e.id == id)
                 return e.display_name;

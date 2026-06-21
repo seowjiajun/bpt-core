@@ -1,14 +1,14 @@
 #pragma once
 
+#include "features/realized_vol.h"
+#include "features/regime_classifier.h"
+#include "features/vol_gate.h"
 #include "strategy/config/config.h"
 #include "strategy/md/md_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
-#include "features/realized_vol.h"
-#include "features/regime_classifier.h"
-#include "features/vol_gate.h"
 
 #include <messages/ExchangeId.h>
 #include <messages/ExecutionReport.h>
@@ -25,9 +25,9 @@
 
 namespace bpt::strategy::strategy {
 
-using bpt::features::VolatilityGate;
 using bpt::features::RealizedVolEstimator;
 using bpt::features::RegimeClassifier;
+using bpt::features::VolatilityGate;
 
 // PassiveMakerStrategy — wide-spread, low-cadence market maker.
 //

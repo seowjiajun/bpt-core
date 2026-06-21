@@ -15,6 +15,7 @@
 import type { FC } from 'react'
 import type { StrategyKind, StrategyStateMsg } from '../../types/messages'
 import { AvellanedaStoikovPanel } from './AvellanedaStoikovPanel'
+import { FairValueMmPanel } from './FairValueMmPanel'
 import { FundingArbPanel } from './FundingArbPanel'
 import { GenericStrategyPanel } from './GenericStrategyPanel'
 import { OptionsMakerPanel } from './OptionsMakerPanel'
@@ -26,6 +27,7 @@ type AnyPanel = FC<{ state: StrategyStateMsg }>
 
 export const STRATEGY_PANELS: Record<StrategyKind, AnyPanel> = {
   AS: AvellanedaStoikovPanel as AnyPanel,
+  FVMM: FairValueMmPanel as AnyPanel,
   FundingArb: FundingArbPanel as AnyPanel,
   OptionsMaker: OptionsMakerPanel as AnyPanel,
 }

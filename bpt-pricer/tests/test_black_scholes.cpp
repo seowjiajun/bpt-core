@@ -23,33 +23,35 @@ TEST(BlackScholes, NormCdfExtremes) {
 }
 
 TEST(BlackScholes, CallPutParity) {
-    // Put-call parity: C - P = S - K*exp(-rT)
-    const double S = 100.0, K = 100.0, T = 1.0, r = 0.05, sigma = 0.2;
+    // Black-76 put-call parity: C - P = df * (F - K)
+    const double F = 100.0, K = 100.0, T = 1.0, r = 0.05, sigma = 0.2;
 
-    auto call = bs_call(S, K, T, r, sigma);
-    auto put = bs_put(S, K, T, r, sigma);
+    auto call = bs_call(F, K, T, r, sigma);
+    auto put = bs_put(F, K, T, r, sigma);
 
     const double parity_diff = call.price - put.price;
-    const double expected = S - K * std::exp(-r * T);
+    const double expected = std::exp(-r * T) * (F - K);
 
     EXPECT_NEAR(parity_diff, expected, 1e-10);
 }
 
 TEST(BlackScholes, AtmCallPrice) {
-    // ATM call at S=K=100, T=1y, r=5%, sigma=20%
-    // Known value ≈ 10.4506
+    // Black-76 ATM call at F=K=100, T=1y, r=5%, sigma=20%
+    // df*F*(N(0.1)-N(-0.1)) = 0.951229*100*0.0796557 ≈ 7.5774
     auto result = bs_call(100.0, 100.0, 1.0, 0.05, 0.2);
-    EXPECT_NEAR(result.price, 10.4506, 0.01);
-    EXPECT_GT(result.delta, 0.5);  // ATM call delta > 0.5
+    EXPECT_NEAR(result.price, 7.5774, 0.01);
+    EXPECT_GT(result.delta, 0.5);  // ATM call delta (df*N(d1)) > 0.5
     EXPECT_GT(result.vega, 0.0);
 }
 
 TEST(BlackScholes, DeepItmCall) {
-    // Deep ITM call approaches intrinsic value
-    auto result = bs_call(200.0, 100.0, 0.25, 0.05, 0.2);
-    const double intrinsic = 200.0 - 100.0 * std::exp(-0.05 * 0.25);
+    // Deep ITM call approaches discounted intrinsic; forward delta -> df.
+    const double r = 0.05, T = 0.25;
+    auto result = bs_call(200.0, 100.0, T, r, 0.2);
+    const double df = std::exp(-r * T);
+    const double intrinsic = df * (200.0 - 100.0);
     EXPECT_GT(result.price, intrinsic);
-    EXPECT_NEAR(result.delta, 1.0, 0.01);
+    EXPECT_NEAR(result.delta, df, 0.01);
 }
 
 TEST(BlackScholes, DeepOtmCall) {
@@ -108,10 +110,11 @@ TEST(BlackScholes, GammaHighestAtm) {
 }
 
 TEST(BlackScholes, CallPutDeltaRelation) {
-    // Call delta - Put delta = 1 (for same strike/expiry)
-    auto call = bs_call(100.0, 100.0, 1.0, 0.05, 0.2);
-    auto put = bs_put(100.0, 100.0, 1.0, 0.05, 0.2);
-    EXPECT_NEAR(call.delta - put.delta, 1.0, 1e-10);
+    // Black-76 forward delta: call - put = df (= e^{-rT})
+    const double r = 0.05, T = 1.0;
+    auto call = bs_call(100.0, 100.0, T, r, 0.2);
+    auto put = bs_put(100.0, 100.0, T, r, 0.2);
+    EXPECT_NEAR(call.delta - put.delta, std::exp(-r * T), 1e-10);
 }
 
 }  // namespace bpt::pricer::pricing

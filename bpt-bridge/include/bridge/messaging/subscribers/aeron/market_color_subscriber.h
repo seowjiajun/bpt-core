@@ -8,6 +8,7 @@
 #include <Aeron.h>
 
 #include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <bpt_common/logging.h>
 #include <cstddef>
 #include <cstdint>
@@ -22,9 +23,9 @@ namespace bpt::bridge::messaging::aeron {
 template <class Handler>
 class MarketColorSubscriber final : public api::MarketColorSubscriber {
 public:
-    MarketColorSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
-        sub_ = bpt::common::aeron::wait_for_subscription(std::move(aeron), channel, stream_id);
-        bpt::common::log::info("[bridge/MarketColor] subscribed on {} stream {}", channel, stream_id);
+    MarketColorSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream) {
+        sub_ = bpt::common::aeron::wait_for_subscription(std::move(aeron), stream.channel, stream.stream_id);
+        bpt::common::log::info("[bridge/MarketColor] subscribed on {} stream {}", stream.channel, stream.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }

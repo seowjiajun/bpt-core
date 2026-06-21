@@ -30,6 +30,7 @@
 
 #include <atomic>
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -50,14 +51,12 @@ class MdPublisher {
 public:
     /// \brief Construct.
     /// \param aeron                     shared Aeron client (typically the bus-built singleton)
-    /// \param channel                   Aeron URI
-    /// \param stream_id                 publication stream — 2002 in prod
+    /// \param stream                    Aeron channel + stream id (md.feed, 2002 in prod)
     /// \param max_price_deviation_pct   validator mid-deviation guard threshold (10.0 = 10%)
     /// \param breaker_cfg               rolling-window drop-rate breaker config (default-disabled)
     /// \param adapter_name              shown in breaker trip logs (e.g. "BINANCE")
     MdPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                const std::string& channel,
-                int stream_id,
+                const bpt::common::config::StreamConfig& stream,
                 double max_price_deviation_pct,
                 md::ValidationDropBreaker::Config breaker_cfg,
                 std::string adapter_name);

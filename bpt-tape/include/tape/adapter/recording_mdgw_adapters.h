@@ -50,7 +50,7 @@ namespace bpt::tape::adapter {
             : ::bpt::md_gateway::adapter::BaseClass<Pub>(cfg,                             \
                                                          std::move(md_pub),               \
                                                          nullptr, /* funding_pub */       \
-                                                         nullptr  /* stats_pub  */ ),     \
+                                                         nullptr /* stats_pub  */),       \
               tape_(std::move(tape)) {}                                                   \
                                                                                           \
     protected:                                                                            \

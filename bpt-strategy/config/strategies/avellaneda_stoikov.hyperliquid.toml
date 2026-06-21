@@ -1,13 +1,11 @@
 [strategy]
 type = "AvellanedaStoikovStrategy"
 enabled = true
-# Paper-mode XMR on HL: AS is fee-starved on BTC spot/perp (pro-MM
-# competition + tight spread vs fee floor), but HL's XMR perp has a
-# ~7 bps baseline spread = 2.3x the ~3 bps round-trip maker fee, with
-# $10M/day volume — enough signal to see if AS captures markout.
-# See monitoring/notes or chat log for the HL market scan that picked
-# this symbol.
-instruments = ["XMR/USD:PERPETUAL"]
+# EIGEN perp on HL: ~6-8 bps baseline spread = 2x the ~3 bps round-trip
+# maker fee, lighter pro-MM competition than BTC/ETH, $5-10M/day volume.
+# Same spread-to-fee profile as XMR but at a lower absolute price (~$0.25)
+# — equity-fraction sizing handles the lot-count difference automatically.
+instruments = ["EIGEN/USD:PERPETUAL"]
 md_exchanges = ["HYPERLIQUID"]
 
 [strategy.venue_exec.HYPERLIQUID]
@@ -61,17 +59,13 @@ kappa_min = 5.0
 # this is just a last-resort ceiling, not the operating point.
 max_half_spread_bps = 12.0
 
-# Paper-mode XMR sizing (HL mainnet XMR ~ $370, 7 bps baseline spread).
-# 0.1 XMR = ~$37 notional per order; max_inventory 1.0 XMR = ~$370.
-# Scale is symbolic since paper — what matters is the ratio order_qty
-# to max_inventory (~10x) so the strategy has room to skew before
-# hitting the cap.
-order_qty = 0.1
-# Half-spread of XMR baseline (3.5 bps) — trigger requote when our
-# quote has drifted half a spread off the market. Matches typical
-# practice of "requote when meaningful price move but not every tick".
+# EIGEN sizing (HL EIGEN perp ~ $0.25, 7 bps baseline spread).
+# Static fallbacks — overridden by equity-fraction when equity snapshot
+# arrives. 100 EIGEN = ~$25 notional; max_inventory 400 EIGEN = ~$100.
+order_qty = 100
+# 3.5 bps as a fraction — scale-invariant, works for any instrument price.
 requote_threshold = 0.00035
-max_inventory = 1.0
+max_inventory = 400
 
 # Equity-fraction sizing — overrides order_qty / max_inventory above
 # when set. Notional sizes derived from AccountSnapshot.totalEquity each
@@ -80,13 +74,13 @@ max_inventory = 1.0
 # a shrinking equity from driving qty below the exchange lot size and
 # stranding the position un-unwindable.
 #
-# Tuning at $686 starting equity / $377 XMR mid:
-#   order_qty_fraction     = 0.05  → ~0.09 XMR (~$34 notional, similar
-#                                    to today's static 0.1)
-#   order_qty_min          = 0.05  → never below ~$19 notional
-#   max_inventory_fraction = 0.5   → ~0.91 XMR cap (similar to static 1.0)
+# Tuning at ~$100 starting equity / ~$0.25 EIGEN mid:
+#   order_qty_fraction     = 0.05  → ~$5 notional → bumped to $10 HL floor
+#                                    → ~40 EIGEN per order
+#   order_qty_min          = 40    → never below $10 notional (HL floor)
+#   max_inventory_fraction = 0.5   → ~$50 cap → ~200 EIGEN max
 order_qty_fraction      = 0.05
-order_qty_min           = 0.05
+order_qty_min           = 40
 max_inventory_fraction  = 0.5
 # Bumped 2026-04-25 from 0.1 → 2.0. Refdata reports tick=0 for XMR
 # (real fix is in refdata's HL meta lookup), so AS doesn't tick-round

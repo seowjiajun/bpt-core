@@ -58,15 +58,13 @@ MdGatewayService::MdGatewayService(config::Settings cfg,
         // the "adapter owns what it produces" greenfield principle and
         // gives free per-venue metrics granularity.
         auto md_pub = std::make_shared<messaging::MdPublisher>(aeron,
-                                                               cfg_.aeron.md_data.channel,
-                                                               cfg_.aeron.md_data.stream_id,
+                                                               cfg_.aeron.md_data,
                                                                a_cfg.max_price_deviation_pct,
                                                                breaker_cfg_from(a_cfg),
                                                                a_cfg.exchange);
-        auto funding_pub = std::make_shared<messaging::aeron::FundingRatePublisher>(
-            aeron, cfg_.aeron.funding_rate.channel, cfg_.aeron.funding_rate.stream_id);
-        auto stats_pub = std::make_shared<messaging::aeron::InstrumentStatsPublisher>(
-            aeron, cfg_.aeron.instrument_stats.channel, cfg_.aeron.instrument_stats.stream_id);
+        auto funding_pub = std::make_shared<messaging::aeron::FundingRatePublisher>(aeron, cfg_.aeron.funding_rate);
+        auto stats_pub =
+            std::make_shared<messaging::aeron::InstrumentStatsPublisher>(aeron, cfg_.aeron.instrument_stats);
 
         auto adapter = adapter::make_md_adapter<messaging::MdPublisher>(*exch_id,
                                                                         a_cfg,
@@ -137,12 +135,14 @@ void MdGatewayService::run() {
         if (fragments == 0)
             std::this_thread::sleep_for(10us);
 
-        // Sum per-adapter back-pressure drops into the legacy single gauge.
-        // Cheap relaxed loads — done every idle iteration so lag is at most ~10µs.
         uint64_t total_backpressure_drops = 0;
         for (auto& [_, a] : md_stat_reporters_)
             total_backpressure_drops += a->md_backpressure_drop_count();
-        metrics_.md_messages_dropped->Set(static_cast<double>(total_backpressure_drops));
+        if (total_backpressure_drops > last_backpressure_drops_) {
+            metrics_.md_messages_dropped->Increment(
+                static_cast<double>(total_backpressure_drops - last_backpressure_drops_));
+            last_backpressure_drops_ = total_backpressure_drops;
+        }
 
         // Snapshot decode latency histograms and push per-exchange gauges to Prometheus.
         if (now - last_lat_report >= lat_report_interval) {

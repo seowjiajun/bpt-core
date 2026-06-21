@@ -29,11 +29,11 @@ namespace bpt::canon {
 class CanonWriter {
 public:
     struct Config {
-        std::string path;            ///< absolute output path (dirs created on open)
-        std::string producer_kind;   ///< populated into FileHeader.producer_kind (truncated to 16)
-        std::string producer_sha;    ///< populated into FileHeader.producer_sha (truncated to 40)
-        uint8_t venue_id{0};         ///< messages::ExchangeId enum
-        uint32_t date_utc{0};        ///< YYYYMMDD packed
+        std::string path;                    ///< absolute output path (dirs created on open)
+        std::string producer_kind;           ///< populated into FileHeader.producer_kind (truncated to 16)
+        std::string producer_sha;            ///< populated into FileHeader.producer_sha (truncated to 40)
+        uint8_t venue_id{0};                 ///< messages::ExchangeId enum
+        uint32_t date_utc{0};                ///< YYYYMMDD packed
         std::size_t buffer_bytes{1u << 20};  ///< 1 MiB userspace buffer
     };
 

@@ -5,6 +5,7 @@
 #include <Aeron.h>
 
 #include <Publication.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -21,10 +22,10 @@ namespace bpt::strategy::console {
 // console with empty payloads from linear strategies.
 class PortfolioSnapshotPublisher {
 public:
-    // channel/stream may be empty/0 — in that case the publisher operates as
-    // a no-op so call sites don't need conditionals. Used when running in
-    // backtest mode or with no console configured.
-    PortfolioSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
+    // stream.channel/stream_id may be empty/0 — in that case the publisher
+    // operates as a no-op so call sites don't need conditionals. Used when
+    // running in backtest mode or with no console configured.
+    PortfolioSnapshotPublisher(std::shared_ptr<aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     // Publishes a snapshot if at least kIntervalNs has elapsed since the
     // previous publish AND the snapshot has content. now_ns must come from

@@ -3,7 +3,7 @@
 /// \file
 /// \brief IExchangeRefDataAdapter — the per-venue refdata interface used by bpt-refdata.
 
-#include "refdata/model/funding_rate.h"
+#include "refdata/model/fee_schedule.h"
 #include "refdata/model/instrument.h"
 
 #include <messages/DeltaUpdateType.h>

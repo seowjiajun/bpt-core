@@ -13,6 +13,7 @@
 #include <Aeron.h>
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 #include <string>
 
@@ -25,7 +26,7 @@ namespace bpt::md_gateway::messaging::aeron {
 /// aeron::Publication serializes them.
 class InstrumentStatsPublisher final : public api::InstrumentStatsPublisher {
 public:
-    InstrumentStatsPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    InstrumentStatsPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish(const InstrumentStatsUpdate& oi) override;
 

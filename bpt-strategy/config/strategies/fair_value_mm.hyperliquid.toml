@@ -1,0 +1,69 @@
+[strategy]
+type = "FairValueMmStrategy"
+enabled = true
+instruments = ["EIGEN/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "GTC"
+max_retries = 3
+
+[strategy.risk]
+max_position_usd = 1000.0
+max_order_size_usd = 100.0
+max_open_orders = 10
+
+[strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[strategy.params]
+# Vol-scaled spread: half_spread_bps = clamp(sigma_bps * vol_mult, min, max)
+# EIGEN has ~6-8 bps natural spread; 2× σ targets mid-spread at typical vol.
+vol_halflife_s = 60.0
+vol_warmup_ticks = 20
+spread_vol_mult = 2.0
+min_spread_bps = 2.0
+max_spread_bps = 20.0
+
+# Inventory skew: both quotes shift by skew_alpha * q_norm * fv.
+# 0.1 shifts quotes ~10% of fv per unit of normalised inventory —
+# at full inventory one side is 10 bps closer to touch.
+skew_alpha = 0.1
+
+# One-sided quoting: suppress bid when long ≥ 80% of max_inventory,
+# suppress ask when short ≥ 80%. Prevents accumulating past the cap.
+one_sided_threshold = 0.8
+
+# Requote when mid has moved more than this fraction since order placement.
+# 3.5 bps matches EIGEN's typical tick step.
+requote_threshold = 0.00035
+
+# Static sizing fallbacks (used before AccountSnapshot arrives).
+# EIGEN at ~$0.25: 100 units = ~$25 notional (bumped to $10 HL floor automatically).
+order_qty = 100
+order_qty_fraction = 0.05
+order_qty_min = 40
+max_inventory = 400
+max_inventory_fraction = 0.5
+
+# Drawdown circuit breaker. Pause both sides for pause_cooldown_s when
+# realized PnL crosses this negative threshold.
+pause_below_rpnl_usd = -0.30
+pause_cooldown_s = 300.0
+
+# Graceful unwind: post passive LIMIT at fair value, step one tick toward market
+# every step interval, escalate to IOC after patience expires.
+# IOC cross bps is the fallback — reduced from 50 since it's no longer first action.
+unwind_passive_timeout_s = 45.0
+unwind_step_interval_s = 8.0
+shutdown_cross_bps = 20.0
+shutdown_max_unwind_retries = 3
+
+[strategy.params.fair_value]
+mode = "micro"

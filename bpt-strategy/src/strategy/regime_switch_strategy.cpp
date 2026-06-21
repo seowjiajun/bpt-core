@@ -1,8 +1,8 @@
 #include "strategy/strategy/regime_switch_strategy.h"
 
+#include "features/hurst.h"
 #include "strategy/md/subscribe_helpers.h"
 #include "strategy/refdata/exchange_id.h"
-#include "features/hurst.h"
 
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
@@ -997,15 +997,17 @@ uint64_t RegimeSwitchStrategy::send_order(InstrumentState& st,
                            qty,
                            tif == bpt::messages::TimeInForce::IOC ? "IOC" : "GTC");
 
-    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = st.instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = type,
-        .tif = tif,
-        .price = price,
-        .qty = qty,
-    }).order_id();
+    const uint64_t order_id = order_mgr_
+                                  ->send_new_order(order::NewOrderRequest{
+                                      .instrument_id = st.instrument_id,
+                                      .exchange_id = st.exchange_id,
+                                      .side = side,
+                                      .type = type,
+                                      .tif = tif,
+                                      .price = price,
+                                      .qty = qty,
+                                  })
+                                  .order_id();
     if (order_id == 0)
         return 0;
 

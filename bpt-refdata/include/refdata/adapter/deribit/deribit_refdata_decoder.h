@@ -4,7 +4,7 @@
 /// \brief Deribit `public/get_instruments` decoder (JSON → refdata structs).
 
 #include "refdata/mapping/instrument_mapping_loader.h"
-#include "refdata/model/funding_rate.h"
+#include "refdata/model/fee_schedule.h"
 #include "refdata/model/instrument.h"
 
 #include <memory>

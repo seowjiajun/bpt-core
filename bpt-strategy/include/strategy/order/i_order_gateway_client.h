@@ -22,13 +22,11 @@
 /// optimistic (misleading) fill behaviour; see
 /// `feedback_avoid_synthetic_fills.md`.
 
+#include "strategy/order/requests.h"
+
 #include <messages/ExchangeId.h>
-#include <messages/OrderSide.h>
-#include <messages/OrderType.h>
-#include <messages/TimeInForce.h>
 
 #include <cstdint>
-#include <string>
 
 namespace bpt::strategy::order {
 
@@ -40,28 +38,13 @@ public:
     // (non-zero quantity, positive price for LIMIT, non-empty symbol).
     // Returns false if pre-flight checks fail; the caller must undo any
     // bookkeeping tied to the rejected order.
-    [[nodiscard]] virtual bool send_new_order(uint64_t order_id,
-                                              bpt::messages::ExchangeId::Value exchange_id,
-                                              uint64_t instrument_id,
-                                              bpt::messages::OrderSide::Value side,
-                                              bpt::messages::OrderType::Value order_type,
-                                              bpt::messages::TimeInForce::Value tif,
-                                              int64_t price,
-                                              uint64_t quantity,
-                                              uint8_t exec_inst,
-                                              const std::string& exchange_symbol) = 0;
+    [[nodiscard]] virtual bool send_new_order(const OutboundNewOrder& order) = 0;
 
-    virtual void send_cancel(uint64_t order_id,
-                             bpt::messages::ExchangeId::Value exchange_id,
-                             uint64_t instrument_id) = 0;
+    virtual void send_cancel(const CancelOrderRequest& cancel) = 0;
 
     virtual void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) = 0;
 
-    virtual void send_modify(uint64_t order_id,
-                             bpt::messages::ExchangeId::Value exchange_id,
-                             uint64_t instrument_id,
-                             int64_t new_price,
-                             uint64_t new_quantity) = 0;
+    virtual void send_modify(const ModifyOrderRequest& modify) = 0;
 
     virtual void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
                                                uint64_t correlation_id) = 0;

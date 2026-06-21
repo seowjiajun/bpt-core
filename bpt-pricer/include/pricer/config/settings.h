@@ -3,6 +3,7 @@
 #include <bpt_app/base_settings.h>
 #include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
+#include <pricer/config/aeron_config.h>
 #include <string>
 #include <vector>
 
@@ -13,25 +14,10 @@ struct Settings {
     // metrics_port, calibrate_tsc). Populated by bpt::app::load_base_settings().
     bpt::app::BaseSettings base;
 
-    // MD input (reads from MdGateway stream 2002 = md_data)
-    bpt::common::config::StreamConfig md_data;
-
-    // MD control (pricer → md-gateway: subscribe requests for the option
-    // universe we want BBOs for). Reuses the same stream strategy uses;
-    // md-gateway refcounts across consumers so pricer and strategy can
-    // coexist.
-    bpt::common::config::StreamConfig md_control;
-
-    // Refdata input (reads from Sindri streams 1001-1003)
-    bpt::common::config::StreamConfig refdata_snapshot;
-    bpt::common::config::StreamConfig refdata_delta;
-    bpt::common::config::StreamConfig refdata_control;  // Strategy → Sindri (we reuse for our subscription)
-
-    // Vol surface output (Pricer → Strategy stream 4001)
-    bpt::common::config::StreamConfig vol_surface;
-
-    // Heartbeat + ready output (Pricer → Strategy stream 4002 = pricer_status)
-    bpt::common::config::StreamConfig pricer_status;
+    // Aeron streams, grouped per producer (md / refdata) plus pricer's own
+    // outputs. See aeron_config.h. md-gateway refcounts md.control across
+    // consumers, so pricer and strategy can both subscribe.
+    AeronConfig aeron;
 
     // Exchanges to track options on
     std::vector<std::string> exchanges;

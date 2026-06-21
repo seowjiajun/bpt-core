@@ -20,14 +20,13 @@ quill::Logger* kLog() {
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 MdPublisher::MdPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                         const std::string& channel,
-                         int stream_id,
+                         const bpt::common::config::StreamConfig& stream,
                          double max_price_deviation_pct,
                          md::ValidationDropBreaker::Config breaker_cfg,
                          std::string adapter_name)
     // Latency-critical MD fan-out. On back-pressure, drop rather than
     // delay — a slow consumer shouldn't wedge the market-data path.
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kDropAlways),
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kDropAlways),
       validator_(max_price_deviation_pct),
       breaker_(breaker_cfg),
       adapter_name_(std::move(adapter_name)) {}

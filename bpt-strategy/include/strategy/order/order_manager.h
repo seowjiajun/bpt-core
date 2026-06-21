@@ -46,19 +46,6 @@ class OrderManager {
 public:
     OrderManager(IOrderGatewayClient& gw, const refdata::InstrumentCache& cache);
 
-    // Place a new order.  Returns the assigned order_id (> 0) on success, or 0
-    // if any pre-flight check fails (instrument unknown/inactive, zero quantity,
-    // non-positive price for a LIMIT order, etc.).
-    [[deprecated("use send_new_order(NewOrderRequest)")]]
-    [[nodiscard]] uint64_t place_order(uint64_t instrument_id,
-                                       bpt::messages::ExchangeId::Value exchange_id,
-                                       bpt::messages::OrderSide::Value side,
-                                       bpt::messages::OrderType::Value order_type,
-                                       bpt::messages::TimeInForce::Value tif,
-                                       double price,
-                                       double quantity,
-                                       uint8_t exec_inst = 0);
-
     // Typed entry points (mlp-algo-style). send_new_order tracks lifecycle
     // and returns a handle that stays valid for the process lifetime.
     // `tag` is strategy-defined intent (e.g. Quote vs Unwind); OM does
@@ -85,18 +72,11 @@ public:
 
     // Thin delegations to the underlying gateway — strategies should use these
     // rather than holding a raw IOrderGatewayClient pointer.
-    [[deprecated("use send_cancel(OrderHandle&) or send_cancel(CancelOrderRequest)")]]
-    void cancel_order(uint64_t order_id, bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id);
-
     void cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id);
 
-    // Modify uses wire-format (1e8) fixed-point price and quantity — caller is responsible
-    // for converting from natural units if needed.
-    void modify_order(uint64_t order_id,
-                      bpt::messages::ExchangeId::Value exchange_id,
-                      uint64_t instrument_id,
-                      int64_t new_price,
-                      uint64_t new_quantity);
+    // Modify uses wire-format (1e8) fixed-point price and quantity (carried
+    // on ModifyOrderRequest) — caller converts from natural units if needed.
+    void modify_order(const ModifyOrderRequest& req);
 
 private:
     // Live + historical order records. deque preserves stable pointers

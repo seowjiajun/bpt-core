@@ -9,8 +9,7 @@ namespace bpt::strategy::md {
 
 // StateMap = map<uint64_t, State> where State has `.exchange` + `.symbol`.
 template <typename StateMap>
-[[nodiscard]] std::vector<IMdClient::InstrumentDesc> build_subscriptions(const StateMap& state,
-                                                                         uint8_t depth = 0) {
+[[nodiscard]] std::vector<IMdClient::InstrumentDesc> build_subscriptions(const StateMap& state, uint8_t depth = 0) {
     std::vector<IMdClient::InstrumentDesc> subs;
     subs.reserve(state.size());
     for (const auto& [id, st] : state)

@@ -1,8 +1,7 @@
 // AS graceful-exit path + account-snapshot reconcile.
 
-#include "strategy/strategy/avellaneda_stoikov_strategy.h"
-
 #include "strategy/clock/sim_clock.h"
+#include "strategy/strategy/avellaneda_stoikov_strategy.h"
 #include "strategy/strategy/reconciler.h"
 
 #include <messages/ExchangeId.h>
@@ -19,113 +18,39 @@ quill::Logger* kLog() {
 }
 }  // namespace
 
-using bpt::messages::OrderSide;
-
 void AvellanedaStoikovStrategy::on_shutdown_flatten() {
-    if (!order_mgr_) {
-        bpt::common::log::warn(kLog(), "shutdown flatten: order_mgr null — cannot flatten");
+    if (!order_mgr_)
         return;
-    }
 
-    int cancels = 0;
-    int unwinds = 0;
-    int cancel_alls = 0;
-
-    // Exchange-authoritative sweep, fired FIRST before the tracked-order
-    // cancels below. Routes via order-gateway → adapter.send_cancel_all,
-    // which (on HL) queries /info openOrders and batch-cancels every
-    // returned oid. Catches orphans our in-memory state never knew about
-    // — WS reconnect, lost cancel-ack races, and (critically) orders
-    // left behind by a previous session whose shutdown thought it had
-    // nothing to cancel because bid_order_id / ask_order_id had already
-    // been cleared locally. Individual cancels below stay — they provide
-    // the has_pending_flatten() drain signal; cancel_all is fire-and-
-    // forget from the strategy side (see strategy_service_shutdown for the
-    // minimum drain window that gives the async round-trip time to land).
-    for (const auto& [instrument_id, st] : state_) {
-        bpt::common::log::warn(kLog(),
-                               "SHUTDOWN FLATTEN {} {} cancel_all (exchange-authoritative sweep)",
-                               st.symbol,
-                               st.exchange);
-        order_mgr_->cancel_all(st.exchange_id, instrument_id);
-        ++cancel_alls;
-    }
-
-    for (auto& [instrument_id, st] : state_) {
-        // Cancel resting bid + ask so they don't interfere with the unwind
-        // or get filled right as we're exiting.
-        if (st.h_bid.live()) {
-            bpt::common::log::warn(kLog(),
-                                   "SHUTDOWN FLATTEN {} cancelling bid order_id={}",
-                                   st.symbol,
-                                   st.h_bid.order_id());
+    std::vector<unwind::GracefulUnwinder::Instrument> instruments;
+    for (auto& [id, st] : state_) {
+        order_mgr_->cancel_all(st.exchange_id, id);
+        if (st.h_bid.live())
             order_mgr_->send_cancel(st.h_bid);
-            ++cancels;
-        }
-        if (st.h_ask.live()) {
-            bpt::common::log::warn(kLog(),
-                                   "SHUTDOWN FLATTEN {} cancelling ask order_id={}",
-                                   st.symbol,
-                                   st.h_ask.order_id());
+        if (st.h_ask.live())
             order_mgr_->send_cancel(st.h_ask);
-            ++cancels;
-        }
 
-        // Unwind any net inventory with an aggressive IOC cross.
-        //
-        // Position source priority: exchange's most-recent AccountSnapshot
-        // if fresh (< 10 s old), else the strategy-side PositionTracker.
-        // AccountSnapshot is exchange-authoritative so it absorbs any
-        // fill-reporting lag / queue-drain race in the strategy-side
-        // tracker at shutdown. Fallback to PositionTracker covers the
-        // case where no snapshot has arrived yet (early session,
-        // account-snapshot stream down).
-        constexpr uint64_t kSnapshotFreshnessNs = 10ULL * 1'000'000'000ULL;
-        const uint64_t now_wall_ns = bpt::strategy::clock::SimClock::now_ns();
-        const bool snapshot_fresh = last_snapshot_ns_ > 0 && (now_wall_ns - last_snapshot_ns_) <= kSnapshotFreshnessNs;
-
-        int64_t net_qty_e8 = 0;
-        const char* qty_source = "tracker";
-        if (snapshot_fresh) {
-            const auto it = last_snapshot_qty_e8_.find({st.exchange_id, st.symbol});
-            if (it != last_snapshot_qty_e8_.end()) {
-                net_qty_e8 = it->second;
-                qty_source = "snapshot";
-            } else {
-                net_qty_e8 = positions_.net_qty(instrument_id, st.exchange_id);
-            }
-        } else {
-            net_qty_e8 = positions_.net_qty(instrument_id, st.exchange_id);
-        }
-        const double net_qty = static_cast<double>(net_qty_e8) / 1e8;
-        if (net_qty == 0.0 || st.last_mid <= 0.0)
-            continue;
-
-        bpt::common::log::info(kLog(), "SHUTDOWN FLATTEN {} position_source={}", st.symbol, qty_source);
-
-        const auto side = (net_qty > 0.0) ? OrderSide::SELL : OrderSide::BUY;
-        bpt::common::log::warn(kLog(), "SHUTDOWN FLATTEN {} unwinding net_qty={:.8f} via IOC", st.symbol, net_qty);
-        // Arm retry budget — consumed in on_exec_report on terminal
-        // status of this unwind (rejected or partial+cancelled). Resets
-        // to 0 once residual is flat or the budget is exhausted.
-        st.unwind_retries_left = shutdown_max_unwind_retries_;
-        // Tag flows into OrderState — on_exec_report dispatches off it so
-        // EXHAUSTED watchdog only fires for actual shutdown-drain failures
-        // (kTagUnwindNormal entries hit the same on_exec_report path but
-        // skip the warning).
-        auto h = send_unwind_order(instrument_id, st, side, st.last_mid, std::abs(net_qty), kTagUnwindShutdown);
-        if (h.valid())
-            st.h_unwind = h;
-        ++unwinds;
+        const double fv = st.fv.last_estimate();
+        instruments.push_back({
+            .instrument_id = id,
+            .exchange_id = st.exchange_id,
+            .tick_size = st.tick_size,
+            .lot_size = st.lot_size,
+            .symbol = st.symbol,
+            .price_ref = (!std::isnan(fv) && fv > 0.0) ? fv : st.last_mid,
+        });
     }
+    unwinder_.arm(std::move(instruments));
+}
 
-    if (cancels > 0 || unwinds > 0 || cancel_alls > 0)
-        bpt::common::log::warn(
-            kLog(),
-            "shutdown flatten: cancel_all swept {} venue(s), cancelled {} tracked order(s), fired {} unwind IOC(s)",
-            cancel_alls,
-            cancels,
-            unwinds);
+void AvellanedaStoikovStrategy::on_flatten_tick() {
+    unwinder_.tick();
+}
+bool AvellanedaStoikovStrategy::has_pending_flatten() const {
+    return unwinder_.pending();
+}
+double AvellanedaStoikovStrategy::shutdown_drain_budget_s() const {
+    return unwinder_.drain_budget_s();
 }
 
 std::size_t AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::AccountSnapshot& snap) {
@@ -270,18 +195,6 @@ std::size_t AvellanedaStoikovStrategy::on_account_snapshot(bpt::messages::Accoun
                                seed_avg_px);
     }
     return divergences.size();
-}
-
-bool AvellanedaStoikovStrategy::has_pending_flatten() const {
-    // "Pending" = any instrument still has a resting bid, resting ask,
-    // or in-flight unwind IOC. Each is cleared by on_exec_report on the
-    // FILLED / CANCELLED / REJECTED terminal status, so this returns
-    // false once the shutdown drain has processed the acks.
-    for (const auto& [_, st] : state_) {
-        if (st.h_bid.valid() || st.h_ask.valid() || st.h_unwind.valid())
-            return true;
-    }
-    return false;
 }
 
 }  // namespace bpt::strategy::strategy

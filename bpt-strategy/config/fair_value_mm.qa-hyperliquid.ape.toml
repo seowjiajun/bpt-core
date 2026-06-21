@@ -1,0 +1,12 @@
+profile_config = "../deploy/config/profile/qa-hyperliquid.toml"
+strategy_config = "strategies/fair_value_mm.ape.hyperliquid.toml"
+aeron_config = "../deploy/config/aeron/streams.toml"
+
+[aeron]
+media_driver_dir = "/dev/shm/aeron-bpt"
+
+[strategy]
+correlation_id = 1007
+
+[metrics]
+port = 9105

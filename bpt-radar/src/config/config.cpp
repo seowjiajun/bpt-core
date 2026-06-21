@@ -37,12 +37,12 @@ Settings load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    s.vol_surface = resolve_stream(shared_streams, "vol_surface", 4001);
-    s.instrument_stats = resolve_stream(shared_streams, "instrument_stats", 2004);
-    s.funding_rate = resolve_stream(shared_streams, "funding_rate", 1005);
-    s.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
-    s.md_data = resolve_stream(shared_streams, "md_data", 2002);
-    s.market_color = resolve_stream(shared_streams, "market_color", 6002);
+    s.vol_surface = resolve_stream(shared_streams, "pricer.vol_surface", 4001);
+    s.instrument_stats = resolve_stream(shared_streams, "md.instrument_stats", 2004);
+    s.funding_rate = resolve_stream(shared_streams, "md.funding_rate", 2005);
+    s.refdata_snapshot = resolve_stream(shared_streams, "refdata.snapshot", 1001);
+    s.md_data = resolve_stream(shared_streams, "md.feed", 2002);
+    s.market_color = resolve_stream(shared_streams, "radar.market_color", 6002);
 
     if (auto t = tbl["radar"])
         s.publish_interval_ms = t["publish_interval_ms"].value_or(uint32_t{2000});

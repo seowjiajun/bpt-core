@@ -14,12 +14,13 @@ using bpt::messages::MdSubscribeBatch;
 using bpt::messages::MessageHeader;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
-MdSubscribeClient::MdSubscribeClient(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
+MdSubscribeClient::MdSubscribeClient(std::shared_ptr<::aeron::Aeron> aeron,
+                                     const bpt::common::config::StreamConfig& stream)
     : publisher_(std::make_unique<bpt::common::aeron::Publisher>(std::move(aeron),
-                                                                 channel,
-                                                                 stream_id,
+                                                                 stream.channel,
+                                                                 stream.stream_id,
                                                                  Policy::kRetryOnBackpressure)) {
-    bpt::common::log::info("[MdSubscribeClient] control publication ready on stream {}", stream_id);
+    bpt::common::log::info("[MdSubscribeClient] control publication ready on stream {}", stream.stream_id);
 }
 
 void MdSubscribeClient::publish(uint64_t correlation_id, const std::vector<InstrumentDesc>& instruments) {

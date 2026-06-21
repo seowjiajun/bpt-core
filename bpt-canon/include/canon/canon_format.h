@@ -53,11 +53,11 @@ inline constexpr uint16_t kSbeTemplateFamily = 1;
 /// New event types are *additive* — old readers see UNKNOWN, skip, and
 /// continue. Removing/repurposing a value is a kSchemaVersion bump.
 enum class EventType : uint8_t {
-    BBO = 0,     ///< SBE MdMarketData (top-of-book + microprice helpers)
-    TRADE = 1,   ///< SBE MdTrade (aggressor side included)
-    BOOK = 2,    ///< SBE MdOrderBook (L2 depth)
-    FUNDING = 3, ///< SBE FundingRate
-    MARK = 4,    ///< reserved — not all SBE templates exist yet
+    BBO = 0,      ///< SBE MdMarketData (top-of-book + microprice helpers)
+    TRADE = 1,    ///< SBE MdTrade (aggressor side included)
+    BOOK = 2,     ///< SBE MdOrderBook (L2 depth)
+    FUNDING = 3,  ///< SBE FundingRate
+    MARK = 4,     ///< reserved — not all SBE templates exist yet
 };
 
 /// Number of bytes the file header occupies on disk. Pinned to 96 so
@@ -71,27 +71,25 @@ inline constexpr uint32_t kFileHeaderBytes = 96;
 /// `producer_sha` are null-padded ASCII (NOT null-terminated; consumers
 /// must respect the field length).
 struct CanonFileHeader {
-    uint8_t magic[4];           ///< must equal kMagic
-    uint16_t schema_version;    ///< canon's own versioning (kSchemaVersion)
-    uint16_t sbe_template_id;   ///< SBE family the records use (kSbeTemplateFamily)
-    uint8_t venue_id;           ///< messages::ExchangeId
-    uint8_t flags;              ///< reserved, must be 0 today
-    uint32_t date_utc;          ///< YYYYMMDD packed decimal (e.g. 20260520)
-    char producer_kind[16];     ///< e.g. "wslog-replay", "okx-archive"
-    char producer_sha[40];      ///< git sha of the producer; ascii hex
-    uint8_t reserved[26];       ///< zero-filled, brings struct to 96 bytes
+    uint8_t magic[4];          ///< must equal kMagic
+    uint16_t schema_version;   ///< canon's own versioning (kSchemaVersion)
+    uint16_t sbe_template_id;  ///< SBE family the records use (kSbeTemplateFamily)
+    uint8_t venue_id;          ///< messages::ExchangeId
+    uint8_t flags;             ///< reserved, must be 0 today
+    uint32_t date_utc;         ///< YYYYMMDD packed decimal (e.g. 20260520)
+    char producer_kind[16];    ///< e.g. "wslog-replay", "okx-archive"
+    char producer_sha[40];     ///< git sha of the producer; ascii hex
+    uint8_t reserved[26];      ///< zero-filled, brings struct to 96 bytes
 };
-static_assert(sizeof(CanonFileHeader) == kFileHeaderBytes,
-              "CanonFileHeader on-disk size must be exactly 96 bytes");
+static_assert(sizeof(CanonFileHeader) == kFileHeaderBytes, "CanonFileHeader on-disk size must be exactly 96 bytes");
 
 /// Per-record header. Written immediately before the SBE blob.
 struct CanonRecordHeader {
-    uint64_t ts_ns;     ///< wall-clock ns since Unix epoch
-    uint8_t event_t;    ///< EventType
-    uint16_t sbe_len;   ///< bytes of SBE payload that follow
+    uint64_t ts_ns;    ///< wall-clock ns since Unix epoch
+    uint8_t event_t;   ///< EventType
+    uint16_t sbe_len;  ///< bytes of SBE payload that follow
 };
-static_assert(sizeof(CanonRecordHeader) == 11,
-              "CanonRecordHeader on-disk size must be exactly 11 bytes");
+static_assert(sizeof(CanonRecordHeader) == 11, "CanonRecordHeader on-disk size must be exactly 11 bytes");
 
 #pragma pack(pop)
 

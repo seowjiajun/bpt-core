@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -32,7 +33,7 @@ namespace bpt::md_gateway::messaging::aeron {
 /// the same aeron::Publication thread-safety contract used by MdPublisher.
 class AckPublisher final : public api::AckPublisher {
 public:
-    AckPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    AckPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish_ack(uint64_t correlation_id,
                      uint64_t instrument_id,

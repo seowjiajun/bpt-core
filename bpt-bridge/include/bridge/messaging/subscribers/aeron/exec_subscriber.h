@@ -14,6 +14,7 @@
 #include <messages/ExecutionReport.h>
 #include <messages/OrderSide.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <bpt_common/aeron/subscriber.h>
 #include <bpt_common/logging.h>
 #include <cstdint>
@@ -26,15 +27,15 @@ namespace bpt::bridge::messaging::aeron {
 template <class Handler>
 class ExecSubscriber final : public api::ExecSubscriber {
 public:
-    ExecSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
+    ExecSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream) {
         sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             std::move(aeron),
-            channel,
-            stream_id,
+            stream.channel,
+            stream.stream_id,
             [this](::aeron::AtomicBuffer& b, ::aeron::util::index_t o, ::aeron::util::index_t l, ::aeron::Header& h) {
                 on_fragment(b, o, l, h);
             });
-        bpt::common::log::info("[bridge/Exec] subscribed on {} stream {}", channel, stream_id);
+        bpt::common::log::info("[bridge/Exec] subscribed on {} stream {}", stream.channel, stream.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }
@@ -50,7 +51,10 @@ private:
         using bpt::messages::OrderSide;
 
         decode_sbe_fragment<bpt::messages::ExecutionReport>(
-            buffer, offset, length, [this](bpt::messages::ExecutionReport& msg) {
+            buffer,
+            offset,
+            length,
+            [this](bpt::messages::ExecutionReport& msg) {
                 constexpr double kPriceScale = 1e8;
                 constexpr double kQtyScale = 1e8;
                 constexpr double kFeeScale = 1e8;

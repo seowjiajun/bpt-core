@@ -179,9 +179,7 @@ void StrategyService::on_vol_surface(bpt::messages::VolSurface& surface) {
     strategy_->on_vol_surface(surface);
 }
 
-void StrategyService::on_pricer_ready(uint8_t exchanges_loaded,
-                                      uint16_t underlying_count,
-                                      uint32_t point_count) {
+void StrategyService::on_pricer_ready(uint8_t exchanges_loaded, uint16_t underlying_count, uint32_t point_count) {
     bpt::common::log::info("PricerReady: exchanges=0x{:02x} underlyings={} points={}",
                            exchanges_loaded,
                            underlying_count,

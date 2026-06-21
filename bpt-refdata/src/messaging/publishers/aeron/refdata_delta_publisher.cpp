@@ -18,9 +18,8 @@ using bpt::messages::OptionSide;
 using bpt::messages::RefDataDelta;
 
 RefdataDeltaPublisher::RefdataDeltaPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                             const std::string& channel,
-                                             int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
+                                             const bpt::common::config::StreamConfig& stream) {
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, stream.channel, stream.stream_id);
 }
 
 void RefdataDeltaPublisher::publish_delta(bpt::messages::DeltaUpdateType::Value update_type,

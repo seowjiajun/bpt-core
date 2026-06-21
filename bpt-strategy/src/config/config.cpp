@@ -50,26 +50,31 @@ AppConfig AppConfig::load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    app_cfg.aeron.refdata_control = resolve_stream(shared_streams, "refdata_control", 1003);
-    app_cfg.aeron.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
-    app_cfg.aeron.refdata_delta = resolve_stream(shared_streams, "refdata_delta", 1002);
-    app_cfg.aeron.fee_schedule = resolve_stream(shared_streams, "fee_schedule", 1004);
-    app_cfg.aeron.funding_rate = resolve_stream(shared_streams, "funding_rate", 1005);
-    app_cfg.aeron.refdata_status = resolve_stream(shared_streams, "refdata_status", 1006);
-    app_cfg.aeron.md_control = resolve_stream(shared_streams, "md_control", 0);
-    app_cfg.aeron.md_data = resolve_stream(shared_streams, "md_data", 0);
-    app_cfg.aeron.md_ack_hb = resolve_stream(shared_streams, "md_ack_hb", 0);
-    app_cfg.aeron.order = resolve_stream(shared_streams, "order", 0);
-    app_cfg.aeron.exec_report = resolve_stream(shared_streams, "exec_report", 0);
-    app_cfg.aeron.heartbeat = resolve_stream(shared_streams, "heartbeat", 0);
-    app_cfg.aeron.account_snapshot = resolve_stream(shared_streams, "account_snapshot", 0);
-    app_cfg.aeron.vol_surface = resolve_stream(shared_streams, "vol_surface", 0);
-    app_cfg.aeron.pricer_status = resolve_stream(shared_streams, "pricer_status", 0);
-    app_cfg.aeron.toxicity = resolve_stream(shared_streams, "toxicity", 0);
-    app_cfg.aeron.backtest_control = resolve_stream(shared_streams, "backtest_control", 9002);
-    app_cfg.aeron.backtest_ack = resolve_stream(shared_streams, "backtest_ack", 9001);
-    app_cfg.aeron.console_control = resolve_stream(shared_streams, "console_control", 9003);
-    app_cfg.aeron.portfolio = resolve_stream(shared_streams, "portfolio", 9004);
+    // resolve_stream keys are the registry's dotted global names
+    // (producer.stream); the assignment targets are this service's
+    // per-consumer projection. These axes can differ: funding arrives via
+    // strategy's refdata client (so the field sits under .refdata) but its
+    // global name is md.funding_rate — md-gateway produces it.
+    app_cfg.aeron.refdata.control = resolve_stream(shared_streams, "refdata.control", 1003);
+    app_cfg.aeron.refdata.snapshot = resolve_stream(shared_streams, "refdata.snapshot", 1001);
+    app_cfg.aeron.refdata.delta = resolve_stream(shared_streams, "refdata.delta", 1002);
+    app_cfg.aeron.refdata.fee_schedule = resolve_stream(shared_streams, "refdata.fee_schedule", 1004);
+    app_cfg.aeron.refdata.funding_rate = resolve_stream(shared_streams, "md.funding_rate", 2005);
+    app_cfg.aeron.refdata.status = resolve_stream(shared_streams, "refdata.status", 1006);
+    app_cfg.aeron.md.control = resolve_stream(shared_streams, "md.control", 0);
+    app_cfg.aeron.md.data = resolve_stream(shared_streams, "md.feed", 0);
+    app_cfg.aeron.md.ack_hb = resolve_stream(shared_streams, "md.ack_hb", 0);
+    app_cfg.aeron.order.submit = resolve_stream(shared_streams, "order.submit", 0);
+    app_cfg.aeron.order.exec_report = resolve_stream(shared_streams, "order.exec_report", 0);
+    app_cfg.aeron.order.heartbeat = resolve_stream(shared_streams, "order.heartbeat", 0);
+    app_cfg.aeron.order.account_snapshot = resolve_stream(shared_streams, "order.account_snapshot", 0);
+    app_cfg.aeron.vol.surface = resolve_stream(shared_streams, "pricer.vol_surface", 0);
+    app_cfg.aeron.vol.pricer_status = resolve_stream(shared_streams, "pricer.status", 0);
+    app_cfg.aeron.toxicity = resolve_stream(shared_streams, "analytics.toxicity", 0);
+    app_cfg.aeron.backtest.control = resolve_stream(shared_streams, "backtest.control", 9002);
+    app_cfg.aeron.backtest.ack = resolve_stream(shared_streams, "backtest.ack", 9001);
+    app_cfg.aeron.console_control = resolve_stream(shared_streams, "bridge.console_control", 9003);
+    app_cfg.aeron.portfolio = resolve_stream(shared_streams, "bridge.portfolio", 9004);
 
     // [strategy] in the parent config carries service-level fields (correlation_id).
     // The strategy body — type / params / risk / etc. — lives either in the same

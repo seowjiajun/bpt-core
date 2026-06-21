@@ -58,26 +58,13 @@ public:
     /// the ctor).
     void set_results_collector(results::ResultsCollector* results) noexcept { results_ = results; }
 
-    [[nodiscard]] bool send_new_order(uint64_t order_id,
-                                      bpt::messages::ExchangeId::Value exchange_id,
-                                      uint64_t instrument_id,
-                                      bpt::messages::OrderSide::Value side,
-                                      bpt::messages::OrderType::Value order_type,
-                                      bpt::messages::TimeInForce::Value tif,
-                                      int64_t price,
-                                      uint64_t quantity,
-                                      uint8_t exec_inst,
-                                      const std::string& exchange_symbol) override;
+    [[nodiscard]] bool send_new_order(const bpt::strategy::order::OutboundNewOrder& order) override;
 
-    void send_cancel(uint64_t order_id, bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) override;
+    void send_cancel(const bpt::strategy::order::CancelOrderRequest& cancel) override;
 
     void send_cancel_all(bpt::messages::ExchangeId::Value exchange_id, uint64_t instrument_id) override;
 
-    void send_modify(uint64_t order_id,
-                     bpt::messages::ExchangeId::Value exchange_id,
-                     uint64_t instrument_id,
-                     int64_t new_price,
-                     uint64_t new_quantity) override;
+    void send_modify(const bpt::strategy::order::ModifyOrderRequest& modify) override;
 
     void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id, uint64_t correlation_id) override;
 
@@ -148,21 +135,24 @@ private:
     /// fills produce a coherent FILLED status sequence.
     void publish_fill(const matching::FillReport& fr);
 
-    /// \brief Build + fire a non-fill ExecutionReport (ACKED, CANCELLED,
-    ///        REJECTED).
-    ///
-    /// Drives the strategy's order-state machine for events that don't
-    /// involve a fill.
-    void publish_exec_status(uint64_t order_id,
-                             bpt::messages::ExchangeId::Value exchange_id,
-                             uint64_t instrument_id,
-                             bpt::messages::ExecStatus::Value status,
-                             bpt::messages::OrderSide::Value side,
-                             bpt::messages::OrderType::Value order_type,
-                             int64_t price,
-                             uint64_t quantity,
-                             uint64_t cumulative_filled_qty,
-                             bpt::messages::RejectSource::Value reject_source = bpt::messages::RejectSource::EXCHANGE);
+    /// \brief One ExecutionReport to synthesise (fill or non-fill). Bundled
+    ///        so the 4 emit sites can't transpose the four uint64 fields.
+    struct ExecStatusEvent {
+        uint64_t order_id;
+        bpt::messages::ExchangeId::Value exchange_id;
+        uint64_t instrument_id;
+        bpt::messages::ExecStatus::Value status;
+        bpt::messages::OrderSide::Value side;
+        bpt::messages::OrderType::Value order_type;
+        int64_t price;
+        uint64_t quantity;
+        uint64_t cumulative_filled_qty;
+        bpt::messages::RejectSource::Value reject_source = bpt::messages::RejectSource::EXCHANGE;
+    };
+
+    /// \brief Build + fire an ExecutionReport (ACKED, CANCELLED, REJECTED,
+    ///        FILLED, PARTIAL). Drives the strategy's order-state machine.
+    void publish_exec_status(const ExecStatusEvent& ev);
 
     matching::MatchingEngine& matching_;
 

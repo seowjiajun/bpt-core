@@ -60,7 +60,7 @@ void StrategyService::shutdown_flatten() {
     // typical HL round-trip comfortably with headroom for network jitter.
     const uint64_t drain_start_ns = bpt::common::util::TscClock::now_epoch_ns();
     constexpr uint64_t kMinDrainNs = 2ULL * 1'000'000'000ULL;
-    constexpr uint64_t kDrainBudgetNs = 5ULL * 1'000'000'000ULL;
+    const uint64_t kDrainBudgetNs = static_cast<uint64_t>(strategy_->shutdown_drain_budget_s() * 1'000'000'000.0);
     bool drained_cleanly = true;
     if (bus_.order_gw) {
         while (true) {
@@ -76,6 +76,11 @@ void StrategyService::shutdown_flatten() {
                 }
                 break;
             }
+            // Advance the strategy's unwind state machine (timer-based price
+            // stepping, passive → IOC phase transition). Must run before the
+            // poll so that any cancels fired here are processed in the same
+            // loop iteration's incoming exec reports.
+            strategy_->on_flatten_tick();
             // Need both: tracked orders drained AND minimum cancel_all
             // settle time elapsed. Tracked orders typically clear in
             // <100ms; cancel_all's orphan sweep takes 200–500ms.

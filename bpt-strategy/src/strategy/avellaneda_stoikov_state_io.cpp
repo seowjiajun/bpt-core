@@ -1,8 +1,7 @@
 // AS console JSON + warm-start save/load. Pure serialisation.
 
-#include "strategy/strategy/avellaneda_stoikov_strategy.h"
-
 #include "strategy/clock/sim_clock.h"
+#include "strategy/strategy/avellaneda_stoikov_strategy.h"
 
 #include <algorithm>
 #include <bpt_common/logging.h>
@@ -35,24 +34,26 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     const double net_qty = static_cast<double>(positions_.net_qty(instrument_id, st.exchange_id)) / 1e8;
 
     // Compute current quotes to get reservation and half-spread.
-    double bid_quote = 0, ask_quote = 0;
-    bool quotes_valid = false;
-    if (st.last_mid > 0 && st.ewma_var.count() >= vol_warmup_ticks_) {
-        quotes_valid = compute_quotes(st, instrument_id, net_qty, st.last_mid, st.last_tick_ns, bid_quote, ask_quote);
-    }
+    const auto quotes =
+        (st.last_mid > 0 && st.ewma_var.count() >= vol_warmup_ticks_)
+            ? compute_quotes(st, BboContext{.net_qty = net_qty, .mid = st.last_mid, .ts_ns = st.last_tick_ns})
+            : std::nullopt;
 
-    const double half_spread = quotes_valid ? (ask_quote - bid_quote) / 2.0 : 0.0;
-    const double reservation = quotes_valid ? (bid_quote + ask_quote) / 2.0 : st.last_mid;
+    const double bid_quote = quotes ? quotes->bid : 0.0;
+    const double ask_quote = quotes ? quotes->ask : 0.0;
+    const double half_spread = quotes ? (ask_quote - bid_quote) / 2.0 : 0.0;
+    const double reservation = quotes ? (bid_quote + ask_quote) / 2.0 : st.last_mid;
     const double reservation_offset_bps = st.last_mid > 0 ? (reservation - st.last_mid) / st.last_mid * 1e4 : 0.0;
 
     // Suppression snapshot shared with maybe_requote — single source of
     // truth so the console badge can't disagree with the actual
     // runtime decision. Queue suppression is only meaningful when
-    // quotes_valid (pre-warmup returns fp=1); compute_suppression
-    // computes it unconditionally but the projected prices below are
-    // still defaulted from the struct, which is correct since st.book
-    // wouldn't be ready during warmup anyway.
-    const SuppressionState supp = compute_suppression(st, net_qty, bid_quote, ask_quote);
+    // quotes_valid (pre-warmup returns fp=1); evaluate() computes it
+    // unconditionally but the projected prices below are still defaulted
+    // from the struct, which is correct since st.book wouldn't be ready
+    // during warmup anyway.
+    const SuppressionState supp =
+        supp_policy_.evaluate(st, net_qty, bid_quote, ask_quote, effective_max_inventory(st), effective_order_qty(st));
     const double drift_bps = std::abs(st.ewma_drift.value()) * 1e4;  // used in driftBps JSON field below
     const double projected_fp_bid = supp.fp_bid;
     const double projected_fp_ask = supp.fp_ask;
@@ -92,7 +93,7 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["drift"] = st.ewma_drift.value();
     j["driftBps"] = drift_bps;
     j["slowDriftBps"] = st.slow_drift_bps;
-    j["slowDriftSuppressBps"] = slow_drift_suppress_bps_;
+    j["slowDriftSuppressBps"] = supp_policy_.config().slow_drift_suppress_bps;
     j["sigma2"] = st.ewma_var.value();
     j["kappa"] = (st.ewma_kappa.count() >= kappa_warmup_ticks_) ? std::max(kappa_min_, st.ewma_kappa.value()) : kappa_;
     j["kappaLive"] = st.ewma_kappa.count() >= kappa_warmup_ticks_;
@@ -162,7 +163,7 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["askFillProb"] = ask_fill_prob;
     j["bidProjectedFillProb"] = projected_fp_bid;
     j["askProjectedFillProb"] = projected_fp_ask;
-    j["queueSuppressMin"] = queue_suppress_fill_prob_min_;
+    j["queueSuppressMin"] = supp_policy_.config().queue_suppress_fill_prob_min;
 
     // Market best bid/ask — cached by on_bbo. Preferred over st.book
     // because this strategy runs with order_book_depth=0 (no L2 ladder

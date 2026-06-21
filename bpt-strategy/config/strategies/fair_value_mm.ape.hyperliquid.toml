@@ -1,0 +1,45 @@
+[strategy]
+type = "FairValueMmStrategy"
+enabled = true
+instruments = ["APE/USD:PERPETUAL"]
+md_exchanges = ["HYPERLIQUID"]
+
+[strategy.venue_exec.HYPERLIQUID]
+enabled = true
+latency_budget_us = 5000
+order_type = "LIMIT"
+tif = "GTC"
+max_retries = 3
+
+[strategy.risk]
+max_position_usd = 1000.0
+max_order_size_usd = 100.0
+max_open_orders = 10
+
+[strategy.schedule]
+require_refdata_ready = true
+md_staleness_threshold_ms = 10000
+max_refdata_staleness_ns = 300000000000
+configured_exchanges = ["HYPERLIQUID"]
+
+[strategy.params]
+vol_halflife_s = 60.0
+vol_warmup_ticks = 20
+spread_vol_mult = 2.0
+min_spread_bps = 2.0
+max_spread_bps = 20.0
+skew_alpha = 0.1
+one_sided_threshold = 0.8
+requote_threshold = 0.00035
+order_qty = 50
+order_qty_fraction = 0.05
+order_qty_min = 10
+max_inventory = 200
+max_inventory_fraction = 0.5
+pause_below_rpnl_usd = -0.30
+pause_cooldown_s = 300.0
+shutdown_cross_bps = 50.0
+shutdown_max_unwind_retries = 5
+
+[strategy.params.fair_value]
+mode = "micro"

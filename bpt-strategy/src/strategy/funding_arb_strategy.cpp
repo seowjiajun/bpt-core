@@ -416,7 +416,8 @@ void FundingArbStrategy::evaluate_pair(ArbPair& pair, uint64_t now_ns) {
                                    state_name(pair.state),
                                    active_leg.order_id);
             if (order_gw_)
-                order_gw_->send_cancel(active_leg.order_id, active_leg.exchange_id, active_leg.instrument_id);
+                order_gw_->send_cancel(
+                    order::CancelOrderRequest{active_leg.order_id, active_leg.exchange_id, active_leg.instrument_id});
         }
     }
 }
@@ -505,16 +506,18 @@ void FundingArbStrategy::send_leg_order(ArbPair& pair,
     leg.order_id = order_id;
     order_to_base_[order_id] = pair.base_asset;
 
-    if (!order_gw_->send_new_order(order_id,
-                                   leg.exchange_id,
-                                   leg.instrument_id,
-                                   side,
-                                   OrderType::LIMIT,
-                                   TimeInForce::IOC,
-                                   price_fixed,
-                                   qty,
-                                   /*exec_inst*/ 0,
-                                   leg.symbol)) {
+    if (!order_gw_->send_new_order(order::OutboundNewOrder{
+            .order_id = order_id,
+            .exchange_id = leg.exchange_id,
+            .instrument_id = leg.instrument_id,
+            .side = side,
+            .order_type = OrderType::LIMIT,
+            .tif = TimeInForce::IOC,
+            .price = price_fixed,
+            .quantity = qty,
+            .exec_inst = 0,
+            .exchange_symbol = leg.symbol,
+        })) {
         leg.order_id = 0;
         order_to_base_.erase(order_id);
     }

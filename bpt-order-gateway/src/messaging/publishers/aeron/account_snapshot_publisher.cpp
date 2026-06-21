@@ -10,9 +10,8 @@ namespace bpt::order_gateway::messaging::aeron {
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 AccountSnapshotPublisher::AccountSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                                   const std::string& channel,
-                                                   int stream_id)
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
+                                                   const bpt::common::config::StreamConfig& stream)
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kRetryOnBackpressure) {}
 
 void AccountSnapshotPublisher::publish(const adapter::AccountSnapshotData& snapshot) {
     alignas(8) std::byte scratch[SbeAccountSnapshotCodec::kRecommendedScratchSize];

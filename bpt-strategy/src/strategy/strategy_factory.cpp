@@ -4,6 +4,7 @@
 #include "strategy/order/i_order_gateway_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/strategy/avellaneda_stoikov_strategy.h"
+#include "strategy/strategy/fair_value_mm_strategy.h"
 #include "strategy/strategy/funding_arb_strategy.h"
 #include "strategy/strategy/hmm_strategy.h"
 #include "strategy/strategy/momentum_strategy.h"
@@ -42,6 +43,10 @@ std::unique_ptr<IStrategy> StrategyFactory::create(const config::EngineConfig& c
 
     if (type == "AvellanedaStoikovStrategy") {
         return std::make_unique<AvellanedaStoikovStrategy>(cfg.correlation_id, cfg.strategy, refdata, md, order_mgr);
+    }
+
+    if (type == "FairValueMmStrategy") {
+        return std::make_unique<FairValueMmStrategy>(cfg.correlation_id, cfg.strategy, refdata, md, order_mgr);
     }
 
     if (type == "PassiveMakerStrategy") {

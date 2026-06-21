@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <strategy/config/aeron_config.h>
 #include <string>
 
 namespace bpt::strategy::order {
@@ -35,36 +36,34 @@ namespace bpt::strategy::order {
 template <class Handler>
 class AeronOrderGatewayClient final : public IOrderGatewayClient {
 public:
-    AeronOrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron,
-                            const std::string& channel,
-                            int order_stream,
-                            int exec_report_stream,
-                            int heartbeat_stream,
-                            int account_snapshot_stream) {
+    AeronOrderGatewayClient(std::shared_ptr<aeron::Aeron> aeron, const config::AeronConfig::Order& streams) {
         order_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-            aeron, channel, order_stream, bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+            aeron,
+            streams.submit.channel,
+            streams.submit.stream_id,
+            bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
         exec_report_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            exec_report_stream,
+            streams.exec_report.channel,
+            streams.exec_report.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_exec_report_fragment(buf, offset, length, hdr); });
         heartbeat_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            heartbeat_stream,
+            streams.heartbeat.channel,
+            streams.heartbeat.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_heartbeat_fragment(buf, offset, length, hdr); });
 
-        if (account_snapshot_stream != 0) {
+        if (streams.account_snapshot.stream_id != 0) {
             account_snapshot_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
                 aeron,
-                channel,
-                account_snapshot_stream,
+                streams.account_snapshot.channel,
+                streams.account_snapshot.stream_id,
                 [this](aeron::AtomicBuffer& buf,
                        aeron::util::index_t offset,
                        aeron::util::index_t length,
@@ -74,58 +73,47 @@ public:
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }
 
-    [[nodiscard]] bool send_new_order(uint64_t order_id,
-                                      bpt::messages::ExchangeId::Value exchange_id,
-                                      uint64_t instrument_id,
-                                      bpt::messages::OrderSide::Value side,
-                                      bpt::messages::OrderType::Value order_type,
-                                      bpt::messages::TimeInForce::Value tif,
-                                      int64_t price,
-                                      uint64_t quantity,
-                                      uint8_t exec_inst,
-                                      const std::string& exchange_symbol) override {
+    [[nodiscard]] bool send_new_order(const OutboundNewOrder& order) override {
         using bpt::messages::NewOrder;
         using bpt::messages::OrderType;
 
-        if (quantity == 0) {
-            bpt::common::log::warn("[OrderGW] Rejected order_id={}: quantity is zero", order_id);
+        if (order.quantity == 0) {
+            bpt::common::log::warn("[OrderGW] Rejected order_id={}: quantity is zero", order.order_id);
             return false;
         }
-        if (order_type != OrderType::MARKET && price <= 0) {
+        if (order.order_type != OrderType::MARKET && order.price <= 0) {
             bpt::common::log::warn("[OrderGW] Rejected order_id={}: price={} invalid for non-MARKET order",
-                                   order_id,
-                                   price);
+                                   order.order_id,
+                                   order.price);
             return false;
         }
-        if (exchange_symbol.empty()) {
-            bpt::common::log::warn("[OrderGW] Rejected order_id={}: exchange_symbol is empty", order_id);
+        if (order.exchange_symbol.empty()) {
+            bpt::common::log::warn("[OrderGW] Rejected order_id={}: exchange_symbol is empty", order.order_id);
             return false;
         }
 
         order_pub_->template publish<NewOrder>([&](NewOrder& msg) {
-            msg.orderId(order_id)
-                .exchangeId(exchange_id)
-                .instrumentId(instrument_id)
-                .side(side)
-                .orderType(order_type)
-                .timeInForce(tif)
-                .price(price)
-                .quantity(quantity)
+            msg.orderId(order.order_id)
+                .exchangeId(order.exchange_id)
+                .instrumentId(order.instrument_id)
+                .side(order.side)
+                .orderType(order.order_type)
+                .timeInForce(order.tif)
+                .price(order.price)
+                .quantity(order.quantity)
                 .timestampNs(bpt::common::util::TscClock::now_epoch_ns())
-                .execInst(exec_inst)
-                .putExchangeSymbol(exchange_symbol);
+                .execInst(order.exec_inst)
+                .putExchangeSymbol(order.exchange_symbol);
         });
         return true;
     }
 
-    void send_cancel(uint64_t order_id,
-                     bpt::messages::ExchangeId::Value exchange_id,
-                     uint64_t instrument_id) override {
+    void send_cancel(const CancelOrderRequest& cancel) override {
         using bpt::messages::CancelOrder;
         order_pub_->template publish<CancelOrder>([&](CancelOrder& msg) {
-            msg.orderId(order_id)
-                .exchangeId(exchange_id)
-                .instrumentId(instrument_id)
+            msg.orderId(cancel.order_id)
+                .exchangeId(cancel.exchange_id)
+                .instrumentId(cancel.instrument_id)
                 .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
         });
     }
@@ -139,24 +127,19 @@ public:
         });
     }
 
-    void send_modify(uint64_t order_id,
-                     bpt::messages::ExchangeId::Value exchange_id,
-                     uint64_t instrument_id,
-                     int64_t new_price,
-                     uint64_t new_quantity) override {
+    void send_modify(const ModifyOrderRequest& modify) override {
         using bpt::messages::ModifyOrder;
         order_pub_->template publish<ModifyOrder>([&](ModifyOrder& msg) {
-            msg.orderId(order_id)
-                .exchangeId(exchange_id)
-                .instrumentId(instrument_id)
-                .newPrice(new_price)
-                .newQuantity(new_quantity)
+            msg.orderId(modify.order_id)
+                .exchangeId(modify.exchange_id)
+                .instrumentId(modify.instrument_id)
+                .newPrice(modify.new_price)
+                .newQuantity(modify.new_quantity)
                 .timestampNs(bpt::common::util::TscClock::now_epoch_ns());
         });
     }
 
-    void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id,
-                                       uint64_t correlation_id) override {
+    void send_account_snapshot_request(bpt::messages::ExchangeId::Value exchange_id, uint64_t correlation_id) override {
         using bpt::messages::AccountSnapshotRequest;
         order_pub_->template publish<AccountSnapshotRequest>([&](AccountSnapshotRequest& msg) {
             msg.exchangeId(exchange_id)

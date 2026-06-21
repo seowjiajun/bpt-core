@@ -3,7 +3,7 @@
 /// \file
 /// \brief Aeron-backed concrete implementation of api::FundingRatePublisher.
 ///
-/// Emits FundingRate SBE messages (template id 18) on stream 1005.
+/// Emits FundingRate SBE messages (template id 18) on stream 2005.
 /// The wire format and stream ID match what bpt-refdata used to publish
 /// before this responsibility moved to the gateway, so strategy-side
 /// consumers were not changed during the migration.
@@ -14,6 +14,7 @@
 #include <Aeron.h>
 
 #include <bpt_common/aeron/publisher.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 #include <string>
 
@@ -26,7 +27,7 @@ namespace bpt::md_gateway::messaging::aeron {
 /// aeron::Publication serializes them.
 class FundingRatePublisher final : public api::FundingRatePublisher {
 public:
-    FundingRatePublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    FundingRatePublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish(const FundingRateUpdate& fr) override;
 

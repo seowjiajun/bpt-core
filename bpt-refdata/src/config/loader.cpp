@@ -98,12 +98,12 @@ Settings load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    settings.refdata_snapshot = resolve_stream(shared_streams, "refdata_snapshot", 1001);
-    settings.refdata_delta = resolve_stream(shared_streams, "refdata_delta", 1002);
-    settings.refdata_control = resolve_stream(shared_streams, "refdata_control", 1003);
-    settings.fee_schedule = resolve_stream(shared_streams, "fee_schedule", 1004);
-    settings.refdata_status = resolve_stream(shared_streams, "refdata_status", 1006);
-    // Note: stream 1005 (funding_rate) is published by MdGateway, not consumed here.
+    settings.refdata_snapshot = resolve_stream(shared_streams, "refdata.snapshot", 1001);
+    settings.refdata_delta = resolve_stream(shared_streams, "refdata.delta", 1002);
+    settings.refdata_control = resolve_stream(shared_streams, "refdata.control", 1003);
+    settings.fee_schedule = resolve_stream(shared_streams, "refdata.fee_schedule", 1004);
+    settings.refdata_status = resolve_stream(shared_streams, "refdata.status", 1006);
+    // Note: stream 2005 (funding_rate) is published by MdGateway, not consumed here.
 
     if (auto v = root["instrument_poll_interval_s"].value<int64_t>())
         settings.instrument_poll_interval_s = static_cast<uint32_t>(*v);

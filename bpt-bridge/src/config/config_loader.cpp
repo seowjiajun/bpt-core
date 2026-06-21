@@ -67,13 +67,13 @@ Settings load(const std::string& path, const std::string& profile_override) {
     }
 
     using bpt::common::config::resolve_stream;
-    s.md_data = resolve_stream(shared_streams, "md_data", 2002);
-    s.exec_report = resolve_stream(shared_streams, "exec_report", 3002);
-    s.console_control = resolve_stream(shared_streams, "console_control", 9003);
-    s.portfolio = resolve_stream(shared_streams, "portfolio", 9004);
-    s.account_snapshot = resolve_stream(shared_streams, "account_snapshot", 3004);
-    s.toxicity = resolve_stream(shared_streams, "toxicity", 0);
-    s.market_color = resolve_stream(shared_streams, "market_color", 0);
+    s.md_data = resolve_stream(shared_streams, "md.feed", 2002);
+    s.exec_report = resolve_stream(shared_streams, "order.exec_report", 3002);
+    s.console_control = resolve_stream(shared_streams, "bridge.console_control", 9003);
+    s.portfolio = resolve_stream(shared_streams, "bridge.portfolio", 9004);
+    s.account_snapshot = resolve_stream(shared_streams, "order.account_snapshot", 3004);
+    s.toxicity = resolve_stream(shared_streams, "analytics.toxicity", 0);
+    s.market_color = resolve_stream(shared_streams, "radar.market_color", 0);
 
     // WebSocket
     if (auto* ws = root["ws"].as_table()) {

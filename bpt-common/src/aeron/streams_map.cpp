@@ -22,19 +22,36 @@ AeronStreamMap load_shared_streams(const std::string& path) {
             out.media_driver_dir = *v;
     }
 
+    // [streams] accepts both flat (`name = id`) and nested
+    // (`[streams.<group>]` then `leaf = id` → global name "group.leaf")
+    // entries. Nested groups streams by producing service; the resolved
+    // global name is the dotted path. Flat is kept for back-compat.
     if (auto* streams = root["streams"].as_table()) {
-        out.stream_ids.reserve(streams->size());
         for (const auto& [k, v] : *streams) {
-            if (auto id = v.value<int64_t>())
+            if (auto id = v.value<int64_t>()) {
                 out.stream_ids.emplace(std::string(k.str()), static_cast<int32_t>(*id));
+            } else if (auto* group = v.as_table()) {
+                const std::string prefix(k.str());
+                for (const auto& [leaf, lv] : *group) {
+                    if (auto lid = lv.value<int64_t>())
+                        out.stream_ids.emplace(prefix + "." + std::string(leaf.str()), static_cast<int32_t>(*lid));
+                }
+            }
         }
     }
 
+    // [channels] mirrors the same shape — flat dotted key or nested group.
     if (auto* channels = root["channels"].as_table()) {
-        out.channels.reserve(channels->size());
         for (const auto& [k, v] : *channels) {
-            if (auto c = v.value<std::string>())
+            if (auto c = v.value<std::string>()) {
                 out.channels.emplace(std::string(k.str()), *c);
+            } else if (auto* group = v.as_table()) {
+                const std::string prefix(k.str());
+                for (const auto& [leaf, lv] : *group) {
+                    if (auto lc = lv.value<std::string>())
+                        out.channels.emplace(prefix + "." + std::string(leaf.str()), *lc);
+                }
+            }
         }
     }
 

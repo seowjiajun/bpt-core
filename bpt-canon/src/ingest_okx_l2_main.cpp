@@ -23,7 +23,6 @@
 #include "canon/canon_format.h"
 #include "canon/canon_sbe.h"
 #include "canon/canon_writer.h"
-
 #include "md_gateway/md/md_types.h"
 #include "refdata/mapping/instrument_mapping_loader.h"
 
@@ -138,8 +137,8 @@ int main(int argc, char* argv[]) {
     bpt::common::logging::init("bpt-canon-ingest-okx-l2");
 
     if (depth_limit > bpt::md_gateway::md::kMaxBookLevels) {
-        std::cerr << "fatal: --depth " << depth_limit << " > kMaxBookLevels "
-                  << bpt::md_gateway::md::kMaxBookLevels << "\n";
+        std::cerr << "fatal: --depth " << depth_limit << " > kMaxBookLevels " << bpt::md_gateway::md::kMaxBookLevels
+                  << "\n";
         return 1;
     }
 

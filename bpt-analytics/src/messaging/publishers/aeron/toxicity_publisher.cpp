@@ -4,10 +4,11 @@
 
 namespace bpt::analytics::messaging::aeron {
 
-ToxicityPublisher::ToxicityPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
+ToxicityPublisher::ToxicityPublisher(std::shared_ptr<::aeron::Aeron> aeron,
+                                     const bpt::common::config::StreamConfig& stream)
     : pub_(std::make_unique<bpt::common::aeron::Publisher>(std::move(aeron),
-                                                           channel,
-                                                           stream_id,
+                                                           stream.channel,
+                                                           stream.stream_id,
                                                            bpt::common::aeron::Publisher::Policy::kBoundedRetry)) {}
 
 bool ToxicityPublisher::publish(const ToxicityUpdate& update) {

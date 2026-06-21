@@ -21,6 +21,7 @@
 #include <bpt_common/logging.h>
 #include <cstdint>
 #include <memory>
+#include <strategy/config/aeron_config.h>
 #include <string>
 #include <utility>
 
@@ -38,12 +39,12 @@ public:
 template <class Handler>
 class VolSurfaceClient : public IVolSurfaceClient {
 public:
-    VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron,
-                     const std::string& channel,
-                     int vol_surface_stream,
-                     int pricer_status_stream) {
-        surface_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, vol_surface_stream);
-        status_sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, pricer_status_stream);
+    VolSurfaceClient(std::shared_ptr<aeron::Aeron> aeron, const config::AeronConfig::Vol& streams) {
+        surface_sub_ =
+            bpt::common::aeron::wait_for_subscription(aeron, streams.surface.channel, streams.surface.stream_id);
+        status_sub_ = bpt::common::aeron::wait_for_subscription(aeron,
+                                                                streams.pricer_status.channel,
+                                                                streams.pricer_status.stream_id);
 
         // FragmentAssembler for surface stream — VolSurface messages can be large
         surface_assembler_ = std::make_unique<aeron::FragmentAssembler>(
@@ -53,8 +54,8 @@ public:
                    aeron::Header& header) { handle_surface_fragment(buffer, offset, length, header); });
 
         bpt::common::log::info("[VolSurfaceClient] Subscriptions ready: surface={} status={}",
-                               vol_surface_stream,
-                               pricer_status_stream);
+                               streams.surface.stream_id,
+                               streams.pricer_status.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }

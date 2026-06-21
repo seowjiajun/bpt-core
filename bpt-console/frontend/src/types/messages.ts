@@ -198,7 +198,7 @@ export interface ToxicityMsg {
 // To add a new strategy: add its kind below, extend StrategyStateMsg
 // with a new interface, write the C++ JSON emitter, and register a
 // panel component. Unknown kinds fall back to GenericStrategyPanel.
-export type StrategyKind = 'AS' | 'FundingArb' | 'OptionsMaker'
+export type StrategyKind = 'AS' | 'FundingArb' | 'OptionsMaker' | 'FVMM'
 
 interface BaseStrategyState {
   type: 'strategyState'
@@ -344,7 +344,35 @@ export interface OptionsMakerStrategyState {
   underlyings: OptionsMakerUnderlyingState[]
 }
 
-export type StrategyStateMsg = ASStrategyState | FundingArbStrategyState | OptionsMakerStrategyState
+// FairValueMm — vol-scaled spread + inventory skew quoter.
+export interface FVMMStrategyState extends BaseStrategyState {
+  kind: 'FVMM'
+  mid: number
+  marketBid: number
+  marketAsk: number
+  sigma2: number
+  sigmaBps: number
+  halfSpreadBps: number
+  bidPrice: number
+  askPrice: number
+  bidOrderLive: boolean
+  askOrderLive: boolean
+  inventory: number
+  maxInventory: number
+  inventoryPct: number
+  realizedPnl: number
+  volTicks: number
+  volWarmup: number
+  warmedUp: boolean
+  shuttingDown: boolean
+  refdataStale: boolean
+}
+
+export type StrategyStateMsg =
+  | ASStrategyState
+  | FundingArbStrategyState
+  | OptionsMakerStrategyState
+  | FVMMStrategyState
 
 // Market-color snapshot from bpt-radar via the bridge. One message per
 // (exchange, underlying) every ~2s. Fields are grouped by domain so the

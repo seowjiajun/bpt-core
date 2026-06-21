@@ -16,6 +16,7 @@
 #include <messages/RefDataSnapshot.h>
 
 #include <bpt_common/aeron/aeron_utils.h>
+#include <bpt_common/aeron/stream_config.h>
 #include <bpt_common/logging.h>
 #include <cstddef>
 #include <cstdint>
@@ -28,14 +29,14 @@ namespace bpt::radar::messaging::aeron {
 template <class Handler>
 class RefdataPerpSubscriber final : public api::RefdataPerpSubscriber {
 public:
-    RefdataPerpSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id) {
-        sub_ = bpt::common::aeron::wait_for_subscription(aeron, channel, stream_id);
+    RefdataPerpSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream) {
+        sub_ = bpt::common::aeron::wait_for_subscription(aeron, stream.channel, stream.stream_id);
         assembler_ = std::make_unique<::aeron::FragmentAssembler>(
             [this](::aeron::AtomicBuffer& buffer,
                    ::aeron::util::index_t offset,
                    ::aeron::util::index_t length,
                    ::aeron::Header& header) { handle_fragment(buffer, offset, length, header); });
-        bpt::common::log::info("[RefdataPerpSubscriber] ready on stream {}", stream_id);
+        bpt::common::log::info("[RefdataPerpSubscriber] ready on stream {}", stream.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }

@@ -1,9 +1,5 @@
 #include "order_gateway/adapter/common/order_adapter_base.h"
 
-#include <messages/CancelOrder.h>
-#include <messages/ModifyOrder.h>
-#include <messages/NewOrder.h>
-
 #include <bpt_common/logging.h>
 #include <bpt_common/util/strings.h>
 #include <bpt_common/util/thread_name.h>
@@ -57,23 +53,23 @@ void OrderAdapterBase::stop() {
         send_executor_thread_.join();
 }
 
-void OrderAdapterBase::send_new_order(const bpt::messages::NewOrder& order) {
+void OrderAdapterBase::send_new_order(const order::NewOrderEvent& order) {
     util::NewOrderRequest req;
-    req.order_id = order.orderId();
-    req.instrument_id = order.instrumentId();
-    req.price = order.price();
-    req.quantity = order.quantity();
-    req.side = order.side();
-    req.order_type = order.orderType();
-    req.tif = order.timeInForce();
-    req.exec_inst = order.execInst();
-    req.exchange_symbol = order.getExchangeSymbolAsString();
+    req.order_id = order.order_id;
+    req.instrument_id = order.instrument_id;
+    req.price = order.price;
+    req.quantity = order.quantity;
+    req.side = order.side;
+    req.order_type = order.order_type;
+    req.tif = order.tif;
+    req.exec_inst = order.exec_inst;
+    req.exchange_symbol = order.exchange_symbol;
     send_work_queue_.push(util::SendWorkItem{std::move(req)});
 }
 
-void OrderAdapterBase::send_cancel(const bpt::messages::CancelOrder& cancel, const std::string& native_symbol) {
+void OrderAdapterBase::send_cancel(const order::CancelOrderEvent& cancel, const std::string& native_symbol) {
     util::CancelRequest req;
-    req.order_id = cancel.orderId();
+    req.order_id = cancel.order_id;
     req.native_symbol = native_symbol;
     send_work_queue_.push(util::SendWorkItem{std::move(req)});
 }
@@ -84,11 +80,11 @@ void OrderAdapterBase::send_cancel_all(uint64_t instrument_id) {
     send_work_queue_.push(util::SendWorkItem{std::move(req)});
 }
 
-void OrderAdapterBase::send_modify(const bpt::messages::ModifyOrder& modify, const std::string& native_symbol) {
+void OrderAdapterBase::send_modify(const order::ModifyOrderEvent& modify, const std::string& native_symbol) {
     util::ModifyRequest req;
-    req.order_id = modify.orderId();
-    req.new_price = modify.newPrice();
-    req.new_quantity = modify.newQuantity();
+    req.order_id = modify.order_id;
+    req.new_price = modify.new_price;
+    req.new_quantity = modify.new_quantity;
     req.native_symbol = native_symbol;
     send_work_queue_.push(util::SendWorkItem{std::move(req)});
 }

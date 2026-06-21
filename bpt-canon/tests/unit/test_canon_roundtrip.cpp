@@ -2,7 +2,6 @@
 #include <canon/canon_reader.h>
 #include <canon/canon_sbe.h>
 #include <canon/canon_writer.h>
-
 #include <cstdint>
 #include <cstring>
 #include <filesystem>

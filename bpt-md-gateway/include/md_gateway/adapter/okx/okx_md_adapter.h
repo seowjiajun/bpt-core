@@ -65,7 +65,6 @@ protected:
         }
     }
 
-
     std::unique_ptr<bpt::common::ws::AnyWsStream> connect_and_subscribe() override {
         namespace beast = boost::beast;
         namespace websocket = beast::websocket;

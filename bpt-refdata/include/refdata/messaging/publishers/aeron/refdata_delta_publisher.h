@@ -7,13 +7,14 @@
 
 #include <messages/DeltaUpdateType.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <memory>
 
 namespace bpt::refdata::messaging::aeron {
 
 class RefdataDeltaPublisher final : public api::RefdataDeltaPublisher {
 public:
-    RefdataDeltaPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id);
+    RefdataDeltaPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish_delta(bpt::messages::DeltaUpdateType::Value update_type, const model::Instrument& inst) override;
 

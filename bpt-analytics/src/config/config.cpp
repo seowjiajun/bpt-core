@@ -37,9 +37,9 @@ Settings load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    s.exec_report = resolve_stream(shared_streams, "exec_report", 3002);
-    s.md_data = resolve_stream(shared_streams, "md_data", 2002);
-    s.toxicity = resolve_stream(shared_streams, "toxicity", 5001);
+    s.exec_report = resolve_stream(shared_streams, "order.exec_report", 3002);
+    s.md_data = resolve_stream(shared_streams, "md.feed", 2002);
+    s.toxicity = resolve_stream(shared_streams, "analytics.toxicity", 5001);
 
     if (auto t = tbl["analytics"]) {
         s.markout_max_pending = t["markout_max_pending"].value_or(std::size_t{64});

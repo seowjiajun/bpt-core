@@ -9,26 +9,14 @@
 namespace bpt::pricer::messaging {
 
 PricerBus PricerAeronBus::build(std::shared_ptr<::aeron::Aeron> aeron, const config::Settings& settings) {
+    const auto& ac = settings.aeron;
+
     PricerBus bus;
-    bus.vol_pub = std::make_unique<aeron::VolSurfacePublisher>(aeron,
-                                                               settings.vol_surface.channel,
-                                                               settings.vol_surface.stream_id);
-    bus.status_pub = std::make_unique<aeron::StatusPublisher>(aeron,
-                                                              settings.pricer_status.channel,
-                                                              settings.pricer_status.stream_id);
-    bus.md_sub = std::make_unique<md::aeron::MdSubscriber<PricerService>>(
-        aeron, settings.md_data.channel, settings.md_data.stream_id);
-    bus.md_ctrl = std::make_unique<md::aeron::MdSubscribeClient>(aeron,
-                                                                 settings.md_control.channel,
-                                                                 settings.md_control.stream_id);
-    bus.refdata_sub = std::make_unique<refdata::aeron::RefdataSubscriber<PricerService>>(
-        aeron,
-        settings.refdata_snapshot.channel,
-        settings.refdata_snapshot.stream_id,
-        settings.refdata_delta.channel,
-        settings.refdata_delta.stream_id,
-        settings.refdata_control.channel,
-        settings.refdata_control.stream_id);
+    bus.vol_pub = std::make_unique<aeron::VolSurfacePublisher>(aeron, ac.vol_surface);
+    bus.status_pub = std::make_unique<aeron::StatusPublisher>(aeron, ac.pricer_status);
+    bus.md_sub = std::make_unique<md::aeron::MdSubscriber<PricerService>>(aeron, ac.md.data);
+    bus.md_ctrl = std::make_unique<md::aeron::MdSubscribeClient>(aeron, ac.md.control);
+    bus.refdata_sub = std::make_unique<refdata::aeron::RefdataSubscriber<PricerService>>(aeron, ac.refdata);
     return bus;
 }
 

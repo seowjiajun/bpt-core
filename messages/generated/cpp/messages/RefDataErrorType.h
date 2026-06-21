@@ -3,15 +3,15 @@
 #define _BPT_MESSAGES_REFDATAERRORTYPE_CXX_H_
 
 #if !defined(__STDC_LIMIT_MACROS)
-#  define __STDC_LIMIT_MACROS 1
+#define __STDC_LIMIT_MACROS 1
 #endif
 
 #include <cstdint>
 #include <iomanip>
 #include <limits>
 #include <ostream>
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 #define SBE_NULLVALUE_INT8 (std::numeric_limits<std::int8_t>::min)()
@@ -26,11 +26,9 @@
 namespace bpt {
 namespace messages {
 
-class RefDataErrorType
-{
+class RefDataErrorType {
 public:
-    enum Value
-    {
+    enum Value {
         EXCHANGE_NOT_CONFIGURED = static_cast<std::uint8_t>(1),
         SNAPSHOT_FAILED = static_cast<std::uint8_t>(2),
         DELTA_FEED_LOST = static_cast<std::uint8_t>(3),
@@ -38,43 +36,48 @@ public:
         NULL_VALUE = static_cast<std::uint8_t>(255)
     };
 
-    static RefDataErrorType::Value get(const std::uint8_t value)
-    {
-        switch (value)
-        {
-            case static_cast<std::uint8_t>(1): return EXCHANGE_NOT_CONFIGURED;
-            case static_cast<std::uint8_t>(2): return SNAPSHOT_FAILED;
-            case static_cast<std::uint8_t>(3): return DELTA_FEED_LOST;
-            case static_cast<std::uint8_t>(4): return LOOKUP_FAILED;
-            case static_cast<std::uint8_t>(255): return NULL_VALUE;
+    static RefDataErrorType::Value get(const std::uint8_t value) {
+        switch (value) {
+            case static_cast<std::uint8_t>(1):
+                return EXCHANGE_NOT_CONFIGURED;
+            case static_cast<std::uint8_t>(2):
+                return SNAPSHOT_FAILED;
+            case static_cast<std::uint8_t>(3):
+                return DELTA_FEED_LOST;
+            case static_cast<std::uint8_t>(4):
+                return LOOKUP_FAILED;
+            case static_cast<std::uint8_t>(255):
+                return NULL_VALUE;
         }
 
         throw std::runtime_error("unknown value for enum RefDataErrorType [E103]");
     }
 
-    static const char *c_str(const RefDataErrorType::Value value)
-    {
-        switch (value)
-        {
-            case EXCHANGE_NOT_CONFIGURED: return "EXCHANGE_NOT_CONFIGURED";
-            case SNAPSHOT_FAILED: return "SNAPSHOT_FAILED";
-            case DELTA_FEED_LOST: return "DELTA_FEED_LOST";
-            case LOOKUP_FAILED: return "LOOKUP_FAILED";
-            case NULL_VALUE: return "NULL_VALUE";
+    static const char* c_str(const RefDataErrorType::Value value) {
+        switch (value) {
+            case EXCHANGE_NOT_CONFIGURED:
+                return "EXCHANGE_NOT_CONFIGURED";
+            case SNAPSHOT_FAILED:
+                return "SNAPSHOT_FAILED";
+            case DELTA_FEED_LOST:
+                return "DELTA_FEED_LOST";
+            case LOOKUP_FAILED:
+                return "LOOKUP_FAILED";
+            case NULL_VALUE:
+                return "NULL_VALUE";
         }
 
         throw std::runtime_error("unknown value for enum RefDataErrorType [E103]:");
     }
 
-    template<typename CharT, typename Traits>
-    friend std::basic_ostream<CharT, Traits> & operator << (
-        std::basic_ostream<CharT, Traits> &os, RefDataErrorType::Value m)
-    {
+    template <typename CharT, typename Traits>
+    friend std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os,
+                                                         RefDataErrorType::Value m) {
         return os << RefDataErrorType::c_str(m);
     }
 };
 
-}
-}
+}  // namespace messages
+}  // namespace bpt
 
 #endif

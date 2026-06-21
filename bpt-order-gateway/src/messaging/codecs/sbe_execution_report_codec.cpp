@@ -12,7 +12,7 @@ namespace bpt::order_gateway::messaging {
 using bpt::messages::ExecutionReport;
 using bpt::messages::MessageHeader;
 
-std::span<const std::byte> SbeExecutionReportCodec::encode(const ExecutionReportMsg& m, std::span<std::byte> scratch) {
+std::span<const std::byte> SbeExecutionReportCodec::encode(const api::ExecReport& m, std::span<std::byte> scratch) {
     auto* buf = reinterpret_cast<char*>(scratch.data());
     std::memset(buf, 0, scratch.size());
 
@@ -44,7 +44,7 @@ std::span<const std::byte> SbeExecutionReportCodec::encode(const ExecutionReport
     return scratch.subspan(0, total);
 }
 
-ExecutionReportMsg SbeExecutionReportCodec::decode(std::span<const std::byte> bytes) {
+api::ExecReport SbeExecutionReportCodec::decode(std::span<const std::byte> bytes) {
     if (bytes.size() < MessageHeader::encodedLength())
         throw std::runtime_error("SbeExecutionReportCodec::decode: too short");
 
@@ -60,23 +60,23 @@ ExecutionReportMsg SbeExecutionReportCodec::decode(std::span<const std::byte> by
     ExecutionReport msg;
     msg.wrapForDecode(data, MessageHeader::encodedLength(), hdr.blockLength(), hdr.version(), len);
 
-    ExecutionReportMsg out;
-    out.order_id = msg.orderId();
-    out.exchange_order_id = msg.exchangeOrderId();
-    out.exchange_id = msg.exchangeId();
-    out.instrument_id = msg.instrumentId();
-    out.status = msg.status();
-    out.side = msg.side();
-    out.order_type = msg.orderType();
-    out.price = msg.price();
-    out.filled_qty = msg.filledQty();
-    out.remaining_qty = msg.remainingQty();
-    out.reject_reason = msg.rejectReason();
-    out.fee = msg.fee();
-    out.fee_currency = msg.getFeeCurrencyAsString();
-    out.exchange_ts_ns = msg.timestampNs();
-    out.local_ts_ns = msg.localTsNs();
-    return out;
+    return api::ExecReport{
+        .order_id = msg.orderId(),
+        .exchange_order_id = msg.exchangeOrderId(),
+        .exchange_id = msg.exchangeId(),
+        .instrument_id = msg.instrumentId(),
+        .status = msg.status(),
+        .side = msg.side(),
+        .order_type = msg.orderType(),
+        .price = msg.price(),
+        .filled_qty = msg.filledQty(),
+        .remaining_qty = msg.remainingQty(),
+        .reject_reason = msg.rejectReason(),
+        .fee = msg.fee(),
+        .fee_currency = msg.getFeeCurrencyAsString(),
+        .exchange_ts_ns = msg.timestampNs(),
+        .local_ts_ns = msg.localTsNs(),
+    };
 }
 
 }  // namespace bpt::order_gateway::messaging

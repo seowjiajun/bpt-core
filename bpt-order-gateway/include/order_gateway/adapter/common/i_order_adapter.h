@@ -4,14 +4,13 @@
 /// \brief IOrderAdapter — the per-venue order-routing interface used by order-gateway.
 
 #include "order_gateway/adapter/common/account_snapshot_data.h"
+#include "order_gateway/messaging/publishers/api/exec_report_publisher.h"
+#include "order_gateway/order/inbound_order_events.h"
 #include "order_gateway/order/order_state_manager.h"
 #include "order_gateway/risk/disconnect_rate_breaker.h"
 
-#include <messages/CancelOrder.h>
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
-#include <messages/ModifyOrder.h>
-#include <messages/NewOrder.h>
 #include <messages/OrderSide.h>
 #include <messages/OrderType.h>
 #include <messages/RejectReason.h>
@@ -47,6 +46,29 @@ struct ExecEvent {
     std::string fee_currency;
     uint64_t exchange_ts_ns{0};
     uint64_t local_ts_ns{0};
+
+    /// \brief Project this event onto the strategy-facing exec-report DTO
+    /// (fields map 1:1). The adapter owns the conversion — outer layer
+    /// depending on the messaging port, the correct hexagonal direction.
+    [[nodiscard]] messaging::api::ExecReport to_report() const {
+        return messaging::api::ExecReport{
+            .order_id = order_id,
+            .exchange_order_id = exchange_order_id,
+            .exchange_id = exchange_id,
+            .instrument_id = instrument_id,
+            .status = status,
+            .side = side,
+            .order_type = order_type,
+            .price = price,
+            .filled_qty = filled_qty,
+            .remaining_qty = remaining_qty,
+            .reject_reason = reject_reason,
+            .fee = fee,
+            .fee_currency = fee_currency,
+            .exchange_ts_ns = exchange_ts_ns,
+            .local_ts_ns = local_ts_ns,
+        };
+    }
 };
 
 class IOrderAdapter {
@@ -64,10 +86,10 @@ public:
     /// Resulting `ExecEvent`s are delivered via `drain_exec_events()`.
     /// Called from the main poll thread.
     /// @{
-    virtual void send_new_order(const bpt::messages::NewOrder& order) = 0;
-    virtual void send_cancel(const bpt::messages::CancelOrder& cancel, const std::string& native_symbol) = 0;
+    virtual void send_new_order(const order::NewOrderEvent& order) = 0;
+    virtual void send_cancel(const order::CancelOrderEvent& cancel, const std::string& native_symbol) = 0;
     virtual void send_cancel_all(uint64_t instrument_id) = 0;
-    virtual void send_modify(const bpt::messages::ModifyOrder& modify, const std::string& native_symbol) = 0;
+    virtual void send_modify(const order::ModifyOrderEvent& modify, const std::string& native_symbol) = 0;
     /// @}
 
     [[nodiscard]] virtual bpt::messages::ExchangeId::Value exchange_id() const = 0;

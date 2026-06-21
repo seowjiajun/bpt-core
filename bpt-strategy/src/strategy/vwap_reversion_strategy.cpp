@@ -328,15 +328,17 @@ void VwapReversionStrategy::send_order(uint64_t instrument_id,
                             vwap,
                             ((mid - vwap) / vwap) * 100.0);
 
-    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = order_type,
-        .tif = tif,
-        .price = price_f,
-        .qty = quantity,
-    }).order_id();
+    const uint64_t order_id = order_mgr_
+                                  ->send_new_order(order::NewOrderRequest{
+                                      .instrument_id = instrument_id,
+                                      .exchange_id = st.exchange_id,
+                                      .side = side,
+                                      .type = order_type,
+                                      .tif = tif,
+                                      .price = price_f,
+                                      .qty = quantity,
+                                  })
+                                  .order_id();
     if (order_id != 0) {
         bpt::common::log::debug("[VwapReversion] order placed → order_id={}", order_id);
         st.open_order_id = order_id;

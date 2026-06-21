@@ -8,10 +8,11 @@ namespace bpt::order_gateway::messaging::aeron {
 using bpt::common::util::WallClock;
 using Policy = bpt::common::aeron::Publisher::Policy;
 
-HeartbeatPublisher::HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id)
+HeartbeatPublisher::HeartbeatPublisher(std::shared_ptr<::aeron::Aeron> aeron,
+                                       const bpt::common::config::StreamConfig& stream)
     // Heartbeats are strictly idempotent — next tick republishes. Drop
     // on no-subscriber; bounded retry on back-pressure.
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kBoundedRetry) {}
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kBoundedRetry) {}
 
 void HeartbeatPublisher::publish(uint8_t service_id, uint16_t orders_in_flight, uint8_t exchange_status) {
     alignas(8) std::byte scratch[SbeOrderGatewayHeartbeatCodec::kRecommendedScratchSize];

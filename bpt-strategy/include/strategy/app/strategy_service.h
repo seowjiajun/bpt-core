@@ -8,7 +8,6 @@
 #include "strategy/strategy/i_strategy.h"
 #include "strategy/strategy/refdata_stale_gate.h"
 
-#include <analytics/messaging/toxicity_update.h>
 #include <messages/AccountSnapshot.h>
 #include <messages/DeltaUpdateType.h>
 #include <messages/ExchangeId.h>
@@ -20,13 +19,13 @@
 #include <messages/RefDataErrorType.h>
 #include <messages/VolSurface.h>
 
+#include <analytics/messaging/toxicity_update.h>
 #include <bpt_app/app.h>
 #include <bpt_common/util/latency_histogram.h>
 #include <bpt_common/util/topology.h>
 #include <bpt_common/util/tsc_clock.h>
 #include <cstdint>
 #include <memory>
-
 
 namespace bpt::strategy {
 

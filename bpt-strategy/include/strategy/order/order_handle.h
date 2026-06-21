@@ -23,17 +23,19 @@ struct OrderState {
     uint64_t instrument_id{0};
     bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
     bpt::messages::OrderSide::Value side{bpt::messages::OrderSide::NULL_VALUE};
-    double price{0.0};            // last submitted price
-    double qty{0.0};              // original order size
-    double filled_qty{0.0};       // running cumulative
-    double avg_fill_price{0.0};   // running VWAP of fills
+    double price{0.0};           // last submitted price
+    double qty{0.0};             // original order size
+    double filled_qty{0.0};      // running cumulative
+    double avg_fill_price{0.0};  // running VWAP of fills
     Status status{Status::Live};
     uint64_t created_ns{0};
     uint64_t last_update_ns{0};
-    uint8_t tag{0};               // strategy-defined intent (e.g. Quote vs Unwind)
+    uint8_t tag{0};  // strategy-defined intent (e.g. Quote vs Unwind)
 
     bool live() const { return status == Status::Live || status == Status::PartiallyFilled; }
-    bool terminal() const { return status == Status::Filled || status == Status::Cancelled || status == Status::Rejected; }
+    bool terminal() const {
+        return status == Status::Filled || status == Status::Cancelled || status == Status::Rejected;
+    }
     bool cancel_pending() const { return status == Status::CancelPending; }
 };
 

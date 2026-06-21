@@ -11,6 +11,7 @@
 
 #include <Aeron.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -19,7 +20,7 @@ namespace bpt::pricer::messaging::aeron {
 
 class StatusPublisher : public api::StatusPublisher {
 public:
-    StatusPublisher(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id);
+    StatusPublisher(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream);
 
     void publish_heartbeat(uint64_t timestamp_ns, uint64_t seq_num) override;
     void publish_ready(uint64_t timestamp_ns,

@@ -1,13 +1,13 @@
-#include "features/fair_value.h"
 #include "bpt_common/book/order_book_state.h"
+#include "features/fair_value.h"
 
 #include <cmath>
 #include <gtest/gtest.h>
 
 namespace {
 
-using bpt::features::FairValueEstimator;
 using bpt::common::book::OrderBookState;
+using bpt::features::FairValueEstimator;
 using Mode = FairValueEstimator::Mode;
 using Level = OrderBookState::Level;
 

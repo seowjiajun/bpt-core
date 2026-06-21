@@ -6,10 +6,9 @@
 namespace bpt::bridge::messaging::aeron {
 
 ConsoleControlPublisher::ConsoleControlPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                                 const std::string& channel,
-                                                 int32_t stream_id) {
-    pub_ = bpt::common::aeron::wait_for_publication(std::move(aeron), channel, stream_id);
-    bpt::common::log::info("[bridge/Control] publication ready on stream {}", stream_id);
+                                                 const bpt::common::config::StreamConfig& stream) {
+    pub_ = bpt::common::aeron::wait_for_publication(std::move(aeron), stream.channel, stream.stream_id);
+    bpt::common::log::info("[bridge/Control] publication ready on stream {}", stream.stream_id);
 }
 
 void ConsoleControlPublisher::publish_halt() {

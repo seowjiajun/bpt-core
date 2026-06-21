@@ -70,7 +70,7 @@ Settings load(const std::string& path) {
     }
 
     using bpt::common::config::resolve_stream;
-    s.aeron.balance_snapshot = resolve_stream(shared_streams, "balance_snapshot", 6001);
+    s.aeron.balance_snapshot = resolve_stream(shared_streams, "pms.balance_snapshot", 6001);
 
     if (auto* b = root["pms"].as_table()) {
         if (auto v = (*b)["poll_interval_ms"].value<int64_t>())

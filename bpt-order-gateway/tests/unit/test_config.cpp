@@ -254,8 +254,8 @@ TEST(GatewayConfigTest, CustomAeronStreamIdsFromSharedRegistry) {
         f << R"([aeron]
 media_driver_dir = "/tmp/aeron-test"
 
-[streams]
-order            = 5001
+[streams.order]
+submit           = 5001
 exec_report      = 5002
 heartbeat        = 5003
 account_snapshot = 5004

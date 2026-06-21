@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <pricer/config/aeron_config.h>
 #include <string>
 #include <thread>
 #include <vector>
@@ -39,31 +40,26 @@ namespace bpt::pricer::refdata::aeron {
 template <class Handler>
 class RefdataSubscriber final : public api::RefdataSubscriber {
 public:
-    RefdataSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                      const std::string& snapshot_channel,
-                      int32_t snapshot_stream_id,
-                      const std::string& delta_channel,
-                      int32_t delta_stream_id,
-                      const std::string& control_channel = "",
-                      int32_t control_stream_id = 0) {
+    RefdataSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const config::AeronConfig::Refdata& streams) {
         snapshot_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            snapshot_channel,
-            snapshot_stream_id,
+            streams.snapshot.channel,
+            streams.snapshot.stream_id,
             [this](::aeron::AtomicBuffer& buf,
                    ::aeron::util::index_t offset,
                    ::aeron::util::index_t length,
                    ::aeron::Header& hdr) { on_snapshot_fragment(buf, offset, length, hdr); });
         delta_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            delta_channel,
-            delta_stream_id,
+            streams.delta.channel,
+            streams.delta.stream_id,
             [this](::aeron::AtomicBuffer& buf,
                    ::aeron::util::index_t offset,
                    ::aeron::util::index_t length,
                    ::aeron::Header& hdr) { on_delta_fragment(buf, offset, length, hdr); });
-        if (control_stream_id != 0)
-            ctrl_pub_ = bpt::common::aeron::wait_for_publication(aeron, control_channel, control_stream_id);
+        if (streams.control.stream_id != 0)
+            ctrl_pub_ =
+                bpt::common::aeron::wait_for_publication(aeron, streams.control.channel, streams.control.stream_id);
 
         bpt::common::log::info("[RefdataSubscriber] Snapshot + delta subscriptions ready");
         if (ctrl_pub_)
@@ -95,8 +91,7 @@ public:
         req.instrumentsCount(0);
         req.canonicalFilterCount(0);
 
-        ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf.data()),
-                                 static_cast<::aeron::util::index_t>(buf_size));
+        ::aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf.data()), static_cast<::aeron::util::index_t>(buf_size));
         auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
         long result = 0;
         while ((result = ctrl_pub_->offer(ab, 0, static_cast<::aeron::util::index_t>(buf_size))) < 0) {
@@ -222,8 +217,9 @@ private:
             if (handler_ != nullptr) [[likely]]
                 handler_->on_refdata_option(oi);
         }
-        bpt::common::log::info(
-            "[RefdataSubscriber] Snapshot: {} total instruments, {} options", total_count, option_count);
+        bpt::common::log::info("[RefdataSubscriber] Snapshot: {} total instruments, {} options",
+                               total_count,
+                               option_count);
     }
 
     void on_delta_fragment(::aeron::AtomicBuffer& buffer,

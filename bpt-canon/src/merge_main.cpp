@@ -68,9 +68,9 @@ int main(int argc, char* argv[]) {
             // venue per file. Date and producer_kind can differ (that's
             // the whole point).
             if (r->header().venue_id != first_header.venue_id) {
-                std::cerr << "fatal: cannot merge across venues. " << p << " has venue_id="
-                          << static_cast<int>(r->header().venue_id) << " but first input has venue_id="
-                          << static_cast<int>(first_header.venue_id) << "\n";
+                std::cerr << "fatal: cannot merge across venues. " << p
+                          << " has venue_id=" << static_cast<int>(r->header().venue_id)
+                          << " but first input has venue_id=" << static_cast<int>(first_header.venue_id) << "\n";
                 return 1;
             }
         }

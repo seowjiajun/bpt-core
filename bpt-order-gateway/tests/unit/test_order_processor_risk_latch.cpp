@@ -14,6 +14,7 @@
 
 #include "order_gateway/messaging/publishers/api/exec_report_publisher.h"
 #include "order_gateway/metrics/metrics.h"
+#include "order_gateway/order/inbound_order_events.h"
 #include "order_gateway/order/order_processor.h"
 #include "order_gateway/order/order_state_manager.h"
 #include "order_gateway/risk/pnl_tracker.h"
@@ -22,14 +23,11 @@
 #include <messages/AccountSnapshot.h>
 #include <messages/ExchangeId.h>
 #include <messages/ExecStatus.h>
-#include <messages/MessageHeader.h>
-#include <messages/NewOrder.h>
 #include <messages/OrderSide.h>
 #include <messages/OrderType.h>
 #include <messages/RejectReason.h>
 #include <messages/TimeInForce.h>
 
-#include <array>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
@@ -46,9 +44,11 @@ using bpt::order_gateway::adapter::ExecEvent;
 using bpt::order_gateway::adapter::IOrderAdapter;
 using bpt::order_gateway::messaging::api::ExecReportPublisher;
 using bpt::order_gateway::metrics::OrderGatewayMetrics;
+using bpt::order_gateway::order::NewOrderEvent;
 using bpt::order_gateway::order::OrderProcessor;
 using bpt::order_gateway::order::OrderStateManager;
 using bpt::order_gateway::risk::PnlTracker;
+using bpt::order_gateway::risk::PreTradeRiskGate;
 using bpt::order_gateway::risk::RejectRateBreaker;
 using bpt::order_gateway::risk::RiskChecker;
 
@@ -63,22 +63,8 @@ struct CapturingExecReportPublisher final : public ExecReportPublisher {
 
     std::vector<Entry> entries;
 
-    void publish(uint64_t order_id,
-                 uint64_t /*exchange_order_id*/,
-                 ExchangeId::Value /*exchange_id*/,
-                 uint64_t /*instrument_id*/,
-                 ExecStatus::Value status,
-                 OrderSide::Value /*side*/,
-                 OrderType::Value /*order_type*/,
-                 int64_t /*price*/,
-                 uint64_t /*filled_qty*/,
-                 uint64_t /*remaining_qty*/,
-                 RejectReason::Value reject_reason,
-                 int64_t /*fee*/,
-                 std::string_view /*fee_currency*/,
-                 uint64_t /*exchange_ts_ns*/,
-                 uint64_t /*local_ts_ns*/) override {
-        entries.push_back({order_id, status, reject_reason});
+    void publish(const bpt::order_gateway::messaging::api::ExecReport& report) override {
+        entries.push_back({report.order_id, report.status, report.reject_reason});
     }
 };
 
@@ -151,37 +137,24 @@ ExecEvent make_ack(uint64_t order_id, uint64_t local_ts_ns) {
     return ev;
 }
 
-// Build a NewOrder SBE message so we can feed on_new_order a real
-// decoded instance.
-struct NewOrderBuf {
-    std::array<char, 256> buf{};
-    bpt::messages::NewOrder decoded;
-
-    NewOrderBuf(uint64_t order_id,
-                ExchangeId::Value exchange,
-                uint64_t instrument_id,
-                OrderSide::Value side,
-                int64_t price_e8,
-                uint64_t qty_e8) {
-        bpt::messages::NewOrder w;
-        w.wrapAndApplyHeader(buf.data(), 0, buf.size())
-            .orderId(order_id)
-            .exchangeId(exchange)
-            .instrumentId(instrument_id)
-            .side(side)
-            .orderType(OrderType::LIMIT)
-            .timeInForce(TimeInForce::GTC)
-            .price(price_e8)
-            .quantity(qty_e8)
-            .timestampNs(0)
-            .putExchangeSymbol("BTC-USDT");
-        decoded.wrapForDecode(buf.data(),
-                              bpt::messages::MessageHeader::encodedLength(),
-                              bpt::messages::NewOrder::sbeBlockLength(),
-                              bpt::messages::NewOrder::sbeSchemaVersion(),
-                              buf.size());
-    }
-};
+NewOrderEvent make_new_order(uint64_t order_id,
+                             ExchangeId::Value exchange,
+                             uint64_t instrument_id,
+                             OrderSide::Value side,
+                             int64_t price_e8,
+                             uint64_t qty_e8) {
+    return NewOrderEvent{
+        .order_id = order_id,
+        .instrument_id = instrument_id,
+        .exchange_id = exchange,
+        .side = side,
+        .order_type = OrderType::LIMIT,
+        .tif = TimeInForce::GTC,
+        .price = price_e8,
+        .quantity = qty_e8,
+        .exchange_symbol = "BTC-USDT",
+    };
+}
 
 // Build a full OrderProcessor with sensible defaults for tests. Adapters
 // vector is empty — the tests here don't route to exchanges, they only
@@ -196,20 +169,14 @@ struct Harness {
         /*max_orders_per_second=*/1000,
     };
     PnlTracker pnl_tracker;
+    PreTradeRiskGate risk_gate;
     OrderGatewayMetrics metrics{0};  // port=0 → no HTTP exposer
     std::vector<std::shared_ptr<IOrderAdapter>> adapters;
     OrderProcessor processor;
 
     Harness(double max_daily_loss_usd = 10.0, double max_position_usd = 0.0, RejectRateBreaker::Config breaker_cfg = {})
-        : processor(pub,
-                    state_mgr,
-                    risk_checker,
-                    pnl_tracker,
-                    max_daily_loss_usd,
-                    max_position_usd,
-                    breaker_cfg,
-                    metrics,
-                    adapters) {}
+        : risk_gate(risk_checker, pnl_tracker, max_position_usd, max_daily_loss_usd, breaker_cfg),
+          processor(pub, state_mgr, risk_gate, metrics, adapters) {}
 };
 
 TEST(OrderProcessorRiskLatchTest, TradingEnabledUntilLossCrossesThreshold) {
@@ -267,9 +234,8 @@ TEST(OrderProcessorRiskLatchTest, NewOrderRejectsAfterLatch) {
     // adapter. (Adapters list is empty anyway; if trading were still
     // enabled we'd see an EXCHANGE_ERROR reject for "adapter not
     // connected". RISK_REJECTED proves the risk gate fired first.)
-    NewOrderBuf order(42, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale);
     const size_t before = h.pub.entries.size();
-    h.processor.on_new_order(order.decoded);
+    h.processor.on_new_order(make_new_order(42, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
     ASSERT_GT(h.pub.entries.size(), before);
     const auto& last = h.pub.entries.back();
     EXPECT_EQ(last.order_id, 42u);
@@ -332,9 +298,8 @@ TEST(OrderProcessorRejectBreakerTest, NewOrderRejectsAfterBreakerTrip) {
         h.processor.on_exec_event(make_reject(100 + i, ts + i));
     ASSERT_FALSE(h.risk_checker.trading_enabled());
 
-    NewOrderBuf order(42, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale);
     const size_t before = h.pub.entries.size();
-    h.processor.on_new_order(order.decoded);
+    h.processor.on_new_order(make_new_order(42, ExchangeId::OKX, 100, OrderSide::BUY, 100 * kScale, 1 * kScale));
     ASSERT_GT(h.pub.entries.size(), before);
     const auto& last = h.pub.entries.back();
     EXPECT_EQ(last.order_id, 42u);

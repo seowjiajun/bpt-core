@@ -12,6 +12,7 @@
 #include "order_gateway/order/order_processor.h"
 #include "order_gateway/order/order_state_manager.h"
 #include "order_gateway/risk/pnl_tracker.h"
+#include "order_gateway/risk/pre_trade_risk_gate.h"
 #include "order_gateway/risk/risk_checker.h"
 
 #include <bpt_app/app.h>
@@ -44,6 +45,7 @@ private:
     std::shared_ptr<messaging::api::OrderSubscriber> order_sub_;
     risk::RiskChecker risk_checker_;
     risk::PnlTracker pnl_tracker_;
+    risk::PreTradeRiskGate risk_gate_;
     order::OrderStateManager state_mgr_;
     std::vector<std::shared_ptr<adapter::IOrderAdapter>> adapters_;
     std::unique_ptr<order::OrderProcessor> processor_;

@@ -80,6 +80,8 @@ private:
     std::vector<std::pair<std::string, bpt::common::util::LatencyHistogram*>> lat_reporters_;
     std::vector<std::pair<std::string, adapter::IAdapter*>> md_stat_reporters_;
     /// @}
+
+    uint64_t last_backpressure_drops_{0};
 };
 
 }  // namespace bpt::md_gateway

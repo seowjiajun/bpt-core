@@ -13,6 +13,7 @@
 #include <messages/MdTrade.h>
 #include <messages/MessageHeader.h>
 
+#include <bpt_common/aeron/stream_config.h>
 #include <bpt_common/aeron/subscriber.h>
 #include <bpt_common/logging.h>
 #include <cstdint>
@@ -25,16 +26,16 @@ namespace bpt::pricer::md::aeron {
 template <class Handler>
 class MdSubscriber final : public api::MdSubscriber {
 public:
-    MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int32_t stream_id) {
+    MdSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const bpt::common::config::StreamConfig& stream) {
         sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             std::move(aeron),
-            channel,
-            stream_id,
+            stream.channel,
+            stream.stream_id,
             [this](::aeron::AtomicBuffer& buf,
                    ::aeron::util::index_t offset,
                    ::aeron::util::index_t length,
                    ::aeron::Header& hdr) { on_fragment(buf, offset, length, hdr); });
-        bpt::common::log::info("[MdSubscriber] Subscription ready on {} stream {}", channel, stream_id);
+        bpt::common::log::info("[MdSubscriber] Subscription ready on {} stream {}", stream.channel, stream.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }

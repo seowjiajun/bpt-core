@@ -325,15 +325,17 @@ uint64_t PassiveMakerStrategy::place_side(InstrumentState& st, OrderSide::Value 
     // would cross. The round_to_tick step above already pulls bid/ask
     // one tick inside the touch, so this should never trigger in
     // practice — belt-and-braces for the rare race-condition case.
-    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = st.instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = OrderType::LIMIT,
-        .tif = TimeInForce::GTC,
-        .price = price,
-        .qty = qty,
-    }).order_id();
+    const uint64_t oid = order_mgr_
+                             ->send_new_order(order::NewOrderRequest{
+                                 .instrument_id = st.instrument_id,
+                                 .exchange_id = st.exchange_id,
+                                 .side = side,
+                                 .type = OrderType::LIMIT,
+                                 .tif = TimeInForce::GTC,
+                                 .price = price,
+                                 .qty = qty,
+                             })
+                             .order_id();
     if (oid == 0) {
         bpt::common::log::warn(kLog(),
                                "{} place_order rejected ({} @ {:.6f})",
@@ -419,15 +421,17 @@ void PassiveMakerStrategy::on_shutdown_flatten() {
                     // Cross by 5bps to ensure the IOC takes immediately.
                     const double price =
                         (side == OrderSide::SELL) ? st.bid * (1.0 - 5.0 / 1e4) : st.ask * (1.0 + 5.0 / 1e4);
-                    const uint64_t oid = order_mgr_->send_new_order(order::NewOrderRequest{
-                        .instrument_id = st.instrument_id,
-                        .exchange_id = st.exchange_id,
-                        .side = side,
-                        .type = OrderType::LIMIT,
-                        .tif = TimeInForce::IOC,
-                        .price = price,
-                        .qty = std::abs(st.inventory),
-                    }).order_id();
+                    const uint64_t oid = order_mgr_
+                                             ->send_new_order(order::NewOrderRequest{
+                                                 .instrument_id = st.instrument_id,
+                                                 .exchange_id = st.exchange_id,
+                                                 .side = side,
+                                                 .type = OrderType::LIMIT,
+                                                 .tif = TimeInForce::IOC,
+                                                 .price = price,
+                                                 .qty = std::abs(st.inventory),
+                                             })
+                                             .order_id();
                     if (oid != 0)
                         order_to_instrument_[oid] = st.instrument_id;
                     bpt::common::log::warn(kLog(),

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <strategy/config/aeron_config.h>
 #include <string>
 
 namespace bpt::strategy::backtest {
@@ -17,10 +18,9 @@ namespace bpt::strategy::backtest {
 // Only instantiated when backtest_mode = true in the config.
 class BacktestClient {
 public:
-    BacktestClient(std::shared_ptr<aeron::Aeron> aeron,
-                   const std::string& channel,
-                   int32_t control_stream_id,  // subscribe to BacktestControl
-                   int32_t ack_stream_id);     // publish  to BacktestAck
+    // Takes the backtest stream slice: control (subscribe to BacktestControl)
+    // + ack (publish BacktestAck).
+    BacktestClient(std::shared_ptr<aeron::Aeron> aeron, const config::AeronConfig::Backtest& streams);
 
     // Fired for each BacktestControl fragment decoded.
     std::function<void(bpt::messages::BacktestCommand::Value cmd, uint64_t tick_seq, uint64_t simulation_ts)>

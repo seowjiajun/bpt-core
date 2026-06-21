@@ -10,12 +10,11 @@ namespace bpt::md_gateway::messaging::aeron {
 using Policy = bpt::common::aeron::Publisher::Policy;
 
 FundingRatePublisher::FundingRatePublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                           const std::string& channel,
-                                           int stream_id)
+                                           const bpt::common::config::StreamConfig& stream)
     // Original code had custom "spin on back-pressure, exit on
     // NOT_CONNECTED/CLOSED" — now the default kRetryOnBackpressure
     // policy is exactly that.
-    : publisher_(std::move(aeron), channel, stream_id, Policy::kRetryOnBackpressure) {}
+    : publisher_(std::move(aeron), stream.channel, stream.stream_id, Policy::kRetryOnBackpressure) {}
 
 void FundingRatePublisher::publish(const FundingRateUpdate& fr) {
     alignas(8) std::byte scratch[SbeFundingRateCodec::kRecommendedScratchSize];

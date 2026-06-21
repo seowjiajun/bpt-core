@@ -51,8 +51,7 @@ PYBIND11_MODULE(_core, m) {
     // ─────────────────────────── OFICalculator ───────────────────────────
     // Cont-Kukanov-Stoikov rolling Order-Flow Imbalance. See
     // features/ofi.h for the math + per-level weighting rules.
-    py::class_<OFICalculator> ofi(m, "OFICalculator",
-                                  "Rolling multi-level Order-Flow Imbalance estimator");
+    py::class_<OFICalculator> ofi(m, "OFICalculator", "Rolling multi-level Order-Flow Imbalance estimator");
 
     py::class_<OFICalculator::Config>(ofi, "Config")
         .def(py::init<>())
@@ -63,14 +62,15 @@ PYBIND11_MODULE(_core, m) {
         // update() is the hot path. The (price, qty) Level pairs are
         // std::pair<double, double>; pybind11/stl.h auto-converts a
         // Python list-of-tuples into the C++ vector representation.
-        .def("update", &OFICalculator::update, py::arg("bids"), py::arg("asks"),
-             py::arg("timestamp_ns"), "Feed a book snapshot, return the current rolling OFI value")
-        .def("is_warm", &OFICalculator::is_warm,
-             "True once at least two updates have produced a value")
-        .def("value", &OFICalculator::value,
-             "Last value returned by update(); 0 if never called")
-        .def("avg_depth", &OFICalculator::avg_depth,
-             "Rolling average top-K depth (bid+ask) over the window")
+        .def("update",
+             &OFICalculator::update,
+             py::arg("bids"),
+             py::arg("asks"),
+             py::arg("timestamp_ns"),
+             "Feed a book snapshot, return the current rolling OFI value")
+        .def("is_warm", &OFICalculator::is_warm, "True once at least two updates have produced a value")
+        .def("value", &OFICalculator::value, "Last value returned by update(); 0 if never called")
+        .def("avg_depth", &OFICalculator::avg_depth, "Rolling average top-K depth (bid+ask) over the window")
         .def("reset", &OFICalculator::reset, "Reset all internal state — use on reconnect");
 
     // ────────────────────────── FairValueEstimator ───────────────────────
@@ -84,7 +84,8 @@ PYBIND11_MODULE(_core, m) {
     // Only the top-of-book overload is exposed here, which means
     // kL2WeightedMicro silently degrades to kMicro in Python (same
     // behaviour as the C++ TOB-only path; documented in fair_value.h).
-    py::class_<FairValueEstimator> fve(m, "FairValueEstimator",
+    py::class_<FairValueEstimator> fve(m,
+                                       "FairValueEstimator",
                                        "Reference-price estimator (mid / micro / EWMA variants)");
 
     py::enum_<FairValueEstimator::Mode>(fve, "Mode")
@@ -108,9 +109,13 @@ PYBIND11_MODULE(_core, m) {
         // pybind11 picks this by argument count + types.
         .def("estimate",
              py::overload_cast<double, double, double, double>(&FairValueEstimator::estimate),
-             py::arg("bid_px"), py::arg("ask_px"), py::arg("bid_qty"), py::arg("ask_qty"),
+             py::arg("bid_px"),
+             py::arg("ask_px"),
+             py::arg("bid_qty"),
+             py::arg("ask_qty"),
              "Compute fair value from top-of-book. Returns NaN on degenerate quote.")
-        .def("last_estimate", &FairValueEstimator::last_estimate,
+        .def("last_estimate",
+             &FairValueEstimator::last_estimate,
              "Last computed value; NaN if estimate() never called or book was unready")
         .def("mode", &FairValueEstimator::mode, "Current mode");
 
@@ -118,49 +123,52 @@ PYBIND11_MODULE(_core, m) {
     // Rolling-window annualised realised vol from mid-price returns.
     // Sampled at fixed intervals (sample_interval_ns) so the rate is
     // deterministic regardless of tick density.
-    py::class_<RealizedVolEstimator>(m, "RealizedVolEstimator",
-                                     "Rolling annualised realised vol estimator")
+    py::class_<RealizedVolEstimator>(m, "RealizedVolEstimator", "Rolling annualised realised vol estimator")
         .def(py::init<size_t, uint64_t>(),
-             py::arg("window_size"), py::arg("sample_interval_ns"),
+             py::arg("window_size"),
+             py::arg("sample_interval_ns"),
              "window_size: number of samples in the rolling window. "
              "sample_interval_ns: minimum spacing between samples (ticks closer than "
              "this are ignored).")
-        .def("update", &RealizedVolEstimator::update,
-             py::arg("mid_price"), py::arg("timestamp_ns"),
+        .def("update",
+             &RealizedVolEstimator::update,
+             py::arg("mid_price"),
+             py::arg("timestamp_ns"),
              "Feed a mid-price tick. Returns True if this tick was accepted as a sample "
              "(i.e. enough time has elapsed since the last accepted sample).")
-        .def("realized_vol", &RealizedVolEstimator::realized_vol,
+        .def("realized_vol",
+             &RealizedVolEstimator::realized_vol,
              "Current realised vol (annualised, in price units). 0 until ready().")
-        .def("count", &RealizedVolEstimator::count,
-             "Number of samples currently in the rolling window.")
-        .def("ready", &RealizedVolEstimator::ready,
-             "True once min_samples samples have been collected.")
+        .def("count", &RealizedVolEstimator::count, "Number of samples currently in the rolling window.")
+        .def("ready", &RealizedVolEstimator::ready, "True once min_samples samples have been collected.")
         .def("reset", &RealizedVolEstimator::reset, "Reset all internal state.");
 
     // ─────────────────────────── VolatilityGate ──────────────────────────
     // Suppression gate that trips on a short-horizon mid-price move
     // exceeding `max_bps_per_window`. While tripped, is_halted() returns
     // true and the strategy should suppress quoting.
-    py::class_<VolatilityGate> volgate(m, "VolatilityGate",
-                                       "Vol-spike suppression gate (trips on rapid mid moves)");
+    py::class_<VolatilityGate> volgate(m, "VolatilityGate", "Vol-spike suppression gate (trips on rapid mid moves)");
 
     py::class_<VolatilityGate::Config>(volgate, "Config")
         .def(py::init<>())
         .def_readwrite("max_bps_per_window", &VolatilityGate::Config::max_bps_per_window);
 
     volgate.def(py::init<VolatilityGate::Config>(), py::arg("cfg"))
-        .def("update_and_check", &VolatilityGate::update_and_check,
-             py::arg("mid"), py::arg("now_ns"),
+        .def("update_and_check",
+             &VolatilityGate::update_and_check,
+             py::arg("mid"),
+             py::arg("now_ns"),
              "Feed a mid-price tick. Returns True if the gate is currently HALTED.")
-        .def("is_halted", &VolatilityGate::is_halted, py::arg("now_ns"),
+        .def("is_halted",
+             &VolatilityGate::is_halted,
+             py::arg("now_ns"),
              "True if the gate is currently in its post-trip halt window.")
-        .def("last_trip_bps", &VolatilityGate::last_trip_bps,
+        .def("last_trip_bps",
+             &VolatilityGate::last_trip_bps,
              "Bps move that triggered the most recent trip (0 if never tripped).")
-        .def("enabled", &VolatilityGate::enabled,
-             "True if max_bps_per_window > 0 (gate is configured to fire).")
+        .def("enabled", &VolatilityGate::enabled, "True if max_bps_per_window > 0 (gate is configured to fire).")
         .def("max_bps_per_window", &VolatilityGate::max_bps_per_window)
-        .def("set_max_bps_per_window", &VolatilityGate::set_max_bps_per_window,
-             py::arg("max_bps"));
+        .def("set_max_bps_per_window", &VolatilityGate::set_max_bps_per_window, py::arg("max_bps"));
 
     // ─────────────────────────── OrderSide enum ──────────────────────────
     // Wire-format enum from messages/OrderSide.h. Exposed here so
@@ -183,8 +191,7 @@ PYBIND11_MODULE(_core, m) {
     // The MdOrderBook overload of apply() is NOT bound — that path is
     // for the live md-gateway adapter feeding SBE-decoded frames; from
     // Python you construct ladders directly via the vector overload.
-    py::class_<OrderBookState> obs(m, "OrderBookState",
-                                   "Stateful L2 order book ladder");
+    py::class_<OrderBookState> obs(m, "OrderBookState", "Stateful L2 order book ladder");
 
     py::class_<OrderBookState::Level>(obs, "Level")
         .def(py::init<>())
@@ -200,14 +207,17 @@ PYBIND11_MODULE(_core, m) {
         .def("apply",
              py::overload_cast<const std::vector<OrderBookState::Level>&,
                                const std::vector<OrderBookState::Level>&,
-                               uint64_t, uint64_t, bool>(&OrderBookState::apply),
-             py::arg("bid_levels"), py::arg("ask_levels"),
-             py::arg("seq_num"), py::arg("timestamp_ns"),
+                               uint64_t,
+                               uint64_t,
+                               bool>(&OrderBookState::apply),
+             py::arg("bid_levels"),
+             py::arg("ask_levels"),
+             py::arg("seq_num"),
+             py::arg("timestamp_ns"),
              py::arg("is_snapshot") = false,
              "Fold a book frame into the ladder.")
         .def("reset", &OrderBookState::reset, "Clear all state.")
-        .def("ready", &OrderBookState::ready,
-             "True once both sides have at least one level.")
+        .def("ready", &OrderBookState::ready, "True once both sides have at least one level.")
         // Top-of-book accessors — undefined if !ready().
         .def("best_bid", &OrderBookState::best_bid)
         .def("best_ask", &OrderBookState::best_ask)
@@ -217,18 +227,24 @@ PYBIND11_MODULE(_core, m) {
         // Exact-price + cumulative lookups (always safe).
         .def("size_at_bid", &OrderBookState::size_at_bid, py::arg("price"))
         .def("size_at_ask", &OrderBookState::size_at_ask, py::arg("price"))
-        .def("bid_vol_above", &OrderBookState::bid_vol_above, py::arg("price"),
+        .def("bid_vol_above",
+             &OrderBookState::bid_vol_above,
+             py::arg("price"),
              "Sum of qty at all bid prices STRICTLY greater than `price`.")
-        .def("ask_vol_below", &OrderBookState::ask_vol_below, py::arg("price"),
+        .def("ask_vol_below",
+             &OrderBookState::ask_vol_below,
+             py::arg("price"),
              "Sum of qty at all ask prices STRICTLY less than `price`.")
         // Value-return top-N accessors. (The buffer-fill overloads are
         // hot-path optimisations not relevant to Python.)
         .def("top_bids",
              py::overload_cast<size_t>(&OrderBookState::top_bids, py::const_),
-             py::arg("n"), "Top n bid levels, best first.")
+             py::arg("n"),
+             "Top n bid levels, best first.")
         .def("top_asks",
              py::overload_cast<size_t>(&OrderBookState::top_asks, py::const_),
-             py::arg("n"), "Top n ask levels, best first.")
+             py::arg("n"),
+             "Top n ask levels, best first.")
         .def("n_bid_levels", &OrderBookState::n_bid_levels)
         .def("n_ask_levels", &OrderBookState::n_ask_levels)
         .def("last_seq_num", &OrderBookState::last_seq_num)
@@ -246,8 +262,7 @@ PYBIND11_MODULE(_core, m) {
     // event-shaped for a simple DataFrame mapping. Once we have a canon
     // reader that yields (book_state, my_fills, trades) streams together,
     // a `bf.queue_position_history(...)` wrapper becomes natural.
-    py::class_<QueueTracker> qt(m, "QueueTracker",
-                                "Estimates queue position for resting orders");
+    py::class_<QueueTracker> qt(m, "QueueTracker", "Estimates queue position for resting orders");
 
     py::class_<QueueTracker::Entry>(qt, "Entry")
         .def_readonly("side", &QueueTracker::Entry::side)
@@ -257,26 +272,38 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("placed_ns", &QueueTracker::Entry::placed_ns);
 
     qt.def(py::init<>())
-        .def("track", &QueueTracker::track,
-             py::arg("order_id"), py::arg("side"), py::arg("price"),
-             py::arg("our_qty"), py::arg("ts_ns"), py::arg("book"),
+        .def("track",
+             &QueueTracker::track,
+             py::arg("order_id"),
+             py::arg("side"),
+             py::arg("price"),
+             py::arg("our_qty"),
+             py::arg("ts_ns"),
+             py::arg("book"),
              "Register a newly acked resting order; snapshots queue_ahead from the current book.")
-        .def("on_fill", &QueueTracker::on_fill,
-             py::arg("order_id"), py::arg("filled_qty"))
+        .def("on_fill", &QueueTracker::on_fill, py::arg("order_id"), py::arg("filled_qty"))
         .def("on_cancel", &QueueTracker::on_cancel, py::arg("order_id"))
-        .def("on_trade", &QueueTracker::on_trade,
-             py::arg("aggressor"), py::arg("trade_price"),
-             py::arg("trade_qty"), py::arg("ts_ns"),
+        .def("on_trade",
+             &QueueTracker::on_trade,
+             py::arg("aggressor"),
+             py::arg("trade_price"),
+             py::arg("trade_qty"),
+             py::arg("ts_ns"),
              "Public-market trade printed; decrements queue_ahead for matching passive entries.")
         // lookup() returns a pointer that may be nullptr; pybind11 needs
         // an explicit reference-policy + nullable-check. Use a lambda
         // that returns Optional[Entry] instead.
-        .def("lookup", [](const QueueTracker& self, uint64_t order_id) -> py::object {
-            const auto* e = self.lookup(order_id);
-            if (e == nullptr) return py::none();
-            return py::cast(*e);  // copy the Entry into Python
-        }, py::arg("order_id"))
-        .def("fill_probability", &QueueTracker::fill_probability,
+        .def(
+            "lookup",
+            [](const QueueTracker& self, uint64_t order_id) -> py::object {
+                const auto* e = self.lookup(order_id);
+                if (e == nullptr)
+                    return py::none();
+                return py::cast(*e);  // copy the Entry into Python
+            },
+            py::arg("order_id"))
+        .def("fill_probability",
+             &QueueTracker::fill_probability,
              py::arg("order_id"),
              "p = our_qty / (our_qty + queue_ahead). 0 if order_id unknown.")
         .def("size", &QueueTracker::size, "Number of tracked entries.");
@@ -287,8 +314,7 @@ PYBIND11_MODULE(_core, m) {
     // each tick, query value() and count() for warmup. KappaEstimator
     // takes just a trade timestamp.
 
-    py::class_<TimeWeightedEwma>(m, "TimeWeightedEwma",
-                                 "Time-weighted EWMA primitive. λ = exp(-dt_s / halflife_s).")
+    py::class_<TimeWeightedEwma>(m, "TimeWeightedEwma", "Time-weighted EWMA primitive. λ = exp(-dt_s / halflife_s).")
         .def(py::init<double>(), py::arg("halflife_s"))
         .def("update", &TimeWeightedEwma::update, py::arg("obs"), py::arg("dt_s"))
         .def("reset", &TimeWeightedEwma::reset)
@@ -296,7 +322,8 @@ PYBIND11_MODULE(_core, m) {
         .def("count", &TimeWeightedEwma::count)
         .def("halflife_s", &TimeWeightedEwma::halflife_s);
 
-    py::class_<EwmaVariance>(m, "EwmaVariance",
+    py::class_<EwmaVariance>(m,
+                             "EwmaVariance",
                              "EWMA of squared time-normalised log returns — per-second variance σ². "
                              "Observation each tick: (log(mid/last_mid)/sqrt(dt_s))².")
         .def(py::init<double>(), py::arg("halflife_s"))
@@ -307,8 +334,7 @@ PYBIND11_MODULE(_core, m) {
         .def("last_mid", &EwmaVariance::last_mid)
         .def("last_ns", &EwmaVariance::last_ns);
 
-    py::class_<EwmaDrift>(m, "EwmaDrift",
-                          "EWMA of signed time-normalised log returns — per-√second drift µ.")
+    py::class_<EwmaDrift>(m, "EwmaDrift", "EWMA of signed time-normalised log returns — per-√second drift µ.")
         .def(py::init<double>(), py::arg("halflife_s"))
         .def("update", &EwmaDrift::update, py::arg("mid"), py::arg("ts_ns"))
         .def("reset", &EwmaDrift::reset)
@@ -317,7 +343,8 @@ PYBIND11_MODULE(_core, m) {
         .def("last_mid", &EwmaDrift::last_mid)
         .def("last_ns", &EwmaDrift::last_ns);
 
-    py::class_<KappaEstimator>(m, "KappaEstimator",
+    py::class_<KappaEstimator>(m,
+                               "KappaEstimator",
                                "EWMA of per-side trade-arrival rate κ (trades/s). "
                                "Observation each trade: 0.5/dt_s (splits across bid/ask).")
         .def(py::init<double>(), py::arg("halflife_s"))
@@ -329,22 +356,27 @@ PYBIND11_MODULE(_core, m) {
 
     // ─── Hurst free functions ─────────────────────────────────────────────
     // Accept Python lists / numpy arrays via pybind11::stl auto-conversion.
-    m.def("compute_hurst",
-          [](const std::vector<double>& returns, std::size_t max_window) {
-              return compute_hurst(returns.data(), returns.size(), max_window);
-          },
-          py::arg("returns"), py::arg("max_window"),
-          "Single-window rescaled-range Hurst over the first len(returns) entries.");
+    m.def(
+        "compute_hurst",
+        [](const std::vector<double>& returns, std::size_t max_window) {
+            return compute_hurst(returns.data(), returns.size(), max_window);
+        },
+        py::arg("returns"),
+        py::arg("max_window"),
+        "Single-window rescaled-range Hurst over the first len(returns) entries.");
 
-    m.def("compute_hurst_multi_window",
-          [](const std::vector<double>& returns, std::size_t max_window) {
-              return compute_hurst_multi_window(returns.data(), returns.size(), max_window);
-          },
-          py::arg("returns"), py::arg("max_window"),
-          "Multi-window R/S Hurst (regression slope) — more robust on short series.");
+    m.def(
+        "compute_hurst_multi_window",
+        [](const std::vector<double>& returns, std::size_t max_window) {
+            return compute_hurst_multi_window(returns.data(), returns.size(), max_window);
+        },
+        py::arg("returns"),
+        py::arg("max_window"),
+        "Multi-window R/S Hurst (regression slope) — more robust on short series.");
 
     // ─── RegimeDetector (Hurst-based) ─────────────────────────────────────
-    py::class_<RegimeDetector> rd(m, "RegimeDetector",
+    py::class_<RegimeDetector> rd(m,
+                                  "RegimeDetector",
                                   "Rolling Hurst-based regime classifier: MEAN_REVERT / NEUTRAL / TRENDING.");
 
     py::enum_<RegimeDetector::Regime>(rd, "Regime")
@@ -376,7 +408,8 @@ PYBIND11_MODULE(_core, m) {
         .def("tick_count", &RegimeDetector::tick_count);
 
     // ─── RegimeClassifier (vol + trend z-score) ───────────────────────────
-    py::class_<RegimeClassifier> rc(m, "RegimeClassifier",
+    py::class_<RegimeClassifier> rc(m,
+                                    "RegimeClassifier",
                                     "Vol + trend-z-score binary regime gate: QUIET / TRENDING / CHOPPY.");
 
     py::enum_<RegimeClassifier::Regime>(rc, "Regime")
@@ -394,7 +427,10 @@ PYBIND11_MODULE(_core, m) {
 
     rc.def(py::init<>())
         .def(py::init<RegimeClassifier::Config>(), py::arg("config"))
-        .def("update", &RegimeClassifier::update, py::arg("mid"), py::arg("ts_ns"),
+        .def("update",
+             &RegimeClassifier::update,
+             py::arg("mid"),
+             py::arg("ts_ns"),
              "Feed a mid-price observation. Returns ready() after the update.")
         .def("ready", &RegimeClassifier::ready)
         .def("realized_vol_bps_per_min", &RegimeClassifier::realized_vol_bps_per_min)
@@ -405,13 +441,16 @@ PYBIND11_MODULE(_core, m) {
     // ─── Fill probability models (free functions) ─────────────────────────
     m.def("fill_probability_poisson",
           &bpt::features::fill_probability_poisson,
-          py::arg("kappa"), py::arg("horizon_s"), py::arg("queue_ahead"),
+          py::arg("kappa"),
+          py::arg("horizon_s"),
+          py::arg("queue_ahead"),
           "Poisson-arrival fill probability over horizon_s. "
           "P ≈ 1 - exp(-kappa * horizon_s / queue_ahead). "
           "Returns 1 when queue_ahead<=0; 0 when kappa<=0 or horizon<=0.");
     m.def("fill_probability_geometric",
           &bpt::features::fill_probability_geometric,
-          py::arg("our_qty"), py::arg("queue_ahead"),
+          py::arg("our_qty"),
+          py::arg("queue_ahead"),
           "Ordinal queue-share fallback: our_qty / (our_qty + queue_ahead). "
           "Not a true probability; useful as a unit-free ranking signal.");
 }

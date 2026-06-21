@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <strategy/config/aeron_config.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -49,32 +50,33 @@ namespace bpt::strategy::md {
 template <class Handler>
 class AeronMdClient : public IMdClient {
 public:
-    AeronMdClient(std::shared_ptr<aeron::Aeron> aeron,
-                  const std::string& channel,
-                  int control_stream,
-                  int data_stream,
-                  int ack_hb_stream) {
+    AeronMdClient(std::shared_ptr<aeron::Aeron> aeron, const config::AeronConfig::Md& streams) {
         ctrl_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-            aeron, channel, control_stream, bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+            aeron,
+            streams.control.channel,
+            streams.control.stream_id,
+            bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
         data_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            data_stream,
+            streams.data.channel,
+            streams.data.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_data_fragment(buf, offset, length, hdr); });
         ack_hb_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            ack_hb_stream,
+            streams.ack_hb.channel,
+            streams.ack_hb.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_ack_hb_fragment(buf, offset, length, hdr); });
 
-        bpt::common::log::info(
-            "MdClient connected: ctrl={} data={} ack_hb={}", control_stream, data_stream, ack_hb_stream);
+        bpt::common::log::info("MdClient connected: ctrl={} data={} ack_hb={}",
+                               streams.control.stream_id,
+                               streams.data.stream_id,
+                               streams.ack_hb.stream_id);
     }
 
     /// Bind the per-tick dispatch target. Called once during StrategyService
@@ -112,8 +114,7 @@ public:
 
         ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size));
 
-        bpt::common::log::info(
-            "MdClient: subscription sent correlation_id={} instruments={}", correlation_id, n);
+        bpt::common::log::info("MdClient: subscription sent correlation_id={} instruments={}", correlation_id, n);
     }
 
     int poll(int fragment_limit = 10) override {

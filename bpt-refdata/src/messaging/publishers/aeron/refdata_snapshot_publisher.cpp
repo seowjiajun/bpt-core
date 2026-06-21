@@ -69,9 +69,8 @@ bool matches(const model::Instrument& inst, const RefdataRequest& req) {
 }  // namespace
 
 RefdataSnapshotPublisher::RefdataSnapshotPublisher(std::shared_ptr<::aeron::Aeron> aeron,
-                                                   const std::string& channel,
-                                                   int stream_id) {
-    publication_ = bpt::common::aeron::wait_for_publication(aeron, channel, stream_id);
+                                                   const bpt::common::config::StreamConfig& stream) {
+    publication_ = bpt::common::aeron::wait_for_publication(aeron, stream.channel, stream.stream_id);
 }
 
 void RefdataSnapshotPublisher::publish(const registry::InstrumentRegistry& registry,

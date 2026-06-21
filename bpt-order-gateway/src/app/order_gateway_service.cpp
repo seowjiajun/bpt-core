@@ -15,6 +15,10 @@
 
 using namespace std::chrono_literals;
 using bpt::messages::ExchangeId;
+using bpt::order_gateway::order::CancelAllEvent;
+using bpt::order_gateway::order::CancelOrderEvent;
+using bpt::order_gateway::order::ModifyOrderEvent;
+using bpt::order_gateway::order::NewOrderEvent;
 
 namespace bpt::order_gateway {
 
@@ -35,6 +39,18 @@ OrderGatewayService::OrderGatewayService(config::Settings cfg,
                     cfg_.gateway.risk.max_notional_per_order_usd,
                     cfg_.gateway.risk.max_open_orders_per_venue,
                     cfg_.gateway.risk.max_orders_per_second),
+      risk_gate_(risk_checker_,
+                 pnl_tracker_,
+                 cfg_.gateway.risk.max_position_usd,
+                 cfg_.gateway.risk.max_daily_loss_usd,
+                 [&] {
+                     risk::RejectRateBreaker::Config c;
+                     c.enabled = cfg_.gateway.risk.reject_rate_breaker_enabled;
+                     c.threshold_pct = cfg_.gateway.risk.reject_rate_threshold_pct;
+                     c.window_ns = static_cast<uint64_t>(cfg_.gateway.risk.reject_rate_window_sec) * 1'000'000'000ULL;
+                     c.min_events = cfg_.gateway.risk.reject_rate_min_events;
+                     return c;
+                 }()),
       topology_(topology) {
     risk_checker_.set_trading_enabled(cfg_.gateway.risk.trading_enabled);
 
@@ -77,33 +93,19 @@ OrderGatewayService::OrderGatewayService(config::Settings cfg,
         bpt::common::log::info("Started adapter: {}", a_cfg.exchange);
     }
 
-    risk::RejectRateBreaker::Config breaker_cfg;
-    breaker_cfg.enabled = cfg_.gateway.risk.reject_rate_breaker_enabled;
-    breaker_cfg.threshold_pct = cfg_.gateway.risk.reject_rate_threshold_pct;
-    breaker_cfg.window_ns = static_cast<uint64_t>(cfg_.gateway.risk.reject_rate_window_sec) * 1'000'000'000ULL;
-    breaker_cfg.min_events = cfg_.gateway.risk.reject_rate_min_events;
+    processor_ = std::make_unique<order::OrderProcessor>(*exec_pub_, state_mgr_, risk_gate_, metrics_, adapters_);
 
-    processor_ = std::make_unique<order::OrderProcessor>(*exec_pub_,
-                                                         state_mgr_,
-                                                         risk_checker_,
-                                                         pnl_tracker_,
-                                                         cfg_.gateway.risk.max_daily_loss_usd,
-                                                         cfg_.gateway.risk.max_position_usd,
-                                                         breaker_cfg,
-                                                         metrics_,
-                                                         adapters_);
-
-    order_sub_->on_new_order = [this](const bpt::messages::NewOrder& o) {
-        processor_->on_new_order(o);
+    order_sub_->on_new_order = [this](const order::NewOrderEvent& e) {
+        processor_->on_new_order(e);
     };
-    order_sub_->on_cancel = [this](const bpt::messages::CancelOrder& c) {
-        processor_->on_cancel(c);
+    order_sub_->on_cancel = [this](const order::CancelOrderEvent& e) {
+        processor_->on_cancel(e);
     };
-    order_sub_->on_cancel_all = [this](const bpt::messages::CancelAll& c) {
-        processor_->on_cancel_all(c);
+    order_sub_->on_cancel_all = [this](const order::CancelAllEvent& e) {
+        processor_->on_cancel_all(e);
     };
-    order_sub_->on_modify = [this](const bpt::messages::ModifyOrder& m) {
-        processor_->on_modify(m);
+    order_sub_->on_modify = [this](const order::ModifyOrderEvent& e) {
+        processor_->on_modify(e);
     };
     snap_executor_ = std::make_unique<app::AccountSnapExecutor>(*account_snap_pub_);
     snap_executor_->start();
@@ -178,8 +180,7 @@ void OrderGatewayService::run() {
             // window. trading_enabled flipping to false is the daily-loss
             // latch; reject_rate_breaker_.tripped() latches on its own.
             metrics_.daily_loss_latched->Set(risk_checker_.trading_enabled() ? 0.0 : 1.0);
-            metrics_.reject_rate_breaker_tripped->Set(processor_ && processor_->reject_rate_breaker_tripped() ? 1.0
-                                                                                                              : 0.0);
+            metrics_.reject_rate_breaker_tripped->Set(risk_gate_.reject_rate_breaker_tripped() ? 1.0 : 0.0);
             for (const auto& a : adapters_) {
                 metrics_.disconnect_breaker_tripped(a->exchange_name()).Set(a->is_halted() ? 1.0 : 0.0);
             }

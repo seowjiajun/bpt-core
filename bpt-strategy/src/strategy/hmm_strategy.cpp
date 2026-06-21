@@ -961,15 +961,17 @@ uint64_t HmmStrategy::send_order(InstrumentState& st,
     if (!order_mgr_)
         return 0;
 
-    const uint64_t order_id = order_mgr_->send_new_order(order::NewOrderRequest{
-        .instrument_id = st.instrument_id,
-        .exchange_id = st.exchange_id,
-        .side = side,
-        .type = type,
-        .tif = tif,
-        .price = price,
-        .qty = qty,
-    }).order_id();
+    const uint64_t order_id = order_mgr_
+                                  ->send_new_order(order::NewOrderRequest{
+                                      .instrument_id = st.instrument_id,
+                                      .exchange_id = st.exchange_id,
+                                      .side = side,
+                                      .type = type,
+                                      .tif = tif,
+                                      .price = price,
+                                      .qty = qty,
+                                  })
+                                  .order_id();
     if (order_id == 0)
         return 0;
 

@@ -19,11 +19,12 @@ using bpt::messages::MessageHeader;
 using bpt::messages::ModifyOrder;
 using bpt::messages::NewOrder;
 
-OrderSubscriber::OrderSubscriber(std::shared_ptr<::aeron::Aeron> aeron, const std::string& channel, int stream_id) {
+OrderSubscriber::OrderSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
+                                 const bpt::common::config::StreamConfig& stream) {
     subscription_ = std::make_unique<bpt::common::aeron::Subscriber>(
         std::move(aeron),
-        channel,
-        stream_id,
+        stream.channel,
+        stream.stream_id,
         [this](::aeron::AtomicBuffer& buf,
                ::aeron::util::index_t offset,
                ::aeron::util::index_t length,
@@ -41,46 +42,24 @@ void OrderSubscriber::handle_fragment(::aeron::AtomicBuffer& buf,
     MessageHeader hdr(data, static_cast<std::size_t>(length));
 
     const uint16_t tmpl = hdr.templateId();
+    const auto bytes =
+        std::span<const std::byte>(reinterpret_cast<const std::byte*>(data), static_cast<std::size_t>(length));
 
     if (tmpl == NewOrder::sbeTemplateId()) {
-        NewOrder msg;
-        msg.wrapForDecode(data,
-                          MessageHeader::encodedLength(),
-                          hdr.blockLength(),
-                          hdr.version(),
-                          static_cast<std::size_t>(length));
         if (on_new_order)
-            on_new_order(msg);
+            on_new_order(codec_.decode_new_order(bytes));
 
     } else if (tmpl == CancelOrder::sbeTemplateId()) {
-        CancelOrder msg;
-        msg.wrapForDecode(data,
-                          MessageHeader::encodedLength(),
-                          hdr.blockLength(),
-                          hdr.version(),
-                          static_cast<std::size_t>(length));
         if (on_cancel)
-            on_cancel(msg);
+            on_cancel(codec_.decode_cancel(bytes));
 
     } else if (tmpl == CancelAll::sbeTemplateId()) {
-        CancelAll msg;
-        msg.wrapForDecode(data,
-                          MessageHeader::encodedLength(),
-                          hdr.blockLength(),
-                          hdr.version(),
-                          static_cast<std::size_t>(length));
         if (on_cancel_all)
-            on_cancel_all(msg);
+            on_cancel_all(codec_.decode_cancel_all(bytes));
 
     } else if (tmpl == ModifyOrder::sbeTemplateId()) {
-        ModifyOrder msg;
-        msg.wrapForDecode(data,
-                          MessageHeader::encodedLength(),
-                          hdr.blockLength(),
-                          hdr.version(),
-                          static_cast<std::size_t>(length));
         if (on_modify)
-            on_modify(msg);
+            on_modify(codec_.decode_modify(bytes));
 
     } else if (tmpl == AccountSnapshotRequest::sbeTemplateId()) {
         AccountSnapshotRequest msg;

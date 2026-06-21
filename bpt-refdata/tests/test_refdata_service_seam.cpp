@@ -14,7 +14,7 @@
 #include "refdata/messaging/publishers/api/refdata_snapshot_publisher.h"
 #include "refdata/messaging/publishers/api/refdata_status_publisher.h"
 #include "refdata/messaging/subscribers/api/refdata_control_subscriber.h"
-#include "refdata/model/funding_rate.h"
+#include "refdata/model/fee_schedule.h"
 #include "refdata/model/instrument.h"
 #include "refdata/registry/instrument_registry.h"
 

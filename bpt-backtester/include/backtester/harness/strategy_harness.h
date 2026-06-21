@@ -156,7 +156,7 @@ private:
     std::unordered_set<uint64_t> strategy_instrument_ids_;
 
     // Funding-rate + instrument-stats callbacks the decoder requires;
-    // AS strategy doesn't need either (HL funding is on stream 1005 in
+    // AS strategy doesn't need either (HL funding is on stream 2005 in
     // production but the strategy reads from refdata's FundingRateCache,
     // not directly; stats aren't consumed by AS at all).
     bpt::md_gateway::messaging::FundingRateCallback noop_funding_cb_{

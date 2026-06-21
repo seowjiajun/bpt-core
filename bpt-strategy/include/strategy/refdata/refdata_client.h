@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <strategy/config/aeron_config.h>
 #include <string>
 #include <vector>
 
@@ -39,66 +40,63 @@ template <class Handler>
 class AeronRefdataClient final : public IRefdataClient {
 public:
     AeronRefdataClient(std::shared_ptr<aeron::Aeron> aeron,
-                       const std::string& channel,
-                       int control_stream,       // 1003 — subscription requests
-                       int snapshot_stream,      // 1001 — instrument snapshot
-                       int delta_stream,         // 1002 — instrument deltas + heartbeats
-                       int fee_schedule_stream,  // 1004 — fee schedule updates
-                       int funding_rate_stream,  // 1005 — funding rate updates
-                       int status_stream,        // 1006 — ready + error signals
+                       const config::AeronConfig::Refdata& streams,
                        uint64_t max_staleness_ns)
         : fee_cache_(max_staleness_ns),
           funding_rate_cache_(max_staleness_ns) {
         ctrl_pub_ = std::make_unique<bpt::common::aeron::Publisher>(
-            aeron, channel, control_stream, bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
+            aeron,
+            streams.control.channel,
+            streams.control.stream_id,
+            bpt::common::aeron::Publisher::Policy::kRetryOnBackpressure);
         snap_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            snapshot_stream,
+            streams.snapshot.channel,
+            streams.snapshot.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_snapshot_fragment(buf, offset, length, hdr); });
         delta_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            delta_stream,
+            streams.delta.channel,
+            streams.delta.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_delta_fragment(buf, offset, length, hdr); });
         fee_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            fee_schedule_stream,
+            streams.fee_schedule.channel,
+            streams.fee_schedule.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_fee_schedule_fragment(buf, offset, length, hdr); });
         funding_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            funding_rate_stream,
+            streams.funding_rate.channel,
+            streams.funding_rate.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_funding_rate_fragment(buf, offset, length, hdr); });
         status_sub_ = std::make_unique<bpt::common::aeron::Subscriber>(
             aeron,
-            channel,
-            status_stream,
+            streams.status.channel,
+            streams.status.stream_id,
             [this](aeron::AtomicBuffer& buf,
                    aeron::util::index_t offset,
                    aeron::util::index_t length,
                    aeron::Header& hdr) { handle_status_fragment(buf, offset, length, hdr); });
 
         bpt::common::log::info("RefdataClient connected: ctrl={} snap={} delta={} fee={} funding={} status={}",
-                               control_stream,
-                               snapshot_stream,
-                               delta_stream,
-                               fee_schedule_stream,
-                               funding_rate_stream,
-                               status_stream);
+                               streams.control.stream_id,
+                               streams.snapshot.stream_id,
+                               streams.delta.stream_id,
+                               streams.fee_schedule.stream_id,
+                               streams.funding_rate.stream_id,
+                               streams.status.stream_id);
     }
 
     void set_handler(Handler* handler) noexcept { handler_ = handler; }
@@ -137,8 +135,7 @@ public:
         aeron::AtomicBuffer ab(reinterpret_cast<uint8_t*>(buf.data()), static_cast<aeron::util::index_t>(buf_size));
         ctrl_pub_->offer(ab, 0, static_cast<aeron::util::index_t>(buf_size));
 
-        bpt::common::log::info(
-            "Subscription request sent: correlation_id={} canonical_filters={}", correlation_id, nf);
+        bpt::common::log::info("Subscription request sent: correlation_id={} canonical_filters={}", correlation_id, nf);
     }
 
     int poll(int fragment_limit = 10) override {
@@ -343,12 +340,11 @@ private:
                               hdr.version(),
                               static_cast<std::size_t>(length));
 
-            bpt::common::log::debug(
-                "RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
-                msg.exchangesLoaded(),
-                msg.instrumentCount(),
-                msg.feeSchedulesLoaded(),
-                msg.fundingRatesLoaded());
+            bpt::common::log::debug("RefDataReady: exchanges=0x{:02x} instruments={} fee_schedules={} funding_rates={}",
+                                    msg.exchangesLoaded(),
+                                    msg.instrumentCount(),
+                                    msg.feeSchedulesLoaded(),
+                                    msg.fundingRatesLoaded());
 
             if (handler_ != nullptr) [[likely]]
                 handler_->on_refdata_ready(msg.exchangesLoaded(),

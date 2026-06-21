@@ -12,12 +12,11 @@ using bpt::messages::MdSubscribeBatch;
 using bpt::messages::MessageHeader;
 
 MdControlSubscriber::MdControlSubscriber(std::shared_ptr<::aeron::Aeron> aeron,
-                                         const std::string& channel,
-                                         int stream_id) {
+                                         const bpt::common::config::StreamConfig& stream) {
     subscription_ = std::make_unique<bpt::common::aeron::Subscriber>(
         std::move(aeron),
-        channel,
-        stream_id,
+        stream.channel,
+        stream.stream_id,
         [this](::aeron::AtomicBuffer& buf,
                ::aeron::util::index_t offset,
                ::aeron::util::index_t length,

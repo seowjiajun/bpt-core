@@ -293,14 +293,13 @@ void HyperliquidOrderAdapter::do_send_new_order_blocking(const util::NewOrderReq
                                size_d,
                                resp);
 
-        exec_emitter_.emit_order_response(
-            resp,
-            ctx,
-            [this, client_id = req.order_id, qty_e8 = req.quantity](uint64_t exch_oid) {
-                client_to_exch_oid_[client_id] = exch_oid;
-                exch_oid_to_client_[exch_oid] = client_id;
-                decoder_.register_order(exch_oid, client_id, qty_e8);
-            });
+        exec_emitter_.emit_order_response(resp,
+                                          ctx,
+                                          [this, client_id = req.order_id, qty_e8 = req.quantity](uint64_t exch_oid) {
+                                              client_to_exch_oid_[client_id] = exch_oid;
+                                              exch_oid_to_client_[exch_oid] = client_id;
+                                              decoder_.register_order(exch_oid, client_id, qty_e8);
+                                          });
     } catch (const std::exception& e) {
         bpt::common::log::warn(
             "HyperliquidOrderAdapter: send_new_order id={} threw "
