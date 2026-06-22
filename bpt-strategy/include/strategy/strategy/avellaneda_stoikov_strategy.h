@@ -12,6 +12,7 @@
 #include "strategy/md/md_client.h"
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/refdata_client.h"
+#include "strategy/strategy/as_pricer.h"
 #include "strategy/strategy/canonical_resolver.h"
 #include "strategy/strategy/i_strategy.h"
 #include "strategy/strategy/position_tracker.h"
@@ -70,36 +71,16 @@ public:
     void on_flatten_tick() override;
     [[nodiscard]] double shutdown_drain_budget_s() const override;
 
-    // Persist per-instrument EWMA + regime state so a restart within
-    // max_age_s doesn't eat the full vol/drift/kappa warmup.
     void save_state(const std::string& path) override;
     void load_state(const std::string& path, uint64_t max_age_s) override;
 
 private:
-    // OrderState::tag values used by AS — dispatched on in on_exec_report.
-    static constexpr uint8_t kTagQuote = 0;         // resting bid/ask
-    static constexpr uint8_t kTagUnwindNormal = 1;  // inventory-cap auto-unwind
+    static constexpr uint8_t kTagQuote = 0;
+    static constexpr uint8_t kTagUnwindNormal = 1;
 
     struct InstrumentState {
+        // ── Metadata ────────────────────────────────────────────────────────────
         uint64_t instrument_id{0};
-        EwmaVariance ewma_var;
-        EwmaDrift ewma_drift;
-        KappaEstimator ewma_kappa;
-        double last_mid{0.0};
-        uint64_t last_tick_ns{0};
-        uint64_t last_trade_ns{0};
-        order::OrderHandle h_bid;
-        order::OrderHandle h_ask;
-        order::OrderHandle h_unwind;  // mid-session inventory-cap unwind (kTagUnwindNormal)
-        double last_bid_price{0.0};
-        double last_ask_price{0.0};
-        double last_market_bid{0.0};
-        double last_market_ask{0.0};
-        double bid_placed_mid{0.0};
-        double ask_placed_mid{0.0};
-        uint64_t session_start_ns{0};
-        uint32_t consecutive_exchange_errors{0};
-        uint64_t reject_backoff_until_ns{0};
         std::string symbol;
         std::string exchange;
         bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
@@ -107,21 +88,50 @@ private:
         std::string base_ccy;
         double tick_size{0.0};
         double lot_size{0.0};
-        VolatilityGate vol_gate;
+
+        // ── Vol / drift / regime ─────────────────────────────────────────────
+        EwmaVariance ewma_var;
+        EwmaDrift ewma_drift;
+        KappaEstimator ewma_kappa;
         RegimeDetector regime;
+        double last_mid{0.0};
+        uint64_t last_tick_ns{0};
+        uint64_t last_trade_ns{0};
+        uint64_t session_start_ns{0};
+        double slow_drift_bps{0.0};
+        double slow_drift_window_start_mid{0.0};
+        uint64_t slow_drift_window_start_ns{0};
+
+        // ── Resting quotes ────────────────────────────────────────────────────
+        order::OrderHandle h_bid;
+        order::OrderHandle h_ask;
+        order::OrderHandle h_unwind;
+        double last_bid_price{0.0};
+        double last_ask_price{0.0};
+        double last_market_bid{0.0};
+        double last_market_ask{0.0};
+        double bid_placed_mid{0.0};
+        double ask_placed_mid{0.0};
+
+        // ── Risk / suppression inputs ─────────────────────────────────────────
+        VolatilityGate vol_gate;
         double tox_bid_toxicity{0.0};
         double tox_ask_toxicity{0.0};
         bool tox_data_received{false};
-        double slow_drift_window_start_mid{0.0};
-        uint64_t slow_drift_window_start_ns{0};
-        double slow_drift_bps{0.0};
-        std::deque<double> recent_rpnl;
+        uint32_t consecutive_exchange_errors{0};
+        uint64_t reject_backoff_until_ns{0};
+        uint64_t pause_until_ns{0};
+
+        // ── Fill tracking / post-fill markout ─────────────────────────────────
         double pending_buy_fill_price{0.0};
         uint64_t pending_buy_fill_ts{0};
         double pending_sell_fill_price{0.0};
         uint64_t pending_sell_fill_ts{0};
         uint64_t post_fill_suspend_until_bid{0};
         uint64_t post_fill_suspend_until_ask{0};
+        std::deque<double> recent_rpnl;
+
+        // ── Order book / queue / fair value / OFI ─────────────────────────────
         OrderBookState book;
         QueueTracker queue;
         FairValueEstimator fv;
@@ -132,21 +142,17 @@ private:
         std::vector<OrderBookState::Level> ofi_top_ask_buf;
         std::vector<OFICalculator::Level> ofi_bids_buf;
         std::vector<OFICalculator::Level> ofi_asks_buf;
-        uint64_t pause_until_ns{0};
     };
 
-    struct BboContext {
-        double net_qty;
-        double mid;
-        uint64_t ts_ns;
-    };
+    [[nodiscard]] InstrumentState make_instrument_state(uint64_t instrument_id,
+                                                        const std::string& symbol,
+                                                        const std::string& exchange,
+                                                        bpt::messages::ExchangeId::Value exchange_id,
+                                                        refdata::InstrumentType type,
+                                                        const std::string& base_ccy,
+                                                        double tick_size,
+                                                        double lot_size) const;
 
-    struct QuoteTarget {
-        double bid;
-        double ask;
-    };
-
-    [[nodiscard]] std::optional<QuoteTarget> compute_quotes(const InstrumentState& st, const BboContext& ctx) const;
     void maybe_requote(InstrumentState& st, const BboContext& ctx, const QuoteTarget& quotes);
     order::OrderHandle send_unwind_order(InstrumentState& st, bpt::messages::OrderSide::Value side,
                                          double mid, double qty, uint8_t tag);
@@ -154,49 +160,30 @@ private:
                                         double price, double qty);
 
     uint64_t correlation_id_;
-    double gamma_;
-    double kappa_;
-    double session_duration_s_;
     double vol_halflife_s_;
-    std::size_t vol_warmup_ticks_;
     double kappa_halflife_s_;
-    std::size_t kappa_warmup_ticks_;
-    double kappa_min_;
+    double drift_halflife_s_;
     double requote_threshold_;
-    double min_half_spread_bps_;
-    double max_half_spread_bps_;
-    double quote_sanity_bps_;
     uint8_t order_book_depth_;
     FairValueEstimator::Config fv_cfg_;
     double pause_below_rpnl_usd_;
     double pause_cooldown_s_;
     double post_fill_markout_threshold_bps_;
     double post_fill_markout_cooldown_s_;
-    double drift_halflife_s_;
-    std::size_t drift_warmup_ticks_;
-    double max_drift_skew_bps_;
     double slow_drift_window_s_;
     SuppressionPolicy supp_policy_;
+    ASPricer pricer_;
     unwind::GracefulUnwinder unwinder_;
     RegimeDetector::Config regime_cfg_;
     VolatilityGate::Config vol_gate_cfg_;
     double vol_gate_sigma_mult_;
-    std::size_t gamma_pnl_window_n_;
-    double gamma_pnl_loss_threshold_usd_;
-    double gamma_pnl_profit_threshold_usd_;
-    double gamma_pnl_widen_mult_;
-    double gamma_pnl_tighten_mult_;
-    [[nodiscard]] double gamma_pnl_mult(const InstrumentState& st) const;
-    double ofi_weight_bps_;
     uint64_t ofi_window_ns_;
-    double imbalance_weight_bps_;
-    double ofi_cancel_threshold_sigma_;
     double ofi_sigma_halflife_s_;
     config::Sizer sizer_;
 
     std::vector<std::string> instruments_;
     std::vector<std::string> md_exchanges_;
-    std::unordered_map<std::string, config::VenueExecConfig> venue_exec_;
+    std::unordered_map<bpt::messages::ExchangeId::Value, config::VenueExecConfig> venue_exec_;
 
     refdata::IRefdataClient& refdata_;
     md::IMdClient* md_client_;

@@ -122,11 +122,11 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
             // γ-feedback rolling window — only push when feature enabled
             // and the fill actually realized PnL (opening fills don't
             // realize anything; deltas of 0 would dilute the window).
-            if (gamma_pnl_window_n_ > 0) {
+            if (pricer_.config().gamma_pnl_window_n > 0) {
                 const double delta = pos->realized_pnl - prior_rpnl;
                 if (delta != 0.0) {
                     st.recent_rpnl.push_back(delta);
-                    while (st.recent_rpnl.size() > gamma_pnl_window_n_)
+                    while (st.recent_rpnl.size() > pricer_.config().gamma_pnl_window_n)
                         st.recent_rpnl.pop_front();
                 }
             }

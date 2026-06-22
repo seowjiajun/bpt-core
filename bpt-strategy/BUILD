@@ -68,7 +68,6 @@ cc_library(
         "src/strategy/ofi_strategy.cpp",
         "src/strategy/passive_maker_strategy.cpp",
         "src/strategy/avellaneda_stoikov_strategy.cpp",
-        "src/strategy/avellaneda_stoikov_quoting.cpp",
         "src/strategy/avellaneda_stoikov_exec.cpp",
         "src/strategy/avellaneda_stoikov_orders.cpp",
         "src/strategy/avellaneda_stoikov_shutdown.cpp",

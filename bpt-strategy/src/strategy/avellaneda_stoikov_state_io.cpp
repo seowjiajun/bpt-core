@@ -30,9 +30,14 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     const auto& [instrument_id, st] = *state_.begin();
     const double net_qty = static_cast<double>(positions_.net_qty(instrument_id, st.exchange_id)) / 1e8;
 
+    const auto& pc = pricer_.config();
+    const auto fee_entry = refdata_.fee_cache().get(st.exchange_id, st.instrument_id, st.last_tick_ns);
+    const double fee_hs = fee_entry ? (static_cast<double>(fee_entry->maker_bps) / 10000.0) * st.last_mid : 0.0;
+
     const auto quotes =
-        (st.last_mid > 0 && st.ewma_var.count() >= vol_warmup_ticks_)
-            ? compute_quotes(st, BboContext{.net_qty = net_qty, .mid = st.last_mid, .ts_ns = st.last_tick_ns})
+        (st.last_mid > 0 && st.ewma_var.count() >= pc.vol_warmup_ticks)
+            ? pricer_.evaluate(st, BboContext{.net_qty = net_qty, .mid = st.last_mid, .ts_ns = st.last_tick_ns},
+                               fee_hs)
             : std::nullopt;
 
     const double bid_quote = quotes ? quotes->bid : 0.0;
@@ -80,17 +85,17 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["slowDriftBps"] = st.slow_drift_bps;
     j["slowDriftSuppressBps"] = supp_policy_.config().slow_drift_suppress_bps;
     j["sigma2"] = st.ewma_var.value();
-    j["kappa"] = (st.ewma_kappa.count() >= kappa_warmup_ticks_) ? std::max(kappa_min_, st.ewma_kappa.value()) : kappa_;
-    j["kappaLive"] = st.ewma_kappa.count() >= kappa_warmup_ticks_;
+    j["kappa"] = (st.ewma_kappa.count() >= pc.kappa_warmup_ticks) ? std::max(pc.kappa_min, st.ewma_kappa.value()) : pc.kappa;
+    j["kappaLive"] = st.ewma_kappa.count() >= pc.kappa_warmup_ticks;
 
     j["regime"] = st.regime.regime_name();
     j["hurst"] = st.regime.hurst();
-    j["gammaBase"] = gamma_;
-    const double gpnl_mult = gamma_pnl_mult(st);
-    j["gammaEffective"] = gamma_ * st.regime.gamma_multiplier() * gpnl_mult;
+    j["gammaBase"] = pc.gamma;
+    const double gpnl_mult = pricer_.gamma_pnl_mult(st);
+    j["gammaEffective"] = pc.gamma * st.regime.gamma_multiplier() * gpnl_mult;
     j["gammaMultiplier"] = st.regime.gamma_multiplier();
     j["gammaPnlMultiplier"] = gpnl_mult;
-    j["gammaPnlWindow"] = static_cast<int>(gamma_pnl_window_n_);
+    j["gammaPnlWindow"] = static_cast<int>(pc.gamma_pnl_window_n);
     j["gammaPnlRecentSum"] = [&]() {
         double s = 0.0;
         for (double r : st.recent_rpnl)
@@ -124,8 +129,8 @@ std::string AvellanedaStoikovStrategy::get_strategy_state_json() {
     j["askPrice"] = st.last_ask_price;
 
     j["volTicks"] = st.ewma_var.count();
-    j["volWarmup"] = vol_warmup_ticks_;
-    j["warmedUp"] = st.ewma_var.count() >= vol_warmup_ticks_;
+    j["volWarmup"] = pc.vol_warmup_ticks;
+    j["warmedUp"] = st.ewma_var.count() >= pc.vol_warmup_ticks;
 
     j["bookBidLevels"] = st.book.n_bid_levels();
     j["bookAskLevels"] = st.book.n_ask_levels();

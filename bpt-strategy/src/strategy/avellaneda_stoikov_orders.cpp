@@ -160,7 +160,7 @@ order::OrderHandle AvellanedaStoikovStrategy::send_limit_order(InstrumentState& 
                                                                bpt::messages::OrderSide::Value side,
                                                                double price,
                                                                double qty) {
-    const auto vex_it = venue_exec_.find(st.exchange);
+    const auto vex_it = venue_exec_.find(st.exchange_id);
     if (vex_it == venue_exec_.end() || !vex_it->second.enabled || !order_mgr_)
         return {};
 
@@ -180,7 +180,7 @@ order::OrderHandle AvellanedaStoikovStrategy::send_unwind_order(InstrumentState&
                                                                 double mid,
                                                                 double qty,
                                                                 uint8_t tag) {
-    const auto vex_it = venue_exec_.find(st.exchange);
+    const auto vex_it = venue_exec_.find(st.exchange_id);
     if (vex_it == venue_exec_.end() || !vex_it->second.enabled)
         return {};
 

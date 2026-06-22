@@ -48,32 +48,16 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                                                      md::IMdClient* md,
                                                      order::OrderManager* order_mgr)
     : correlation_id_(correlation_id),
-      gamma_(cfg.params["gamma"].value<double>().value_or(0.1)),
-      kappa_(cfg.params["kappa"].value<double>().value_or(1.5)),
-      session_duration_s_(cfg.params["session_duration_s"].value<double>().value_or(86400.0)),
       vol_halflife_s_(cfg.params["vol_halflife_s"].value<double>().value_or(60.0)),
-      vol_warmup_ticks_(static_cast<std::size_t>(cfg.params["vol_warmup_ticks"].value<int64_t>().value_or(20))),
       kappa_halflife_s_(cfg.params["kappa_halflife_s"].value<double>().value_or(300.0)),
-      kappa_warmup_ticks_(static_cast<std::size_t>(cfg.params["kappa_warmup_ticks"].value<int64_t>().value_or(10))),
-      kappa_min_(cfg.params["kappa_min"].value<double>().value_or(0.01)),
+      drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
       requote_threshold_(cfg.params["requote_threshold"].value<double>().value_or(0.0001)),
-      sizer_{.order_qty = cfg.params["order_qty"].value<double>().value_or(0.001),
-             .order_qty_fraction = cfg.params["order_qty_fraction"].value<double>().value_or(0.0),
-             .order_qty_min = cfg.params["order_qty_min"].value<double>().value_or(0.0),
-             .max_inventory = cfg.params["max_inventory"].value<double>().value_or(0.1),
-             .max_inventory_fraction = cfg.params["max_inventory_fraction"].value<double>().value_or(0.0)},
-      min_half_spread_bps_(cfg.params["min_half_spread_bps"].value<double>().value_or(1.0)),
-      max_half_spread_bps_(cfg.params["max_half_spread_bps"].value<double>().value_or(50.0)),
-      quote_sanity_bps_(cfg.params["quote_sanity_bps"].value<double>().value_or(5000.0)),
       order_book_depth_(static_cast<uint8_t>(cfg.params["order_book_depth"].value<int64_t>().value_or(0))),
       fv_cfg_(config::parse_fv_config(cfg.params)),
       pause_below_rpnl_usd_(cfg.params["pause_below_rpnl_usd"].value<double>().value_or(0.0)),
       pause_cooldown_s_(cfg.params["pause_cooldown_s"].value<double>().value_or(300.0)),
       post_fill_markout_threshold_bps_(cfg.params["post_fill_markout_threshold_bps"].value<double>().value_or(0.0)),
       post_fill_markout_cooldown_s_(cfg.params["post_fill_markout_cooldown_s"].value<double>().value_or(30.0)),
-      drift_halflife_s_(cfg.params["drift_halflife_s"].value<double>().value_or(30.0)),
-      drift_warmup_ticks_(static_cast<std::size_t>(cfg.params["drift_warmup_ticks"].value<int64_t>().value_or(50))),
-      max_drift_skew_bps_(cfg.params["max_drift_skew_bps"].value<double>().value_or(10.0)),
       slow_drift_window_s_(cfg.params["slow_drift_window_s"].value<double>().value_or(300.0)),
       supp_policy_(SuppressionPolicy::Config{
           .post_fill_markout_threshold_bps =
@@ -91,6 +75,33 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
               static_cast<std::size_t>(cfg.params["kappa_warmup_ticks"].value<int64_t>().value_or(10)),
           .ofi_cancel_threshold_sigma = cfg.params["ofi_cancel_threshold_sigma"].value<double>().value_or(
               std::numeric_limits<double>::infinity()),
+      }),
+      pricer_(ASPricer::Config{
+          .gamma = cfg.params["gamma"].value<double>().value_or(0.1),
+          .kappa = cfg.params["kappa"].value<double>().value_or(1.5),
+          .session_duration_s = cfg.params["session_duration_s"].value<double>().value_or(86400.0),
+          .max_inventory = cfg.params["max_inventory"].value<double>().value_or(0.1),
+          .vol_warmup_ticks =
+              static_cast<std::size_t>(cfg.params["vol_warmup_ticks"].value<int64_t>().value_or(20)),
+          .kappa_warmup_ticks =
+              static_cast<std::size_t>(cfg.params["kappa_warmup_ticks"].value<int64_t>().value_or(10)),
+          .kappa_min = cfg.params["kappa_min"].value<double>().value_or(0.01),
+          .drift_warmup_ticks =
+              static_cast<std::size_t>(cfg.params["drift_warmup_ticks"].value<int64_t>().value_or(50)),
+          .min_half_spread_bps = cfg.params["min_half_spread_bps"].value<double>().value_or(1.0),
+          .max_half_spread_bps = cfg.params["max_half_spread_bps"].value<double>().value_or(50.0),
+          .quote_sanity_bps = cfg.params["quote_sanity_bps"].value<double>().value_or(5000.0),
+          .max_drift_skew_bps = cfg.params["max_drift_skew_bps"].value<double>().value_or(10.0),
+          .ofi_weight_bps = cfg.params["ofi_weight_bps"].value<double>().value_or(0.0),
+          .imbalance_weight_bps = cfg.params["imbalance_weight_bps"].value<double>().value_or(0.0),
+          .gamma_pnl_window_n =
+              static_cast<std::size_t>(cfg.params["gamma_pnl_window_n"].value<int64_t>().value_or(0)),
+          .gamma_pnl_loss_threshold_usd =
+              cfg.params["gamma_pnl_loss_threshold_usd"].value<double>().value_or(0.0),
+          .gamma_pnl_profit_threshold_usd =
+              cfg.params["gamma_pnl_profit_threshold_usd"].value<double>().value_or(0.0),
+          .gamma_pnl_widen_mult = cfg.params["gamma_pnl_widen_mult"].value<double>().value_or(1.0),
+          .gamma_pnl_tighten_mult = cfg.params["gamma_pnl_tighten_mult"].value<double>().value_or(1.0),
       }),
       unwinder_(positions_,
                 *order_mgr,
@@ -116,23 +127,22 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
           static_cast<uint64_t>(cfg.params["vol_gate_halt_ms"].value<double>().value_or(5000.0) * 1e6),
       },
       vol_gate_sigma_mult_(cfg.params["vol_gate_sigma_mult"].value<double>().value_or(0.0)),
-      gamma_pnl_window_n_(static_cast<std::size_t>(cfg.params["gamma_pnl_window_n"].value<int64_t>().value_or(0))),
-      gamma_pnl_loss_threshold_usd_(cfg.params["gamma_pnl_loss_threshold_usd"].value<double>().value_or(0.0)),
-      gamma_pnl_profit_threshold_usd_(cfg.params["gamma_pnl_profit_threshold_usd"].value<double>().value_or(0.0)),
-      gamma_pnl_widen_mult_(cfg.params["gamma_pnl_widen_mult"].value<double>().value_or(1.0)),
-      gamma_pnl_tighten_mult_(cfg.params["gamma_pnl_tighten_mult"].value<double>().value_or(1.0)),
-      ofi_weight_bps_(cfg.params["ofi_weight_bps"].value<double>().value_or(0.0)),
       ofi_window_ns_(static_cast<uint64_t>(cfg.params["ofi_window_ms"].value<double>().value_or(1000.0) * 1e6)),
-      imbalance_weight_bps_(cfg.params["imbalance_weight_bps"].value<double>().value_or(0.0)),
-      ofi_cancel_threshold_sigma_(
-          cfg.params["ofi_cancel_threshold_sigma"].value<double>().value_or(std::numeric_limits<double>::infinity())),
       ofi_sigma_halflife_s_(cfg.params["ofi_sigma_halflife_s"].value<double>().value_or(60.0)),
+      sizer_{.order_qty = cfg.params["order_qty"].value<double>().value_or(0.001),
+             .order_qty_fraction = cfg.params["order_qty_fraction"].value<double>().value_or(0.0),
+             .order_qty_min = cfg.params["order_qty_min"].value<double>().value_or(0.0),
+             .max_inventory = cfg.params["max_inventory"].value<double>().value_or(0.1),
+             .max_inventory_fraction = cfg.params["max_inventory_fraction"].value<double>().value_or(0.0)},
       instruments_(cfg.instruments),
       md_exchanges_(cfg.md_exchanges),
-      venue_exec_(cfg.venue_exec),
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
+    for (const auto& [name, vex] : cfg.venue_exec)
+        venue_exec_.emplace(refdata::to_exchange_id(name), vex);
+
+    const auto& pc = pricer_.config();
     bpt::common::log::info(kLog(),
                            "γ={:.4f} κ_fallback={:.4f} session={:.0f}s "
                            "vol_halflife={:.1f}s vol_warmup={} "
@@ -141,19 +151,19 @@ AvellanedaStoikovStrategy::AvellanedaStoikovStrategy(uint64_t correlation_id,
                            "half_spread=[{:.1f},{:.1f}]bps "
                            "drift_halflife={:.1f}s drift_suppress={:.1f}bps (σ×{:.2f}) "
                            "slow_drift_window={:.0f}s slow_drift_suppress={:.1f}bps (σ×{:.2f})",
-                           gamma_,
-                           kappa_,
-                           session_duration_s_,
+                           pc.gamma,
+                           pc.kappa,
+                           pc.session_duration_s,
                            vol_halflife_s_,
-                           vol_warmup_ticks_,
+                           pc.vol_warmup_ticks,
                            kappa_halflife_s_,
-                           kappa_warmup_ticks_,
-                           kappa_min_,
+                           pc.kappa_warmup_ticks,
+                           pc.kappa_min,
                            requote_threshold_ * 100.0,
                            sizer_.max_inventory,
                            sizer_.order_qty,
-                           min_half_spread_bps_,
-                           max_half_spread_bps_,
+                           pc.min_half_spread_bps,
+                           pc.max_half_spread_bps,
                            drift_halflife_s_,
                            supp_policy_.config().drift_suppress_bps,
                            supp_policy_.config().drift_suppress_sigma_mult,
@@ -236,28 +246,10 @@ void AvellanedaStoikovStrategy::on_snapshot(const refdata::InstrumentCache& cach
     initial_ccy_equity_captured_ = false;
 
     for (const auto& r : CanonicalResolver::resolve_instruments(cache, instruments_, md_exchanges_)) {
-        auto [it, inserted] = state_.emplace(r.instrument_id,
-                                             InstrumentState{.instrument_id = r.instrument_id,
-                                                             .ewma_var = EwmaVariance(vol_halflife_s_),
-                                                             .ewma_drift = EwmaDrift(drift_halflife_s_),
-                                                             .ewma_kappa = KappaEstimator(kappa_halflife_s_),
-                                                             .symbol = r.instrument.symbol,
-                                                             .exchange = r.instrument.exchange,
-                                                             .exchange_id = r.exchange_id,
-                                                             .instrument_type = r.instrument.type,
-                                                             .base_ccy = r.instrument.base_currency,
-                                                             .tick_size = r.instrument.tick_size,
-                                                             .lot_size = r.instrument.lot_size,
-                                                             .vol_gate = VolatilityGate(vol_gate_cfg_),
-                                                             .regime = RegimeDetector(regime_cfg_)});
-        if (inserted) {
-            it->second.fv = FairValueEstimator{fv_cfg_};
-            it->second.ofi = OFICalculator{OFICalculator::Config{
-                .max_levels = static_cast<int>(order_book_depth_ > 0 ? order_book_depth_ : 5),
-                .window_ns = ofi_window_ns_,
-            }};
-            it->second.ewma_ofi_sq = TimeWeightedEwma(ofi_sigma_halflife_s_);
-        }
+        state_.emplace(r.instrument_id,
+                       make_instrument_state(r.instrument_id, r.instrument.symbol, r.instrument.exchange,
+                                             r.exchange_id, r.instrument.type, r.instrument.base_currency,
+                                             r.instrument.tick_size, r.instrument.lot_size));
         bpt::common::log::info("  [{}] {} @ {} tick={} lot={}",
                                r.instrument_id,
                                r.instrument.symbol,
@@ -285,29 +277,10 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
             return;
 
         const auto ex_id = refdata::to_exchange_id(inst.exchange);
-
-        auto [it, inserted] = state_.emplace(inst.instrument_id,
-                                             InstrumentState{.instrument_id = inst.instrument_id,
-                                                             .ewma_var = EwmaVariance(vol_halflife_s_),
-                                                             .ewma_drift = EwmaDrift(drift_halflife_s_),
-                                                             .ewma_kappa = KappaEstimator(kappa_halflife_s_),
-                                                             .symbol = inst.symbol,
-                                                             .exchange = inst.exchange,
-                                                             .exchange_id = ex_id,
-                                                             .instrument_type = inst.type,
-                                                             .base_ccy = inst.base_currency,
-                                                             .tick_size = inst.tick_size,
-                                                             .lot_size = inst.lot_size,
-                                                             .vol_gate = VolatilityGate(vol_gate_cfg_),
-                                                             .regime = RegimeDetector(regime_cfg_)});
-        if (inserted) {
-            it->second.fv = FairValueEstimator{fv_cfg_};
-            it->second.ofi = OFICalculator{OFICalculator::Config{
-                .max_levels = static_cast<int>(order_book_depth_ > 0 ? order_book_depth_ : 5),
-                .window_ns = ofi_window_ns_,
-            }};
-            it->second.ewma_ofi_sq = TimeWeightedEwma(ofi_sigma_halflife_s_);
-        }
+        state_.emplace(inst.instrument_id,
+                       make_instrument_state(inst.instrument_id, inst.symbol, inst.exchange,
+                                             ex_id, inst.type, inst.base_currency,
+                                             inst.tick_size, inst.lot_size));
         bpt::common::log::info(kLog(),
                                "Delta ADD {} @ {} tick={} lot={}",
                                inst.symbol,
@@ -319,6 +292,39 @@ void AvellanedaStoikovStrategy::on_delta(const refdata::Instrument& inst,
         state_.erase(inst.instrument_id);
         bpt::common::log::info(kLog(), "Delta REMOVE {} @ {}", inst.symbol, inst.exchange);
     }
+}
+
+AvellanedaStoikovStrategy::InstrumentState AvellanedaStoikovStrategy::make_instrument_state(
+    uint64_t instrument_id,
+    const std::string& symbol,
+    const std::string& exchange,
+    bpt::messages::ExchangeId::Value exchange_id,
+    refdata::InstrumentType type,
+    const std::string& base_ccy,
+    double tick_size,
+    double lot_size) const {
+    InstrumentState st{
+        .instrument_id = instrument_id,
+        .symbol = symbol,
+        .exchange = exchange,
+        .exchange_id = exchange_id,
+        .instrument_type = type,
+        .base_ccy = base_ccy,
+        .tick_size = tick_size,
+        .lot_size = lot_size,
+        .ewma_var = EwmaVariance(vol_halflife_s_),
+        .ewma_drift = EwmaDrift(drift_halflife_s_),
+        .ewma_kappa = KappaEstimator(kappa_halflife_s_),
+    };
+    st.vol_gate = VolatilityGate(vol_gate_cfg_);
+    st.regime = RegimeDetector(regime_cfg_);
+    st.fv = FairValueEstimator{fv_cfg_};
+    st.ofi = OFICalculator{OFICalculator::Config{
+        .max_levels = static_cast<int>(order_book_depth_ > 0 ? order_book_depth_ : 5),
+        .window_ns = ofi_window_ns_,
+    }};
+    st.ewma_ofi_sq = TimeWeightedEwma(ofi_sigma_halflife_s_);
+    return st;
 }
 
 void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& book) {
@@ -348,8 +354,8 @@ void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& 
     // OFI update gate widened: also fires when the cancel rule is armed.
     // Keep the "skip when fully off" property so existing baselines stay
     // byte-identical when both knobs are disabled (weight=0, threshold=inf).
-    const bool cancel_armed = !std::isinf(ofi_cancel_threshold_sigma_);
-    const bool ofi_active = ofi_weight_bps_ != 0.0 || cancel_armed;
+    const bool cancel_armed = !std::isinf(supp_policy_.config().ofi_cancel_threshold_sigma);
+    const bool ofi_active = pricer_.config().ofi_weight_bps != 0.0 || cancel_armed;
     if (ofi_active && st.book.ready()) {
         const std::size_t K = order_book_depth_ > 0 ? order_book_depth_ : 5;
         st.book.top_bids(K, st.ofi_top_bid_buf);
@@ -530,8 +536,11 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     const double s_est = st.fv.estimate(bid_px, ask_px, tick.bidQty(), tick.askQty());
     const double s = std::isnan(s_est) ? mid : s_est;
 
+    const auto fee_entry = refdata_.fee_cache().get(st.exchange_id, st.instrument_id, ts_ns);
+    const double fee_hs = fee_entry ? (static_cast<double>(fee_entry->maker_bps) / 10000.0) * s : 0.0;
+
     const BboContext ctx{.net_qty = net_qty, .mid = s, .ts_ns = ts_ns};
-    const auto quotes = compute_quotes(st, ctx);
+    const auto quotes = pricer_.evaluate(st, ctx, fee_hs);
     if (!quotes)
         return;
     maybe_requote(st, ctx, *quotes);
