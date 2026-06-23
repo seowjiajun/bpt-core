@@ -87,6 +87,11 @@ private:
         double half_spread_bps{0.0};
     };
 
+    [[nodiscard]] InstrumentState* find_state(uint64_t instrument_id) {
+        const auto it = state_.find(instrument_id);
+        return it != state_.end() ? &it->second : nullptr;
+    }
+
     [[nodiscard]] std::optional<QuoteTarget> compute_quotes(const InstrumentState& st, double net_qty) const;
     void maybe_requote(InstrumentState& st, double net_qty, const QuoteTarget& q, uint64_t ts_ns);
     [[nodiscard]] order::OrderHandle send_limit_order(InstrumentState& st,

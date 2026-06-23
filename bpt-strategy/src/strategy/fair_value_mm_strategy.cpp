@@ -128,11 +128,10 @@ void FairValueMmStrategy::on_instrument_snapshot(const refdata::InstrumentCache&
 }
 
 void FairValueMmStrategy::on_instrument_delta(const refdata::Instrument& inst, bpt::messages::DeltaUpdateType::Value) {
-    const auto it = state_.find(inst.instrument_id);
-    if (it == state_.end())
-        return;
-    it->second.tick_size = inst.tick_size;
-    it->second.lot_size = inst.lot_size;
+    auto* st = find_state(inst.instrument_id);
+    if (!st) return;
+    st->tick_size = inst.tick_size;
+    st->lot_size = inst.lot_size;
 }
 
 void FairValueMmStrategy::on_refdata_stale_changed(bool stale) {
@@ -146,10 +145,9 @@ void FairValueMmStrategy::on_refdata_stale_changed(bool stale) {
 // ── Market data ───────────────────────────────────────────────────────────────
 
 void FairValueMmStrategy::on_bbo(const bpt::messages::MdMarketData& tick) {
-    auto it = state_.find(tick.instrumentId());
-    if (it == state_.end())
-        return;
-    auto& st = it->second;
+    auto* st_ptr = find_state(tick.instrumentId());
+    if (!st_ptr) return;
+    auto& st = *st_ptr;
 
     const double bid_px = tick.bidPrice();
     const double ask_px = tick.askPrice();
@@ -329,10 +327,9 @@ void FairValueMmStrategy::on_exec_report(const bpt::messages::ExecutionReport& r
     order_mgr_->on_exec_report(rpt);
 
     const uint64_t instrument_id = rpt.instrumentId();
-    const auto it = state_.find(instrument_id);
-    if (it == state_.end())
-        return;
-    auto& st = it->second;
+    auto* st_ptr = find_state(instrument_id);
+    if (!st_ptr) return;
+    auto& st = *st_ptr;
 
     const auto status = rpt.status();
     const bool is_fill = (status == ExecStatus::FILLED || status == ExecStatus::PARTIAL);
