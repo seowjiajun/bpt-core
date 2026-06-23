@@ -153,6 +153,11 @@ private:
                                                         double tick_size,
                                                         double lot_size) const;
 
+    [[nodiscard]] InstrumentState* find_state(uint64_t instrument_id) {
+        const auto it = state_.find(instrument_id);
+        return it != state_.end() ? &it->second : nullptr;
+    }
+
     void maybe_requote(InstrumentState& st, const BboContext& ctx, const QuoteTarget& quotes);
     order::OrderHandle send_unwind_order(InstrumentState& st, bpt::messages::OrderSide::Value side,
                                          double mid, double qty, uint8_t tag);

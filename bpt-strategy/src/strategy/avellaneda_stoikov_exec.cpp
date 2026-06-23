@@ -40,14 +40,14 @@ void AvellanedaStoikovStrategy::on_exec_report(const bpt::messages::ExecutionRep
     order::OrderState* const os = handle.state;
     const uint64_t canonical_id = os->instrument_id;
 
-    auto state_it = state_.find(canonical_id);
-    if (state_it == state_.end()) {
+    auto* st_ptr = find_state(canonical_id);
+    if (!st_ptr) {
         bpt::common::log::warn(kLog(), "ExecReport order_id={} instrument_id={} not in state — dropping",
                                order_id, canonical_id);
         return;
     }
 
-    InstrumentState& st = state_it->second;
+    InstrumentState& st = *st_ptr;
 
     // Shutdown-drain orders: update position then hand off to the unwinder.
     if (os->tag == unwind::GracefulUnwinder::kTag) {

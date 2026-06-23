@@ -328,10 +328,9 @@ AvellanedaStoikovStrategy::InstrumentState AvellanedaStoikovStrategy::make_instr
 }
 
 void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& book) {
-    auto it = state_.find(book.instrumentId());
-    if (it == state_.end())
-        return;
-    InstrumentState& st = it->second;
+    auto* st_ptr = find_state(book.instrumentId());
+    if (!st_ptr) return;
+    InstrumentState& st = *st_ptr;
     // With order_book_depth_ <= 5 we're on OKX `books5` (or equivalent
     // snapshot-only channels), where every frame is a full top-N
     // snapshot — clear+rebuild avoids stale-level accumulation. Above 5
@@ -401,11 +400,9 @@ void AvellanedaStoikovStrategy::on_order_book(const bpt::messages::MdOrderBook& 
 }
 
 void AvellanedaStoikovStrategy::on_trade(const bpt::messages::MdTrade& tick) {
-    auto it = state_.find(tick.instrumentId());
-    if (it == state_.end())
-        return;
-
-    InstrumentState& st = it->second;
+    auto* st_ptr = find_state(tick.instrumentId());
+    if (!st_ptr) return;
+    InstrumentState& st = *st_ptr;
     const uint64_t ts_ns = tick.timestampNs();
 
     using bpt::messages::TradeSide;
@@ -420,11 +417,9 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
     if (refdata_stale_)  // fee_cache returns nullopt when stale — skip to avoid zero-fee-buffer quotes
         return;
 
-    auto it = state_.find(tick.instrumentId());
-    if (it == state_.end())
-        return;
-
-    InstrumentState& st = it->second;
+    auto* st_ptr = find_state(tick.instrumentId());
+    if (!st_ptr) return;
+    InstrumentState& st = *st_ptr;
 
     const double bid_px = tick.bidPrice();
     const double ask_px = tick.askPrice();
@@ -549,11 +544,9 @@ void AvellanedaStoikovStrategy::on_bbo(const bpt::messages::MdMarketData& tick) 
 // ── Toxicity feedback from Analytics ──────────────────────────────────────────────
 
 void AvellanedaStoikovStrategy::on_toxicity_update(const bpt::analytics::messaging::ToxicityUpdate& update) {
-    auto it = state_.find(update.instrument_id);
-    if (it == state_.end())
-        return;
-
-    auto& st = it->second;
+    auto* st_ptr = find_state(update.instrument_id);
+    if (!st_ptr) return;
+    auto& st = *st_ptr;
     st.tox_bid_toxicity = update.bid_toxicity_score;
     st.tox_ask_toxicity = update.ask_toxicity_score;
     st.tox_data_received = true;
