@@ -8,8 +8,7 @@
 #include "strategy/order/order_manager.h"
 #include "strategy/refdata/i_refdata_client.h"
 #include "strategy/refdata/instrument.h"
-#include "strategy/strategy/i_strategy.h"
-#include "strategy/strategy/position_tracker.h"
+#include "strategy/strategy/strategy_base.h"
 #include "strategy/unwind/graceful_unwinder.h"
 
 #include <messages/AccountSnapshot.h>
@@ -29,7 +28,33 @@ namespace bpt::strategy::strategy {
 using bpt::features::EwmaVariance;
 using bpt::features::FairValueEstimator;
 
-class FairValueMmStrategy : public IStrategy {
+struct FVMMInstrumentState {
+    uint64_t instrument_id{0};
+    EwmaVariance ewma_var;
+    double last_mid{0.0};
+    uint64_t last_tick_ns{0};
+    double last_market_bid{0.0};
+    double last_market_ask{0.0};
+    double last_bid_price{0.0};
+    double last_ask_price{0.0};
+    double bid_placed_mid{0.0};
+    double ask_placed_mid{0.0};
+    order::OrderHandle h_bid;
+    order::OrderHandle h_ask;
+    order::OrderHandle h_unwind;  // mid-session inventory unwind only (kTagUnwindNormal)
+    uint32_t consecutive_exchange_errors{0};
+    uint64_t reject_backoff_until_ns{0};
+    uint64_t pause_until_ns{0};
+    double tick_size{0.0};
+    double lot_size{0.0};
+    std::string symbol;
+    std::string exchange;
+    bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
+    refdata::InstrumentType instrument_type{refdata::InstrumentType::SPOT};
+    FairValueEstimator fv;
+};
+
+class FairValueMmStrategy : public StrategyBase<FVMMInstrumentState> {
 public:
     FairValueMmStrategy(uint64_t correlation_id,
                         const config::StrategyConfig& cfg,
@@ -52,45 +77,16 @@ public:
     [[nodiscard]] double shutdown_drain_budget_s() const override;
 
 private:
+    using InstrumentState = FVMMInstrumentState;
+
     static constexpr uint8_t kTagQuote = 0;
     static constexpr uint8_t kTagUnwindNormal = 1;
-
-    struct InstrumentState {
-        uint64_t instrument_id{0};
-        EwmaVariance ewma_var;
-        double last_mid{0.0};
-        uint64_t last_tick_ns{0};
-        double last_market_bid{0.0};
-        double last_market_ask{0.0};
-        double last_bid_price{0.0};
-        double last_ask_price{0.0};
-        double bid_placed_mid{0.0};
-        double ask_placed_mid{0.0};
-        order::OrderHandle h_bid;
-        order::OrderHandle h_ask;
-        order::OrderHandle h_unwind;  // mid-session inventory unwind only (kTagUnwindNormal)
-        uint32_t consecutive_exchange_errors{0};
-        uint64_t reject_backoff_until_ns{0};
-        uint64_t pause_until_ns{0};
-        double tick_size{0.0};
-        double lot_size{0.0};
-        std::string symbol;
-        std::string exchange;
-        bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
-        refdata::InstrumentType instrument_type{refdata::InstrumentType::SPOT};
-        FairValueEstimator fv;
-    };
 
     struct QuoteTarget {
         double bid{0.0};
         double ask{0.0};
         double half_spread_bps{0.0};
     };
-
-    [[nodiscard]] InstrumentState* find_state(uint64_t instrument_id) {
-        const auto it = state_.find(instrument_id);
-        return it != state_.end() ? &it->second : nullptr;
-    }
 
     [[nodiscard]] std::optional<QuoteTarget> compute_quotes(const InstrumentState& st, double net_qty) const;
     void maybe_requote(InstrumentState& st, double net_qty, const QuoteTarget& q, uint64_t ts_ns);
@@ -126,8 +122,6 @@ private:
     refdata::IRefdataClient& refdata_;
     md::IMdClient* md_client_;
     order::OrderManager* order_mgr_;
-    std::unordered_map<uint64_t, InstrumentState> state_;
-    PositionTracker positions_;
 
     // Symbol → snapshot qty (authoritative exchange view for shutdown flatten).
     std::unordered_map<std::string, int64_t> last_snapshot_qty_e8_;

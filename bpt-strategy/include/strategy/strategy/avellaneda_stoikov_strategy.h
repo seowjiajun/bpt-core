@@ -14,8 +14,7 @@
 #include "strategy/refdata/refdata_client.h"
 #include "strategy/strategy/as_pricer.h"
 #include "strategy/strategy/canonical_resolver.h"
-#include "strategy/strategy/i_strategy.h"
-#include "strategy/strategy/position_tracker.h"
+#include "strategy/strategy/strategy_base.h"
 #include "strategy/strategy/suppression_policy.h"
 #include "strategy/unwind/graceful_unwinder.h"
 
@@ -47,7 +46,73 @@ using bpt::features::RegimeDetector;
 using bpt::features::TimeWeightedEwma;
 using bpt::features::VolatilityGate;
 
-class AvellanedaStoikovStrategy : public IStrategy {
+struct ASInstrumentState {
+    // ── Metadata ────────────────────────────────────────────────────────────
+    uint64_t instrument_id{0};
+    std::string symbol;
+    std::string exchange;
+    bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
+    refdata::InstrumentType instrument_type{refdata::InstrumentType::SPOT};
+    std::string base_ccy;
+    double tick_size{0.0};
+    double lot_size{0.0};
+
+    // ── Vol / drift / regime ─────────────────────────────────────────────
+    EwmaVariance ewma_var;
+    EwmaDrift ewma_drift;
+    KappaEstimator ewma_kappa;
+    RegimeDetector regime;
+    double last_mid{0.0};
+    uint64_t last_tick_ns{0};
+    uint64_t last_trade_ns{0};
+    uint64_t session_start_ns{0};
+    double slow_drift_bps{0.0};
+    double slow_drift_window_start_mid{0.0};
+    uint64_t slow_drift_window_start_ns{0};
+
+    // ── Resting quotes ────────────────────────────────────────────────────
+    order::OrderHandle h_bid;
+    order::OrderHandle h_ask;
+    order::OrderHandle h_unwind;
+    double last_bid_price{0.0};
+    double last_ask_price{0.0};
+    double last_market_bid{0.0};
+    double last_market_ask{0.0};
+    double bid_placed_mid{0.0};
+    double ask_placed_mid{0.0};
+
+    // ── Risk / suppression inputs ─────────────────────────────────────────
+    VolatilityGate vol_gate;
+    double tox_bid_toxicity{0.0};
+    double tox_ask_toxicity{0.0};
+    bool tox_data_received{false};
+    uint32_t consecutive_exchange_errors{0};
+    uint64_t reject_backoff_until_ns{0};
+    uint64_t pause_until_ns{0};
+
+    // ── Fill tracking / post-fill markout ─────────────────────────────────
+    double pending_buy_fill_price{0.0};
+    uint64_t pending_buy_fill_ts{0};
+    double pending_sell_fill_price{0.0};
+    uint64_t pending_sell_fill_ts{0};
+    uint64_t post_fill_suspend_until_bid{0};
+    uint64_t post_fill_suspend_until_ask{0};
+    std::deque<double> recent_rpnl;
+
+    // ── Order book / queue / fair value / OFI ─────────────────────────────
+    OrderBookState book;
+    QueueTracker queue;
+    FairValueEstimator fv;
+    OFICalculator ofi{OFICalculator::Config{}};
+    TimeWeightedEwma ewma_ofi_sq{60.0};
+    uint64_t ewma_ofi_last_ns{0};
+    std::vector<OrderBookState::Level> ofi_top_bid_buf;
+    std::vector<OrderBookState::Level> ofi_top_ask_buf;
+    std::vector<OFICalculator::Level> ofi_bids_buf;
+    std::vector<OFICalculator::Level> ofi_asks_buf;
+};
+
+class AvellanedaStoikovStrategy : public StrategyBase<ASInstrumentState> {
 public:
     AvellanedaStoikovStrategy(uint64_t correlation_id,
                               const config::StrategyConfig& cfg,
@@ -75,74 +140,10 @@ public:
     void load_state(const std::string& path, uint64_t max_age_s) override;
 
 private:
+    using InstrumentState = ASInstrumentState;
+
     static constexpr uint8_t kTagQuote = 0;
     static constexpr uint8_t kTagUnwindNormal = 1;
-
-    struct InstrumentState {
-        // ── Metadata ────────────────────────────────────────────────────────────
-        uint64_t instrument_id{0};
-        std::string symbol;
-        std::string exchange;
-        bpt::messages::ExchangeId::Value exchange_id{bpt::messages::ExchangeId::NULL_VALUE};
-        refdata::InstrumentType instrument_type{refdata::InstrumentType::SPOT};
-        std::string base_ccy;
-        double tick_size{0.0};
-        double lot_size{0.0};
-
-        // ── Vol / drift / regime ─────────────────────────────────────────────
-        EwmaVariance ewma_var;
-        EwmaDrift ewma_drift;
-        KappaEstimator ewma_kappa;
-        RegimeDetector regime;
-        double last_mid{0.0};
-        uint64_t last_tick_ns{0};
-        uint64_t last_trade_ns{0};
-        uint64_t session_start_ns{0};
-        double slow_drift_bps{0.0};
-        double slow_drift_window_start_mid{0.0};
-        uint64_t slow_drift_window_start_ns{0};
-
-        // ── Resting quotes ────────────────────────────────────────────────────
-        order::OrderHandle h_bid;
-        order::OrderHandle h_ask;
-        order::OrderHandle h_unwind;
-        double last_bid_price{0.0};
-        double last_ask_price{0.0};
-        double last_market_bid{0.0};
-        double last_market_ask{0.0};
-        double bid_placed_mid{0.0};
-        double ask_placed_mid{0.0};
-
-        // ── Risk / suppression inputs ─────────────────────────────────────────
-        VolatilityGate vol_gate;
-        double tox_bid_toxicity{0.0};
-        double tox_ask_toxicity{0.0};
-        bool tox_data_received{false};
-        uint32_t consecutive_exchange_errors{0};
-        uint64_t reject_backoff_until_ns{0};
-        uint64_t pause_until_ns{0};
-
-        // ── Fill tracking / post-fill markout ─────────────────────────────────
-        double pending_buy_fill_price{0.0};
-        uint64_t pending_buy_fill_ts{0};
-        double pending_sell_fill_price{0.0};
-        uint64_t pending_sell_fill_ts{0};
-        uint64_t post_fill_suspend_until_bid{0};
-        uint64_t post_fill_suspend_until_ask{0};
-        std::deque<double> recent_rpnl;
-
-        // ── Order book / queue / fair value / OFI ─────────────────────────────
-        OrderBookState book;
-        QueueTracker queue;
-        FairValueEstimator fv;
-        OFICalculator ofi{OFICalculator::Config{}};
-        TimeWeightedEwma ewma_ofi_sq{60.0};
-        uint64_t ewma_ofi_last_ns{0};
-        std::vector<OrderBookState::Level> ofi_top_bid_buf;
-        std::vector<OrderBookState::Level> ofi_top_ask_buf;
-        std::vector<OFICalculator::Level> ofi_bids_buf;
-        std::vector<OFICalculator::Level> ofi_asks_buf;
-    };
 
     [[nodiscard]] InstrumentState make_instrument_state(uint64_t instrument_id,
                                                         const std::string& symbol,
@@ -152,11 +153,6 @@ private:
                                                         const std::string& base_ccy,
                                                         double tick_size,
                                                         double lot_size) const;
-
-    [[nodiscard]] InstrumentState* find_state(uint64_t instrument_id) {
-        const auto it = state_.find(instrument_id);
-        return it != state_.end() ? &it->second : nullptr;
-    }
 
     void maybe_requote(InstrumentState& st, const BboContext& ctx, const QuoteTarget& quotes);
     order::OrderHandle send_unwind_order(InstrumentState& st, bpt::messages::OrderSide::Value side,
@@ -193,8 +189,6 @@ private:
     refdata::IRefdataClient& refdata_;
     md::IMdClient* md_client_;
     order::OrderManager* order_mgr_;
-    std::unordered_map<uint64_t, InstrumentState> state_;
-    PositionTracker positions_;
 
     struct SnapshotKey {
         bpt::messages::ExchangeId::Value exchange_id;
