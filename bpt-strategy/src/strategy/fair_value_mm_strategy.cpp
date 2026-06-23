@@ -68,10 +68,11 @@ FairValueMmStrategy::FairValueMmStrategy(uint64_t correlation_id,
       fv_cfg_(config::parse_fv_config(cfg.params)),
       instruments_(cfg.instruments),
       md_exchanges_(cfg.md_exchanges),
-      venue_exec_(cfg.venue_exec),
       refdata_(refdata),
       md_client_(md),
       order_mgr_(order_mgr) {
+    for (const auto& [name, vex] : cfg.venue_exec)
+        venue_exec_.emplace(refdata::to_exchange_id(name), vex);
     bpt::common::log::info(kLog(),
                            "[FVMM:{}] min_spread={} bps max_spread={} bps vol_mult={} "
                            "skew_alpha={} one_sided_thr={} requote_thr={}",
@@ -269,6 +270,9 @@ order::OrderHandle FairValueMmStrategy::send_limit_order(InstrumentState& st,
                                                          OrderSide::Value side,
                                                          double price,
                                                          double qty) {
+    const auto vex_it = venue_exec_.find(st.exchange_id);
+    if (vex_it == venue_exec_.end() || !vex_it->second.enabled || !order_mgr_)
+        return {};
     auto h = order_mgr_->send_quote(st.instrument_id, st.exchange_id, side, price, qty, kTagQuote);
     if (h.valid()) {
         if (side == OrderSide::BUY) st.last_bid_price = price;
@@ -285,6 +289,9 @@ order::OrderHandle FairValueMmStrategy::send_unwind_order(InstrumentState& st,
                                                           double mid,
                                                           double qty,
                                                           uint8_t tag) {
+    const auto vex_it = venue_exec_.find(st.exchange_id);
+    if (vex_it == venue_exec_.end() || !vex_it->second.enabled || !order_mgr_)
+        return {};
     // Never bump to min_notional: unwind orders are always position-reducing,
     // and bumping beyond the actual position size would flip the sign.
     constexpr double kCrossBps = 20.0;

@@ -116,7 +116,7 @@ private:
 
     std::vector<std::string> instruments_;
     std::vector<std::string> md_exchanges_;
-    std::unordered_map<std::string, config::VenueExecConfig> venue_exec_;
+    std::unordered_map<bpt::messages::ExchangeId::Value, config::VenueExecConfig> venue_exec_;
 
     refdata::IRefdataClient& refdata_;
     md::IMdClient* md_client_;
